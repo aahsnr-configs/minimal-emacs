@@ -62,7 +62,7 @@ Lower this if you experience freezing, raise if stuttering.")
 ** Package Management
 #+begin_src emacs-lisp
 ;; To check your system's file handle limit: ulimit -n
-(defvar elpaca-queue-limit 10
+(defvar elpaca-queue-limit 30
   "Maximum number of packages to process concurrently.
 This prevents file handle exhaustion on systems with limited resources.")
 
@@ -115,17 +115,17 @@ This prevents file handle exhaustion on systems with limited resources.")
 (elpaca elpaca-use-package
   (elpaca-use-package-mode))
 
+(elpaca-wait)
+
 (require 'use-package)
 (require 'bind-key)
 
 ;; --- USE-PACKAGE CONFIGURATION ---
-(eval-and-compile
-  (setq use-package-verbose nil                  ;; Silence package loading messages
-        use-package-expand-minimally t            ;; Minimal expansion for better performance
-        use-package-compute-statistics nil        ;; Don't track package load times
-        use-package-always-ensure t               ;; Auto-install packages
-        use-package-enable-imenu-support t))      ;; Enable imenu support for use-package
-
+(setq use-package-verbose nil
+      use-package-expand-minimally t
+      use-package-compute-statistics nil
+      use-package-always-ensure t
+      use-package-enable-imenu-support t)
 #+end_src
 
 ** Custom File
@@ -522,7 +522,7 @@ This prevents file handle exhaustion on systems with limited resources.")
 (setq evil-undo-system 'undo-fu)
 
 (use-package evil
-  :hook (elpaca-after-init . evil-mode)
+  :ensure (:wait t)
   :init
   (setq evil-want-integration t)
   (setq evil-want-keybinding nil)
@@ -542,6 +542,7 @@ This prevents file handle exhaustion on systems with limited resources.")
   (evil-search-wrap nil)
   (evil-want-Y-yank-to-eol t)
   :config
+  (evil-mode 1)
   (evil-select-search-module 'evil-search-module 'isearch))
 #+end_src
 
@@ -6172,7 +6173,6 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
 #+begin_src emacs-lisp
 (use-package general
   :after evil
-  :ensure (:wait t)
   :demand t
   :config
   ;; Set up leader keys
