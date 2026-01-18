@@ -61,6 +61,12 @@ Lower this if you experience freezing, raise if stuttering.")
 
 ** Package Management
 #+begin_src emacs-lisp
+;; To check your system's file handle limit: ulimit -n
+(defvar elpaca-queue-limit 10
+  "Maximum number of packages to process concurrently.
+This prevents file handle exhaustion on systems with limited resources.")
+
+;; --- ELPACA INSTALLER ---
 (defvar elpaca-installer-version 0.11)
 (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
 (defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
@@ -69,6 +75,7 @@ Lower this if you experience freezing, raise if stuttering.")
                               :ref nil :depth 1 :inherit ignore
                               :files (:defaults "elpaca-test.el" (:exclude "extensions"))
                               :build (:not elpaca--activate-package)))
+
 (let* ((repo  (expand-file-name "elpaca/" elpaca-repos-directory))
        (build (expand-file-name "elpaca/" elpaca-builds-directory))
        (order (cdr elpaca-order))
@@ -97,21 +104,28 @@ Lower this if you experience freezing, raise if stuttering.")
     (require 'elpaca)
     (elpaca-generate-autoloads "elpaca" repo)
     (let ((load-source-file-function nil)) (load "./elpaca-autoloads"))))
+
+;; Queue processing happens after init
 (add-hook 'after-init-hook #'elpaca-process-queues)
+
+;; Install Elpaca itself
 (elpaca `(,@elpaca-order))
 
+;; --- USE-PACKAGE INTEGRATION ---
 (elpaca elpaca-use-package
   (elpaca-use-package-mode))
 
 (require 'use-package)
 (require 'bind-key)
 
+;; --- USE-PACKAGE CONFIGURATION ---
 (eval-and-compile
-  (setq use-package-verbose nil
-        use-package-expand-minimally t
-        use-package-compute-statistics nil
-        use-package-always-ensure t
-        use-package-enable-imenu-support t))
+  (setq use-package-verbose nil                  ;; Silence package loading messages
+        use-package-expand-minimally t            ;; Minimal expansion for better performance
+        use-package-compute-statistics nil        ;; Don't track package load times
+        use-package-always-ensure t               ;; Auto-install packages
+        use-package-enable-imenu-support t))      ;; Enable imenu support for use-package
+
 #+end_src
 
 ** Custom File
