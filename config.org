@@ -403,7 +403,6 @@ Lower this if you experience freezing, raise if stuttering.")
                                         regexp-search-ring
                                         extended-command-history)
         savehist-autosave-interval 300))
-
 #+end_src
 
 ** Misc
@@ -489,7 +488,6 @@ Lower this if you experience freezing, raise if stuttering.")
 * Evil
 ** Undo Fu
 #+begin_src emacs-lisp
-;; The undo-fu package is a lightweight wrapper around Emacs' built-in undo system, providing more convenient undo/redo functionality.
 (use-package undo-fu
   :commands (undo-fu-only-undo
              undo-fu-only-redo
@@ -500,8 +498,6 @@ Lower this if you experience freezing, raise if stuttering.")
   (global-set-key (kbd "C-z") 'undo-fu-only-undo)
   (global-set-key (kbd "C-S-z") 'undo-fu-only-redo))
 
-;; The undo-fu-session package complements undo-fu by enabling the saving
-;; and restoration of undo history across Emacs sessions, even after restarting.
 (use-package undo-fu-session
   :commands undo-fu-session-global-mode
   :hook (elpaca-after-init . undo-fu-session-global-mode))
@@ -511,7 +507,6 @@ Lower this if you experience freezing, raise if stuttering.")
 #+begin_src emacs-lisp
 (setq evil-undo-system 'undo-fu)
 
-;; Vim emulation
 (use-package evil
   :hook (elpaca-after-init . evil-mode)
   :init
@@ -566,7 +561,6 @@ Lower this if you experience freezing, raise if stuttering.")
      (?> . ("<" . ">"))))
   :hook (elpaca-after-init . global-evil-surround-mode))
 
-;; Jump to the last change (Visual Studio/Vim style 'g;')
 (use-package goto-chg
   :after evil
   :commands (goto-last-change goto-last-change-reverse)
@@ -675,7 +669,6 @@ Lower this if you experience freezing, raise if stuttering.")
 #+end_src
 
 ** Native Commenting Operator
-Replaces evil-nerd-commenter/evil-commentary with native Emacs behavior. This restores the "smart" toggling you prefer.
 #+begin_src emacs-lisp
 (with-eval-after-load 'evil
   (evil-define-operator ar/evil-comment-operator (beg end type)
@@ -767,12 +760,9 @@ Replaces evil-nerd-commenter/evil-commentary with native Emacs behavior. This re
   :ensure (:wait t)
   :bind ("<f6>" . ar/toggles-transient)
   :init
-  ;; Allow the minibuffer to expand to fit the full menu height
   (setq resize-mini-windows t)
 
   :config
-  ;; --- HELPERS ---
-
   (defun ar/transient-title ()
     "Returns the menu title with a Nerd Icon, formatted like Doom Emacs."
     (concat
@@ -1447,7 +1437,7 @@ Replaces evil-nerd-commenter/evil-commentary with native Emacs behavior. This re
         doom-modeline-percent-position nil
         doom-modeline-vcs-icon t
         doom-modeline-vcs-max-length 0))
-        #+end_src
+#+end_src
 
 ** Hide Modeline
 #+begin_src emacs-lisp
@@ -1963,7 +1953,6 @@ If file doesn't exist, creates it with TEMPLATE content."
   (org-edna-use-inheritance t))
 
 (use-package org-gtd
-  :ensure t
   :defer t
   :after (org org-edna)
   :commands (org-gtd-capture
@@ -2458,7 +2447,6 @@ These functions are now safe to use in org-mode source blocks without breaking r
 (use-package org-pomodoro
   :defer t
   :config
-  ;; configure pomodoro alerts to use growl or libnotify
   (alert-add-rule :category "org-pomodoro"
                   :style (cond (alert-growl-command
                                 'growl)
@@ -2474,7 +2462,6 @@ These functions are now safe to use in org-mode source blocks without breaking r
 (use-package org-remark
   :after org
   :config
-  ;; Enable global tracking mode
   (org-remark-global-tracking-mode +1))
 #+end_src
 
@@ -2508,8 +2495,7 @@ These functions are now safe to use in org-mode source blocks without breaking r
                                ("Agenda for today:"           . "Today's agenda:")
                                ("Agenda for the coming week:" . "Agenda:")))
   (setq dashboard-display-icons-p t)     ; display icons on both GUI and terminal
-  (setq dashboard-icon-type 'nerd-icons) ; use `nerd-icons' package
-  )
+  (setq dashboard-icon-type 'nerd-icons))
 #+end_src
 
 * Treesitter/Folding
@@ -2574,55 +2560,27 @@ These functions are now safe to use in org-mode source blocks without breaking r
   (define-key evil-normal-state-map (kbd "[F")
               (lambda () (interactive) (evil-textobj-tree-sitter-goto-textobj "function.outer" t t)))
 
-  ;; Bind text objects (inner/outer)
-  ;; 'f' for function, 'c' for class
   (define-key evil-inner-text-objects-map "f" (evil-textobj-tree-sitter-get-textobj "function.inner"))
   (define-key evil-outer-text-objects-map "f" (evil-textobj-tree-sitter-get-textobj "function.outer"))
   (define-key evil-inner-text-objects-map "c" (evil-textobj-tree-sitter-get-textobj "class.inner"))
   (define-key evil-outer-text-objects-map "c" (evil-textobj-tree-sitter-get-textobj "class.outer"))
   
-  ;; Arguments (requires 'parameter' query support in the language grammar)
   (define-key evil-inner-text-objects-map "a" (evil-textobj-tree-sitter-get-textobj "parameter.inner"))
   (define-key evil-outer-text-objects-map "a" (evil-textobj-tree-sitter-get-textobj "parameter.outer")))
 #+end_src
 
-** Hideshow
-Standard native folding, kept as fallback; disabling for now
-#+begin_src emacs-lisp
-;; (use-package hideshow
-;;   :ensure nil
-;;   :hook (prog-mode . hs-minor-mode)
-;;   :config
-;;   (defun hs-cycle (&optional level)
-;;     (interactive "p")
-;;     (let (message-log-max (inhibit-message t))
-;;       (if (= level 1)
-;;           (pcase last-command
-;;             ('hs-cycle (hs-hide-level 1) (setq this-command 'hs-cycle-children))
-;;             ('hs-cycle-children (save-excursion (hs-show-block)) (setq this-command 'hs-cycle-subtree))
-;;             ('hs-cycle-subtree (hs-hide-block))
-;;             (_ (if (not (hs-already-hidden-p)) (hs-hide-block) (hs-hide-level 1) (setq this-command 'hs-cycle-children))))
-;;         (hs-hide-level level) (setq this-command 'hs-hide-level))))
-  
-;;   (defun hs-toggle-all () 
-;;     (interactive) 
-;;     (pcase last-command 
-;;       ('hs-toggle-all (save-excursion (hs-show-all)) (setq this-command 'hs-global-show)) 
-;;       (_ (hs-hide-all)))))
-#+end_src
-
 ** Vimish Fold
 #+begin_src emacs-lisp
-;; (use-package vimish-fold
-;;   :after evil
-;;   :config (vimish-fold-global-mode 1))
+(use-package vimish-fold
+  :after evil
+  :config (vimish-fold-global-mode 1))
 
-;; (use-package evil-vimish-fold
-;;   :after vimish-fold
-;;   :init
-;;   (setq evil-vimish-fold-mode-lighter " ⮒")
-;;   (setq evil-vimish-fold-target-modes '(prog-mode conf-mode text-mode))
-;;   :config (global-evil-vimish-fold-mode))
+(use-package evil-vimish-fold
+  :after vimish-fold
+  :init
+  (setq evil-vimish-fold-mode-lighter " ⮒")
+  (setq evil-vimish-fold-target-modes '(prog-mode conf-mode text-mode))
+  :config (global-evil-vimish-fold-mode))
 #+end_src
 
 * Highlight
@@ -2689,19 +2647,18 @@ Standard native folding, kept as fallback; disabling for now
   :hook ((LaTeX-mode . rainbow-delimiters-mode)
          (prog-mode . rainbow-delimiters-mode))
   :custom-face
-  ;; Tokyo Night palette applied to delimiter depths
-  (rainbow-delimiters-depth-1-face ((t (:foreground "#7aa2f7"))))  ; Blue
-  (rainbow-delimiters-depth-2-face ((t (:foreground "#ff9e64"))))  ; Orange
-  (rainbow-delimiters-depth-3-face ((t (:foreground "#9ece6a"))))  ; Green
-  (rainbow-delimiters-depth-4-face ((t (:foreground "#7dcfff"))))  ; Cyan
-  (rainbow-delimiters-depth-5-face ((t (:foreground "#bb9af7"))))  ; Magenta
-  (rainbow-delimiters-depth-6-face ((t (:foreground "#e0af68"))))  ; Yellow
-  (rainbow-delimiters-depth-7-face ((t (:foreground "#f7768e"))))  ; Red
-  (rainbow-delimiters-depth-8-face ((t (:foreground "#9d7cd8"))))  ; Purple
-  (rainbow-delimiters-depth-9-face ((t (:foreground "#73daca"))))) ; Teal
+  (rainbow-delimiters-depth-1-face ((t (:foreground "#7aa2f7"))))
+  (rainbow-delimiters-depth-2-face ((t (:foreground "#ff9e64"))))
+  (rainbow-delimiters-depth-3-face ((t (:foreground "#9ece6a"))))
+  (rainbow-delimiters-depth-4-face ((t (:foreground "#7dcfff"))))
+  (rainbow-delimiters-depth-5-face ((t (:foreground "#bb9af7"))))
+  (rainbow-delimiters-depth-6-face ((t (:foreground "#e0af68"))))
+  (rainbow-delimiters-depth-7-face ((t (:foreground "#f7768e"))))
+  (rainbow-delimiters-depth-8-face ((t (:foreground "#9d7cd8"))))  
+  (rainbow-delimiters-depth-9-face ((t (:foreground "#73daca")))))
 #+end_src
 
-** Parenthesis Matching & Context
+** NEXT Parenthesis Matching & Context
 #+begin_src emacs-lisp
 (use-package paren
   :ensure nil
@@ -2711,9 +2668,7 @@ Standard native folding, kept as fallback; disabling for now
   (show-paren-highlight-openparen t)
   (show-paren-when-point-inside-paren t)
   (show-paren-when-point-in-periphery t)
-  ;; 1. Clean Visuals: Only highlight the bracket character itself
   (show-paren-style 'parenthesis)
-  ;; 2. Disable default messages: We use the custom ElDoc logic below
   (show-paren-context-when-offscreen nil)
   
   :config
@@ -2824,7 +2779,6 @@ Standard native folding, kept as fallback; disabling for now
     "Use `consult-ripgrep' to find all TODO keywords in the current project."
     (interactive)
     (if (fboundp 'consult-ripgrep)
-        ;; Pre-fill the search with a regex matching all defined keywords
         (consult-ripgrep nil (concat "\\b(" (string-join (mapcar #'car hl-todo-keyword-faces) "|") ")\\b"))
       (user-error "Consult-ripgrep is not available"))))
 #+end_src
@@ -2834,7 +2788,7 @@ Standard native folding, kept as fallback; disabling for now
 (use-package rainbow-mode
   :defer t
   :hook ((prog-mode . rainbow-mode)
-	 (LaTeX-mode . rainbow-mode)
+         (LaTeX-mode . rainbow-mode)
          (org-mode . rainbow-mode)))
 #+end_src
 
@@ -2843,21 +2797,7 @@ Standard native folding, kept as fallback; disabling for now
 #+begin_src emacs-lisp
 (use-package prog-mode
   :ensure nil
-  :pretty-hydra
-  ((:title (pretty-hydra-title "Prettify Symbols" 'mdicon "nf-md-code_tags")
-    :color amaranth :quit-key ("q" "C-g"))
-   ("Toggle"
-    (("s" prettify-symbols-mode "mode" :toggle t)
-     ("a" ar/prettify-symbols-toggle-aggressive "aggressive")
-     ("u" ar/prettify-symbols-toggle-unprettify-at-point "unprettify"))
-    "Info"
-    (("p" ar/prettify-symbols-show-at-point "at point")
-     ("l" ar/prettify-symbols-list-all "list all")
-     ("d" ar/prettify-symbols-describe-char "describe"))
-    "Edit"
-    (("r" ar/prettify-symbols-reload "reload")
-     ("i" ar/prettify-symbols-insert-unicode "insert"))))
-  :bind ("C-c s" . prog-mode-hydra/body)
+  :bind ("C-c s" . ar/prettify-symbols-transient)
   :init
   ;; Unprettify when cursor approaches symbol (critical for editing)
   (setq prettify-symbols-unprettify-at-point 'right-edge)
@@ -2887,7 +2827,40 @@ Standard native folding, kept as fallback; disabling for now
   
   ;; Enable globally but allow modes to opt out
   :config
-  (global-prettify-symbols-mode +1))
+  (global-prettify-symbols-mode +1)
+
+  ;; ============================================
+  ;; TRANSIENT MENU
+  ;; ============================================
+
+  (defun ar/prettify-symbols-title ()
+    "Returns the menu title with a Nerd Icon."
+    (concat
+     (if (and (fboundp 'nerd-icons-mdicon) (display-graphic-p))
+         (nerd-icons-mdicon "nf-md-code_tags" :face 'transient-heading :v-adjust 0.02)
+       "")
+     (propertize " Prettify Symbols" 'face 'transient-heading)))
+
+  (transient-define-prefix ar/prettify-symbols-transient ()
+    "Prettify Symbols Control"
+    [:description ar/prettify-symbols-title]
+    ["" ("q" "" transient-quit-one :format " ")] ;; Invisible quit key
+
+    [
+     ;; One Row, 3 Columns
+     ["Toggle"
+      ("s" "Mode" prettify-symbols-mode :transient t)
+      ("a" "Aggressive" ar/prettify-symbols-toggle-aggressive :transient t)
+      ("u" "Unprettify logic" ar/prettify-symbols-toggle-unprettify-at-point :transient t)]
+
+     ["Info"
+      ("p" "At point" ar/prettify-symbols-show-at-point)
+      ("l" "List all" ar/prettify-symbols-list-all)
+      ("d" "Describe char" ar/prettify-symbols-describe-char)]
+
+     ["Edit"
+      ("r" "Reload" ar/prettify-symbols-reload :transient t)
+      ("i" "Insert Unicode" ar/prettify-symbols-insert-unicode)]]))
 #+end_src
 
 ** Custom Compose Predicate
