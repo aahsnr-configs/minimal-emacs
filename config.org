@@ -10,8 +10,6 @@
 #+begin_src emacs-lisp
 ;;; init.el --- Main Configuration File -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; Commentary:
-;; v0.3
-;; The contents of my whole emacs configuration
 #+end_src
 
 ** Garbage Collection
@@ -763,186 +761,129 @@ Replaces evil-nerd-commenter/evil-commentary with native Emacs behavior. This re
 (keymap-global-set "C-M-g" #'keyboard-quit)
 #+end_src
 
-* Hydra Setup
+* Transient
 #+begin_src emacs-lisp
-(use-package hydra
+(use-package transient
   :ensure (:wait t)
-  :demand t
-  :hook (emacs-lisp-mode . hydra-add-imenu)
+  :bind ("<f6>" . ar/toggles-transient)
   :init
-  (setq hydra-hint-display-type 'lv))
+  ;; Allow the minibuffer to expand to fit the full menu height
+  (setq resize-mini-windows t)
 
-(use-package major-mode-hydra
-  :ensure (:wait t)
-  :demand t
-  :bind ("<f6>" . toggles-hydra/body)
-  :hook (emacs-lisp-mode . (lambda ()
-                             (add-to-list
-                              'imenu-generic-expression
-                              '("Hydras"
-                                "^.*(\\(pretty-hydra-define\\) \\([a-zA-Z-]+\\)"
-                                2))))
-  :init
-  (cl-defun pretty-hydra-title (title &optional icon-type icon-name
-                                      &key face height v-adjust)
-    "Add an icon in the hydra title."
-    (let ((face (or face 'mode-line-emphasis))
-          (height (or height 1.2))
-          (v-adjust (or v-adjust 0.0)))
-      (concat
-       (when (and (display-graphic-p)
-                  (or (featurep 'nerd-icons) (require 'nerd-icons nil t))
-                  icon-type icon-name)
-         (let ((f (intern (format "nerd-icons-%s" icon-type))))
-           (when (fboundp f)
-             (concat
-              (apply f (list icon-name :face face :height height :v-adjust v-adjust))
-              " "))))
-       (propertize title 'face face))))
+  :config
+  ;; --- HELPERS ---
 
-  ;; Global toggles
-  (with-no-warnings
-    (pretty-hydra-define toggles-hydra 
-      (:title (pretty-hydra-title "Toggles" 'faicon "nf-fa-toggle_on")
-       :color amaranth 
-       :quit-key ("q" "C-g"))
-      
-      ("Basic"
-       (("n" (cond ((fboundp 'display-line-numbers-mode)
-                    (display-line-numbers-mode (if display-line-numbers-mode -1 1)))
-                   ((fboundp 'global-linum-mode)
-                    (global-linum-mode (if global-linum-mode -1 1))))
-         "line number"
-         :toggle (or (bound-and-true-p display-line-numbers-mode)
-                     (bound-and-true-p global-linum-mode)))
-        ("a" global-aggressive-indent-mode "aggressive indent" 
-         :toggle t)
-        ("d" global-hungry-delete-mode "hungry delete" 
-         :toggle t)
-        ("e" electric-pair-mode "electric pair" 
-         :toggle t)
-        ("c" flyspell-mode "spell check" 
-         :toggle t)
-        ("s" prettify-symbols-mode "pretty symbol" 
-         :toggle t)
-        ("l" global-page-break-lines-mode "page break lines" 
-         :toggle t)
-        ("b" display-battery-mode "battery" 
-         :toggle t)
-        ("i" display-time-mode "time" 
-         :toggle t)
-        ("m" (if (fboundp 'doom-modeline-mode)
-                 (doom-modeline-mode (if doom-modeline-mode -1 1))
-               (message "doom-modeline not available"))
-         "modern mode-line" 
-         :toggle (and (fboundp 'doom-modeline-mode) doom-modeline-mode)))
-       
-       "Highlight"
-       (("h l" global-hl-line-mode "line" 
-         :toggle t)
-        ("h p" show-paren-mode "paren" 
-         :toggle t)
-        ("h s" (if (fboundp 'symbol-overlay-mode)
-                   (symbol-overlay-mode (if symbol-overlay-mode -1 1))
-                 (message "symbol-overlay not available"))
-         "symbol" 
-         :toggle (and (fboundp 'symbol-overlay-mode) symbol-overlay-mode))
-        ("h r" (if (fboundp 'rainbow-mode)
-                   (rainbow-mode (if rainbow-mode -1 1))
-                 (message "rainbow-mode not available"))
-         "rainbow" 
-         :toggle (and (fboundp 'rainbow-mode) rainbow-mode))
-        ("h w" (setq-default show-trailing-whitespace (not show-trailing-whitespace))
-         "whitespace" 
-         :toggle show-trailing-whitespace)
-        ("h d" (if (fboundp 'rainbow-delimiters-mode)
-                   (rainbow-delimiters-mode (if rainbow-delimiters-mode -1 1))
-                 (message "rainbow-delimiters not available"))
-         "delimiter" 
-         :toggle (and (fboundp 'rainbow-delimiters-mode) rainbow-delimiters-mode))
-        ("h i" (if (fboundp 'highlight-indent-guides-mode)
-                   (highlight-indent-guides-mode (if highlight-indent-guides-mode -1 1))
-                 (message "highlight-indent-guides not available"))
-         "indent" 
-         :toggle (and (fboundp 'highlight-indent-guides-mode) 
-                      highlight-indent-guides-mode))
-        ("h t" (if (fboundp 'global-hl-todo-mode)
-                   (global-hl-todo-mode (if global-hl-todo-mode -1 1))
-                 (message "hl-todo not available"))
-         "todo" 
-         :toggle (and (fboundp 'global-hl-todo-mode) global-hl-todo-mode)))
-       
-       "Program"
-       (("f" flymake-mode "flymake" 
-         :toggle t)
-        ("O" hs-minor-mode "hideshow" 
-         :toggle t)
-        ("u" subword-mode "subword" 
-         :toggle t)
-        ("W" which-function-mode "which function" 
-         :toggle t)
-        ("E" toggle-debug-on-error "debug on error" 
-         :toggle (default-value 'debug-on-error))
-        ("Q" toggle-debug-on-quit "debug on quit" 
-         :toggle (default-value 'debug-on-quit))
-        ("v" (if (fboundp 'global-diff-hl-mode)
-                 (global-diff-hl-mode (if global-diff-hl-mode -1 1))
-               (message "diff-hl not available"))
-         "gutter" 
-         :toggle (and (fboundp 'global-diff-hl-mode) global-diff-hl-mode))
-        ("V" (if (fboundp 'diff-hl-flydiff-mode)
-                 (diff-hl-flydiff-mode (if diff-hl-flydiff-mode -1 1))
-               (message "diff-hl-flydiff not available"))
-         "live gutter" 
-         :toggle (and (fboundp 'diff-hl-flydiff-mode) diff-hl-flydiff-mode))
-        ("M" (if (fboundp 'diff-hl-margin-mode)
-                 (diff-hl-margin-mode (if diff-hl-margin-mode -1 1))
-               (message "diff-hl-margin not available"))
-         "margin gutter" 
-         :toggle (and (fboundp 'diff-hl-margin-mode) diff-hl-margin-mode))
-        ("D" (if (fboundp 'diff-hl-dired-mode)
-                 (diff-hl-dired-mode (if diff-hl-dired-mode -1 1))
-               (message "diff-hl-dired not available"))
-         "dired gutter" 
-         :toggle (and (fboundp 'diff-hl-dired-mode) diff-hl-dired-mode)))
-       
-       "Theme"
-       (("t d" (load-theme 'modus-operandi t) "light (modus-operandi)" 
-         :exit t)
-        ("t k" (load-theme 'modus-vivendi t) "dark (modus-vivendi)" 
-         :exit t)
-        ("t w" (load-theme 'whiteboard t) "whiteboard" 
-         :exit t)
-        ("t t" (load-theme 'tango t) "tango" 
-         :exit t)
-        ("t g" (load-theme 'tango-dark t) "tango-dark" 
-         :exit t)
-        ("t l" (load-theme 'leuven t) "leuven" 
-         :exit t)
-        ("t a" (load-theme 'adwaita t) "adwaita" 
-         :exit t)
-        ("t D" (load-theme 'deeper-blue t) "deeper-blue" 
-         :exit t)
-        ("t w" (load-theme 'wombat t) "wombat" 
-         :exit t)
-        ("t o" (call-interactively 'load-theme) "other..." 
-         :exit t)
-        ("t c" (call-interactively 'customize-themes) "customize themes" 
-         :exit t)
-        ("t u" (mapc #'disable-theme custom-enabled-themes) "unload all" 
-         :exit t))
-       
-       "Package"
-       (("p r" package-refresh-contents "refresh archives" 
-         :exit t)
-        ("p l" package-list-packages "list packages" 
-         :exit t)
-        ("p i" package-install "install package" 
-         :exit t)
-        ("p d" package-delete "delete package" 
-         :exit t)
-        ("p a" package-autoremove "autoremove" 
-         :exit t))))))
+  (defun ar/transient-title ()
+    "Returns the menu title with a Nerd Icon, formatted like Doom Emacs."
+    (concat
+     (if (and (fboundp 'nerd-icons-faicon) (display-graphic-p))
+         (nerd-icons-faicon "nf-fa-toggle_on" :face 'transient-heading :v-adjust 0.02)
+       "")
+     (propertize " Doom Toggles" 'face 'transient-heading)))
+
+  (defun ar/toggle-line-numbers ()
+    "Toggle line numbers (Relative -> Absolute -> Off)."
+    (interactive)
+    (cond
+     ((bound-and-true-p display-line-numbers-mode)
+      (if (eq display-line-numbers 'relative)
+          (setq display-line-numbers t)
+        (display-line-numbers-mode -1)))
+     (t
+      (display-line-numbers-mode 1)
+      (setq display-line-numbers 'relative))))
+
+  (defun ar/toggle-whitespace ()
+    "Toggle trailing whitespace visualization."
+    (interactive)
+    (setq show-trailing-whitespace (not show-trailing-whitespace))
+    (redraw-display)
+    (message "Trailing whitespace %s" (if show-trailing-whitespace "ON" "OFF")))
+
+  ;; --- TRANSIENT DEFINITION ---
+  (transient-define-prefix ar/toggles-transient ()
+    "Global Toggles and Actions"
+
+    ;; 1. THE TITLE (Dynamic Function)
+    [:description ar/transient-title]
+
+    ;; 2. THE INVISIBLE TOGGLE KEY
+    ;; Binds <f6> to quit, but hides it visually.
+    ;; This allows F6 to toggle the menu open/closed.
+    ["" ("<f6>" "" transient-quit-one :format " ")]
+
+    ;; 3. THE MENU GRID (One Row, 5 Columns)
+    [
+     ;; --- Col 1: Basic ---
+     ["Basic"
+      ("n" "Line numbers" ar/toggle-line-numbers :transient t)
+      ("a" "Aggressive indent" global-aggressive-indent-mode :transient t
+       :if (lambda () (fboundp 'global-aggressive-indent-mode)))
+      ("d" "Hungry delete" global-hungry-delete-mode :transient t
+       :if (lambda () (fboundp 'global-hungry-delete-mode)))
+      ("e" "Electric pair" electric-pair-mode :transient t)
+      ("c" "Spell check" flyspell-mode :transient t
+       :if (lambda () (fboundp 'flyspell-mode)))
+      ("s" "Pretty symbol" prettify-symbols-mode :transient t)
+      ("l" "Page break lines" global-page-break-lines-mode :transient t
+       :if (lambda () (fboundp 'global-page-break-lines-mode)))
+      ("b" "Battery" display-battery-mode :transient t)
+      ("i" "Time" display-time-mode :transient t)
+      ("m" "Modeline" (lambda () (interactive)
+                        (if (bound-and-true-p doom-modeline-mode)
+                            (doom-modeline-mode -1)
+                          (doom-modeline-mode 1)))
+       :transient t :if (lambda () (fboundp 'doom-modeline-mode)))]
+
+     ;; --- Col 2: Highlight ---
+     ["Highlight"
+      ("h l" "Line" global-hl-line-mode :transient t)
+      ("h p" "Paren" show-paren-mode :transient t)
+      ("h s" "Symbol" symbol-overlay-mode :transient t
+       :if (lambda () (fboundp 'symbol-overlay-mode)))
+      ("h r" "Rainbow" rainbow-mode :transient t
+       :if (lambda () (fboundp 'rainbow-mode)))
+      ("h w" "Whitespace" ar/toggle-whitespace :transient t)
+      ("h d" "Delimiters" rainbow-delimiters-mode :transient t
+       :if (lambda () (fboundp 'rainbow-delimiters-mode)))
+      ("h i" "Indent guides" indent-bars-mode :transient t
+       :if (lambda () (fboundp 'indent-bars-mode)))
+      ("h t" "Todo" global-hl-todo-mode :transient t
+       :if (lambda () (fboundp 'global-hl-todo-mode)))]
+
+     ;; --- Col 3: Program ---
+     ["Program"
+      ("f" "Flymake" flymake-mode :transient t)
+      ("O" "Hideshow" hs-minor-mode :transient t)
+      ("u" "Subword" subword-mode :transient t)
+      ("W" "Which func" which-function-mode :transient t)
+      ("E" "Debug on error" toggle-debug-on-error :transient t)
+      ("Q" "Debug on quit" toggle-debug-on-quit :transient t)
+      ("v" "Gutter" git-gutter-mode :transient t
+       :if (lambda () (fboundp 'git-gutter-mode)))
+      ("V" "Diff HL" global-diff-hl-mode :transient t
+       :if (lambda () (fboundp 'global-diff-hl-mode)))]
+
+     ;; --- Col 4: Theme ---
+     ["Theme"
+      ("t d" "Light (Modus)" (lambda () (interactive) (load-theme 'modus-operandi t)))
+      ("t k" "Dark (Modus)" (lambda () (interactive) (load-theme 'modus-vivendi t)))
+      ("t n" "Tokyo Night" (lambda () (interactive) (load-theme 'doom-tokyo-night t)))
+      ("t t" "Tango" (lambda () (interactive) (load-theme 'tango t)))
+      ("t g" "Tango-dark" (lambda () (interactive) (load-theme 'tango-dark t)))
+      ("t l" "Leuven" (lambda () (interactive) (load-theme 'leuven t)))
+      ("t D" "Deeper-blue" (lambda () (interactive) (load-theme 'deeper-blue t)))
+      ("t o" "Other..." load-theme)
+      ("t c" "Customize" customize-themes)
+      ("t u" "Unload all" (lambda () (interactive) (mapc #'disable-theme custom-enabled-themes)))]
+
+     ;; --- Col 5: Package ---
+     ["Package"
+      ("p r" "Refresh archives" package-refresh-contents)
+      ("p l" "List packages" package-list-packages)
+      ("p i" "Install package" package-install)
+      ("p d" "Delete package" package-delete)
+      ("p a" "Autoremove" package-autoremove)]]))
 #+end_src
 
 * Editor Behaviour
@@ -1476,9 +1417,6 @@ Replaces evil-nerd-commenter/evil-commentary with native Emacs behavior. This re
 ** Solaire Mode
 #+begin_src emacs-lisp
 (use-package solaire-mode
-  ;; :ensure (:host github 
-  ;;          :repo "hlissner/emacs-solaire-mode"
-  ;;          :ref "c9334666bd208f3322e6118d30eba1b2438e2bb9")
   :hook (elpaca-after-init . solaire-global-mode))
 #+end_src
 
@@ -1750,51 +1688,6 @@ If file doesn't exist, creates it with TEMPLATE content."
   :defer t
   :ensure nil
   :commands (org-mode org-agenda org-capture org-store-link)
-  :pretty-hydra
-  ((:title (pretty-hydra-title "Org Template" 'sucicon "nf-custom-orgmode" :face 'nerd-icons-green)
-    :color blue :quit-key ("q" "C-g"))
-   ("Basic"
-    (("a" (hot-expand "<a") "ascii")
-     ("c" (hot-expand "<c") "center")
-     ("C" (hot-expand "<C") "comment")
-     ("x" (hot-expand "<e") "example")
-     ("E" (hot-expand "<E") "export")
-     ("h" (hot-expand "<h") "html")
-     ("l" (hot-expand "<l") "latex")
-     ("n" (hot-expand "<n") "note")
-     ("o" (hot-expand "<q") "quote")
-     ("v" (hot-expand "<v") "verse"))
-    "Head"
-    (("i" (hot-expand "<i") "index")
-     ("A" (hot-expand "<A") "ASCII")
-     ("I" (hot-expand "<I") "INCLUDE")
-     ("H" (hot-expand "<H") "HTML")
-     ("L" (hot-expand "<L") "LaTeX"))
-    "Source"
-    (("s" (hot-expand "<s") "src")
-     ("e" (hot-expand "<s" "emacs-lisp") "emacs-lisp")
-     ("y" (hot-expand "<s" "python") "python")
-     ("w" (hot-expand "<s" "powershell") "powershell")
-     ("r" (hot-expand "<s" "ruby") "ruby")
-     ("S" (hot-expand "<s" "sh") "sh")
-     ("g" (hot-expand "<s" "go :imports '(\"fmt\")") "golang"))
-    "Misc"
-    (("m" (hot-expand "<s" "mermaid :file chart.png") "mermaid")
-     ("u" (hot-expand "<s" "plantuml :file chart.png") "plantuml")
-     ("Y" (hot-expand "<s" "ipython :session :exports both :results raw drawer\n$0") "ipython")
-     ("P" (progn
-            (insert "#+HEADERS: :results output :exports both :shebang \"#!/usr/bin/env perl\"\n")
-            (hot-expand "<s" "perl")) "Perl tangled")
-     ("<" self-insert-command "ins"))))
-  
-  :bind (:map org-mode-map
-         ("<" . (lambda ()
-                  "Insert org template."
-                  (interactive)
-                  (if (or (region-active-p) (looking-back "^\s*" 1))
-                      (org-hydra/body)
-                    (self-insert-command 1)))))
-  
   :hook ((org-mode . visual-line-mode)
          (org-mode . ar/org-font-setup)
          (org-mode . auto-fill-mode)
@@ -1845,32 +1738,26 @@ If file doesn't exist, creates it with TEMPLATE content."
   ;; ============================================
   ;; TODO KEYWORDS (Multiple Sequences)
   ;; ============================================
-  ;; CRITICAL: All keywords MUST be unique across sequences
-  ;; Personal workflow + Goals + GTD (separate and distinct)
   (org-todo-keywords
    '((sequence "TODO(t)" "NEXT(n)" "PROG(p)" "WAIT(w@/!)" "|" "DONE(d!)" "CANCEL(c@)")
      (sequence "PLAN(P)" "ACTIVE(A)" "PAUSED(x)" "|" "ACHIEVED(a)" "DROPPED(D)")
-     ;; GTD-specific sequence (used only in ~/org/gtd/ files)
      (sequence "INBOX(i)" "GTD-NEXT(N)" "GTD-WAIT(W@/!)" "|" "GTD-DONE(D!)" "GTD-CNCL(C@)")))
   
   ;; ============================================
   ;; TODO KEYWORD FACES
   ;; ============================================
   (org-todo-keyword-faces
-   '(;; Personal workflow
-     ("TODO"      . (:foreground "#f7768e" :weight bold))
+   '(("TODO"      . (:foreground "#f7768e" :weight bold))
      ("NEXT"      . (:foreground "#ff9e64" :weight bold))
      ("PROG"      . (:foreground "#7aa2f7" :weight bold))
      ("WAIT"      . (:foreground "#e0af68" :weight bold))
      ("DONE"      . (:foreground "#9ece6a" :weight bold))
      ("CANCEL"    . (:foreground "#565f89" :weight bold))
-     ;; Goals workflow
      ("PLAN"      . (:foreground "#7dcfff" :weight bold))
      ("ACTIVE"    . (:foreground "#bb9af7" :weight bold))
      ("PAUSED"    . (:foreground "#a9b1d6" :weight bold))
      ("ACHIEVED"  . (:foreground "#9ece6a" :weight bold))
      ("DROPPED"   . (:foreground "#565f89" :weight bold))
-     ;; GTD workflow (distinct colors)
      ("INBOX"     . (:foreground "#e0af68" :weight bold))
      ("GTD-NEXT"  . (:foreground "#7aa2f7" :weight bold))
      ("GTD-WAIT"  . (:foreground "#ff9e64" :weight bold))
@@ -1878,7 +1765,7 @@ If file doesn't exist, creates it with TEMPLATE content."
      ("GTD-CNCL"  . (:foreground "#565f89" :weight bold))))
   
   ;; ============================================
-  ;; TAGS
+  ;; TAGS & PRIORITIES
   ;; ============================================
   (org-tag-alist '(("@work"      . ?w)
                    ("@home"      . ?h)
@@ -1889,9 +1776,6 @@ If file doesn't exist, creates it with TEMPLATE content."
                    ("urgent"     . ?u)
                    ("someday"    . ?s)))
   
-  ;; ============================================
-  ;; PRIORITIES
-  ;; ============================================
   (org-priority-faces '((?A . error)
                         (?B . warning)
                         (?C . success)))
@@ -1899,11 +1783,9 @@ If file doesn't exist, creates it with TEMPLATE content."
   ;; ============================================
   ;; AGENDA SETTINGS
   ;; ============================================
-  ;; PERFORMANCE: Only include task files, NOT knowledge notes
   (org-agenda-files (list my/org-directory
                           (expand-file-name "gtd" my/org-directory)))
   
-  ;; Visual settings
   (org-agenda-block-separator ?─)
   (org-agenda-time-grid
    '((daily today require-timed)
@@ -1912,73 +1794,126 @@ If file doesn't exist, creates it with TEMPLATE content."
   (org-agenda-current-time-string
    "◀ now ─────────────────────────────────────────────────")
   
-  ;; Performance optimizations
-  (org-agenda-inhibit-startup t)           ;; CRITICAL: Don't honor startup options
-  (org-agenda-dim-blocked-tasks nil)       ;; Performance: disable dimming
-  (org-agenda-use-tag-inheritance nil)     ;; Performance: disable tag inheritance
-  (org-agenda-ignore-properties '(effort appt category))  ;; Performance: skip properties
+  (org-agenda-inhibit-startup t)
+  (org-agenda-dim-blocked-tasks nil)
+  (org-agenda-use-tag-inheritance nil)
+  (org-agenda-ignore-properties '(effort appt category))
   (org-agenda-span 'day)
   (org-tags-column -80)
   
-  ;; ============================================
-  ;; CONFIGURATION
-  ;; ============================================
   :config
-  ;; Template expansion function
-  (defun hot-expand (str &optional mod)
-    "Expand org template STR with optional MOD."
-    (let (text)
-      (when (region-active-p)
-        (setq text (buffer-substring (region-beginning) (region-end)))
-        (delete-region (region-beginning) (region-end)))
-      (insert str)
-      (if (fboundp 'org-try-structure-completion)
-          (org-try-structure-completion)
-        (progn
-          (require 'org-tempo nil t)
-          (org-tempo-complete-tag)))
-      (when mod (insert mod) (forward-line))
-      (when text (insert text))))
-  
   ;; ============================================
-  ;; BABEL CONFIGURATION
+  ;; BABEL & TEMPO CONFIG
   ;; ============================================
+  (require 'org-tempo) 
   (setq org-confirm-babel-evaluate nil
         org-src-fontify-natively t
         org-src-tab-acts-natively t)
   
   (defconst load-language-alist
-    '((emacs-lisp . t)
-      (perl       . t)
-      (python     . t)
-      (ruby       . t)
-      (js         . t)
-      (css        . t)
-      (sass       . t)
-      (C          . t)
-      (java       . t)
-      (shell      . t)
-      (plantuml   . t))
-    "Alist of org babel languages.")
+    '((emacs-lisp . t) (perl . t) (python . t) (ruby . t) 
+      (js . t) (css . t) (sass . t) (C . t) (java . t) 
+      (shell . t) (plantuml . t)))
   
-  (org-babel-do-load-languages 'org-babel-load-languages
-                               load-language-alist)
+  (org-babel-do-load-languages 'org-babel-load-languages load-language-alist)
   
+  ;; Add Structure Templates
+  (dolist (pair '(("sh" . "src shell")
+                  ("el" . "src emacs-lisp")
+                  ("py" . "src python")
+                  ("jpy" . "src jupyter-python")
+                  ("tex" . "src latex")))
+    (add-to-list 'org-structure-template-alist pair))
+
   ;; ============================================
-  ;; STRUCTURE TEMPLATES
+  ;; TRANSIENT TEMPLATE SYSTEM
   ;; ============================================
-  (add-to-list 'org-structure-template-alist '("sh" . "src shell"))
-  (add-to-list 'org-structure-template-alist '("el" . "src emacs-lisp"))
-  (add-to-list 'org-structure-template-alist '("py" . "src python"))
-  (add-to-list 'org-structure-template-alist '("jpy" . "src jupyter-python"))
-  (add-to-list 'org-structure-template-alist '("tex" . "src latex"))
   
+  ;; 1. Helper Function (Replaces 'hot-expand')
+  (defun ar/org-template-expand (str &optional mod)
+    "Expand org template STR with optional modifier MOD."
+    (let (text)
+      (when (region-active-p)
+        (setq text (buffer-substring (region-beginning) (region-end)))
+        (delete-region (region-beginning) (region-end)))
+      (insert str)
+      (org-tempo-complete-tag)
+      (when mod (insert mod) (forward-line))
+      (when text (insert text))))
+
+  ;; 2. Specific Template Actions
+  (defun ar/org-insert-perl-tangled ()
+    (interactive)
+    (insert "#+HEADERS: :results output :exports both :shebang \"#!/usr/bin/env perl\"\n")
+    (ar/org-template-expand "<s" "perl"))
+
+  (defun ar/org-insert-ipython ()
+    (interactive)
+    (ar/org-template-expand "<s" "ipython :session :exports both :results raw drawer\n$0"))
+
+  ;; 3. Title Generator
+  (defun ar/org-transient-title ()
+    (concat
+     (if (and (fboundp 'nerd-icons-sucicon) (display-graphic-p))
+         (nerd-icons-sucicon "nf-custom-orgmode" :face 'transient-heading :v-adjust 0.02)
+       "")
+     (propertize " Org Template" 'face 'transient-heading)))
+
+  ;; 4. The Transient Definition
+  (transient-define-prefix ar/org-template-transient ()
+    "Org Mode Structure Templates"
+    [:description ar/org-transient-title]
+    ["" ("<" "" transient-quit-one :format " ")] ;; Invisible quit key
+    
+    [;; One Row, 4 Columns
+     ["Basic"
+      ("a" "ascii" (lambda () (interactive) (ar/org-template-expand "<a")))
+      ("c" "center" (lambda () (interactive) (ar/org-template-expand "<c")))
+      ("C" "comment" (lambda () (interactive) (ar/org-template-expand "<C")))
+      ("x" "example" (lambda () (interactive) (ar/org-template-expand "<e")))
+      ("E" "export" (lambda () (interactive) (ar/org-template-expand "<E")))
+      ("h" "html" (lambda () (interactive) (ar/org-template-expand "<h")))
+      ("l" "latex" (lambda () (interactive) (ar/org-template-expand "<l")))
+      ("n" "note" (lambda () (interactive) (ar/org-template-expand "<n")))
+      ("o" "quote" (lambda () (interactive) (ar/org-template-expand "<q")))
+      ("v" "verse" (lambda () (interactive) (ar/org-template-expand "<v")))]
+
+     ["Head"
+      ("i" "index" (lambda () (interactive) (ar/org-template-expand "<i")))
+      ("A" "ASCII" (lambda () (interactive) (ar/org-template-expand "<A")))
+      ("I" "INCLUDE" (lambda () (interactive) (ar/org-template-expand "<I")))
+      ("H" "HTML" (lambda () (interactive) (ar/org-template-expand "<H")))
+      ("L" "LaTeX" (lambda () (interactive) (ar/org-template-expand "<L")))]
+
+     ["Source"
+      ("s" "src" (lambda () (interactive) (ar/org-template-expand "<s")))
+      ("e" "emacs-lisp" (lambda () (interactive) (ar/org-template-expand "<s" "emacs-lisp")))
+      ("y" "python" (lambda () (interactive) (ar/org-template-expand "<s" "python")))
+      ("w" "powershell" (lambda () (interactive) (ar/org-template-expand "<s" "powershell")))
+      ("r" "ruby" (lambda () (interactive) (ar/org-template-expand "<s" "ruby")))
+      ("S" "sh" (lambda () (interactive) (ar/org-template-expand "<s" "sh")))
+      ("g" "golang" (lambda () (interactive) (ar/org-template-expand "<s" "go :imports '(\"fmt\")")))]
+
+     ["Misc"
+      ("m" "mermaid" (lambda () (interactive) (ar/org-template-expand "<s" "mermaid :file chart.png")))
+      ("u" "plantuml" (lambda () (interactive) (ar/org-template-expand "<s" "plantuml :file chart.png")))
+      ("Y" "ipython" ar/org-insert-ipython)
+      ("P" "Perl tangled" ar/org-insert-perl-tangled)
+      ("<" "insert <" self-insert-command)]])
+
+  ;; 5. Bind '<' to trigger the menu contextually
+  (define-key org-mode-map (kbd "<")
+              (lambda ()
+                (interactive)
+                (if (or (region-active-p) (looking-back "^[ \t]*" 1))
+                    (ar/org-template-transient)
+                  (self-insert-command 1))))
+
   ;; ============================================
   ;; CUSTOM AGENDA COMMANDS
   ;; ============================================
   (setq org-agenda-custom-commands
-        '(;; === DAILY DASHBOARD ===
-          ("d" "Daily Dashboard"
+        '(("d" "Daily Dashboard"
            ((agenda "" ((org-agenda-span 'day)
                         (org-agenda-start-day "0d")
                         (org-agenda-overriding-header "📅 Today's Schedule")))
@@ -1988,61 +1923,32 @@ If file doesn't exist, creates it with TEMPLATE content."
                        ((org-agenda-overriding-header "🏠 @Home Tasks")))
             (todo "INBOX"
                   ((org-agenda-overriding-header "📥 Inbox (Process Later)")
-                   (org-agenda-skip-function 
-                    '(org-agenda-skip-entry-if 'scheduled 'deadline))
+                   (org-agenda-skip-function '(org-agenda-skip-entry-if 'scheduled 'deadline))
                    (org-agenda-files (list (expand-file-name "gtd/inbox.org" my/org-directory)))))))
           
-          ;; === WEEKLY REVIEW AGENDA ===
           ("w" "Weekly Review Agenda"
-           ((todo "INBOX"
-                  ((org-agenda-overriding-header "📥 GTD Inbox (Must Process)")
-                   (org-agenda-files (list (expand-file-name "gtd/inbox.org" my/org-directory)))))
-            (todo "GTD-WAIT"
-                  ((org-agenda-overriding-header "⏳ Waiting For (Follow Up)")))
-            (stuck ""
-                   ((org-agenda-overriding-header "🚫 Stuck Projects")))
-            (todo "GTD-NEXT"
-                  ((org-agenda-overriding-header "✅ All NEXT Actions")))))
+           ((todo "INBOX" ((org-agenda-overriding-header "📥 GTD Inbox (Must Process)")
+                           (org-agenda-files (list (expand-file-name "gtd/inbox.org" my/org-directory)))))
+            (todo "GTD-WAIT" ((org-agenda-overriding-header "⏳ Waiting For (Follow Up)")))
+            (stuck "" ((org-agenda-overriding-header "🚫 Stuck Projects")))
+            (todo "GTD-NEXT" ((org-agenda-overriding-header "✅ All NEXT Actions")))))
           
-          ;; === PROJECTS VIEW ===
           ("p" "Projects Dashboard"
-           ((tags "LEVEL=1"
-                  ((org-agenda-overriding-header "📋 GTD Projects (Execution)")
-                   (org-agenda-files (list (expand-file-name "gtd/projects.org" my/org-directory)))))
-            (tags "+ACTIVE"
-                  ((org-agenda-overriding-header "🚀 Active Project Context")
-                   (org-agenda-files (list (expand-file-name "roam/projects" my/org-roam-directory)))))))
+           ((tags "LEVEL=1" ((org-agenda-overriding-header "📋 GTD Projects (Execution)")
+                             (org-agenda-files (list (expand-file-name "gtd/projects.org" my/org-directory)))))
+            (tags "+ACTIVE" ((org-agenda-overriding-header "🚀 Active Project Context")
+                             (org-agenda-files (list (expand-file-name "roam/projects" my/org-roam-directory)))))))
           
-          ;; === GTD CONTEXT VIEWS ===
           ("g" . "GTD Views")
-          
-          ("gn" "Next Actions"
-           ((todo "GTD-NEXT"
-                  ((org-agenda-overriding-header "✅ Next Actions")
-                   (org-agenda-sorting-strategy '(priority-down category-keep))))))
-          
-          ("gi" "Inbox (Unprocessed)"
-           ((todo "INBOX"
-                  ((org-agenda-overriding-header "📥 GTD Inbox")
-                   (org-agenda-files (list (expand-file-name "gtd/inbox.org" my/org-directory)))))))
-          
-          ("gw" "Waiting For"
-           ((todo "GTD-WAIT"
-                  ((org-agenda-overriding-header "⏳ Waiting For")))))
-          
-          ("gs" "Stuck Projects"
-           ((stuck ""
-                   ((org-agenda-overriding-header "🚫 Stuck Projects")))))
-          
+          ("gn" "Next Actions" ((todo "GTD-NEXT" ((org-agenda-overriding-header "✅ Next Actions") (org-agenda-sorting-strategy '(priority-down category-keep))))))
+          ("gi" "Inbox (Unprocessed)" ((todo "INBOX" ((org-agenda-overriding-header "📥 GTD Inbox") (org-agenda-files (list (expand-file-name "gtd/inbox.org" my/org-directory)))))))
+          ("gw" "Waiting For" ((todo "GTD-WAIT" ((org-agenda-overriding-header "⏳ Waiting For")))))
+          ("gs" "Stuck Projects" ((stuck "" ((org-agenda-overriding-header "🚫 Stuck Projects")))))
           ("gc" "By Context"
-           ((tags-todo "@computer/GTD-NEXT"
-                       ((org-agenda-overriding-header "💻 @Computer")))
-            (tags-todo "@home/GTD-NEXT"
-                       ((org-agenda-overriding-header "🏠 @Home")))
-            (tags-todo "@errands/GTD-NEXT"
-                       ((org-agenda-overriding-header "🚗 @Errands")))
-            (tags-todo "@phone/GTD-NEXT"
-                       ((org-agenda-overriding-header "📞 @Phone"))))))))
+           ((tags-todo "@computer/GTD-NEXT" ((org-agenda-overriding-header "💻 @Computer")))
+            (tags-todo "@home/GTD-NEXT" ((org-agenda-overriding-header "🏠 @Home")))
+            (tags-todo "@errands/GTD-NEXT" ((org-agenda-overriding-header "🚗 @Errands")))
+            (tags-todo "@phone/GTD-NEXT" ((org-agenda-overriding-header "📞 @Phone"))))))))
 #+end_src
 
 ** Org GTD - Pure Task Management
@@ -2928,7 +2834,7 @@ Standard native folding, kept as fallback; disabling for now
 (use-package rainbow-mode
   :defer t
   :hook ((prog-mode . rainbow-mode)
-	     (LaTeX-mode . rainbow-mode)
+	 (LaTeX-mode . rainbow-mode)
          (org-mode . rainbow-mode)))
 #+end_src
 
@@ -4049,23 +3955,23 @@ If completion fails in the future, check these:
   (setq eglot-autoshutdown t)) ;consider setting this to nil
 
 (use-package org-src-context
- :ensure nil ; Relies on lisp/org-src-context.el
- :hook (elpaca-after-init . org-src-context-mode)
- :custom
- ;; Visual: Set to 'nil' to see the grayed-out context surrounding your block.
- ;; Set to 't' if you prefer a focused view (narrowed to just your code).
- (org-src-context-narrow-p nil)
+  :ensure nil ; Relies on lisp/org-src-context.el
+  :hook (elpaca-after-init . org-src-context-mode)
+  :custom
+  ;; Visual: Set to 'nil' to see the grayed-out context surrounding your block.
+  ;; Set to 't' if you prefer a focused view (narrowed to just your code).
+  (org-src-context-narrow-p nil)
 
- ;; Safety: Disable context injection for files larger than 500KB to prevent lag.
- (org-src-context-max-filesize 500000)
+  ;; Safety: Disable context injection for files larger than 500KB to prevent lag.
+  (org-src-context-max-filesize 500000)
 
- :config
- ;; Enable Apheleia (auto-formatting) inside the edit buffer.
- ;; The patched org-src-context ensures a valid file path exists for this to work.
- (with-eval-after-load 'apheleia
-   (add-hook 'org-src-mode-hook
-             (lambda ()
-               (apheleia-mode 1)))))
+  :config
+  ;; Enable Apheleia (auto-formatting) inside the edit buffer.
+  ;; The patched org-src-context ensures a valid file path exists for this to work.
+  (with-eval-after-load 'apheleia
+    (add-hook 'org-src-mode-hook
+              (lambda ()
+                (apheleia-mode 1)))))
 
 ;; Integration with Consult for searching symbols
 (use-package consult-eglot
@@ -4077,45 +3983,45 @@ If completion fails in the future, check these:
 
 ** DAP
 #+begin_src emacs-lisp
-(use-package dape
-  :defer t
-  :bind (("<f5>" . dape)
-         ("M-<f5>" . dape-hydra/body))
-  :custom (dape-buffer-window-arrangment 'right)
-  :pretty-hydra
-  ((:title (pretty-hydra-title "Debug" 'codicon "nf-cod-debug")
-    :color pink :quit-key ("q" "C-g"))
-   ("Stepping"
-    (("n" dape-next "next")
-     ("s" dape-step-in "step in")
-     ("o" dape-step-out "step out")
-     ("c" dape-continue "continue")
-     ("p" dape-pause "pause")
-     ("k" dape-kill "kill")
-     ("r" dape-restart "restart")
-     ("D" dape-disconnect-quit "disconnect"))
-    "Switch"
-    (("m" dape-read-memory "memory")
-     ("t" dape-select-thread "thread")
-     ("w" dape-watch-dwim "watch")
-     ("S" dape-select-stack "stack")
-     ("i" dape-info "info")
-     ("R" dape-repl "repl"))
-    "Breakpoints"
-    (("b" dape-breakpoint-toggle "toggle")
-     ("l" dape-breakpoint-log "log")
-     ("e" dape-breakpoint-expression "expression")
-     ("B" dape-breakpoint-remove-all "clear"))
-    "Debug"
-    (("d" dape "dape")
-     ("Q" dape-quit "quit" :exit t))))
-  :config
-  ;; Save buffers on startup, useful for interpreted languages
-  (add-hook 'dape-on-start-hooks
-            (defun dape--save-on-start ()
-              (save-some-buffers t t)))
-  ;; Display hydra on startup
-  (add-hook 'dape-on-start-hooks #'dape-hydra/body))
+;; (use-package dape
+;;   :defer t
+;;   :bind (("<f5>" . dape)
+;;          ("M-<f5>" . dape-hydra/body))
+;;   :custom (dape-buffer-window-arrangment 'right)
+;;   :pretty-hydra
+;;   ((:title (pretty-hydra-title "Debug" 'codicon "nf-cod-debug")
+;;     :color pink :quit-key ("q" "C-g"))
+;;    ("Stepping"
+;;     (("n" dape-next "next")
+;;      ("s" dape-step-in "step in")
+;;      ("o" dape-step-out "step out")
+;;      ("c" dape-continue "continue")
+;;      ("p" dape-pause "pause")
+;;      ("k" dape-kill "kill")
+;;      ("r" dape-restart "restart")
+;;      ("D" dape-disconnect-quit "disconnect"))
+;;     "Switch"
+;;     (("m" dape-read-memory "memory")
+;;      ("t" dape-select-thread "thread")
+;;      ("w" dape-watch-dwim "watch")
+;;      ("S" dape-select-stack "stack")
+;;      ("i" dape-info "info")
+;;      ("R" dape-repl "repl"))
+;;     "Breakpoints"
+;;     (("b" dape-breakpoint-toggle "toggle")
+;;      ("l" dape-breakpoint-log "log")
+;;      ("e" dape-breakpoint-expression "expression")
+;;      ("B" dape-breakpoint-remove-all "clear"))
+;;     "Debug"
+;;     (("d" dape "dape")
+;;      ("Q" dape-quit "quit" :exit t))))
+;;   :config
+;;   ;; Save buffers on startup, useful for interpreted languages
+;;   (add-hook 'dape-on-start-hooks
+;;             (defun dape--save-on-start ()
+;;               (save-some-buffers t t)))
+;;   ;; Display hydra on startup
+;;   (add-hook 'dape-on-start-hooks #'dape-hydra/body))
 #+end_src
 
 ** Syntax Checking
@@ -4131,16 +4037,16 @@ If completion fails in the future, check these:
   (flymake-no-changes-timeout 0.5)
   (flymake-start-on-save-buffer t)
   :config
-  ;; ;; Integration with hl-todo
-  ;; ;; Adds TODO/FIXME/NOTE items to the Flymake diagnostics list
-  ;; (with-eval-after-load 'hl-todo
-  ;;   (add-hook 'flymake-mode-hook
-  ;;             (lambda ()
-  ;;               (add-hook 'flymake-diagnostic-functions #'hl-todo-flymake nil t))))
+  ;; Integration with hl-todo
+  ;; Adds TODO/FIXME/NOTE items to the Flymake diagnostics list
+  (with-eval-after-load 'hl-todo
+    (add-hook 'flymake-mode-hook
+              (lambda ()
+                (add-hook 'flymake-diagnostic-functions #'hl-todo-flymake nil t))))
 
   ;; UI: Doom Emacs Double-Arrow Fringe Bitmaps
   (define-fringe-bitmap 'ar/flymake-double-arrow
-    [#b00000000 #b00010000 #b00011000 #b00011100 #b00011110 
+    [#b00000000 #b00010000 #b00011000 #b00011100 #b00011110
      #b00011100 #b00011000 #b00010000 #b00000000])
 
   (setq flymake-error-bitmap   '(ar/flymake-double-arrow flymake-error)
@@ -4173,7 +4079,7 @@ If completion fails in the future, check these:
 ;;   (flymake-popon-delay 0.2)
 ;;   :config
 ;;   ;; Border logic to match your custom posframe configuration
-;;   (set-face-attribute 'flymake-popon-posframe-border nil 
+;;   (set-face-attribute 'flymake-popon-posframe-border nil
 ;;                       :background (face-attribute 'posframe-border :background nil t)))
 #+end_src
 
@@ -4216,34 +4122,34 @@ If completion fails in the future, check these:
 
 ** Hydra
 #+begin_src emacs-lisp
-(pretty-hydra-define dev-hydra
-  (:title (pretty-hydra-title "Development" 'codicon "nf-cod-code" :face 'nerd-icons-blue)
-   :color amaranth :quit-key ("q" "C-g"))
-  ("LSP (Eglot)"
-   (("a" eglot-code-actions "actions")
-    ("r" eglot-rename "rename")
-    ("d" xref-find-definitions "definition")
-    ("D" xref-find-references "references")
-    ("s" consult-eglot-symbols "symbols")
-    ("h" eldoc "hover doc"))
-   
-   "Syntax (Flymake)"
-   (("n" ar/flymake-next-error "next error")
-    ("p" ar/flymake-prev-error "prev error")
-    ("b" flymake-show-buffer-diagnostics "buffer list")
-    ("B" consult-flymake "project list")
-    ("!" flymake-running-backends "backends"))
+;; (pretty-hydra-define dev-hydra
+;;   (:title (pretty-hydra-title "Development" 'codicon "nf-cod-code" :face 'nerd-icons-blue)
+;;    :color amaranth :quit-key ("q" "C-g"))
+;;   ("LSP (Eglot)"
+;;    (("a" eglot-code-actions "actions")
+;;     ("r" eglot-rename "rename")
+;;     ("d" xref-find-definitions "definition")
+;;     ("D" xref-find-references "references")
+;;     ("s" consult-eglot-symbols "symbols")
+;;     ("h" eldoc "hover doc"))
 
-   "Formatting"
-   (("f" apheleia-format-buffer "format buffer")
-    ("F" (lambda () (interactive) (let ((apheleia-formatter 'eglot)) (apheleia-format-buffer))) "format w/ LSP"))
+;;    "Syntax (Flymake)"
+;;    (("n" ar/flymake-next-error "next error")
+;;     ("p" ar/flymake-prev-error "prev error")
+;;     ("b" flymake-show-buffer-diagnostics "buffer list")
+;;     ("B" consult-flymake "project list")
+;;     ("!" flymake-running-backends "backends"))
 
-   "Toggles"
-   (("t l" eglot-managed-p "LSP mode" :toggle t)
-    ("t s" flymake-mode "syntax mode" :toggle t)
-    ("t f" apheleia-mode "auto-format" :toggle t)
-    ("t e" eldoc-mode "eldoc" :toggle t)
-    ("t p" flymake-popon-mode "popon tooltips" :toggle t))))
+;;    "Formatting"
+;;    (("f" apheleia-format-buffer "format buffer")
+;;     ("F" (lambda () (interactive) (let ((apheleia-formatter 'eglot)) (apheleia-format-buffer))) "format w/ LSP"))
+
+;;    "Toggles"
+;;    (("t l" eglot-managed-p "LSP mode" :toggle t)
+;;     ("t s" flymake-mode "syntax mode" :toggle t)
+;;     ("t f" apheleia-mode "auto-format" :toggle t)
+;;     ("t e" eldoc-mode "eldoc" :toggle t)
+;;     ("t p" flymake-popon-mode "popon tooltips" :toggle t))))
 #+end_src
 
 * Podman
@@ -4732,43 +4638,43 @@ If completion fails in the future, check these:
 
 ** Comprehensive VC Hydra
 #+begin_src emacs-lisp
-(with-eval-after-load 'hydra
-  (pretty-hydra-define version-control-hydra
-    (:title (pretty-hydra-title "Version Control" 'octicon "nf-oct-git_branch" :face 'nerd-icons-green)
-     :color amaranth
-     :quit-key ("q" "C-g"))
-    
-    ("Magit Core"
-     (("s" magit-status "status" :exit t)
-      ("a" ar/magit-stage-all "stage all") 
-      ("c" magit-commit "commit" :exit t)
-      ("p" magit-push-current-to-pushremote "push")
-      ("P" magit-pull-from-upstream "pull")
-      ("f" magit-fetch "fetch")
-      ("F" magit-fetch-all "fetch all"))
-     
-     "Branch & Log"
-     (("b" magit-branch "branches" :exit t)
-      ("B" magit-checkout "checkout" :exit t)
-      ("m" magit-merge "merge" :exit t)
-      ("r" magit-rebase "rebase" :exit t)
-      ("l" ar/magit-log-buffer-file-and-follow "log file" :exit t)
-      ("L" magit-log-current "log branch" :exit t))
-     
-     "Diff & Stage"
-     (("d" magit-diff-unstaged "diff unstaged" :exit t)
-      ("D" magit-diff-staged "diff staged" :exit t)
-      ("S" magit-stage-file "stage file")
-      ("u" magit-unstage-file "unstage file")
-      ("U" magit-unstage-all "unstage all"))
-     
-     "Advanced"
-     (("z" magit-stash "stash" :exit t)
-      ("Z" magit-stash-pop "stash pop" :exit t)
-      ("x" magit-reset "reset" :exit t)
-      ("!" magit-run "run cmd" :exit t)
-      ("R" magit-refresh "refresh")
-      ("?" magit-dispatch "dispatch" :exit t)))))
+;; (with-eval-after-load 'hydra
+;;   (pretty-hydra-define version-control-hydra
+;;     (:title (pretty-hydra-title "Version Control" 'octicon "nf-oct-git_branch" :face 'nerd-icons-green)
+;;      :color amaranth
+;;      :quit-key ("q" "C-g"))
+
+;;     ("Magit Core"
+;;      (("s" magit-status "status" :exit t)
+;;       ("a" ar/magit-stage-all "stage all")
+;;       ("c" magit-commit "commit" :exit t)
+;;       ("p" magit-push-current-to-pushremote "push")
+;;       ("P" magit-pull-from-upstream "pull")
+;;       ("f" magit-fetch "fetch")
+;;       ("F" magit-fetch-all "fetch all"))
+
+;;      "Branch & Log"
+;;      (("b" magit-branch "branches" :exit t)
+;;       ("B" magit-checkout "checkout" :exit t)
+;;       ("m" magit-merge "merge" :exit t)
+;;       ("r" magit-rebase "rebase" :exit t)
+;;       ("l" ar/magit-log-buffer-file-and-follow "log file" :exit t)
+;;       ("L" magit-log-current "log branch" :exit t))
+
+;;      "Diff & Stage"
+;;      (("d" magit-diff-unstaged "diff unstaged" :exit t)
+;;       ("D" magit-diff-staged "diff staged" :exit t)
+;;       ("S" magit-stage-file "stage file")
+;;       ("u" magit-unstage-file "unstage file")
+;;       ("U" magit-unstage-all "unstage all"))
+
+;;      "Advanced"
+;;      (("z" magit-stash "stash" :exit t)
+;;       ("Z" magit-stash-pop "stash pop" :exit t)
+;;       ("x" magit-reset "reset" :exit t)
+;;       ("!" magit-run "run cmd" :exit t)
+;;       ("R" magit-refresh "refresh")
+;;       ("?" magit-dispatch "dispatch" :exit t)))))
 #+end_src
 
 * Workflow Management
@@ -5563,7 +5469,6 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
   (TeX-fold-auto t)
   (font-latex-fontify-script 'multi-level)
   (font-latex-fontify-sectioning 1.2)
-  (TeX-view-program-selection '((output-pdf "PDF Tools")))
   (TeX-source-correlate-mode t)
   (TeX-source-correlate-method 'synctex)
   (TeX-source-correlate-start-server nil)
@@ -5965,102 +5870,102 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
 
 ** Ace window
 #+begin_src emacs-lisp
-(use-package ace-window
-  :defer t
-  :commands (toggle-window-split) 
-  :pretty-hydra
-  ((:title (pretty-hydra-title "Window Management" 'faicon "nf-fa-th")
-    :foreign-keys warn :quit-key ("q" "C-g"))
-   ("Actions"
-    (("TAB" other-window "switch")
-     ("x" ace-delete-window "delete")
-     ("X" ace-delete-other-windows "delete other" :exit t)
-     ("s" ace-swap-window "swap")
-     ("a" ace-select-window "select" :exit t)
-     ("m" toggle-frame-maximized "maximize" :exit t)
-     ("u" toggle-frame-fullscreen "fullscreen" :exit t))
-    "Resize"
-    (("h" shrink-window-horizontally "←")
-     ("j" enlarge-window "↓")
-     ("k" shrink-window "↑")
-     ("l" enlarge-window-horizontally "→")
-     ("n" balance-windows "balance"))
-    "Split"
-    (("r" split-window-right "horizontally")
-     ("R" split-window-horizontally-instead "horizontally instead")
-     ("v" split-window-below "vertically")
-     ("V" split-window-vertically-instead "vertically instead")
-     ("t" toggle-window-split "toggle"))
-    "Zoom"
-    (("+" text-scale-increase "in")
-     ("=" text-scale-increase "in")
-     ("-" text-scale-decrease "out")
-     ("0" (text-scale-increase 0) "reset"))
-    "Misc"
-    (("o" set-frame-font "frame font")
-     ("f" make-frame-command "new frame")
-     ("d" delete-frame "delete frame")
-     ("<left>" winner-undo "winner undo")
-     ("<right>" winner-redo "winner redo"))))
-  :custom-face
-  (aw-leading-char-face ((t (:inherit font-lock-keyword-face :foreground unspecified :bold t :height 3.0))))
-  (aw-minibuffer-leading-char-face ((t (:inherit font-lock-keyword-face :bold t :height 1.0))))
-  (aw-mode-line-face ((t (:inherit mode-line-emphasis :bold t))))
-  :bind (([remap other-window] . ace-window)
-         ("C-c w" . ace-window-hydra/body)
-         ("C-x |" . split-window-horizontally-instead)
-         ("C-x _" . split-window-vertically-instead))
-  ;; REMOVED: :hook (emacs-startup . ace-window-display-mode)
-  ;; This prevents the "1" from appearing in the modeline.
-  :config
-  (defun toggle-window-split ()
-    (interactive)
-    (if (= (count-windows) 2)
-        (let* ((this-win-buffer (window-buffer))
-               (next-win-buffer (window-buffer (next-window)))
-               (this-win-edges (window-edges (selected-window)))
-               (next-win-edges (window-edges (next-window)))
-               (this-win-2nd (not (and (<= (car this-win-edges)
-                                           (car next-win-edges))
-                                       (<= (cadr this-win-edges)
-                                           (cadr next-win-edges)))))
-               (splitter
-                (if (= (car this-win-edges)
-                       (car (window-edges (next-window))))
-                    'split-window-horizontally
-                  'split-window-vertically)))
-          (delete-other-windows)
-          (let ((first-win (selected-window)))
-            (funcall splitter)
-            (if this-win-2nd (other-window 1))
-            (set-window-buffer (selected-window) this-win-buffer)
-            (set-window-buffer (next-window) next-win-buffer)
-            (select-window first-win)
-            (if this-win-2nd (other-window 1))))
-      (user-error "`toggle-window-split' only supports two windows")))
+;; (use-package ace-window
+;;   :defer t
+;;   :commands (toggle-window-split)
+;;   :pretty-hydra
+;;   ((:title (pretty-hydra-title "Window Management" 'faicon "nf-fa-th")
+;;     :foreign-keys warn :quit-key ("q" "C-g"))
+;;    ("Actions"
+;;     (("TAB" other-window "switch")
+;;      ("x" ace-delete-window "delete")
+;;      ("X" ace-delete-other-windows "delete other" :exit t)
+;;      ("s" ace-swap-window "swap")
+;;      ("a" ace-select-window "select" :exit t)
+;;      ("m" toggle-frame-maximized "maximize" :exit t)
+;;      ("u" toggle-frame-fullscreen "fullscreen" :exit t))
+;;     "Resize"
+;;     (("h" shrink-window-horizontally "←")
+;;      ("j" enlarge-window "↓")
+;;      ("k" shrink-window "↑")
+;;      ("l" enlarge-window-horizontally "→")
+;;      ("n" balance-windows "balance"))
+;;     "Split"
+;;     (("r" split-window-right "horizontally")
+;;      ("R" split-window-horizontally-instead "horizontally instead")
+;;      ("v" split-window-below "vertically")
+;;      ("V" split-window-vertically-instead "vertically instead")
+;;      ("t" toggle-window-split "toggle"))
+;;     "Zoom"
+;;     (("+" text-scale-increase "in")
+;;      ("=" text-scale-increase "in")
+;;      ("-" text-scale-decrease "out")
+;;      ("0" (text-scale-increase 0) "reset"))
+;;     "Misc"
+;;     (("o" set-frame-font "frame font")
+;;      ("f" make-frame-command "new frame")
+;;      ("d" delete-frame "delete frame")
+;;      ("<left>" winner-undo "winner undo")
+;;      ("<right>" winner-redo "winner redo"))))
+;;   :custom-face
+;;   (aw-leading-char-face ((t (:inherit font-lock-keyword-face :foreground unspecified :bold t :height 3.0))))
+;;   (aw-minibuffer-leading-char-face ((t (:inherit font-lock-keyword-face :bold t :height 1.0))))
+;;   (aw-mode-line-face ((t (:inherit mode-line-emphasis :bold t))))
+;;   :bind (([remap other-window] . ace-window)
+;;          ("C-c w" . ace-window-hydra/body)
+;;          ("C-x |" . split-window-horizontally-instead)
+;;          ("C-x _" . split-window-vertically-instead))
+;;   ;; REMOVED: :hook (emacs-startup . ace-window-display-mode)
+;;   ;; This prevents the "1" from appearing in the modeline.
+;;   :config
+;;   (defun toggle-window-split ()
+;;     (interactive)
+;;     (if (= (count-windows) 2)
+;;         (let* ((this-win-buffer (window-buffer))
+;;                (next-win-buffer (window-buffer (next-window)))
+;;                (this-win-edges (window-edges (selected-window)))
+;;                (next-win-edges (window-edges (next-window)))
+;;                (this-win-2nd (not (and (<= (car this-win-edges)
+;;                                            (car next-win-edges))
+;;                                        (<= (cadr this-win-edges)
+;;                                            (cadr next-win-edges)))))
+;;                (splitter
+;;                 (if (= (car this-win-edges)
+;;                        (car (window-edges (next-window))))
+;;                     'split-window-horizontally
+;;                   'split-window-vertically)))
+;;           (delete-other-windows)
+;;           (let ((first-win (selected-window)))
+;;             (funcall splitter)
+;;             (if this-win-2nd (other-window 1))
+;;             (set-window-buffer (selected-window) this-win-buffer)
+;;             (set-window-buffer (next-window) next-win-buffer)
+;;             (select-window first-win)
+;;             (if this-win-2nd (other-window 1))))
+;;       (user-error "`toggle-window-split' only supports two windows")))
 
-  ;; Bind hydra to dispatch list
-  (add-to-list 'aw-dispatch-alist '(?w ace-window-hydra/body) t)
+;;   ;; Bind hydra to dispatch list
+;;   (add-to-list 'aw-dispatch-alist '(?w ace-window-hydra/body) t)
 
-  ;; Select window via `M-1'...`M-9'
-  (defun aw--select-window (number)
-    "Select the specified window."
-    (when (numberp number)
-      (let ((found nil))
-        (dolist (win (aw-window-list))
-          (when (and (window-live-p win)
-                     (eq number
-                         (string-to-number
-                          (window-parameter win 'ace-window-path))))
-            (setq found t)
-            (aw-switch-to-window win)))
-        (unless found
-          (message "No specified window: %d" number)))))
-  (dotimes (n 9)
-    (bind-key (format "M-%d" (1+ n))
-              (lambda ()
-                (interactive)
-                (aw--select-window (1+ n))))))
+;;   ;; Select window via `M-1'...`M-9'
+;;   (defun aw--select-window (number)
+;;     "Select the specified window."
+;;     (when (numberp number)
+;;       (let ((found nil))
+;;         (dolist (win (aw-window-list))
+;;           (when (and (window-live-p win)
+;;                      (eq number
+;;                          (string-to-number
+;;                           (window-parameter win 'ace-window-path))))
+;;             (setq found t)
+;;             (aw-switch-to-window win)))
+;;         (unless found
+;;           (message "No specified window: %d" number)))))
+;;   (dotimes (n 9)
+;;     (bind-key (format "M-%d" (1+ n))
+;;               (lambda ()
+;;                 (interactive)
+;;                 (aw--select-window (1+ n))))))
 #+end_src
 
 ** Popper
@@ -6247,7 +6152,9 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
           "\\*Error\\*$"
           "\\*Flycheck.*\\*$"
           "\\*Format All Errors\\*$"
-          "\\*Pp Eval Output\\*$"))
+          "\\*Pp Eval Output\\*$"
+          ;; ADDED: Transient buffer
+          "^\\*transient.*"))
   :config
   (with-no-warnings
     (defun my-popper-fit-window-height (win)
