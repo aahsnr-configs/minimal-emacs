@@ -10,6 +10,8 @@ auto-save-list/
 undo-fu-session/
 tramp
 projects
+persp-auto-save
+projectile-bookmarks.eld
 org-roam.db
 transient/
 .cache/

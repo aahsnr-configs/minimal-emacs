@@ -212,6 +212,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (interactive)
   (let ((default-directory user-emacs-directory))
     (call-interactively #'project-find-file)))
+
 #+end_src
 
 ** Constants
@@ -266,11 +267,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
       undo-strong-limit 1200000
       undo-outer-limit 120000000)
 
-(setq scroll-conservatively 101
-      scroll-margin 0
-      scroll-preserve-screen-position t
-      auto-window-vscroll nil
-      fast-but-imprecise-scrolling t  ;; Trade accuracy for speed
+(setq fast-but-imprecise-scrolling t  ;; Trade accuracy for speed
       redisplay-skip-fontification-on-input t)  ;; Skip during rapid input
 
 (setq highlight-nonselected-windows nil)
@@ -858,7 +855,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
       ("h t" "Todo" global-hl-todo-mode :transient t
        :if (lambda () (fboundp 'global-hl-todo-mode)))]
 
-     ;; --- Col 3: Program ---
      ["Program"
       ("f" "Flymake" flymake-mode :transient t)
       ("O" "Hideshow" hs-minor-mode :transient t)
@@ -866,10 +862,8 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
       ("W" "Which func" which-function-mode :transient t)
       ("E" "Debug on error" toggle-debug-on-error :transient t)
       ("Q" "Debug on quit" toggle-debug-on-quit :transient t)
-      ("v" "Gutter" git-gutter-mode :transient t
-       :if (lambda () (fboundp 'git-gutter-mode)))
-      ("V" "Diff HL" global-diff-hl-mode :transient t
-       :if (lambda () (fboundp 'global-diff-hl-mode)))]
+      ("v" "Gutter" diff-hl-mode :transient t
+       :if (lambda () (fboundp 'diff-hl-mode)))]
 
      ;; --- Col 4: Theme ---
      ["Theme"
@@ -959,15 +953,20 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 #+end_src
 
 ** Eldoc
+*Disabled global which-func for now*
 #+begin_src emacs-lisp
 ;; Dependency: Enable which-function-mode globally
-(use-package which-func
-  :ensure nil
-  :config
-  ;; Enable globally so we can calculate context
-  (which-function-mode 1)
-  ;; Hide it from the modeline (we only want it in Echo Area)
-  (setq which-func-format ""))
+;; (use-package which-func
+;;   :ensure nil
+;;   :config
+;;   (which-function-mode 1)
+;;   (setq which-func-format "")
+  
+;;   ;; Disable in treemacs buffers
+;;   (with-eval-after-load 'treemacs
+;;     (add-hook 'treemacs-mode-hook
+;;               (lambda ()
+;;                 (which-function-mode -1)))))
 
 (use-package eldoc
   :ensure nil
@@ -1024,9 +1023,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
     (add-to-list 'eldoc-mouse-posframe-override-parameters
                  `(background-color . ,(face-background 'tooltip nil t)))))
 #+end_src
-
-#+RESULTS:
-| eldoc-mouse-mode | #[nil ((add-hook 'eldoc-documentation-functions #'ar/generic-eldoc-backend 0 t)) nil] | #[nil ((add-hook 'eldoc-documentation-functions #'ar/paren-eldoc-offscreen-context -50 t)) (t)] | #[nil ((add-hook 'eldoc-documentation-functions #'ar/generic-eldoc-backend 0 t)) (t)] | eldoc-mode-set-explicitly |
 
 ** Cross Referencing Commands
 #+begin_src emacs-lisp
@@ -1334,9 +1330,9 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 #+begin_src emacs-lisp
 (defun ar/set-fonts ()
   "Set the default, fixed-pitch, and variable-pitch fonts for the current frame."
-  (set-face-attribute 'default nil :font "JetBrains Mono" :height 125 :weight 'medium)
-  (set-face-attribute 'fixed-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
-  (set-face-attribute 'variable-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
+  (set-face-attribute 'default nil :font "JetBrainsMono Nerd Font" :height 125 :weight 'medium)
+  (set-face-attribute 'fixed-pitch nil :font "JetBrainsMono Nerd Font" :height 125 :weight 'medium)
+  (set-face-attribute 'variable-pitch nil :font "JetBrainsMono Nerd Font" :height 125 :weight 'medium)
   ;; Apply italic slant to comments and keywords
   (set-face-attribute 'font-lock-comment-face nil :slant 'italic)
   (set-face-attribute 'font-lock-keyword-face nil :slant 'italic))
@@ -1488,10 +1484,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 * Org Mode
 ** Dynamic Directory Structure
 #+begin_src emacs-lisp
-;; ============================================
-;; DIRECTORY STRUCTURE - AUTO-CREATION SYSTEM
-;; ============================================
-
 ;; Define base directory with symlinks resolved
 (defvar my/org-directory (file-truename (expand-file-name "~/org/"))
   "Base directory for all org files (symlinks resolved).")
@@ -1668,7 +1660,7 @@ If file doesn't exist, creates it with TEMPLATE content."
   
   :custom
   ;; Core settings
-  ;;(org-modules nil)
+  (org-modules nil)
   (org-directory my/org-directory)
   (org-log-done 'time)
   (org-log-into-drawer t)
@@ -1866,54 +1858,23 @@ If file doesn't exist, creates it with TEMPLATE content."
       ("P" "Perl tangled" ar/org-insert-perl-tangled)
       ("<" "insert <" self-insert-command)]]))
 
-  ;; 5. Bind '<' to trigger the menu contextually
-  (define-key org-mode-map (kbd "<")
-              (lambda ()
-                (interactive)
-                (if (or (region-active-p) (looking-back "^[ \t]*" 1))
-                    (ar/org-template-transient)
-                  (self-insert-command 1))))
-
-  ;; ============================================
-  ;; CUSTOM AGENDA COMMANDS
-  ;; ============================================
-  (setq org-agenda-custom-commands
-        '(("d" "Daily Dashboard"
-           ((agenda "" ((org-agenda-span 'day)
-                        (org-agenda-start-day "0d")
-                        (org-agenda-overriding-header "📅 Today's Schedule")))
-            (tags-todo "@computer/NEXT"
-                       ((org-agenda-overriding-header "💻 @Computer Tasks")))
-            (tags-todo "@home/NEXT"
-                       ((org-agenda-overriding-header "🏠 @Home Tasks")))
-            (todo "INBOX"
-                  ((org-agenda-overriding-header "📥 Inbox (Process Later)")
-                   (org-agenda-skip-function '(org-agenda-skip-entry-if 'scheduled 'deadline))
-                   (org-agenda-files (list (expand-file-name "gtd/inbox.org" my/org-directory)))))))
-          
-          ("w" "Weekly Review Agenda"
-           ((todo "INBOX" ((org-agenda-overriding-header "📥 GTD Inbox (Must Process)")
-                           (org-agenda-files (list (expand-file-name "gtd/inbox.org" my/org-directory)))))
-            (todo "GTD-WAIT" ((org-agenda-overriding-header "⏳ Waiting For (Follow Up)")))
-            (stuck "" ((org-agenda-overriding-header "🚫 Stuck Projects")))
-            (todo "GTD-NEXT" ((org-agenda-overriding-header "✅ All NEXT Actions")))))
-          
-          ("p" "Projects Dashboard"
-           ((tags "LEVEL=1" ((org-agenda-overriding-header "📋 GTD Projects (Execution)")
-                             (org-agenda-files (list (expand-file-name "gtd/projects.org" my/org-directory)))))
-            (tags "+ACTIVE" ((org-agenda-overriding-header "🚀 Active Project Context")
-                             (org-agenda-files (list (expand-file-name "roam/projects" my/org-roam-directory)))))))
-          
-          ("g" . "GTD Views")
-          ("gn" "Next Actions" ((todo "GTD-NEXT" ((org-agenda-overriding-header "✅ Next Actions") (org-agenda-sorting-strategy '(priority-down category-keep))))))
-          ("gi" "Inbox (Unprocessed)" ((todo "INBOX" ((org-agenda-overriding-header "📥 GTD Inbox") (org-agenda-files (list (expand-file-name "gtd/inbox.org" my/org-directory)))))))
-          ("gw" "Waiting For" ((todo "GTD-WAIT" ((org-agenda-overriding-header "⏳ Waiting For")))))
-          ("gs" "Stuck Projects" ((stuck "" ((org-agenda-overriding-header "🚫 Stuck Projects")))))
-          ("gc" "By Context"
-           ((tags-todo "@computer/GTD-NEXT" ((org-agenda-overriding-header "💻 @Computer")))
-            (tags-todo "@home/GTD-NEXT" ((org-agenda-overriding-header "🏠 @Home")))
-            (tags-todo "@errands/GTD-NEXT" ((org-agenda-overriding-header "🚗 @Errands")))
-            (tags-todo "@phone/GTD-NEXT" ((org-agenda-overriding-header "📞 @Phone"))))))))
+  ;; (define-key org-mode-map (kbd "<")
+  ;;             (lambda ()
+  ;;               (interactive)
+  ;;               (if (or (region-active-p) (looking-back "^[ \t]*" 1))
+  ;;                   (ar/org-template-transient)
+  ;;                 (self-insert-command 1))))
+  (defun ar/org-smart-less-than ()
+    "Smart less-than key: trigger transient menu or insert character."
+    (interactive)
+    (if (or (region-active-p) (looking-back "^[ \t]*" 1))
+        (if (featurep 'transient)
+            (ar/org-template-transient)
+          (require 'transient)
+          (ar/org-template-transient))
+      (self-insert-command 1)))
+  
+  (define-key org-mode-map (kbd "<") #'ar/org-smart-less-than))
 #+end_src
 
 ** Org GTD - Pure Task Management
@@ -2372,37 +2333,47 @@ These functions are now safe to use in org-mode source blocks without breaking r
   (advice-add 'org-download-dnd :after #'org-download-display-inline-images))
 #+end_src
 
+** Org iBullets
+#+begin_src emacs-lisp
+(use-package org-ibullets
+  :commands org-ibullets-mode
+  :vc (:url "https://github.com/jamescherti/org-ibullets.el.git")
+  :hook (org-mode . org-ibullets-mode))
+#+end_src
+
 ** Org Modern
 #+begin_src emacs-lisp
 (use-package org-modern
+  :defer t
   :hook (org-mode . org-modern-mode)
+  ;; :hook (org-agenda-finalize . org-modern-agenda)
+  :custom
+
+  (org-modern-star '("◉" "○" "✸" "✿" "✤" "✜" "◇" "▷"))
+  ;; (org-modern-list '((43 . "➤") (45 . "–") (42 . "•"))) ; + - *
+
+  (org-modern-table-vertical 1)
+  (org-modern-table-horizontal 0.2)
+  (org-modern-table t)
+
+  (org-modern-checkbox nil)   ; Let prettify-symbols handle checkboxes
+  (org-modern-todo nil)       ; Let your theme handle TODO colors
+  (org-modern-tag nil)        ; Let your theme handle Tags
+  (org-modern-priority nil)   ; Let your theme handle Priorities
+
+  (org-modern-block-fringe nil)
+  (org-modern-hide-stars nil)
+  (org-modern-keyword t)      ; Prettify keywords (TITLE, AUTHOR, etc.)
+
   :config
-  (setq org-modern-hide-stars nil
-        org-modern-star '("◉" "○" "◈" "◇" "◆" "▷")
-        org-modern-list '((43 . "➤") (45 . "–") (42 . "•"))
-        org-modern-table-vertical 1
-        org-modern-table-horizontal 0.1
-        org-modern-block-name
-        '(("src" "»" "«")
-          ("example" "»" "«")
-          ("quote" """ """))
+  ;; Font adjustments for the symbols
+  (set-face-attribute 'org-modern-symbol nil :family "Symbols Nerd Font Mono")
+  (set-face-attribute 'org-modern-label nil :height 0.9)
 
-        org-modern-todo-faces
-        '(("TODO"      . (:foreground "#f7768e" :weight bold))
-          ("NEXT"      . (:foreground "#ff9e64" :weight bold))
-          ("PROG"      . (:foreground "#7aa2f7" :weight bold))
-          ("WAIT"      . (:foreground "#e0af68" :weight bold))
-          ("DONE"      . (:background "#20293a" :foreground "#9ece6a" :weight bold))
-          ("CANCEL"    . (:strike-through t :foreground "#565f89"))
-          ("PLAN"      . (:foreground "#7dcfff" :weight bold))
-          ("ACTIVE"    . (:foreground "#bb9af7" :weight bold))
-          ("PAUSED"    . (:foreground "#a9b1d6" :weight bold))
-          ("ACHIEVED"  . (:background "#20293a" :foreground "#9ece6a" :weight bold :box t))
-          ("DROPPED"   . (:strike-through t :foreground "#565f89")))
-
-        org-modern-tag-faces
-        `((:foreground "#a9b1d6" :weight bold :box (:line-width (1 . -1) :color "#414868")))
-        org-modern-checkbox '((todo . "☐") (done . "☑") (cancel . "☑") (priority . "⚑") (on . "◉") (off . "◯"))))
+  ;; Clean up standard Org settings to play nice with Modern
+  (setq org-auto-align-tags nil
+        org-tags-column 0
+        org-catch-invisible-edits 'show-and-error))
 #+end_src
 
 ** Org Src Buffer Naming
@@ -2681,6 +2652,66 @@ These functions are now safe to use in org-mode source blocks without breaking r
             (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-heading-info -40 t)
             (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-timestamps -30 t)
             (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-breadcrumb -10 t)))
+#+end_src
+
+** Org Super Agenda
+#+begin_src emacs-lisp
+(use-package org-super-agenda
+  :after org-agenda
+  :hook (org-agenda-mode . org-super-agenda-mode)
+  :custom
+  (org-super-agenda-header-separator "─────────────────────────────────")
+  :config
+  ;; Global groups for all agenda views (can be overridden per command)
+  (setq org-super-agenda-groups
+        '((:name "🔴 Overdue"
+           :deadline past
+           :scheduled past
+           :face (:foreground "#f7768e")
+           :order 1)
+
+          (:name "🔥 GTD Inbox (Process Today)"
+           :todo "INBOX"
+           :file-path "gtd/inbox.org"
+           :order 2)
+
+          (:name "⚡ Today's Schedule"
+           :time-grid t
+           :date today
+           :scheduled today
+           :order 3)
+
+          (:name "🎯 High Priority"
+           :priority "A"
+           :order 4)
+
+          (:name "💻 @Computer"
+           :and (:tag "@computer" :todo ("GTD-NEXT" "NEXT"))
+           :order 5)
+
+          (:name "🏠 @Home"
+           :and (:tag "@home" :todo ("GTD-NEXT" "NEXT"))
+           :order 6)
+
+          (:name "📞 @Phone"
+           :and (:tag "@phone" :todo ("GTD-NEXT" "NEXT"))
+           :order 7)
+
+          (:name "⏳ Waiting For"
+           :todo ("GTD-WAIT" "WAIT")
+           :order 8)
+
+          (:name "📆 Due Soon (Next 7 Days)"
+           :deadline future
+           :order 9)
+
+          (:name "🚀 Active Projects (Zettelkasten)"
+           :and (:tag "project" :file-path "roam/projects")
+           :order 10)
+
+          (:name "📋 Other Tasks"
+           :anything t
+           :order 99))))
 #+end_src
 
 * Dashboard
@@ -3024,366 +3055,7 @@ These functions are now safe to use in org-mode source blocks without breaking r
 #+end_src
 
 * Prettify Symbols
-** Core Configuration
 #+begin_src emacs-lisp
-(use-package prog-mode
-  :ensure nil
-  :bind ("C-c s" . ar/prettify-symbols-transient)
-  :init
-  ;; Unprettify when cursor approaches symbol (critical for editing)
-  (setq prettify-symbols-unprettify-at-point 'right-edge)
-  
-  ;; Core configuration variables
-  (defvar ar/prettify-symbols-base-alist
-    '(;; Relational operators
-      ("!=" . ?≠)              ; U+2260 NOT EQUAL TO
-      ("<=" . ?≤)              ; U+2264 LESS-THAN OR EQUAL TO
-      (">=" . ?≥)              ; U+2265 GREATER-THAN OR EQUAL TO
-      ("==" . ?≡)              ; U+2261 IDENTICAL TO
-      
-      ;; Arrows (common across languages)
-      ("->" . ?→)              ; U+2192 RIGHTWARDS ARROW
-      ("=>" . ?⇒)              ; U+21D2 RIGHTWARDS DOUBLE ARROW
-      ("<-" . ?←)              ; U+2190 LEFTWARDS ARROW
-      
-      ;; Mathematical operators
-      ("sqrt" . ?√)            ; U+221A SQUARE ROOT
-      ("sum" . ?∑)             ; U+2211 N-ARY SUMMATION
-      ("pi" . ?π)              ; U+03C0 GREEK SMALL LETTER PI
-      
-      ;; Common symbols
-      ("..." . ?…)             ; U+2026 HORIZONTAL ELLIPSIS
-      ("lambda" . ?λ))         ; U+03BB GREEK SMALL LETTER LAMBDA
-    "Base prettify symbols shared across multiple modes.")
-  
-  ;; Enable globally but allow modes to opt out
-  :config
-  (global-prettify-symbols-mode +1)
-
-  ;; ============================================
-  ;; TRANSIENT MENU
-  ;; ============================================
-
-  (defun ar/prettify-symbols-title ()
-    "Returns the menu title with a Nerd Icon."
-    (concat
-     (if (and (fboundp 'nerd-icons-mdicon) (display-graphic-p))
-         (nerd-icons-mdicon "nf-md-code_tags" :face 'transient-heading :v-adjust 0.02)
-       "")
-     (propertize " Prettify Symbols" 'face 'transient-heading)))
-
-  (with-eval-after-load 'transient
-  (transient-define-prefix ar/prettify-symbols-transient ()
-    "Prettify Symbols Control"
-    [:description ar/prettify-symbols-title]
-    ["" ("q" "" transient-quit-one :format " ")] ;; Invisible quit key
-
-    [
-     ;; One Row, 3 Columns
-     ["Toggle"
-      ("s" "Mode" prettify-symbols-mode :transient t)
-      ("a" "Aggressive" ar/prettify-symbols-toggle-aggressive :transient t)
-      ("u" "Unprettify logic" ar/prettify-symbols-toggle-unprettify-at-point :transient t)]
-
-     ["Info"
-      ("p" "At point" ar/prettify-symbols-show-at-point)
-      ("l" "List all" ar/prettify-symbols-list-all)
-      ("d" "Describe char" ar/prettify-symbols-describe-char)]
-
-     ["Edit"
-      ("r" "Reload" ar/prettify-symbols-reload :transient t)
-      ("i" "Insert Unicode" ar/prettify-symbols-insert-unicode)]]))
-
-
-  )
-#+end_src
-
-** Custom Compose Predicate
-#+begin_src emacs-lisp
-(defun ar/prettify-symbols-compose-p-default (start end _match)
-  "Custom compose predicate that's more permissive than default.
-Allows prettification in more contexts while still being safe."
-  (let* ((syntaxes-beg (if (memq (char-syntax (char-after start)) '(?w ?_))
-                          '(?w ?_) '(?. ?\\)))
-         (syntaxes-end (if (memq (char-syntax (char-before end)) '(?w ?_))
-                          '(?w ?_) '(?. ?\\))))
-    (and
-     ;; Check that surrounding syntax matches
-     (not (memq (char-syntax (or (char-before start) ?\s)) syntaxes-beg))
-     (not (memq (char-syntax (or (char-after end) ?\s)) syntaxes-end))
-     ;; Avoid prettifying in strings (usually)
-     ;; Remove this check if you want prettification in strings
-     (not (nth 3 (syntax-ppss))))))
-
-(defun ar/prettify-symbols-compose-p-aggressive (start end match)
-  "More aggressive compose predicate that prettifies in comments and strings.
-Use this if you want maximum prettification."
-  (let* ((syntaxes-beg (if (memq (char-syntax (char-after start)) '(?w ?_))
-                          '(?w ?_) '(?. ?\\)))
-         (syntaxes-end (if (memq (char-syntax (char-before end)) '(?w ?_))
-                          '(?w ?_) '(?. ?\\))))
-    (and
-     ;; Check that surrounding syntax matches
-     (not (memq (char-syntax (or (char-before start) ?\s)) syntaxes-beg))
-     (not (memq (char-syntax (or (char-after end) ?\s)) syntaxes-end)))))
-#+end_src
-
-** Emacs Lisp
-#+begin_src emacs-lisp
-(defun ar/prettify-symbols-elisp-setup ()
-  "Configure prettify-symbols for Emacs Lisp modes."
-  (setq prettify-symbols-alist
-        (append
-         ar/prettify-symbols-base-alist
-         '(;; Lisp-specific symbols
-           ("defun" . ?ƒ)          ; U+0192 LATIN SMALL LETTER F WITH HOOK
-           ("defmacro" . ?μ)       ; U+03BC GREEK SMALL LETTER MU
-           
-           ;; Logical operators
-           ("not" . ?¬)            ; U+00AC NOT SIGN
-           ("and" . ?∧)            ; U+2227 LOGICAL AND
-           ("or" . ?∨)             ; U+2228 LOGICAL OR
-           
-           ;; Special comparisons
-           ("/=" . ?≠)             ; U+2260 NOT EQUAL TO
-           
-           ;; Constants (commented out - can be confusing)
-           ;; ("nil" . ?∅)         ; U+2205 EMPTY SET
-           ;; ("t" . ?⊤)           ; U+22A4 DOWN TACK (true)
-           ))))
-
-;; Apply to all Emacs Lisp modes
-(add-hook 'emacs-lisp-mode-hook #'ar/prettify-symbols-elisp-setup)
-(add-hook 'lisp-interaction-mode-hook #'ar/prettify-symbols-elisp-setup)
-(add-hook 'inferior-emacs-lisp-mode-hook #'ar/prettify-symbols-elisp-setup)
-#+end_src
-
-** Python
-#+begin_src emacs-lisp
-(defun ar/prettify-symbols-python-setup ()
-  "Configure prettify-symbols for Python modes."
-  (setq prettify-symbols-alist
-        (append
-         ar/prettify-symbols-base-alist
-         '(;; Python keywords - selective to maintain readability
-           ("def" . ?ƒ)            ; U+0192 LATIN SMALL LETTER F WITH HOOK
-           ("class" . ?𝒞)          ; U+1D49E MATHEMATICAL SCRIPT CAPITAL C
-           ("return" . ?⟼)         ; U+27FC LONG RIGHTWARDS ARROW FROM BAR
-           ("yield" . ?⟻)          ; U+27FB LONG LEFTWARDS ARROW FROM BAR
-
-           ;; Python operators
-           ("not" . ?¬)            ; U+00AC NOT SIGN
-           ("in" . ?∈)             ; U+2208 ELEMENT OF
-           ("not in" . ?∉)         ; U+2209 NOT AN ELEMENT OF
-           ("and" . ?∧)            ; U+2227 LOGICAL AND
-           ("or" . ?∨)             ; U+2228 LOGICAL OR
-
-           ;; Python constants
-           ("None" . ?∅)           ; U+2205 EMPTY SET
-           ("True" . ?⊤)           ; U+22A4 DOWN TACK
-           ("False" . ?⊥)          ; U+22A5 UP TACK
-
-           ;; Type hints (Python 3.5+)
-           ("int" . ?ℤ)            ; U+2124 DOUBLE-STRUCK CAPITAL Z
-           ("float" . ?ℝ)          ; U+211D DOUBLE-STRUCK CAPITAL R
-           ("str" . ?𝕊)            ; U+1D54A MATHEMATICAL DOUBLE-STRUCK CAPITAL S
-           ("bool" . ?𝔹)           ; U+1D539 MATHEMATICAL DOUBLE-STRUCK CAPITAL B
-
-           ;; Common type hints (commented - can be too aggressive)
-           ;; ("List" . ?𝐋)        ; U+1D40B MATHEMATICAL BOLD CAPITAL L
-           ;; ("Dict" . ?𝐃)        ; U+1D403 MATHEMATICAL BOLD CAPITAL D
-           ;; ("Set" . ?𝐒)         ; U+1D412 MATHEMATICAL BOLD CAPITAL S
-           ;; ("Tuple" . ?𝐓)       ; U+1D413 MATHEMATICAL BOLD CAPITAL T
-           ;; ("Optional" . ??)    ; U+2370 APL FUNCTIONAL SYMBOL QUAD QUESTION
-           )))
-
-  ;; Custom predicate for Python to avoid conflicts with docstrings
-  (setq prettify-symbols-compose-predicate
-        #'ar/prettify-symbols-compose-p-default))
-
-;; Apply to Python modes
-(add-hook 'python-mode-hook #'ar/prettify-symbols-python-setup)
-(add-hook 'python-ts-mode-hook #'ar/prettify-symbols-python-setup)
-#+end_src
-
-** Shell/Bash
-#+begin_src emacs-lisp
-(defun ar/prettify-symbols-shell-setup ()
-  "Configure prettify-symbols for shell scripts."
-  (setq prettify-symbols-alist
-        (append
-         ar/prettify-symbols-base-alist
-         '(;; Test operators (be conservative here)
-           ("-eq" . ?=)            ; Keep simple for readability
-           ("-ne" . ?≠)            ; U+2260 NOT EQUAL TO
-           ("-le" . ?≤)            ; U+2264 LESS-THAN OR EQUAL TO
-           ("-ge" . ?≥)            ; U+2265 GREATER-THAN OR EQUAL TO
-
-           ;; Logical operators
-           ("&&" . ?∧)             ; U+2227 LOGICAL AND
-           ("||" . ?∨)             ; U+2228 LOGICAL OR
-
-           ;; Don't prettify pipe | - it's too fundamental to shell syntax
-           ))))
-
-;; Apply to shell modes
-(add-hook 'sh-mode-hook #'ar/prettify-symbols-shell-setup)
-(add-hook 'bash-ts-mode-hook #'ar/prettify-symbols-shell-setup)
-#+end_src
-
-** Org Mode
-#+begin_src emacs-lisp
-  (defun ar/prettify-symbols-org-setup ()
-    "Configure prettify-symbols for Org mode.
-  Note: org-modern handles most visual improvements, so we're conservative here."
-    (setq prettify-symbols-alist
-          '(("->" . ?→)
-            ("<-" . ?←)
-            ("=>" . ?⇒)
-            ("<=" . ?≤)
-            (">=" . ?≥)
-
-            ("!=" . ?≠)
-            ("..." . ?…)
-
-            ;; Source block markers (subtle, won't conflict with org-modern)
-            ;; Commented out if you prefer org-modern's handling
-            ("#+BEGIN_SRC" . ?»)
-            ("#+END_SRC" . ?«)
-            ("#+begin_src" . ?»)
-            ("#+end_src" . ?«))))
-
-  (add-hook 'org-mode-hook #'ar/prettify-symbols-org-setup)
-#+end_src
-
-** Markdown
-#+begin_src emacs-lisp
-  (defun ar/prettify-symbols-markdown-setup ()
-    "Configure prettify-symbols for Markdown mode."
-    (setq prettify-symbols-alist
-          '(("->" . ?→)
-            ("<-" . ?←)
-            ("=>" . ?⇒)
-            ("<=" . ?≤)
-            (">=" . ?≥)
-            ("!=" . ?≠)
-            ("..." . ?…)
-            ("```" . ?‣)
-            ("[ ]" . ?☐)
-            ("[x]" . ?☑)
-            ("[X]" . ?☑))))
-
-  (add-hook 'markdown-mode-hook #'ar/prettify-symbols-markdown-setup)
-  (add-hook 'gfm-mode-hook #'ar/prettify-symbols-markdown-setup)
-#+end_src
-
-** Helper Functions
-#+begin_src emacs-lisp
-(defun ar/prettify-symbols-reload ()
-  "Reload prettify-symbols-mode for current buffer.
-Useful after changing symbols configuration."
-  (interactive)
-  (when (bound-and-true-p prettify-symbols-mode)
-    (prettify-symbols-mode -1)
-    (prettify-symbols-mode +1)
-    (message "Prettify symbols reloaded")))
-
-(defun ar/prettify-symbols-show-at-point ()
-  "Show the actual text of prettified symbol at point in the echo area."
-  (interactive)
-  (let* ((pos (point))
-         (props (text-properties-at pos))
-         (composition (plist-get props 'composition)))
-    (if composition
-        (let ((start (previous-single-property-change 
-                      (1+ pos) 'composition nil (point-min)))
-              (end (next-single-property-change 
-                    pos 'composition nil (point-max))))
-          (message "Symbol: %S" (buffer-substring start end)))
-      (message "No prettified symbol at point"))))
-
-(defun ar/prettify-symbols-toggle-unprettify-at-point ()
-  "Cycle through unprettify-at-point options.
-nil -> right-edge -> t -> nil"
-  (interactive)
-  (setq prettify-symbols-unprettify-at-point
-        (pcase prettify-symbols-unprettify-at-point
-          ('nil 'right-edge)
-          ('right-edge t)
-          (_ nil)))
-  (ar/prettify-symbols-reload)
-  (message "Prettify unprettify-at-point: %s" 
-           (pcase prettify-symbols-unprettify-at-point
-             ('nil "disabled")
-             ('right-edge "at right edge")
-             (_ "when on symbol"))))
-
-(defun ar/prettify-symbols-list-all ()
-  "Display all prettified symbols in current buffer's alist."
-  (interactive)
-  (if prettify-symbols-alist
-      (let ((buf (get-buffer-create "*Prettify Symbols*")))
-        (with-current-buffer buf
-          (erase-buffer)
-          (insert (format "Prettify Symbols for %s\n" major-mode))
-          (insert (make-string 50 ?=) "\n\n")
-          (insert (format "%-20s %-10s %s\n" "Text" "Symbol" "Unicode"))
-          (insert (make-string 50 ?-) "\n")
-          (dolist (pair prettify-symbols-alist)
-            (insert (format "%-20s %-10c U+%04X\n"
-                           (car pair)
-                           (cdr pair)
-                           (cdr pair))))
-          (insert "\n")
-          (insert "Unprettify at point: " 
-                  (format "%s" prettify-symbols-unprettify-at-point) "\n")
-          (goto-char (point-min))
-          (special-mode))
-        (display-buffer buf))
-    (message "No prettify-symbols-alist defined for this buffer")))
-
-(defun ar/prettify-symbols-toggle-aggressive ()
-  "Toggle between default and aggressive prettification predicates."
-  (interactive)
-  (if (eq prettify-symbols-compose-predicate 
-          #'ar/prettify-symbols-compose-p-aggressive)
-      (progn
-        (setq-local prettify-symbols-compose-predicate
-                    #'ar/prettify-symbols-compose-p-default)
-        (message "Using default prettification (no strings/comments)"))
-    (setq-local prettify-symbols-compose-predicate
-                #'ar/prettify-symbols-compose-p-aggressive)
-    (message "Using aggressive prettification (includes strings/comments)"))
-  (ar/prettify-symbols-reload))
-
-(defun ar/prettify-symbols-insert-unicode ()
-  "Insert a Unicode character by name or code point.
-Helpful for finding symbols to use in configuration."
-  (interactive)
-  (call-interactively #'insert-char))
-
-(defun ar/prettify-symbols-describe-char ()
-  "Describe the character at point, showing Unicode info."
-  (interactive)
-  (describe-char (point)))
-
-;; Advice to prevent prettification from breaking indentation/alignment
-;; This isn't usually needed but can help in edge cases
-(defun ar/prettify-symbols-before-save ()
-  "Temporarily disable prettify-symbols before saving.
-Re-enables it after save. Prevents indentation issues."
-  (when (bound-and-true-p prettify-symbols-mode)
-    (prettify-symbols-mode -1)
-    (add-hook 'after-save-hook #'ar/prettify-symbols-after-save nil t)))
-
-(defun ar/prettify-symbols-after-save ()
-  "Re-enable prettify-symbols after saving."
-  (prettify-symbols-mode +1)
-  (remove-hook 'after-save-hook #'ar/prettify-symbols-after-save t))
-
-;; Uncomment to enable save protection (usually not needed)
-;; (add-hook 'before-save-hook #'ar/prettify-symbols-before-save)
-
 #+end_src
 
 * Completion Framework
@@ -4470,6 +4142,45 @@ If completion fails in the future, check these:
             #'hl-todo-search-and-highlight t))
 #+end_src
 
+** Diff-hl
+#+begin_src emacs-lisp
+(use-package diff-hl
+  :hook ((after-init . global-diff-hl-mode)
+         (dired-mode . diff-hl-dired-mode))
+  :hook (magit-pre-refresh . diff-hl-magit-pre-refresh)
+  :hook (magit-post-refresh . diff-hl-magit-post-refresh)
+  :init
+  ;; Doom Emacs aesthetic: Thin vertical bars instead of blocks
+  ;; We define custom bitmaps to match Doom's 'ui/vc-gutter' look
+  (define-fringe-bitmap 'my-diff-hl-bmp-insert [224] nil nil '(center repeated))
+  (define-fringe-bitmap 'my-diff-hl-bmp-modify [224] nil nil '(center repeated))
+  (define-fringe-bitmap 'my-diff-hl-bmp-delete [128 192 224 240] nil nil 'bottom)
+
+  :custom
+  (diff-hl-draw-borders nil)
+  (diff-hl-flydiff-delay 0.1) ;; Update immediately while typing
+  
+  :config
+  ;; Enable real-time updates (equivalent to git-gutter+)
+  (diff-hl-flydiff-mode 1)
+  
+  ;; Force the custom thin bitmaps defined in :init
+  (setq diff-hl-fringe-bmp-function
+        (lambda (type pos)
+          (cond
+           ((eq type 'delete) 'my-diff-hl-bmp-delete)
+           ((eq type 'insert) 'my-diff-hl-bmp-insert)
+           ((eq type 'change) 'my-diff-hl-bmp-modify)
+           (t 'my-diff-hl-bmp-insert))))
+
+  ;; Clean Tokyo Night colors (Foreground only, no ugly background blocks)
+  (custom-set-faces
+   '(diff-hl-insert ((t (:foreground "#9ece6a" :background unspecified))))
+   '(diff-hl-change ((t (:foreground "#e0af68" :background unspecified))))
+   '(diff-hl-delete ((t (:foreground "#f7768e" :background unspecified))))))
+#+end_src
+
+
 ** Git-Timemachine: Step Through File History
 #+begin_src emacs-lisp
 (use-package git-timemachine
@@ -4484,78 +4195,46 @@ If completion fails in the future, check these:
       (when (boundp 'native-comp-deferred-compilation-deny-list)
         (add-to-list 'native-comp-deferred-compilation-deny-list "git-timemachine"))))
   
-  ;; Disable interfering modes
-  (with-eval-after-load 'lsp-mode
-    (add-to-list 'lsp-diagnostics-disabled-modes 'git-timemachine-mode))
-  
   :custom
   (git-timemachine-abbreviation-length 7)
   (git-timemachine-show-minibuffer-details t)
   
   :config
-  ;; Improve integration with other modes
   (defun ar/git-timemachine-setup ()
     "Disable interfering modes when entering git-timemachine."
-    ;; Disable git-gutter to avoid conflicts
-    (when (bound-and-true-p git-gutter-mode)
-      (git-gutter-mode -1)
-      (setq-local ar/git-gutter-was-active t))
-    
-    ;; Disable flycheck/flymake (we're viewing history, not editing)
-    (when (bound-and-true-p flycheck-mode)
-      (flycheck-mode -1)
-      (setq-local ar/flycheck-was-active t))
+    (when (bound-and-true-p diff-hl-mode)
+      (diff-hl-mode -1)
+      (setq-local ar/diff-hl-was-active t))
+
+    (when (bound-and-true-p eglot--managed-mode)
+      (eglot-managed-mode -1)
+      (setq-local ar/eglot-was-active t))
     
     (when (bound-and-true-p flymake-mode)
       (flymake-mode -1)
       (setq-local ar/flymake-was-active t))
     
-    ;; Make buffer read-only
     (read-only-mode 1))
   
   (defun ar/git-timemachine-teardown ()
     "Re-enable modes when exiting git-timemachine."
-    ;; Restore git-gutter
-    (when (bound-and-true-p ar/git-gutter-was-active)
-      (git-gutter-mode 1)
-      (kill-local-variable 'ar/git-gutter-was-active))
+    (when (bound-and-true-p ar/diff-hl-was-active)
+      (diff-hl-mode 1)
+      (kill-local-variable 'ar/diff-hl-was-active))
     
-    ;; Restore flycheck
-    (when (bound-and-true-p ar/flycheck-was-active)
-      (flycheck-mode 1)
-      (kill-local-variable 'ar/flycheck-was-active))
+    (when (bound-and-true-p ar/eglot-was-active)
+      (eglot-ensure)
+      (kill-local-variable 'ar/eglot-was-active))
     
-    ;; Restore flymake
     (when (bound-and-true-p ar/flymake-was-active)
       (flymake-mode 1)
       (kill-local-variable 'ar/flymake-was-active))
     
-    ;; Disable read-only
+    ;; 4. Disable read-only
     (read-only-mode -1))
   
   (add-hook 'git-timemachine-mode-hook #'ar/git-timemachine-setup)
   (add-hook 'git-timemachine-mode-exit-hook #'ar/git-timemachine-teardown))
-#+end_src
-
-** Git-Gutter-Fringe: Better Visual Appearance
-#+begin_src emacs-lisp
-(use-package git-gutter-fringe
-  :after git-gutter
-  :demand t
-  :config
-  ;; Clean, modern vertical bars in the fringe
-  (define-fringe-bitmap 'git-gutter-fr:added 
-    [224] nil nil '(center repeated))
-  (define-fringe-bitmap 'git-gutter-fr:modified 
-    [224] nil nil '(center repeated))
-  (define-fringe-bitmap 'git-gutter-fr:deleted 
-    [128 192 224 240] nil nil 'bottom)
-  
-  ;; Tokyo Night Colors (adjust to match your theme)
-  :custom-face
-  (git-gutter-fr:added    ((t (:foreground "#9ece6a"))))
-  (git-gutter-fr:modified ((t (:foreground "#e0af68"))))
-  (git-gutter-fr:deleted  ((t (:foreground "#f7768e")))))
 #+end_src
 
 ** Magit Custom Functions
@@ -4703,12 +4382,9 @@ If completion fails in the future, check these:
   (require 'dirvish-side)
   
   ;; Side window configuration (Restored to Left side)
-  (setq dirvish-side-width 35
+  (setq dirvish-side-width 30
         dirvish-side-follow-buffer-file t)
-        dirvish-side-display-alist '((side . bottom) (slot . -1))
-
-
-        )      
+        dirvish-side-display-alist '((side . bottom) (slot . -1)))      
 #+end_src
 
 ** File Management Extensions
@@ -4796,61 +4472,106 @@ If completion fails in the future, check these:
                 (file-remote-p . "Remote")))))))
 #+end_src
 
-** Tabspaces
+** Persp Mode
 #+begin_src emacs-lisp
-(use-package tabspaces
-  :hook (after-init . tabspaces-mode)
+(use-package persp-mode
+  :hook (after-init . persp-mode)
   :custom
-  (tab-bar-show nil) ;; We use the modeline/consult to visualize tabs
-  
-  ;; Filter buffers by default so Project A only sees Project A's buffers
-  (tabspaces-use-filtered-buffers-as-default t)
-  (tabspaces-default-tab "Default")
-  (tabspaces-remove-to-default t)
-  (tabspaces-include-buffers '("*scratch*" "*Messages*"))
-  
-  ;; CRITICAL FIX: Set to nil to ensure terminals are ISOLATED to their workspace.
-  ;; If we added *vterm* here, it would be visible in ALL tabs (Global).
-  (tabspaces-exclude-buffers nil)
+  ;; Auto-save and restore settings
+  (persp-autokill-buffer-on-remove 'kill-weak)
+  (persp-auto-save-opt 2) ;; Save on exit and persp-mode deactivation
+  (persp-auto-save-num-of-backups 3)
+  (persp-auto-resume-time 2.0) ;; Auto-restore after 2 seconds
 
-  ;; Session management settings
-  (tabspaces-session t)
-  (tabspaces-session-auto-restore nil) ; We use a custom robust timer for this
+  ;; Naming and defaults
+  (persp-nil-name "Default")
+  (persp-set-last-persp-for-new-frames t)
+  (persp-kill-foreign-buffer-behaviour 'kill)
+
+  ;; Buffer management
+  (persp-add-buffer-on-find-file 'if-not-autopersp)
+  (persp-add-buffer-on-after-change-major-mode 'free)
+
+  ;; Don't save window configurations (simpler, more reliable)
+  (persp-reset-windows-on-nil-window-conf t)
+
+  ;; Silence warnings
+  (persp-auto-save-persps-to-their-file-before-kill nil)
+
+  :init
+  ;; Set the autosave file location
+  (setq persp-auto-save-fname (expand-file-name "persp-auto-save" user-emacs-directory))
 
   :config
+  (let ((persp-dir (file-name-directory persp-auto-save-fname)))
+    (unless (file-directory-p persp-dir)
+      (make-directory persp-dir t)))
+  
+  (unless (file-exists-p persp-auto-save-fname)
+    (with-temp-file persp-auto-save-fname
+      (insert ";; Persp-mode auto-save file\n")
+      (insert "nil"))) 
+  
+  ;; --- Buffer Filtering ---
+  ;; Exclude ephemeral buffers from perspectives
+  (add-hook 'persp-common-buffer-filter-functions
+            (lambda (b)
+              (let ((name (buffer-name b)))
+                (or
+                 ;; Exclude dired-sidebar buffers
+                 (string-prefix-p " *" name)
+                 ;; Exclude help/info buffers
+                 (string-match-p "^\\*\\(Help\\|info\\|Apropos\\)" name)
+                 ;; Exclude completion buffers
+                 (string-match-p "^\\*Completions\\*" name)
+                 ;; Exclude message buffers unless explicitly Messages
+                 (and (string-prefix-p "*" name)
+                      (not (string= name "*Messages*"))
+                      (not (string= name "*scratch*")))))))
+
+  ;; Always include scratch and Messages in all perspectives
+  (add-hook 'persp-activated-functions
+            (lambda (type frame-or-window perspective)
+              (persp-add-buffer "*scratch*")
+              (persp-add-buffer "*Messages*")))
+
   ;; --- Consult Integration ---
-  ;; This safety check is REQUIRED because consult might not be loaded yet.
   (with-eval-after-load 'consult
-    ;; Hide the full buffer list by default (so we rely on the workspace source)
+    ;; Hide the default full buffer list
     (consult-customize consult-source-buffer :hidden t :default nil)
 
-    ;; Define a source that lists ONLY buffers in the current tabspace
-    (defvar consult--source-workspace
-      (list :name     "Workspace Buffer"
-            :narrow   ?w
-            :history  'buffer-name-history
+    ;; Define perspective-aware buffer source
+    (defvar consult--source-perspective
+      (list :name     "Perspective Buffers"
+            :narrow   ?p
             :category 'buffer
+            :history  'buffer-name-history
             :state    #'consult--buffer-state
             :default  t
-            :items    (lambda () (consult--buffer-query
-                               :predicate #'tabspaces--local-buffer-p
-                               :sort 'visibility
-                               :as #'buffer-name)))
-      "Set workspace buffer list for consult-buffer.")
-    
-    ;; Add the workspace source to consult
-    (add-to-list 'consult-buffer-sources 'consult--source-workspace))
+            :items    (lambda ()
+                        (let ((persp (get-current-persp)))
+                          (if persp
+                              (mapcar #'buffer-name (persp-buffers persp))
+                            (consult--buffer-query
+                             :sort 'visibility
+                             :as #'buffer-name)))))
+      "Perspective buffer source for consult-buffer.")
 
-  ;; --- Crash Prevention & Cleanup ---
+    (add-to-list 'consult-buffer-sources 'consult--source-perspective))
 
-  (defun my-tabspaces-delete-childframe (&rest _)
-    "Delete all child frames (posframes) before saving session to prevent read errors."
-    (when (and (fboundp 'posframe-delete-all)
-               (featurep 'posframe))
-      (ignore-errors (posframe-delete-all))))
+  ;; --- Treemacs Integration ---
+  (with-eval-after-load 'treemacs
+    (require 'treemacs-persp)
+    (treemacs-set-scope-type 'Perspectives))
 
-  (defun my-tabspaces-clean-markers (&rest _)
-    "Clean up dead markers in buffer-local variables to prevent invalid-read-syntax errors."
+  ;; --- Crash Prevention ---
+  ;; Clean up before saving
+  (defun ar/persp-before-save-cleanup ()
+    "Clean up child frames and markers before saving perspectives."
+    (when (and (fboundp 'posframe-delete-all) (featurep 'posframe))
+      (ignore-errors (posframe-delete-all)))
+
+    ;; Clean up dead markers
     (dolist (buf (buffer-list))
       (with-current-buffer buf
         (dolist (var (buffer-local-variables))
@@ -4860,92 +4581,82 @@ If completion fails in the future, check these:
                            (buffer-live-p (marker-buffer marker)))
                 (set (car var) nil))))))))
 
-  (defun my-tabspaces-bury-window (&rest _)
-    "Bury *Messages* buffer after restoring session to keep the view clean."
-    (run-with-idle-timer 0.5 nil
-      (lambda ()
-        (ignore-errors
-          (when-let ((msg-buf (get-buffer "*Messages*")))
-            (quit-windows-on msg-buf))))))
+  (advice-add 'persp-save-state-to-file :before #'ar/persp-before-save-cleanup)
 
-  ;; --- Session Management Wrappers ---
-
-  (defun my-tabspaces-save-wrapper (orig-fun &rest args)
-    "Advice wrapper to clean environment before saving tabspaces."
-    (my-tabspaces-delete-childframe)
-    (my-tabspaces-clean-markers)
-    (apply orig-fun args))
-
-  (defun my-tabspaces-safe-restore ()
-    "Safely restore tabspaces session with error handling."
-    (interactive)
-    ;; Don't restore if Emacs was launched with a specific file argument
-    (unless command-line-args-left
-      (condition-case err
-          (progn
-            (tabspaces-restore-session)
-            (message "Tabspaces session restored."))
-        (error
-         (message "Tabspaces restore failed: %s" (error-message-string err))
-         ;; Fallback: Create a default tab if restore fails
-         (ignore-errors
-           (tab-bar-new-tab)
-           (tab-bar-rename-tab "Default"))
-         nil))))
-
-  (defun my-tabspaces-safe-save ()
-    "Safely save tabspaces session with error handling (for timer)."
-    (interactive)
+  ;; Safe save wrapper for auto-save timer
+  (defun ar/persp-safe-auto-save ()
+    "Safely auto-save perspectives."
     (condition-case err
-        (progn
-          (my-tabspaces-delete-childframe)
-          (my-tabspaces-clean-markers)
-          (tabspaces-save-session)
-          (message "Tabspaces session saved."))
+        (when (and persp-mode (not (null (persp-names))))
+          (ar/persp-before-save-cleanup)
+          (persp-save-state-to-file))
       (error
-       (message "Tabspaces save failed: %s" (error-message-string err)))))
+       (message "Persp-mode auto-save failed: %s" (error-message-string err)))))
 
-  ;; Apply Advice
-  (advice-add 'tabspaces-save-session :around #'my-tabspaces-save-wrapper)
-  (advice-add 'tabspaces-restore-session :after #'my-tabspaces-bury-window)
+  ;; Auto-save every 5 minutes
+  (run-with-idle-timer 300 t #'ar/persp-safe-auto-save)
 
-  ;; Auto-save session every 5 minutes when idle
-  (run-with-idle-timer 300 t #'my-tabspaces-safe-save)
+  ;; --- Helper Functions ---
+  (defun ar/persp-switch-or-create (name)
+    "Switch to perspective NAME, creating it if it doesn't exist."
+    (interactive
+     (list (completing-read "Perspective: "
+                            (persp-names)
+                            nil nil nil nil
+                            (safe-persp-name (get-current-persp)))))
+    (if (member name (persp-names))
+        (persp-switch name)
+      (persp-add-new name)
+      (persp-switch name)))
 
-  ;; Attempt restore 2 seconds after startup
-  (add-hook 'emacs-startup-hook
-            (lambda ()
-              (run-with-idle-timer 2 nil #'my-tabspaces-safe-restore))))
+  (defun ar/persp-kill-other-buffers ()
+    "Kill all buffers in current perspective except current one."
+    (interactive)
+    (let* ((persp (get-current-persp))
+           (bufs (when persp (persp-buffers persp)))
+           (current (current-buffer)))
+      (when (yes-or-no-p (format "Kill %d other buffers in perspective %s? "
+                                 (1- (length bufs))
+                                 (safe-persp-name persp)))
+        (dolist (buf bufs)
+          (unless (eq buf current)
+            (kill-buffer buf)))))))
 #+end_src
 
 ** Treemacs
+
 #+begin_src emacs-lisp
 (use-package treemacs
   :defer t
-
   :custom-face
-  ;; Matches the border color to your theme's posframe border
   (cfrs-border-color ((t (:inherit posframe-border))))
+  (treemacs-root-face ((t (:inherit font-lock-constant-face :height 1.1 :weight bold))))
   :custom
-  (treemacs-width 30)
+  (treemacs-width 33)
   (treemacs-position 'left)
-  (treemacs-is-never-other-window t) ;; Prevent 'other-window' from jumping into sidebar
+  (treemacs-is-never-other-window t)
   (treemacs-space-between-root-nodes t)
   (treemacs-silent-refresh t)
   (treemacs-silent-filewatch t)
   (treemacs-file-follow-delay 0.2)
+  (treemacs-show-cursor nil)
   :config
-  (treemacs-follow-mode t)      ;; Highlight file in sidebar when selected in buffer
-  (treemacs-filewatch-mode t)   ;; Watch file system for changes
+  (treemacs-follow-mode t)
+  (treemacs-filewatch-mode t)
   (treemacs-fringe-indicator-mode 'always)
 
-  ;; Check for python3 and git to determine how to run git integration
-  (pcase (cons (not (null (executable-find "git")))
-               (not (null (executable-find "python3"))))
-    (`(t . t) (treemacs-git-mode 'deferred)) ;; Best performance (requires python3)
-    (`(t . _) (treemacs-git-mode 'simple))))
+  ;; Git integration configuration
+  (when (and (executable-find "git")
+             (executable-find "python3"))
+    (treemacs-git-mode 'deferred)
+    (setq treemacs-collapse-dirs 3))
+  (when (and (executable-find "git")
+             (not (executable-find "python3")))
+    (treemacs-git-mode 'simple)
+    (setq treemacs-collapse-dirs 0)))
 
-;; Consistent icons with the rest of your config
+
+;; treemacs-nerd-icons with hidden directory arrows
 (use-package treemacs-nerd-icons
   :after treemacs
   :functions treemacs-load-theme
@@ -4960,35 +4671,210 @@ If completion fails in the future, check these:
           magit-post-unstage)
          . treemacs-magit--schedule-update))
 
-;; Scope Treemacs to Tabs (Essential for Tabspaces integration)
-(use-package treemacs-tab-bar
-  :after treemacs
-  :functions treemacs-set-scope-type
-  :config (treemacs-set-scope-type 'Tabs))
+(use-package treemacs-projectile
+  :after (treemacs projectile)
+  :demand t)
 
-;; Evil navigation in the sidebar
+(use-package treemacs-persp
+  :after (treemacs persp-mode)
+  :config
+  (treemacs-set-scope-type 'Perspectives))
+
+;; Evil navigation in the sidebar with mouse interface
 (use-package treemacs-evil
   :after (treemacs evil)
   :config
   (evil-define-key 'normal treemacs-mode-map
     (kbd "TAB") #'treemacs-TAB-action
     (kbd "o")   #'treemacs-visit-node-ace
-    (kbd "q")   #'treemacs-quit))
+    (kbd "q")   #'treemacs-quit
+    ;; Mouse interface
+    [mouse-1] #'treemacs-single-click-expand-action
+    [double-mouse-1] #'treemacs-doubleclick-action
+    [drag-mouse-1] #'treemacs-dragleftclick-action))
+
+;;;###autoload
+(defun ar/treemacs-current-project ()
+  "Add and display current project exclusively in treemacs."
+  (interactive)
+  (require 'treemacs)
+  (require 'projectile)
+  (let ((project-root (or (and (fboundp 'projectile-project-root)
+                               (projectile-project-root))
+                          default-directory)))
+    (if (and project-root (not (file-equal-p project-root "~")))
+        (progn
+          (treemacs-add-and-display-current-project-exclusively)
+          (treemacs-select-window))
+      (message "No valid project in current buffer; opening last treemacs session")
+      (treemacs))))
+
+;;;###autoload
+(defun ar/treemacs-toggle ()
+  "Initialize or toggle treemacs.
+Opens only the current project, removing all other projects."
+  (interactive)
+  (require 'treemacs)
+  (pcase (treemacs-current-visibility)
+    (`visible (delete-window (treemacs-get-local-window)))
+    (_ (ar/treemacs-current-project))))
+
+#+end_src
+
+
+#+begin_src emacs-lisp
+;; (use-package treemacs
+;;   :defer t
+;;   :custom-face
+;;   ;; Matches the border color to your theme's posframe border
+;;   (cfrs-border-color ((t (:inherit posframe-border))))
+;;   :custom
+;;   (treemacs-width 30)
+;;   (treemacs-position 'left)
+;;   (treemacs-is-never-other-window t)
+;;   (treemacs-space-between-root-nodes t)
+;;   (treemacs-silent-refresh t)
+;;   (treemacs-silent-filewatch t)
+;;   (treemacs-file-follow-delay 0.2)
+;;   :config
+;;   (treemacs-follow-mode t)
+;;   (treemacs-filewatch-mode t)
+;;   (treemacs-fringe-indicator-mode 'always)
+
+;;   ;; Check for python3 and git to determine how to run git integration
+;;   (pcase (cons (not (null (executable-find "git")))
+;;                (not (null (executable-find "python3"))))
+;;     (`(t . t) (treemacs-git-mode 'deferred)) ;; Best performance (requires python3)
+;;     (`(t . _) (treemacs-git-mode 'simple))))
+
+;; ;; Consistent icons with the rest of your config
+;; (use-package treemacs-nerd-icons
+;;   :after treemacs
+;;   :functions treemacs-load-theme
+;;   :config (treemacs-load-theme "nerd-icons"))
+
+;; ;; Magit integration (refresh sidebar on git changes)
+;; (use-package treemacs-magit
+;;   :after (treemacs magit)
+;;   :hook ((magit-post-commit
+;;           git-commit-post-finish
+;;           magit-post-stage
+;;           magit-post-unstage)
+;;          . treemacs-magit--schedule-update))
+
+;; (use-package treemacs-persp
+;;   :after (treemacs persp-mode)
+;;   :config
+;;   (treemacs-set-scope-type 'Perspectives))
+
+;; ;; Evil navigation in the sidebar
+;; (use-package treemacs-evil
+;;   :after (treemacs evil)
+;;   :config
+;;   (evil-define-key 'normal treemacs-mode-map
+;;     (kbd "TAB") #'treemacs-TAB-action
+;;     (kbd "o")   #'treemacs-visit-node-ace
+;;     (kbd "q")   #'treemacs-quit))
 #+end_src
 
 ** Project.el
 #+begin_src emacs-lisp
+;; (defun ar/project-switch-to-file ()
+;;   "Switch to a project and immediately find a file in it."
+;;   (interactive)
+;;   (let ((project-switch-commands #'project-find-file))
+;;     (call-interactively #'project-switch-project)))
+
+;; (defun ar/project-switch-with-menu ()
+;;   "Switch to a project and show the dispatch menu."
+;;   (interactive)
+;;   (call-interactively #'project-switch-project))
+#+end_src
+
+** Projectile
+*** Core
+#+begin_src emacs-lisp
+(use-package projectile
+  :demand t
+  :hook (after-init . projectile-mode)
+  :custom
+  (projectile-enable-caching t)
+  (projectile-completion-system 'default)
+  (projectile-auto-discover nil)
+  (projectile-sort-order 'recentf)
+  (projectile-indexing-method 'hybrid)
+  (projectile-require-project-root t)
+  (projectile-project-search-path nil)
+  (projectile-switch-project-action #'projectile-find-file)
+  :config
+  ;; Use faster search tools if available
+  (when (executable-find "rg")
+    (setq projectile-generic-command "rg --files --hidden --glob '!.git'"))
+  (when (executable-find "fd")
+    (setq projectile-git-command "fd . -0 --type f --color=never"
+          projectile-git-submodule-command nil)))
+#+end_src
+
+*** Custom Functions
+#+begin_src emacs-lisp
 (defun ar/project-switch-to-file ()
-  "Switch to a project and immediately find a file in it."
+  "Switch to a project and immediately find a file in it.
+Includes option to manually choose a directory like project.el."
   (interactive)
-  (let ((project-switch-commands #'project-find-file))
-    (call-interactively #'project-switch-project)))
+  (let* ((choose-dir "... (choose a dir)")
+         (projects (append (projectile-relevant-known-projects)
+                          (list choose-dir))))
+    (projectile-completing-read
+     "Switch to project: "
+     projects
+     :action (lambda (project)
+               (let ((project-dir (if (equal project choose-dir)
+                                     (read-directory-name "Select directory: "
+                                                         default-directory
+                                                         nil
+                                                         t)
+                                   project)))
+                 ;; Add the manually selected directory to known projects
+                 (when (equal project choose-dir)
+                   (projectile-add-known-project project-dir))
+                 ;; Switch to the project and find file
+                 (projectile-switch-project-by-name project-dir))))))
 
 (defun ar/project-switch-with-menu ()
   "Switch to a project and show the dispatch menu."
   (interactive)
-  (call-interactively #'project-switch-project))
+  (let ((projectile-switch-project-action #'projectile-commander))
+    (call-interactively #'projectile-switch-project)))
+
+(defun ar/open-emacs-config-project ()
+  "Open Emacs config directory as a project."
+  (interactive)
+  (let ((default-directory user-emacs-directory))
+    (call-interactively #'projectile-find-file)))
 #+end_src
+
+*** consult-projectile buffer switching
+#+begin_src emacs-lisp
+;; Enhanced 
+(with-eval-after-load 'consult
+  (defun ar/consult-project-buffer ()
+    "Enhanced project buffer switching with consult."
+    (interactive)
+    (if (projectile-project-root)
+        (let ((buffers (mapcar #'buffer-name 
+                              (projectile-project-buffers))))
+          (consult-buffer
+           (list (cons (concat "Project Buffers (" 
+                              (projectile-project-name) ")")
+                      buffers))))
+      (consult-buffer)))
+  
+  ;; Optionally rebind projectile's buffer switch
+  (with-eval-after-load 'projectile
+    (define-key projectile-mode-map [remap projectile-switch-to-buffer]
+      #'ar/consult-project-buffer)))
+#+end_src
+
 
 * Markdown
 #+begin_src emacs-lisp
@@ -5363,23 +5249,44 @@ Displays: Narrowed, Read-only, Macro recording, Evil state."
 * LaTeX Writing Environment
 ** Project Awareness
 #+begin_src emacs-lisp
+;; (defun ar/get-project-bibliographies ()
+;;   "Find .bib files in the current project root recursively.
+;; Returns a list of absolute paths to bibliography files, or nil if none found."
+;;   (when-let* ((project (project-current nil))
+;;               (root (project-root project)))
+;;     (directory-files-recursively root "\\.bib$")))
+
+;; (defun ar/setup-project-bibliography ()
+;;   "Create a references.bib file in the project root if it doesn't exist."
+;;   (interactive)
+;;   (if-let* ((project (project-current t))
+;;             (root (project-root project))
+;;             (bib-file (expand-file-name "references.bib" root)))
+;;       (if (file-exists-p bib-file)
+;;           (message "Bibliography already exists: %s" bib-file)
+;;         (with-temp-file bib-file
+;;           (insert "% Bibliography for " (file-name-nondirectory (directory-file-name root)) "\n")
+;;           (insert "% Created: " (format-time-string "%Y-%m-%d") "\n\n"))
+;;         (message "Created project bibliography: %s" bib-file))
+;;     (message "Not currently visiting a project.")))
+#+end_src
+
+#+begin_src emacs-lisp
 (defun ar/get-project-bibliographies ()
   "Find .bib files in the current project root recursively.
 Returns a list of absolute paths to bibliography files, or nil if none found."
-  (when-let* ((project (project-current nil))
-              (root (project-root project)))
-    (directory-files-recursively root "\\.bib$")))
+  (when-let* ((project-root (projectile-project-root)))
+    (directory-files-recursively project-root "\\.bib$")))
 
 (defun ar/setup-project-bibliography ()
   "Create a references.bib file in the project root if it doesn't exist."
   (interactive)
-  (if-let* ((project (project-current t))
-            (root (project-root project))
-            (bib-file (expand-file-name "references.bib" root)))
+  (if-let* ((project-root (projectile-project-root))
+            (bib-file (expand-file-name "references.bib" project-root)))
       (if (file-exists-p bib-file)
           (message "Bibliography already exists: %s" bib-file)
         (with-temp-file bib-file
-          (insert "% Bibliography for " (file-name-nondirectory (directory-file-name root)) "\n")
+          (insert "% Bibliography for " (file-name-nondirectory (directory-file-name project-root)) "\n")
           (insert "% Created: " (format-time-string "%Y-%m-%d") "\n\n"))
         (message "Created project bibliography: %s" bib-file))
     (message "Not currently visiting a project.")))
@@ -5959,6 +5866,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
           Info-mode
           Custom-mode
           special-mode
+          org-agenda-mode
 
           ;; Flycheck/Flymake
           flymake-diagnostics-buffer-mode
@@ -6232,14 +6140,19 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
     "p" '(:ignore t :wk "project")
     "p p" '(ar/project-switch-to-file :wk "Switch project → find file")
     "p P" '(ar/project-switch-with-menu :wk "Switch project (menu)")
-    "p f" '(project-find-file :wk "Find file in project")
+    "p f" '(projectile-find-file :wk "Find file in project")
     "p s" '(consult-ripgrep :wk "Search project")
-    "p b" '(consult-project-buffer :wk "Project buffers")
-    "p k" '(project-kill-buffers :wk "Kill project buffers")
-    "p c" '(project-compile :wk "Compile project")
-    "p d" '(project-dired :wk "Dired project root")
-    "p e" '(project-eshell :wk "Eshell in project")
-    "p t" '(treemacs :wk "Treemacs"))
+    "p b" '(projectile-switch-to-buffer :wk "Project buffers")
+    "p k" '(projectile-kill-buffers :wk "Kill project buffers")
+    "p c" '(projectile-compile-project :wk "Compile project")
+    "p d" '(projectile-dired :wk "Dired project root")
+    "p e" '(projectile-run-eshell :wk "Eshell in project")
+    "p t" '(ar/treemacs-toggle :wk "Toggle treemacs (current project)")
+    "p i" '(projectile-invalidate-cache :wk "Invalidate cache")
+    "p r" '(projectile-replace :wk "Replace in project")
+    "p R" '(projectile-replace-regexp :wk "Replace regexp in project")
+    "p a" '(projectile-add-known-project :wk "Add known project"))
+
   
   ;; Toggle operations (SPC t)
   (ar/global-leader
@@ -6252,6 +6165,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
     "t v" '(visual-line-mode :wk "Visual line mode")
     "t r" '(rainbow-mode :wk "Rainbow mode")
     "t h" '(global-hl-line-mode :wk "Highlight line")
+    "t s" '(global-prettify-symbols-mode :wk "Prettify symbols")
     "t p" '(show-paren-mode :wk "Show paren")
     "t T" '(toggles-hydra/body :wk "Toggles hydra"))
 
@@ -6260,7 +6174,6 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
   (ar/global-leader
     "o" '(:ignore t :wk "open")
     "o c" '(container-hydra/body :wk "Container menu")
-    "o p" '(treemacs :wk "Treemacs")
     "o e" '(ar/eshell-toggle :wk "Toggle eshell")
     "o E" '(ar/eshell-new :wk "Eshell (new)")
     "o t" '(vterm :wk "Vterm")
@@ -6320,11 +6233,11 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
     "g m" '(magit-merge :wk "Merge")
     "g r" '(magit-rebase :wk "Rebase")
     "g t" '(git-timemachine-toggle :wk "Timemachine")
-    "g n" '(git-gutter:next-hunk :wk "Next hunk")
-    "g N" '(git-gutter:previous-hunk :wk "Previous hunk")
-    "g S" '(git-gutter:stage-hunk :wk "Stage hunk")
-    "g R" '(git-gutter:revert-hunk :wk "Revert hunk")
-    "g H" '(git-gutter:popup-hunk :wk "Preview hunk"))
+    "g n" '(diff-hl-next-hunk :wk "Next hunk")
+    "g N" '(diff-hl-previous-hunk :wk "Previous hunk")
+    "g S" '(diff-hl-stage-current-hunk :wk "Stage hunk")
+    "g R" '(diff-hl-revert-hunk :wk "Revert hunk")
+    "g H" '(diff-hl-show-hunk :wk "Preview hunk"))
 
 
   ;; Unified Capture
@@ -6418,16 +6331,32 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
    "C--" 'text-scale-decrease)
   
   ;; Workspace operations (SPC TAB)
+  ;; (ar/global-leader
+  ;;   "TAB" '(:ignore t :wk "workspace")
+  ;;   "TAB TAB" '(tabspaces-switch-or-create-workspace :wk "Switch workspace")
+  ;;   "TAB n" '(tabspaces-switch-or-create-workspace :wk "New workspace")
+  ;;   "TAB d" '(tabspaces-close-workspace :wk "Delete workspace")
+  ;;   "TAB r" '(tab-bar-rename-tab :wk "Rename workspace")
+  ;;   "TAB [" '(tab-bar-switch-to-prev-tab :wk "Previous workspace")
+  ;;   "TAB ]" '(tab-bar-switch-to-next-tab :wk "Next workspace")
+  ;;   "TAB s" '(tabspaces-save-session :wk "Save session")
+  ;;   "TAB l" '(tabspaces-restore-session :wk "Load session"))
+
   (ar/global-leader
-    "TAB" '(:ignore t :wk "workspace")
-    "TAB TAB" '(tabspaces-switch-or-create-workspace :wk "Switch workspace")
-    "TAB n" '(tabspaces-switch-or-create-workspace :wk "New workspace")
-    "TAB d" '(tabspaces-close-workspace :wk "Delete workspace")
-    "TAB r" '(tab-bar-rename-tab :wk "Rename workspace")
-    "TAB [" '(tab-bar-switch-to-prev-tab :wk "Previous workspace")
-    "TAB ]" '(tab-bar-switch-to-next-tab :wk "Next workspace")
-    "TAB s" '(tabspaces-save-session :wk "Save session")
-    "TAB l" '(tabspaces-restore-session :wk "Load session"))
+    "TAB" '(:ignore t :wk "perspective")
+    "TAB TAB" '(ar/persp-switch-or-create :wk "Switch perspective")
+    "TAB n" '(persp-add-new :wk "New perspective")
+    "TAB d" '(persp-kill :wk "Kill perspective")
+    "TAB r" '(persp-rename :wk "Rename perspective")
+    "TAB [" '(persp-prev :wk "Previous perspective")
+    "TAB ]" '(persp-next :wk "Next perspective")
+    "TAB b" '(persp-add-buffer :wk "Add buffer")
+    "TAB B" '(persp-remove-buffer :wk "Remove buffer")
+    "TAB i" '(persp-import-buffers :wk "Import buffers")
+    "TAB k" '(ar/persp-kill-other-buffers :wk "Kill other buffers")
+    "TAB s" '(persp-save-state-to-file :wk "Save session")
+    "TAB l" '(persp-load-state-from-file :wk "Load session"))
+
 
   ;; Macro operations (SPC @)
   (ar/global-leader
@@ -6635,4 +6564,3 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
     "x p" '(org-set-property :wk "Set property")
     "x t" '(org-set-tags-command :wk "Set tags")))
 #+end_src
-

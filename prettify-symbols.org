@@ -1,0 +1,135 @@
+#+begin_src emacs-lisp
+(use-package prettify-symbols
+  :ensure nil
+  :hook (after-init . global-prettify-symbols-mode)
+  :init
+  ;; Visual safety: Unprettify when cursor touches the right edge
+  (setq prettify-symbols-unprettify-at-point 'right-edge)
+
+  :config
+  ;; THE MASTER SYMBOL LIST
+  ;; Defined statically to prevent initialization errors.
+  ;; We use `concat` to prevent these strings from being replaced in this config file.
+  (defconst ar/prettify-symbols-alist
+    `(
+      ;; ─── ORG MODE STRUCTURE (Nerd Font Hex Codes) ───
+      ;; Source: https://www.nerdfonts.com/cheat-sheet
+      ;; Lowercase
+      (,(concat "#+begin_" "src")   . #xf121)   ;  (nf-fa-code)
+      (,(concat "#+end_" "src")     . #xf121)   ; 
+      (,(concat "#+begin_" "quote") . #xf10d)   ;  (nf-fa-quote_left)
+      (,(concat "#+end_" "quote")   . #xf10d)   ; 
+      (,(concat "#+title" ":")      . #xf02dc)  ;  (nf-md-format_title)
+      (,(concat "#+author" ":")     . #xf007)   ;  (nf-fa-user)
+      (,(concat "#+date" ":")       . #xf073)   ;  (nf-fa-calendar)
+      (,(concat "#+email" ":")      . #xf0e0)   ;  (nf-fa-envelope)
+      (,(concat "#+results" ":")    . #xf120)   ;  (nf-fa-terminal)
+      ;; Uppercase
+      (,(concat "#+BEGIN_" "SRC")   . #xf121)
+      (,(concat "#+END_" "SRC")     . #xf121)
+      (,(concat "#+BEGIN_" "QUOTE") . #xf10d)
+      (,(concat "#+END_" "QUOTE")   . #xf10d)
+      (,(concat "#+TITLE" ":")      . #xf02dc)
+      (,(concat "#+AUTHOR" ":")     . #xf007)
+      (,(concat "#+DATE" ":")       . #xf073)
+      (,(concat "#+EMAIL" ":")      . #xf0e0)
+      (,(concat "#+RESULTS" ":")    . #xf120)
+
+      ;; ─── CHECKBOXES (Standard Unicode) ───
+      (,(concat "[" " " "]") . ?☐)
+      (,(concat "[" "X" "]") . ?☑)
+      (,(concat "[" "-" "]") . ?⊟)
+
+      ;; ─── PROGRAMMING KEYWORDS ───
+      ("lambda"    . ?λ) ("LAMBDA" . ?λ)
+      ("fn"        . ?λ)
+      ("function"  . ?ƒ)
+      ("defun"     . ?ƒ)
+      ("def"       . ?ƒ)
+      ("map"       . ?↦)
+      ("return"    . ?⟼)
+      ("yield"     . ?⟻)
+      ("nil"       . ?∅) ("NULL" . ?∅)
+      ("null"      . ?∅)
+      ("void"      . ?∅)
+      ("true"      . ?⊤) ("TRUE" . ?⊤)
+      ("false"     . ?⊥) ("FALSE" . ?⊥)
+      ("undefined" . ?¿)
+
+      ;; ─── LOGIC & SETS ───
+      ("not"       . ?¬) ("NOT" . ?¬)
+      ("!"         . ?¬)
+      ("and"       . ?∧) ("AND" . ?∧)
+      ("&&"        . ?∧)
+      ("or"        . ?∨) ("OR"  . ?∨)
+      ("||"        . ?∨)
+      ("xor"       . ?⊻)
+      ("forall"    . ?∀)
+      ("exists"    . ?∃)
+      ("in"        . ?∈)
+      ("notin"     . ?∉)
+      ("union"     . ?∪)
+      ("intersect" . ?∩)
+      ("subset"    . ?⊂)
+      ("superset"  . ?⊃)
+      ("implies"   . ?⇒)
+      ("iff"       . ?⇔)
+
+      ;; ─── MATH & CALCULUS ───
+      ("sum"       . ?∑)
+      ("prod"      . ?∏)
+      ("sqrt"      . ?√)
+      ("int"       . ?∫)
+      ("pi"        . ?π)
+      ("infinity"  . ?∞)
+      ("inf"       . ?∞)
+      ("approx"    . ?≈)
+      ("neq"       . ?≠)
+      ("grad"      . ?∇)
+      ("partial"   . ?∂)
+
+      ;; ─── GREEK (Lowercase) ───
+      ("alpha"     . ?α)
+      ("beta"      . ?β)
+      ("gamma"     . ?γ)
+      ("delta"     . ?δ)
+      ("epsilon"   . ?ε)
+      ("theta"     . ?θ)
+      ("mu"        . ?μ)
+      ("rho"       . ?ρ)
+      ("sigma"     . ?σ)
+      ("tau"       . ?τ)
+      ("phi"       . ?φ)
+      ("omega"     . ?ω)
+
+      ;; ─── ARROWS ───
+      ("->"        . ?→)
+      ("=>"        . ?⇒)
+      ("<-"        . ?←)
+      ("<="        . ?≤)
+      (">="        . ?≥)
+      ("=="        . ?≡)
+      ("==="       . ?≡)
+      ("!="        . ?≠)
+      ("..."       . ?…)))
+
+  ;; APPLICATION HOOK
+  (defun ar/apply-prettify-symbols ()
+    "Apply the master symbol list to the current buffer."
+    ;; Append master list to buffer-local variable
+    (setq prettify-symbols-alist
+          (append ar/prettify-symbols-alist prettify-symbols-alist))
+    (prettify-symbols-mode 1))
+
+  ;; APPLY TO MODES
+  (add-hook 'prog-mode-hook #'ar/apply-prettify-symbols)
+  (add-hook 'text-mode-hook #'ar/apply-prettify-symbols)
+  (add-hook 'org-mode-hook #'ar/apply-prettify-symbols)
+
+  ;; FONTSET FIX (Prevents "Box" Glyphs for Icons)
+  (when (display-graphic-p)
+    (let ((font "JetBrainsMono Nerd Font"))
+      (set-fontset-font t '(#xe000 . #xf8ff) font nil 'append)
+      (set-fontset-font t '(#xf0000 . #xfffff) font nil 'append))))
+#+end_src
+
