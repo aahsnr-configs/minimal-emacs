@@ -1,3 +1,4 @@
+elpa/
 eln-cache/
 elpaca/
 recentf
@@ -6,3 +7,9 @@ init.el
 history
 tabsession.el
 auto-save-list/
+undo-fu-session/
+tramp
+projects
+org-roam.db
+transient/
+.cache/

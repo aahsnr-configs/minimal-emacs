@@ -23,7 +23,7 @@ Lower this if you experience freezing, raise if stuttering.")
   "GC percentage of heap to trigger collection.")
 
 ;; Restore GC settings after startup
-(add-hook 'elpaca-after-init-hook
+(add-hook 'emacs-startup-hook
           (lambda ()
             (setq gc-cons-threshold better-gc-cons-threshold
                   gc-cons-percentage better-gc-cons-percentage)
@@ -40,7 +40,7 @@ Lower this if you experience freezing, raise if stuttering.")
           101) ;; Run late to ensure accurate timing
 
 ;; Increase GC threshold in minibuffer to prevent slowdowns during completion
-(add-hook 'elpaca-after-init-hook
+(add-hook 'emacs-startup-hook
           (lambda ()
             (defun gc-minibuffer-setup-hook ()
               (setq gc-cons-threshold (* better-gc-cons-threshold 2)))
@@ -83,8 +83,37 @@ Lower this if you experience freezing, raise if stuttering.")
 
 ** Custom File
 #+begin_src emacs-lisp
+;; Set custom file location
 (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
-(add-hook 'after-init-hook (lambda () (load custom-file 'noerror)))
+
+;; Ensure the directory exists
+(unless (file-directory-p user-emacs-directory)
+  (make-directory user-emacs-directory t))
+
+;; Load custom file with comprehensive error handling
+(when (file-exists-p custom-file)
+  (condition-case err
+      (load custom-file 'noerror 'nomessage)
+    (error 
+     (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+     (message "⚠️  WARNING: Failed to load custom-file!")
+     (message "Error: %s" (error-message-string err))
+     (message "Location: %s" custom-file)
+     (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+     (message "")
+     (message "To fix this issue:")
+     (message "1. Backup: cp %s %s.backup" custom-file custom-file)
+     (message "2. Delete: rm %s" custom-file)
+     (message "3. Restart Emacs")
+     (message "")
+     (message "The file will be regenerated when you use M-x customize")
+     (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+     
+     ;; Optionally, create a backup automatically
+     (let ((backup-file (concat custom-file ".error-backup")))
+       (when (not (file-exists-p backup-file))
+         (copy-file custom-file backup-file t)
+         (message "✓ Automatic backup created: %s" backup-file))))))
 #+end_src
 
 ** Custom Functions
@@ -113,31 +142,52 @@ Lower this if you experience freezing, raise if stuttering.")
            (> (car (buffer-line-statistics)) 10000))))
 
 (defun reload-init-file ()
-  "Tangle and reload the Emacs configuration from config.org."
+  "Tangle and reload the Emacs configuration from config.org.
+This function is designed for use with package.el.
+
+IMPORTANT: This does NOT fully restart Emacs. Some changes (especially
+removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (interactive)
   (let* ((config-org (expand-file-name "config.org" user-emacs-directory))
-         (init-el (expand-file-name "init.el" user-emacs-directory)))
+         (init-el (expand-file-name "init.el" user-emacs-directory))
+         (start-time (current-time)))
+    
     ;; Check if config.org exists
     (unless (file-exists-p config-org)
       (user-error "Configuration file %s not found!" config-org))
     
-    (message "Tangling configuration from %s..." config-org)
-    
-    ;; Tangle the org file
-    (org-babel-tangle-file config-org init-el "emacs-lisp")
-    
-    (message "Loading %s..." init-el)
-    
-    ;; Load the tangled init file
-    ;; Note: This doesn't fully restart Emacs, so some changes
-    ;; (especially to package declarations) may require a restart
-    (load-file init-el)
-    
-    ;; Process any queued Elpaca packages
-    (when (fboundp 'elpaca-process-queues)
-      (elpaca-process-queues))
-    
-    (message "Configuration reloaded! Some changes may require an Emacs restart.")))
+    ;; Confirm before reloading
+    (when (yes-or-no-p "Reload configuration? (This won't reset removed keybindings/hooks) ")
+      (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+      (message "Tangling configuration from config.org...")
+      
+      ;; Tangle the org file
+      (condition-case err
+          (org-babel-tangle-file config-org init-el "emacs-lisp")
+        (error
+         (user-error "Failed to tangle config.org: %s" (error-message-string err))))
+      
+      (message "✓ Tangling complete")
+      (message "Loading init.el...")
+      
+      ;; Load the tangled init file
+      (condition-case err
+          (load-file init-el)
+        (error
+         (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+         (user-error "Failed to load init.el: %s" (error-message-string err))))
+      
+      ;; Calculate load time
+      (let ((elapsed-time (float-time (time-subtract (current-time) start-time))))
+        (message "✓ Configuration loaded successfully")
+        (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        (message "Reload completed in %.2f seconds" elapsed-time)
+        (message "")
+        (message "NOTE: Some changes require a full Emacs restart:")
+        (message "  • Removed keybindings, hooks, or modes")
+        (message "  • Package installations/removals")
+        (message "  • Major structural changes")
+        (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")))))
 
 (defun my/auto-tangle-config-org ()
   "Automatically tangle config.org when saved."
@@ -282,7 +332,7 @@ Lower this if you experience freezing, raise if stuttering.")
 ** Garbage Collector Magic Hack
 #+begin_src emacs-lisp
 (use-package gcmh
-  :hook (elpaca-after-init . gcmh-mode)
+  :hook (after-init . gcmh-mode)
   :init
   ;; Match early-init.el restoration value
   (setq gcmh-idle-delay 'auto
@@ -323,12 +373,12 @@ Lower this if you experience freezing, raise if stuttering.")
 ;; Save place
 (use-package saveplace
   :ensure nil
-  :hook (elpaca-after-init . save-place-mode))
+  :hook (after-init . save-place-mode))
 
 ;; History with symlink resolution
 (use-package recentf
   :ensure nil
-  :hook (elpaca-after-init . recentf-mode)
+  :hook (after-init . recentf-mode)
   :init
   (setq recentf-max-saved-items 300
         recentf-exclude
@@ -360,7 +410,7 @@ Lower this if you experience freezing, raise if stuttering.")
 
 (use-package savehist
   :ensure nil
-  :hook (elpaca-after-init . savehist-mode)
+  :hook (after-init . savehist-mode)
   :init
   (setq enable-recursive-minibuffers t
         history-length 1000
@@ -467,7 +517,7 @@ Lower this if you experience freezing, raise if stuttering.")
 
 (use-package undo-fu-session
   :commands undo-fu-session-global-mode
-  :hook (elpaca-after-init . undo-fu-session-global-mode))
+  :hook (after-init . undo-fu-session-global-mode))
 #+end_src
 
 ** Core Evil
@@ -527,7 +577,7 @@ Lower this if you experience freezing, raise if stuttering.")
 
      (?< . ("<" . ">"))
      (?> . ("<" . ">"))))
-  :hook (elpaca-after-init . global-evil-surround-mode))
+  :hook (after-init . global-evil-surround-mode))
 
 (use-package goto-chg
   :after evil
@@ -757,19 +807,13 @@ Lower this if you experience freezing, raise if stuttering.")
     (redraw-display)
     (message "Trailing whitespace %s" (if show-trailing-whitespace "ON" "OFF")))
 
-  ;; --- TRANSIENT DEFINITION ---
   (transient-define-prefix ar/toggles-transient ()
     "Global Toggles and Actions"
 
-    ;; 1. THE TITLE (Dynamic Function)
     [:description ar/transient-title]
 
-    ;; 2. THE INVISIBLE TOGGLE KEY
-    ;; Binds <f6> to quit, but hides it visually.
-    ;; This allows F6 to toggle the menu open/closed.
     ["" ("<f6>" "" transient-quit-one :format " ")]
 
-    ;; 3. THE MENU GRID (One Row, 5 Columns)
     [
      ;; --- Col 1: Basic ---
      ["Basic"
@@ -922,9 +966,10 @@ Lower this if you experience freezing, raise if stuttering.")
 (use-package eldoc
   :ensure nil
   :defer t
+  :init
+  (global-eldoc-mode)
   :commands (eldoc-mode global-eldoc-mode)
-  :hook ((elpaca-after-init . global-eldoc-mode)
-         (emacs-lisp-mode . eldoc-mode)
+  :hook ((emacs-lisp-mode . eldoc-mode)
          (lisp-interaction-mode . eldoc-mode))
   :custom
   (eldoc-idle-delay 0.1)
@@ -944,47 +989,6 @@ Lower this if you experience freezing, raise if stuttering.")
   (global-set-key (kbd "C-h .") #'ar/show-eldoc-buffer)
 
   ;; === ORG MODE BREADCRUMBS ===
-  (defun ar/get-org-breadcrumb-string ()
-    "Generate breadcrumb string: Parent › Current.
-    Priority Order: Bottom Level > Src Block (Nil) > Hierarchy > Top Level."
-    (when (derived-mode-p 'org-mode)
-      (let* ((face-sep '(:inherit shadow :height 0.8))
-             (face-path '(:inherit shadow))
-             (face-current '(:inherit font-lock-keyword-face :weight bold))
-             (sep-str (propertize " › " 'face face-sep)))
-
-        (cond
-         ;; 1. Check Bottom Level FIRST (Highest Priority)
-         ;; Checks if we are at EOB or on the last line of the buffer
-         ((or (eobp)
-              (save-excursion (forward-line 1) (eobp)))
-          (propertize "Bottom Level" 'face face-path))
-
-         ;; 2. Check Src Block (Return nil to let LSP/ElDoc handle it)
-         ((org-in-src-block-p)
-          nil)
-
-         ;; 3. Check Hierarchy
-         ((let ((path (ignore-errors (org-get-outline-path t))))
-            (when path
-              (mapconcat
-               (lambda (heading)
-                 (if (string= heading (car (last path)))
-                     (propertize heading 'face face-current)
-                   (propertize heading 'face face-path)))
-               path
-               sep-str))))
-
-         ;; 4. Default to Top Level
-         (t 
-          (propertize "Top Level" 'face face-path))))))
-
-  (defun ar/org-eldoc-backend (callback &rest _ignored)
-    "ElDoc backend for Org Breadcrumbs."
-    (let ((doc (ar/get-org-breadcrumb-string)))
-      (when doc
-        (funcall callback doc))))
-
   ;; === GENERIC CONTEXT (Fallback) ===
   (defun ar/generic-eldoc-backend (callback &rest _ignored)
     "ElDoc backend for Generic Context (which-function)."
@@ -998,12 +1002,6 @@ Lower this if you experience freezing, raise if stuttering.")
                    (concat
                     (propertize "⚙ " 'face 'font-lock-function-name-face)
                     (propertize current-ctx 'face 'font-lock-function-name-face)))))))
-
-  ;; === HOOK REGISTRATION ===
-  (add-hook 'org-mode-hook
-            (lambda ()
-              (setq-local eldoc-documentation-strategy 'eldoc-documentation-compose)
-              (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-backend -100 t)))
 
   (add-hook 'eldoc-mode-hook
             (lambda ()
@@ -1020,6 +1018,9 @@ Lower this if you experience freezing, raise if stuttering.")
     (add-to-list 'eldoc-mouse-posframe-override-parameters
                  `(background-color . ,(face-background 'tooltip nil t)))))
 #+end_src
+
+#+RESULTS:
+| eldoc-mouse-mode | #[nil ((add-hook 'eldoc-documentation-functions #'ar/generic-eldoc-backend 0 t)) nil] | #[nil ((add-hook 'eldoc-documentation-functions #'ar/paren-eldoc-offscreen-context -50 t)) (t)] | #[nil ((add-hook 'eldoc-documentation-functions #'ar/generic-eldoc-backend 0 t)) (t)] | eldoc-mode-set-explicitly |
 
 ** Cross Referencing Commands
 #+begin_src emacs-lisp
@@ -1043,14 +1044,14 @@ Lower this if you experience freezing, raise if stuttering.")
 #+begin_src emacs-lisp
 (use-package autorevert
   :ensure nil
-  :hook (elpaca-after-init . global-auto-revert-mode))
+  :hook (after-init . global-auto-revert-mode))
 #+end_src
 
 ** Avy/Ace
 #+begin_src emacs-lisp
 ;; Jump to things in Emacs tree-style
 (use-package avy
-  :hook (elpaca-after-init . avy-setup-default)
+  :hook (after-init . avy-setup-default)
   :config (setq avy-all-windows nil
                 avy-all-windows-alt t
                 avy-background t
@@ -1062,7 +1063,7 @@ Lower this if you experience freezing, raise if stuttering.")
 
 ;; Quickly follow links
 (use-package ace-link
-  :hook (elpaca-after-init . ace-link-setup-default))
+  :hook (after-init . ace-link-setup-default))
 #+end_src
 
 ** Anzu
@@ -1073,7 +1074,7 @@ Lower this if you experience freezing, raise if stuttering.")
          :map isearch-mode-map
          ([remap isearch-query-replace] . anzu-isearch-query-replace)
          ([remap isearch-query-replace-regexp] . anzu-isearch-query-replace-regexp))
-  :hook (elpaca-after-init . global-anzu-mode))
+  :hook (after-init . global-anzu-mode))
 
 (use-package evil-anzu :after evil)
 #+end_src
@@ -1097,7 +1098,7 @@ Lower this if you experience freezing, raise if stuttering.")
 #+begin_src emacs-lisp
 (use-package elec-pair
   :ensure nil
-  :hook (elpaca-after-init . electric-pair-mode)
+  :hook (after-init . electric-pair-mode)
   :init (setq electric-pair-inhibit-predicate 'electric-pair-conservative-inhibit))
 #+end_src
 
@@ -1335,7 +1336,7 @@ Lower this if you experience freezing, raise if stuttering.")
   (set-face-attribute 'font-lock-keyword-face nil :slant 'italic))
 
 (if (daemonp)
-    (add-hook 'elpaca-after-init-hook
+    (add-hook 'emacs-startup-hook
               (lambda ()
                 (add-hook 'after-make-frame-functions
                           (lambda (frame)
@@ -1374,7 +1375,7 @@ Lower this if you experience freezing, raise if stuttering.")
 ** Solaire Mode
 #+begin_src emacs-lisp
 (use-package solaire-mode
-  :hook (elpaca-after-init . solaire-global-mode))
+  :hook (after-init . solaire-global-mode))
 #+end_src
 
 ** Modeline
@@ -1384,7 +1385,7 @@ Lower this if you experience freezing, raise if stuttering.")
 
 (use-package doom-modeline
   :defer 0.1
-  :hook (elpaca-after-init . doom-modeline-mode)
+  :hook (after-init . doom-modeline-mode)
   :hook (doom-modeline-mode . column-number-mode)
   :init
   (setq doom-modeline-bar-width 3
@@ -1449,7 +1450,7 @@ Lower this if you experience freezing, raise if stuttering.")
 ** Text Scaling
 #+begin_src emacs-lisp
 (use-package default-text-scale
-  :hook (elpaca-after-init . default-text-scale-mode))
+  :hook (after-init . default-text-scale-mode))
 #+end_src
 
 ** Scrolling
@@ -1470,7 +1471,7 @@ Lower this if you experience freezing, raise if stuttering.")
 (when (fboundp 'pixel-scroll-precision-mode) ;; 29+
   (use-package ultra-scroll
     :functions (hl-todo-mode diff-hl-flydiff-mode)
-    :hook (elpaca-after-init . ultra-scroll-mode)
+    :hook (after-init . ultra-scroll-mode)
     :config
     (add-hook 'ultra-scroll-hide-functions #'diff-hl-flydiff-mode)
     (add-hook 'ultra-scroll-hide-functions #'hl-todo-mode)
@@ -1661,7 +1662,7 @@ If file doesn't exist, creates it with TEMPLATE content."
   
   :custom
   ;; Core settings
-  (org-modules nil)
+  ;;(org-modules nil)
   (org-directory my/org-directory)
   (org-log-done 'time)
   (org-log-into-drawer t)
@@ -1817,6 +1818,7 @@ If file doesn't exist, creates it with TEMPLATE content."
      (propertize " Org Template" 'face 'transient-heading)))
 
   ;; 4. The Transient Definition
+  (with-eval-after-load 'transient
   (transient-define-prefix ar/org-template-transient ()
     "Org Mode Structure Templates"
     [:description ar/org-transient-title]
@@ -1856,7 +1858,7 @@ If file doesn't exist, creates it with TEMPLATE content."
       ("u" "plantuml" (lambda () (interactive) (ar/org-template-expand "<s" "plantuml :file chart.png")))
       ("Y" "ipython" ar/org-insert-ipython)
       ("P" "Perl tangled" ar/org-insert-perl-tangled)
-      ("<" "insert <" self-insert-command)]])
+      ("<" "insert <" self-insert-command)]]))
 
   ;; 5. Bind '<' to trigger the menu contextually
   (define-key org-mode-map (kbd "<")
@@ -2432,6 +2434,249 @@ These functions are now safe to use in org-mode source blocks without breaking r
   (org-remark-global-tracking-mode +1))
 #+end_src
 
+** Eldoc for Org Mode
+#+begin_src emacs-lisp
+(defun ar/org-eldoc-breadcrumb (callback &rest _)
+  "Show org heading breadcrumb path in eldoc."
+  (when (derived-mode-p 'org-mode)
+    (let* ((face-sep '(:inherit shadow :height 0.8))
+           (face-path '(:inherit shadow))
+           (face-current '(:inherit font-lock-keyword-face :weight bold))
+           (sep-str (propertize " → " 'face face-sep)))
+      (condition-case nil
+          (unless (org-in-src-block-p)
+            (cond
+             ;; Check if at end of buffer or last line
+             ((or (eobp)
+                  (save-excursion (forward-line 1) (eobp)))
+              (funcall callback (propertize "Bottom Level" 'face face-path)))
+             
+             ;; Check heading hierarchy
+             ((let ((path (ignore-errors (org-get-outline-path t))))
+                (when path
+                  (funcall callback
+                           (mapconcat
+                            (lambda (heading)
+                              (if (string= heading (car (last path)))
+                                  (propertize heading 'face face-current)
+                                (propertize heading 'face face-path)))
+                            path
+                            sep-str)))))
+             
+             ;; Default to Top Level
+             (t
+              (funcall callback (propertize "Top Level" 'face face-path)))))
+        (error nil)))))
+
+(defun ar/org-eldoc-heading-info (callback &rest _)
+  "Show TODO keyword, priority, and tags for current heading."
+  (when (derived-mode-p 'org-mode)
+    (condition-case nil
+        (let* ((element (org-element-at-point))
+               (type (org-element-type element)))
+          (when (eq type 'headline)
+            (let* ((todo (org-element-property :todo-keyword element))
+                   (priority (org-element-property :priority element))
+                   (tags (org-element-property :tags element))
+                   (info-parts '()))
+              (when todo
+                (push (propertize todo 'face (org-get-todo-face todo))
+                      info-parts))
+              (when priority
+                (push (propertize (format "[#%c]" priority) 'face
+                                 (org-get-priority-face priority))
+                      info-parts))
+              (when tags
+                (push (propertize (concat ":" (string-join tags ":") ":")
+                                 'face 'org-tag)
+                      info-parts))
+              (when info-parts
+                (funcall callback (string-join (nreverse info-parts) " "))))))
+      (error nil))))
+
+(defun ar/org-eldoc-timestamps (callback &rest _)
+  "Show scheduling info (SCHEDULED, DEADLINE, CLOSED) for current heading."
+  (when (derived-mode-p 'org-mode)
+    (condition-case nil
+        (let* ((element (org-element-at-point))
+               (type (org-element-type element)))
+          (when (eq type 'headline)
+            (let* ((scheduled (org-element-property :scheduled element))
+                   (deadline (org-element-property :deadline element))
+                   (closed (org-element-property :closed element))
+                   (timestamps '()))
+              (when scheduled
+                (push (concat
+                       (propertize "SCHEDULED: " 'face 'org-special-keyword)
+                       (org-element-property :raw-value scheduled))
+                      timestamps))
+              (when deadline
+                (push (concat
+                       (propertize "DEADLINE: " 'face 'org-special-keyword)
+                       (org-element-property :raw-value deadline))
+                      timestamps))
+              (when closed
+                (push (concat
+                       (propertize "CLOSED: " 'face 'org-special-keyword)
+                       (org-element-property :raw-value closed))
+                      timestamps))
+              (when timestamps
+                (funcall callback (string-join (nreverse timestamps) " │ "))))))
+      (error nil))))
+
+(defun ar/org-eldoc-link (callback &rest _)
+  "Show link type and target."
+  (when (derived-mode-p 'org-mode)
+    (condition-case nil
+        (when-let ((context (org-element-context)))
+          (when (eq (org-element-type context) 'link)
+            (let* ((type (org-element-property :type context))
+                   (path (org-element-property :path context))
+                   (desc (when (org-element-property :contents-begin context)
+                           (buffer-substring-no-properties
+                            (org-element-property :contents-begin context)
+                            (org-element-property :contents-end context)))))
+              (when (and type path)
+                (funcall callback
+                         (concat
+                          (propertize "Link: " 'face 'bold)
+                          (propertize (concat type ":" path) 'face 'link)
+                          (when desc
+                            (format " [%s]" 
+                                   (propertize desc 'face 'font-lock-doc-face)))))))))
+      (error nil))))
+
+(defun ar/org-eldoc-table (callback &rest _)
+  "Show table cell position and formula information."
+  (when (and (derived-mode-p 'org-mode)
+             (org-at-table-p)
+             (not (org-at-table.el-p)))
+    (condition-case nil
+        (let* ((col (org-table-current-column))
+               (row (save-excursion
+                      (org-table-goto-line 1)
+                      (count-lines (org-table-begin) (line-beginning-position))))
+               (formula (org-table-get-formula col)))
+          (funcall callback
+                   (concat
+                    (propertize (format "Cell[%d,%d]" row col) 
+                               'face 'font-lock-keyword-face)
+                    (when (and formula (not (string-empty-p formula)))
+                      (format " Formula: %s" 
+                             (propertize formula 'face 'font-lock-function-name-face))))))
+      (error nil))))
+
+(defun ar/org-eldoc-drawer (callback &rest _)
+  "Show current drawer name."
+  (when (derived-mode-p 'org-mode)
+    (condition-case nil
+        (save-excursion
+          (beginning-of-line)
+          (when (looking-at org-drawer-regexp)
+            (let ((drawer (match-string 1)))
+              (funcall callback
+                       (propertize (format "Drawer: :%s:" drawer)
+                                  'face 'org-drawer)))))
+      (error nil))))
+
+(defun ar/org-eldoc-property (callback &rest _)
+  "Show property at point."
+  (when (derived-mode-p 'org-mode)
+    (condition-case nil
+        (let ((context (org-element-context)))
+          (when (eq (org-element-type context) 'node-property)
+            (let ((key (org-element-property :key context))
+                  (value (org-element-property :value context)))
+              (funcall callback
+                       (format "%s: %s"
+                               (propertize key 'face 'org-special-keyword)
+                               (propertize value 'face 'font-lock-string-face))))))
+      (error nil))))
+
+(defun ar/org-eldoc-clock (callback &rest _)
+  "Show currently clocked item if any."
+  (when (and (derived-mode-p 'org-mode)
+             (featurep 'org-clock)
+             (bound-and-true-p org-clock-current-task))
+    (condition-case nil
+        (funcall callback
+                 (format "%s %s"
+                         (propertize "CLOCKING:" 'face 'org-special-keyword)
+                         (propertize org-clock-current-task 'face 'org-clock-overlay)))
+      (error nil))))
+
+;; On-demand functions (not in eldoc)
+(defun ar/org-show-statistics ()
+  "Show statistics about current subtree (word count, task count)."
+  (interactive)
+  (when (derived-mode-p 'org-mode)
+    (condition-case nil
+        (let* ((element (org-element-at-point))
+               (type (org-element-type element)))
+          (if (eq type 'headline)
+              (save-excursion
+                (org-narrow-to-subtree)
+                (let* ((words (count-words (point-min) (point-max)))
+                       (tasks (length (org-map-entries t "/+TODO|DONE|NEXT|WAIT|HOLD" 'tree)))
+                       (done (length (org-map-entries t "/+DONE" 'tree))))
+                  (widen)
+                  (message (concat
+                            (when (> words 0)
+                              (format "%s words" 
+                                     (propertize (number-to-string words) 
+                                               'face 'font-lock-constant-face)))
+                            (when (and (> words 0) (> tasks 0)) " │ ")
+                            (when (> tasks 0)
+                              (format "Tasks: %s/%s" 
+                                     (propertize (number-to-string done) 
+                                               'face 'org-done)
+                                     (propertize (number-to-string tasks)
+                                               'face 'org-todo)))))))
+            (message "Not in an Org heading")))
+      (error (message "Failed to calculate statistics")))))
+
+(defun ar/org-show-src-block-info ()
+  "Show source block language and important parameters."
+  (interactive)
+  (when (and (derived-mode-p 'org-mode)
+             (org-in-src-block-p))
+    (condition-case nil
+        (save-excursion
+          (let* ((element (org-element-at-point))
+                 (lang (org-element-property :language element))
+                 (switches (org-element-property :switches element))
+                 (parameters (org-element-property :parameters element)))
+            (when lang
+              (message (concat
+                        (propertize "Source: " 'face 'bold)
+                        (propertize lang 'face 'font-lock-keyword-face)
+                        (when switches
+                          (format " %s" (propertize switches 'face 'font-lock-comment-face)))
+                        (when (and parameters (not (string-empty-p parameters)))
+                          (format " [%s]" 
+                                 (propertize parameters 'face 'font-lock-comment-face))))))))
+      (error (message "Not in a source block or failed to retrieve info")))))
+
+;; Keybindings for on-demand functions (not using general.el)
+(with-eval-after-load 'org
+  (define-key org-mode-map (kbd "C-c i s") #'ar/org-show-statistics)
+  (define-key org-mode-map (kbd "C-c i b") #'ar/org-show-src-block-info))
+
+;; Register eldoc functions for org-mode
+(add-hook 'org-mode-hook
+          (lambda ()
+            (setq-local eldoc-documentation-strategy 'eldoc-documentation-compose)
+            ;; Register functions with priorities (negative = higher priority)
+            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-clock -100 t)
+            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-link -80 t)
+            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-table -70 t)
+            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-property -60 t)
+            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-drawer -50 t)
+            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-heading-info -40 t)
+            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-timestamps -30 t)
+            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-breadcrumb -10 t)))
+#+end_src
+
 * Dashboard
 
 #+begin_src emacs-lisp
@@ -2504,7 +2749,7 @@ These functions are now safe to use in org-mode source blocks without breaking r
 ** Treesit-Fold
 #+begin_src emacs-lisp
 (use-package treesit-fold
-  :ensure (:host github :repo "emacs-tree-sitter/treesit-fold")
+  :vc (:url "https://github.com/emacs-tree-sitter/treesit-fold.git")
   :custom
   (treesit-fold-indicators-priority -1)
   :config
@@ -2555,7 +2800,7 @@ These functions are now safe to use in org-mode source blocks without breaking r
 #+begin_src emacs-lisp
 (use-package hl-line
   :ensure nil
-  :hook ((elpaca-after-init . global-hl-line-mode)
+  :hook ((after-init . global-hl-line-mode)
          ((dashboard-mode eshell-mode shell-mode term-mode vterm-mode) .
           (lambda () (setq-local global-hl-line-mode nil))))
   :config
@@ -2605,6 +2850,19 @@ These functions are now safe to use in org-mode source blocks without breaking r
   (add-hook 'evil-visual-state-exit-hook #'ar/enable-indent-bars-after-visual)
   :config
   (require 'indent-bars-ts))
+
+(use-package dtrt-indent
+  :config
+  (dtrt-indent-global-mode 1)
+  ;; Optional: Adjust verbosity
+  ;; 0 = silent, 1 = notify on change (default), 2 = explain why not changed, 3 = debug
+  (setq dtrt-indent-verbosity 1)
+  ;; Optional: Set minimum confidence threshold
+  ;; Only adjust if dtrt-indent is confident in its detection
+  (setq dtrt-indent-min-quality 100)
+
+  ;; Optional: Exclude certain modes where you want manual control
+  (setq dtrt-indent-mode-exclude-list '(org-mode)))
 #+end_src
 
 ** Highlight brackets according to their depth
@@ -2629,7 +2887,7 @@ These functions are now safe to use in org-mode source blocks without breaking r
 #+begin_src emacs-lisp
 (use-package paren
   :ensure nil
-  :hook (elpaca-after-init . show-paren-mode)
+  :hook (after-init . show-paren-mode)
   :custom
   (show-paren-delay 0.1)
   (show-paren-highlight-openparen t)
@@ -2716,7 +2974,7 @@ These functions are now safe to use in org-mode source blocks without breaking r
   :custom-face
   (hl-todo ((t (:inherit default :height 0.9 :width condensed :weight bold :underline nil :inverse-video nil))))
   
-  :hook ((elpaca-after-init . global-hl-todo-mode)
+  :hook ((after-init . global-hl-todo-mode)
          (org-mode . hl-todo-mode))
   
   :init
@@ -2808,6 +3066,7 @@ These functions are now safe to use in org-mode source blocks without breaking r
        "")
      (propertize " Prettify Symbols" 'face 'transient-heading)))
 
+  (with-eval-after-load 'transient
   (transient-define-prefix ar/prettify-symbols-transient ()
     "Prettify Symbols Control"
     [:description ar/prettify-symbols-title]
@@ -2828,6 +3087,9 @@ These functions are now safe to use in org-mode source blocks without breaking r
      ["Edit"
       ("r" "Reload" ar/prettify-symbols-reload :transient t)
       ("i" "Insert Unicode" ar/prettify-symbols-insert-unicode)]]))
+
+
+  )
 #+end_src
 
 ** Custom Compose Predicate
@@ -2968,7 +3230,7 @@ Use this if you want maximum prettification."
   (defun ar/prettify-symbols-org-setup ()
     "Configure prettify-symbols for Org mode.
   Note: org-modern handles most visual improvements, so we're conservative here."
-    (setq- prettify-symbols-alist
+    (setq prettify-symbols-alist
           '(("->" . ?→)
             ("<-" . ?←)
             ("=>" . ?⇒)
@@ -3137,20 +3399,22 @@ VERTical Interactive COmpletion
   (vertico-count 10)
   (vertico-resize nil)
   (vertico-cycle t)
+  :init
+  (vertico-mode)
 
   :bind (:map vertico-map
          ("RET" . vertico-directory-enter)
          ("DEL" . vertico-directory-delete-char)
          ("M-DEL" . vertico-directory-delete-word))
-  :hook ((elpaca-after-init . vertico-mode)
-         (rfn-eshadow-update-overlay . vertico-directory-tidy)))
+  :hook ((rfn-eshadow-update-overlay . vertico-directory-tidy)))
 #+end_src
 
 ** Marginalia
 Enrich existing commands with completion annotations
 #+begin_src emacs-lisp
 (use-package marginalia
-  :hook (elpaca-after-init . marginalia-mode)
+  :init
+  (marginalia-mode)
   :config
   (setq marginalia-max-relative-age 0 ; Always show absolute time
         marginalia-align 'right))
@@ -3161,9 +3425,9 @@ Add icons to completion candidates
 #+begin_src emacs-lisp
 (use-package nerd-icons-completion
   :after marginalia
-  :hook (marginalia-mode . nerd-icons-completion-marginalia-setup)
   :config
-  (nerd-icons-completion-mode))
+  (nerd-icons-completion-mode)
+  (add-hook 'marginalia-mode-hook #'nerd-icons-completion-marginalia-setup))
 #+end_src
 
 ** Consult
@@ -3341,6 +3605,8 @@ targets."
 ** Corfu
 #+begin_src emacs-lisp
 (use-package corfu
+  :init
+  (global-corfu-mode)
   :autoload (corfu-quit consult-completion-in-region)
   :functions (persistent-scratch-save corfu-move-to-minibuffer)
   :custom
@@ -3367,8 +3633,7 @@ targets."
         ("S-TAB" . corfu-previous)
         ([backtab] . corfu-previous)
         ("M-h" . corfu-info-documentation))
-  :hook ((elpaca-after-init . global-corfu-mode)
-         (global-corfu-mode . corfu-history-mode))
+  :hook ((global-corfu-mode . corfu-history-mode))
   :config
   ;;Quit completion before saving
   (add-hook 'before-save-hook #'corfu-quit)
@@ -3577,16 +3842,22 @@ If completion fails in the future, check these:
 ** Direnv
 #+begin_src emacs-lisp
 (use-package envrc
-  :hook (elpaca-after-init . envrc-global-mode))
+  :hook (after-init . envrc-global-mode))
 #+end_src
 
 ** LSP
 #+begin_src emacs-lisp
 (use-package eglot-booster
-  :ensure (:host github :repo "jdtsmith/eglot-booster")
+  :vc (:url "https://github.com/jdtsmith/eglot-booster.git")
   :after eglot
+  :init
+  (setq eglot-booster-io-only
+        ;; JSON parser on 30+ is faster, so we only exploit eglot-booster's IO
+        ;; buffering (benefits more talkative LSP servers).
+        (and (> emacs-major-version 29)
+             (not (functionp 'json-rpc-connection))))
   :config
-  (eglot-booster-mode))
+  (eglot-booster-mode +1))
 
 (use-package eglot
   :ensure nil
@@ -3612,7 +3883,7 @@ If completion fails in the future, check these:
 
 (use-package org-src-context
   :ensure nil ; Relies on lisp/org-src-context.el
-  :hook (elpaca-after-init . org-src-context-mode)
+  :hook (after-init . org-src-context-mode)
   :custom
   ;; Visual: Set to 'nil' to see the grayed-out context surrounding your block.
   ;; Set to 't' if you prefer a focused view (narrowed to just your code).
@@ -3742,7 +4013,7 @@ If completion fails in the future, check these:
 ** Formatting
 #+begin_src emacs-lisp
 (use-package apheleia
-  :hook (elpaca-after-init . apheleia-global-mode)
+  :hook (after-init . apheleia-global-mode)
   :custom
   (apheleia-log-only-errors t)
   :config
@@ -4107,8 +4378,6 @@ If completion fails in the future, check these:
 * Version Control
 ** Magit: The Git Porcelain
 #+begin_src emacs-lisp
-(use-package transient :defer t)
-
 (use-package magit
   :defer t
   :commands (magit-status 
@@ -4436,7 +4705,6 @@ If completion fails in the future, check these:
         )      
 #+end_src
 
-
 ** File Management Extensions
 #+begin_src emacs-lisp
 (use-package dired-x
@@ -4525,7 +4793,7 @@ If completion fails in the future, check these:
 ** Tabspaces
 #+begin_src emacs-lisp
 (use-package tabspaces
-  :hook (elpaca-after-init . tabspaces-mode)
+  :hook (after-init . tabspaces-mode)
   :custom
   (tab-bar-show nil) ;; We use the modeline/consult to visualize tabs
   
@@ -4639,7 +4907,7 @@ If completion fails in the future, check these:
   (run-with-idle-timer 300 t #'my-tabspaces-safe-save)
 
   ;; Attempt restore 2 seconds after startup
-  (add-hook 'elpaca-after-init-hook
+  (add-hook 'emacs-startup-hook
             (lambda ()
               (run-with-idle-timer 2 nil #'my-tabspaces-safe-restore))))
 #+end_src
@@ -4700,6 +4968,20 @@ If completion fails in the future, check these:
     (kbd "TAB") #'treemacs-TAB-action
     (kbd "o")   #'treemacs-visit-node-ace
     (kbd "q")   #'treemacs-quit))
+#+end_src
+
+** Project.el
+#+begin_src emacs-lisp
+(defun ar/project-switch-to-file ()
+  "Switch to a project and immediately find a file in it."
+  (interactive)
+  (let ((project-switch-commands #'project-find-file))
+    (call-interactively #'project-switch-project)))
+
+(defun ar/project-switch-with-menu ()
+  "Switch to a project and show the dispatch menu."
+  (interactive)
+  (call-interactively #'project-switch-project))
 #+end_src
 
 * Markdown
@@ -4891,7 +5173,7 @@ If completion fails in the future, check these:
 #+begin_src emacs-lisp
 (use-package which-key
   :defer 0.5
-  :hook (elpaca-after-init . which-key-mode)
+  :hook (after-init . which-key-mode)
   :custom
   (which-key-idle-delay 0.1)
   (which-key-separator " → ")
@@ -5488,13 +5770,12 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
   (require 'cape)
   (setq-local completion-at-point-functions
               (list (cape-capf-super
-                     #'eglot-completion-at-point      ; LSP intelligence (citations, refs)
-                     #'LaTeX-completion-at-point    ; AUCTeX specific macros
-                     #'TeX--completion-at-point)    ; TeX primitives
-                    #'cape-dabbrev                  ; Words in buffer
-                    #'cape-file)))                 ; File paths
+                     #'eglot-completion-at-point
+                     #'LaTeX-completion-at-point
+                     #'TeX--completion-at-point)
+                    #'cape-dabbrev
+                    #'cape-file)))
 
-;; Hook into LaTeX mode to activate this setup
 (add-hook 'LaTeX-mode-hook #'ar/latex-setup-completion)
 #+end_src
 
@@ -5504,7 +5785,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
 (use-package winner
   :ensure nil
   :commands (winner-undo winner-redo)
-  :hook (elpaca-after-init . winner-mode)
+  :hook (after-init . winner-mode)
   :init (setq winner-boring-buffers '("*Completions*"
                                       "*Compile-Log*"
                                       "*inferior-lisp*"
@@ -5623,7 +5904,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
   :custom
   (popper-group-function #'popper-group-by-directory)
   (popper-echo-dispatch-actions t)
-  :hook (elpaca-after-init . popper-echo-mode)
+  :hook (after-init . popper-echo-mode)
   :init
   (setq popper-mode-line ""
         popper-reference-buffers
@@ -5942,7 +6223,8 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
   ;; Project operations (SPC p)
   (ar/global-leader
     "p" '(:ignore t :wk "project")
-    "p p" '(project-switch-project :wk "Switch project")
+    "p p" '(ar/project-switch-to-file :wk "Switch project → find file")
+    "p P" '(ar/project-switch-with-menu :wk "Switch project (menu)")
     "p f" '(project-find-file :wk "Find file in project")
     "p s" '(consult-ripgrep :wk "Search project")
     "p b" '(consult-project-buffer :wk "Project buffers")
@@ -5951,7 +6233,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
     "p d" '(project-dired :wk "Dired project root")
     "p e" '(project-eshell :wk "Eshell in project")
     "p t" '(treemacs :wk "Treemacs"))
-
+  
   ;; Toggle operations (SPC t)
   (ar/global-leader
     "t" '(:ignore t :wk "toggle")
@@ -6346,3 +6628,4 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
     "x p" '(org-set-property :wk "Set property")
     "x t" '(org-set-tags-command :wk "Set tags")))
 #+end_src
+
