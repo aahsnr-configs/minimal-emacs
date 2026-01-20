@@ -206,6 +206,12 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (if (region-active-p)
       (buffer-substring-no-properties (region-beginning) (region-end))
     (thing-at-point 'symbol t)))
+
+(defun ar/open-emacs-config-project ()
+  "Open Emacs config directory as a project."
+  (interactive)
+  (let ((default-directory user-emacs-directory))
+    (call-interactively #'project-find-file)))
 #+end_src
 
 ** Constants
@@ -6169,6 +6175,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
     "f r" '(consult-recent-file :wk "Recent files")
     "f s" '(save-buffer :wk "Save file")
     "f S" '(write-file :wk "Save as")
+    "f p" '(ar/open-emacs-config-project :wk "Config project")
     "f E" '(sudo-edit :wk "Sudo edit")
     "f l" '(reload-init-file :wk "Reload config")
     "f e" '(:ignore t :wk "emacs")
