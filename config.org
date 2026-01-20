@@ -61,56 +61,14 @@ Lower this if you experience freezing, raise if stuttering.")
 
 ** Package Management
 #+begin_src emacs-lisp
-;; To check your system's file handle limit: ulimit -n
-(defvar elpaca-queue-limit 30
-  "Maximum number of packages to process concurrently.
-This prevents file handle exhaustion on systems with limited resources.")
+(require 'package)
 
-(defvar elpaca-installer-version 0.11)
-(defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
-(defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
-(defvar elpaca-repos-directory (expand-file-name "repos/" elpaca-directory))
-(defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
-                              :ref nil :depth 1 :inherit ignore
-                              :files (:defaults "elpaca-test.el" (:exclude "extensions"))
-                              :build (:not elpaca--activate-package)))
-(let* ((repo  (expand-file-name "elpaca/" elpaca-repos-directory))
-       (build (expand-file-name "elpaca/" elpaca-builds-directory))
-       (order (cdr elpaca-order))
-       (default-directory repo))
-  (add-to-list 'load-path (if (file-exists-p build) build repo))
-  (unless (file-exists-p repo)
-    (make-directory repo t)
-    (when (<= emacs-major-version 28) (require 'subr-x))
-    (condition-case-unless-debug err
-        (if-let* ((buffer (pop-to-buffer-same-window "*elpaca-bootstrap*"))
-                  ((zerop (apply #'call-process `("git" nil ,buffer t "clone"
-                                                  ,@(when-let* ((depth (plist-get order :depth)))
-                                                      (list (format "--depth=%d" depth) "--no-single-branch"))
-                                                  ,(plist-get order :repo) ,repo))))
-                  ((zerop (call-process "git" nil buffer t "checkout"
-                                        (or (plist-get order :ref) "--"))))
-                  (emacs (concat invocation-directory invocation-name))
-                  ((zerop (call-process emacs nil buffer nil "-Q" "-L" "." "--batch"
-                                        "--eval" "(byte-recompile-directory \".\" 0 'force)")))
-                  ((require 'elpaca))
-                  ((elpaca-generate-autoloads "elpaca" repo)))
-            (progn (message "%s" (buffer-string)) (kill-buffer buffer))
-          (error "%s" (with-current-buffer buffer (buffer-string))))
-      ((error) (warn "%s" err) (delete-directory repo 'recursive))))
-  (unless (require 'elpaca-autoloads nil t)
-    (require 'elpaca)
-    (elpaca-generate-autoloads "elpaca" repo)
-    (let ((load-source-file-function nil)) (load "./elpaca-autoloads"))))
-(add-hook 'after-init-hook #'elpaca-process-queues)
-(elpaca `(,@elpaca-order))
-
-;; Queue processing happens after init
-(add-hook 'elpaca-after-init-hook #'elpaca-process-queues)
-
-;; --- USE-PACKAGE INTEGRATION ---
-(elpaca elpaca-use-package
-  (elpaca-use-package-mode))
+(setq package-archives '(("gnu" . "https://elpa.gnu.org/packages/")
+                         ("nongnu" . "https://elpa.nongnu.org/nongnu/")
+                         ("melpa" . "https://melpa.org/packages/")))
+(package-initialize)
+(unless package-archive-contents
+  (package-refresh-contents))
 
 (require 'use-package)
 (require 'bind-key)
@@ -118,8 +76,8 @@ This prevents file handle exhaustion on systems with limited resources.")
 ;; --- USE-PACKAGE CONFIGURATION ---
 (setq use-package-verbose nil
       use-package-expand-minimally t
-      use-package-compute-statistics nil
       use-package-always-ensure t
+      use-package-compute-statistics nil
       use-package-enable-imenu-support t)
 #+end_src
 
@@ -517,7 +475,7 @@ This prevents file handle exhaustion on systems with limited resources.")
 (setq evil-undo-system 'undo-fu)
 
 (use-package evil
-  :ensure (:wait t)
+  :demand t
   :init
   (setq evil-want-integration t)
   (setq evil-want-keybinding nil)
@@ -767,7 +725,6 @@ This prevents file handle exhaustion on systems with limited resources.")
 * Transient
 #+begin_src emacs-lisp
 (use-package transient
-  :ensure (:wait t)
   :bind ("<f6>" . ar/toggles-transient)
   :init
   (setq resize-mini-windows t)
@@ -2935,240 +2892,121 @@ Use this if you want maximum prettification."
 
 ** Python
 #+begin_src emacs-lisp
-;; (defun ar/prettify-symbols-python-setup ()
-;;   "Configure prettify-symbols for Python modes."
-;;   (setq prettify-symbols-alist
-;;         (append
-;;          ar/prettify-symbols-base-alist
-;;          '(;; Python keywords - selective to maintain readability
-;;            ("def" . ?ƒ)            ; U+0192 LATIN SMALL LETTER F WITH HOOK
-;;            ("class" . ?𝒞)          ; U+1D49E MATHEMATICAL SCRIPT CAPITAL C
-;;            ("return" . ?⟼)         ; U+27FC LONG RIGHTWARDS ARROW FROM BAR
-;;            ("yield" . ?⟻)          ; U+27FB LONG LEFTWARDS ARROW FROM BAR
-           
-;;            ;; Python operators
-;;            ("not" . ?¬)            ; U+00AC NOT SIGN
-;;            ("in" . ?∈)             ; U+2208 ELEMENT OF
-;;            ("not in" . ?∉)         ; U+2209 NOT AN ELEMENT OF
-;;            ("and" . ?∧)            ; U+2227 LOGICAL AND
-;;            ("or" . ?∨)             ; U+2228 LOGICAL OR
-           
-;;            ;; Python constants
-;;            ("None" . ?∅)           ; U+2205 EMPTY SET
-;;            ("True" . ?⊤)           ; U+22A4 DOWN TACK
-;;            ("False" . ?⊥)          ; U+22A5 UP TACK
-           
-;;            ;; Type hints (Python 3.5+)
-;;            ("int" . ?ℤ)            ; U+2124 DOUBLE-STRUCK CAPITAL Z
-;;            ("float" . ?ℝ)          ; U+211D DOUBLE-STRUCK CAPITAL R
-;;            ("str" . ?𝕊)            ; U+1D54A MATHEMATICAL DOUBLE-STRUCK CAPITAL S
-;;            ("bool" . ?𝔹)           ; U+1D539 MATHEMATICAL DOUBLE-STRUCK CAPITAL B
-           
-;;            ;; Common type hints (commented - can be too aggressive)
-;;            ;; ("List" . ?𝐋)        ; U+1D40B MATHEMATICAL BOLD CAPITAL L
-;;            ;; ("Dict" . ?𝐃)        ; U+1D403 MATHEMATICAL BOLD CAPITAL D
-;;            ;; ("Set" . ?𝐒)         ; U+1D412 MATHEMATICAL BOLD CAPITAL S
-;;            ;; ("Tuple" . ?𝐓)       ; U+1D413 MATHEMATICAL BOLD CAPITAL T
-;;            ;; ("Optional" . ??)    ; U+2370 APL FUNCTIONAL SYMBOL QUAD QUESTION
-;;            )))
-  
-;;   ;; Custom predicate for Python to avoid conflicts with docstrings
-;;   (setq prettify-symbols-compose-predicate
-;;         #'ar/prettify-symbols-compose-p-default))
-
-;; ;; Apply to Python modes
-;; (add-hook 'python-mode-hook #'ar/prettify-symbols-python-setup)
-;; (add-hook 'python-ts-mode-hook #'ar/prettify-symbols-python-setup)
-#+end_src
-
-** JavaScript/TypeScript
-#+begin_src emacs-lisp
-(defun ar/prettify-symbols-javascript-setup ()
-  "Configure prettify-symbols for JavaScript and TypeScript."
+(defun ar/prettify-symbols-python-setup ()
+  "Configure prettify-symbols for Python modes."
   (setq prettify-symbols-alist
         (append
          ar/prettify-symbols-base-alist
-         '(;; JavaScript arrows and functions
-           ("function" . ?ƒ)       ; U+0192 LATIN SMALL LETTER F WITH HOOK
-           
-           ;; Logical operators
-           ("&&" . ?∧)             ; U+2227 LOGICAL AND
-           ("||" . ?∨)             ; U+2228 LOGICAL OR
-           
-           ;; Strict equality (JavaScript-specific)
-           ("===" . ?≡)            ; U+2261 IDENTICAL TO
-           ("!==" . ?≢)            ; U+2262 NOT IDENTICAL TO
-           
-           ;; Special values
-           ("null" . ?∅)           ; U+2205 EMPTY SET
-           ("undefined" . ?⊥)      ; U+22A5 UP TACK
-           
-           ;; Math constants (when using Math object)
-           ("Math.PI" . ?π)        ; U+03C0 GREEK SMALL LETTER PI
-           ("Infinity" . ?∞)       ; U+221E INFINITY
-           ))))
+         '(;; Python keywords - selective to maintain readability
+           ("def" . ?ƒ)            ; U+0192 LATIN SMALL LETTER F WITH HOOK
+           ("class" . ?𝒞)          ; U+1D49E MATHEMATICAL SCRIPT CAPITAL C
+           ("return" . ?⟼)         ; U+27FC LONG RIGHTWARDS ARROW FROM BAR
+           ("yield" . ?⟻)          ; U+27FB LONG LEFTWARDS ARROW FROM BAR
 
-;; Apply to JavaScript and TypeScript modes
-(add-hook 'javascript-mode-hook #'ar/prettify-symbols-javascript-setup)
-(add-hook 'js-mode-hook #'ar/prettify-symbols-javascript-setup)
-(add-hook 'js-ts-mode-hook #'ar/prettify-symbols-javascript-setup)
-(add-hook 'typescript-mode-hook #'ar/prettify-symbols-javascript-setup)
-(add-hook 'typescript-ts-mode-hook #'ar/prettify-symbols-javascript-setup)
-(add-hook 'javascript-ts-mode-hook #'ar/prettify-symbols-javascript-setup)
+           ;; Python operators
+           ("not" . ?¬)            ; U+00AC NOT SIGN
+           ("in" . ?∈)             ; U+2208 ELEMENT OF
+           ("not in" . ?∉)         ; U+2209 NOT AN ELEMENT OF
+           ("and" . ?∧)            ; U+2227 LOGICAL AND
+           ("or" . ?∨)             ; U+2228 LOGICAL OR
+
+           ;; Python constants
+           ("None" . ?∅)           ; U+2205 EMPTY SET
+           ("True" . ?⊤)           ; U+22A4 DOWN TACK
+           ("False" . ?⊥)          ; U+22A5 UP TACK
+
+           ;; Type hints (Python 3.5+)
+           ("int" . ?ℤ)            ; U+2124 DOUBLE-STRUCK CAPITAL Z
+           ("float" . ?ℝ)          ; U+211D DOUBLE-STRUCK CAPITAL R
+           ("str" . ?𝕊)            ; U+1D54A MATHEMATICAL DOUBLE-STRUCK CAPITAL S
+           ("bool" . ?𝔹)           ; U+1D539 MATHEMATICAL DOUBLE-STRUCK CAPITAL B
+
+           ;; Common type hints (commented - can be too aggressive)
+           ;; ("List" . ?𝐋)        ; U+1D40B MATHEMATICAL BOLD CAPITAL L
+           ;; ("Dict" . ?𝐃)        ; U+1D403 MATHEMATICAL BOLD CAPITAL D
+           ;; ("Set" . ?𝐒)         ; U+1D412 MATHEMATICAL BOLD CAPITAL S
+           ;; ("Tuple" . ?𝐓)       ; U+1D413 MATHEMATICAL BOLD CAPITAL T
+           ;; ("Optional" . ??)    ; U+2370 APL FUNCTIONAL SYMBOL QUAD QUESTION
+           )))
+
+  ;; Custom predicate for Python to avoid conflicts with docstrings
+  (setq prettify-symbols-compose-predicate
+        #'ar/prettify-symbols-compose-p-default))
+
+;; Apply to Python modes
+(add-hook 'python-mode-hook #'ar/prettify-symbols-python-setup)
+(add-hook 'python-ts-mode-hook #'ar/prettify-symbols-python-setup)
 #+end_src
 
 ** Shell/Bash
 #+begin_src emacs-lisp
-;; (defun ar/prettify-symbols-shell-setup ()
-;;   "Configure prettify-symbols for shell scripts."
-;;   (setq prettify-symbols-alist
-;;         (append
-;;          ar/prettify-symbols-base-alist
-;;          '(;; Test operators (be conservative here)
-;;            ("-eq" . ?=)            ; Keep simple for readability
-;;            ("-ne" . ?≠)            ; U+2260 NOT EQUAL TO
-;;            ("-le" . ?≤)            ; U+2264 LESS-THAN OR EQUAL TO
-;;            ("-ge" . ?≥)            ; U+2265 GREATER-THAN OR EQUAL TO
-           
-;;            ;; Logical operators
-;;            ("&&" . ?∧)             ; U+2227 LOGICAL AND
-;;            ("||" . ?∨)             ; U+2228 LOGICAL OR
-           
-;;            ;; Don't prettify pipe | - it's too fundamental to shell syntax
-;;            ))))
-
-;; ;; Apply to shell modes
-;; (add-hook 'sh-mode-hook #'ar/prettify-symbols-shell-setup)
-;; (add-hook 'bash-ts-mode-hook #'ar/prettify-symbols-shell-setup)
-#+end_src
-
-** C/C++
-#+begin_src emacs-lisp
-(defun ar/prettify-symbols-c-setup ()
-  "Configure prettify-symbols for C/C++ modes."
+(defun ar/prettify-symbols-shell-setup ()
+  "Configure prettify-symbols for shell scripts."
   (setq prettify-symbols-alist
         (append
          ar/prettify-symbols-base-alist
-         '(;; C/C++ specific
-           ("NULL" . ?∅)           ; U+2205 EMPTY SET
-           ("nullptr" . ?∅)        ; U+2205 EMPTY SET (C++11)
-           
-           ;; Logical operators (standard C operators)
-           ("&&" . ?∧)             ; U+2227 LOGICAL AND
-           ("||" . ?∨)             ; U+2228 LOGICAL OR
-           
-           ;; Avoid prettifying -> as it's semantically important for pointers
-           ;; Avoid prettifying ! as it's used frequently and would be confusing
-           
-           ;; Math constants
-           ("M_PI" . ?π)           ; U+03C0 GREEK SMALL LETTER PI
-           ("INFINITY" . ?∞)       ; U+221E INFINITY
-           ))))
+         '(;; Test operators (be conservative here)
+           ("-eq" . ?=)            ; Keep simple for readability
+           ("-ne" . ?≠)            ; U+2260 NOT EQUAL TO
+           ("-le" . ?≤)            ; U+2264 LESS-THAN OR EQUAL TO
+           ("-ge" . ?≥)            ; U+2265 GREATER-THAN OR EQUAL TO
 
-;; Apply to C/C++ modes
-(add-hook 'c-mode-hook #'ar/prettify-symbols-c-setup)
-(add-hook 'c++-mode-hook #'ar/prettify-symbols-c-setup)
-(add-hook 'c-ts-mode-hook #'ar/prettify-symbols-c-setup)
-(add-hook 'c++-ts-mode-hook #'ar/prettify-symbols-c-setup)
-#+end_src
-
-** Rust
-#+begin_src emacs-lisp
-(defun ar/prettify-symbols-rust-setup ()
-  "Configure prettify-symbols for Rust mode."
-  (setq prettify-symbols-alist
-        (append
-         ar/prettify-symbols-base-alist
-         '(;; Rust-specific
-           ("fn" . ?ƒ)             ; U+0192 LATIN SMALL LETTER F WITH HOOK
-           
            ;; Logical operators
            ("&&" . ?∧)             ; U+2227 LOGICAL AND
            ("||" . ?∨)             ; U+2228 LOGICAL OR
-           
-           ;; Avoid prettifying -> as it's the return type operator in Rust
-           ;; This is semantically important
-           )))
-  
-  ;; Custom predicate for Rust to avoid conflicts with closure syntax ||
-  (setq-local prettify-symbols-compose-predicate
-              (lambda (start end match)
-                (and (ar/prettify-symbols-compose-p-default start end match)
-                     ;; Don't prettify || in closure parameters
-                     (not (and (string= match "||")
-                               (save-excursion
-                                 (goto-char start)
-                                 (looking-back "\\(?:\\<move\\|=\\) *" 
-                                              (line-beginning-position)))))))))
 
-;; Apply to Rust mode (if installed)
-(with-eval-after-load 'rust-mode
-  (add-hook 'rust-mode-hook #'ar/prettify-symbols-rust-setup))
-(with-eval-after-load 'rust-ts-mode
-  (add-hook 'rust-ts-mode-hook #'ar/prettify-symbols-rust-setup))
+           ;; Don't prettify pipe | - it's too fundamental to shell syntax
+           ))))
+
+;; Apply to shell modes
+(add-hook 'sh-mode-hook #'ar/prettify-symbols-shell-setup)
+(add-hook 'bash-ts-mode-hook #'ar/prettify-symbols-shell-setup)
 #+end_src
 
 ** Org Mode
 #+begin_src emacs-lisp
-(defun ar/prettify-symbols-org-setup ()
-  "Configure prettify-symbols for Org mode.
-Note: org-modern handles most visual improvements, so we're conservative here."
-  (setq prettify-symbols-alist
-        '(;; Arrows and implications (useful in text)
-          ("->" . ?→)              ; U+2192 RIGHTWARDS ARROW
-          ("<-" . ?←)              ; U+2190 LEFTWARDS ARROW
-          ("=>" . ?⇒)              ; U+21D2 RIGHTWARDS DOUBLE ARROW
-          ("<=" . ?≤)              ; U+2264 LESS-THAN OR EQUAL TO (when used as symbol)
-          (">=" . ?≥)              ; U+2265 GREATER-THAN OR EQUAL TO (when used as symbol)
-          
-          ;; Common symbols in prose
-          ("!=" . ?≠)              ; U+2260 NOT EQUAL TO
-          ("..." . ?…)             ; U+2026 HORIZONTAL ELLIPSIS
-          
-          ;; Source block markers (subtle, won't conflict with org-modern)
-          ;; Commented out if you prefer org-modern's handling
-          ;; ("#+BEGIN_SRC" . ?»)   ; U+00BB RIGHT-POINTING DOUBLE ANGLE QUOTATION MARK
-          ;; ("#+END_SRC" . ?«)     ; U+00AB LEFT-POINTING DOUBLE ANGLE QUOTATION MARK
-          ;; ("#+begin_src" . ?»)
-          ;; ("#+end_src" . ?«)
-          ))
-  
-  ;; Don't prettify in code blocks (org-modern handles those)
-  (setq-local prettify-symbols-compose-predicate
-              (lambda (start end match)
-                (and (ar/prettify-symbols-compose-p-default start end match)
-                     ;; Don't prettify in src blocks
-                     (not (org-in-src-block-p))))))
+  (defun ar/prettify-symbols-org-setup ()
+    "Configure prettify-symbols for Org mode.
+  Note: org-modern handles most visual improvements, so we're conservative here."
+    (setq- prettify-symbols-alist
+          '(("->" . ?→)
+            ("<-" . ?←)
+            ("=>" . ?⇒)
+            ("<=" . ?≤)
+            (">=" . ?≥)
 
-(add-hook 'org-mode-hook #'ar/prettify-symbols-org-setup)
+            ("!=" . ?≠)
+            ("..." . ?…)
+
+            ;; Source block markers (subtle, won't conflict with org-modern)
+            ;; Commented out if you prefer org-modern's handling
+            ("#+BEGIN_SRC" . ?»)
+            ("#+END_SRC" . ?«)
+            ("#+begin_src" . ?»)
+            ("#+end_src" . ?«))))
+
+  (add-hook 'org-mode-hook #'ar/prettify-symbols-org-setup)
 #+end_src
 
 ** Markdown
 #+begin_src emacs-lisp
-(defun ar/prettify-symbols-markdown-setup ()
-  "Configure prettify-symbols for Markdown mode."
-  (setq prettify-symbols-alist
-        '(;; Common symbols
-          ("->" . ?→)              ; U+2192 RIGHTWARDS ARROW
-          ("<-" . ?←)              ; U+2190 LEFTWARDS ARROW
-          ("=>" . ?⇒)              ; U+21D2 RIGHTWARDS DOUBLE ARROW
-          ("<=" . ?≤)              ; U+2264 LESS-THAN OR EQUAL TO
-          (">=" . ?≥)              ; U+2265 GREATER-THAN OR EQUAL TO
-          ("!=" . ?≠)              ; U+2260 NOT EQUAL TO
-          ("..." . ?…)             ; U+2026 HORIZONTAL ELLIPSIS
-          
-          ;; Code fence markers (subtle)
-          ("```" . ?‣)             ; U+2023 TRIANGULAR BULLET
-          
-          ;; Checkbox syntax (if using GitHub-flavored markdown)
-          ;; Note: Some markdown modes handle these specially
-          ("[ ]" . ?☐)          ; U+2610 BALLOT BOX
-          ("[x]" . ?☑)          ; U+2611 BALLOT BOX WITH CHECK
-          ("[X]" . ?☑)          ; U+2611 BALLOT BOX WITH CHECK
-          )))
+  (defun ar/prettify-symbols-markdown-setup ()
+    "Configure prettify-symbols for Markdown mode."
+    (setq prettify-symbols-alist
+          '(("->" . ?→)
+            ("<-" . ?←)
+            ("=>" . ?⇒)
+            ("<=" . ?≤)
+            (">=" . ?≥)
+            ("!=" . ?≠)
+            ("..." . ?…)
+            ("```" . ?‣)
+            ("[ ]" . ?☐)
+            ("[x]" . ?☑)
+            ("[X]" . ?☑))))
 
-(add-hook 'markdown-mode-hook #'ar/prettify-symbols-markdown-setup)
-(add-hook 'gfm-mode-hook #'ar/prettify-symbols-markdown-setup)
+  (add-hook 'markdown-mode-hook #'ar/prettify-symbols-markdown-setup)
+  (add-hook 'gfm-mode-hook #'ar/prettify-symbols-markdown-setup)
 #+end_src
 
 ** Helper Functions
@@ -3278,171 +3116,6 @@ Re-enables it after save. Prevents indentation issues."
 ;; Uncomment to enable save protection (usually not needed)
 ;; (add-hook 'before-save-hook #'ar/prettify-symbols-before-save)
 
-#+end_src
-
-* Elisp
-#+begin_src emacs-lisp
-(use-package elisp-mode
-  :ensure nil
-  :config
-  (with-no-warnings
-    (defun my-lisp-indent-function (indent-point state)
-      (let ((normal-indent (current-column))
-            (orig-point (point)))
-        (goto-char (1+ (elt state 1)))
-        (parse-partial-sexp (point) calculate-lisp-indent-last-sexp 0 t)
-        (cond
-         ((and (elt state 2)
-               (or (not (looking-at "\\sw\\|\\s_"))
-                   (looking-at ":")))
-          (if (not (> (save-excursion (forward-line 1) (point))
-                     calculate-lisp-indent-last-sexp))
-              (progn (goto-char calculate-lisp-indent-last-sexp)
-                     (beginning-of-line)
-                     (parse-partial-sexp (point)
-                                         calculate-lisp-indent-last-sexp 0 t)))
-          (backward-prefix-chars)
-          (current-column))
-         ((and (save-excursion
-                 (goto-char indent-point)
-                 (skip-syntax-forward " ")
-                 (not (looking-at ":")))
-               (save-excursion
-                 (goto-char orig-point)
-                (looking-at ":")))
-         (save-excursion
-           (goto-char (+ 2 (elt state 1)))
-           (current-column)))
-        (t
-         (let ((function (buffer-substring (point)
-                                           (progn (forward-sexp 1) (point))))
-               method)
-           (setq method (or (function-get (intern-soft function)
-                                          'lisp-indent-function)
-                            (get (intern-soft function) 'lisp-indent-hook)))
-           (cond ((or (eq method 'defun)
-                      (and (null method)
-                           (length> function 3)
-                           (string-match "\\`def" function)))
-                  (lisp-indent-defform state indent-point))
-                 ((integerp method)
-                  (lisp-indent-specform method state
-                                        indent-point normal-indent))
-                 (method
-                  (funcall method indent-point state))))))))
-   (add-hook 'emacs-lisp-mode-hook
-             (lambda () (setq-local lisp-indent-function #'my-lisp-indent-function)))
-
-   ;; Add remove buttons for advices
-   (add-hook 'help-mode-hook 'cursor-sensor-mode)
-
-   (defun function-advices (function)
-     "Return FUNCTION's advices."
-     (let ((flist (indirect-function function)) advices)
-       (while (advice--p flist)
-         (setq advices `(,@advices ,(advice--car flist)))
-         (setq flist (advice--cdr flist)))
-       advices))
-
-   (defun add-remove-advice-button (advice function)
-     (when (and (functionp advice) (functionp function))
-       (let ((inhibit-read-only t)
-             (msg (format "Remove advice `%s'" advice)))
-         (insert "\t")
-         (insert-button
-          "Remove"
-          'face 'custom-button
-          'cursor-sensor-functions `((lambda (&rest _) ,msg))
-          'help-echo msg
-          'action (lambda (_)
-                    (when (yes-or-no-p msg)
-                      (message "%s from function `%s'" msg function)
-                      (advice-remove function advice)
-                      (if (eq major-mode 'helpful-mode)
-                          (helpful-update)
-                        (revert-buffer nil t))))
-          'follow-link t))))
-
-   (defun add-button-to-remove-advice (buffer-or-name function)
-     "Add a button to remove advice."
-     (with-current-buffer buffer-or-name
-       (save-excursion
-         (goto-char (point-min))
-         (let ((ad-list (function-advices function)))
-           (while (re-search-forward "^\\(?:This function has \\)?:[-a-z]+ advice: \\(.+\\)$" nil t)
-             (let ((advice (car ad-list)))
-               (add-remove-advice-button advice function)
-               (setq ad-list (delq advice ad-list))))))))
-
-   (define-advice describe-function-1 (:after (function) advice-remove-button)
-     (add-button-to-remove-advice (help-buffer) function))
-   (with-eval-after-load 'helpful
-     (define-advice helpful-update (:after () advice-remove-button)
-       (when helpful--callable-p
-         (add-button-to-remove-advice (current-buffer) helpful--sym))))
-
-   ;; Remove hooks
-   (defun remove-hook-at-point ()
-     "Remove the hook at the point in the *Help* buffer."
-     (interactive)
-     (unless (memq major-mode '(help-mode helpful-mode))
-       (error "Only for help-mode or helpful-mode"))
-
-     (let ((orig-point (point)))
-       (save-excursion
-         (when-let*
-             ((hook (progn (goto-char (point-min)) (symbol-at-point)))
-              (func (when (and
-                           (or (re-search-forward (format "^Value:?[\s|\n]") nil t)
-                               (goto-char orig-point))
-                           (sexp-at-point))
-                      (end-of-sexp)
-                      (backward-char 1)
-                      (catch 'break
-                        (while t
-                          (condition-case _err
-                              (backward-sexp)
-                            (scan-error (throw 'break nil)))
-                          (let ((bounds (bounds-of-thing-at-point 'sexp)))
-                            (when (<= (car bounds) orig-point (cdr bounds))
-                              (throw 'break (sexp-at-point)))))))))
-           (when (yes-or-no-p (format "Remove %s from %s? " func hook))
-             (remove-hook hook func)
-             (if (eq major-mode 'helpful-mode)
-                 (helpful-update)
-               (revert-buffer nil t)))))))
-   (bind-key "r" #'remove-hook-at-point help-mode-map)))
-
-;; Syntax highlighting of known Elisp symbols
-(if (boundp 'elisp-fontify-semantically)
-    (setq elisp-fontify-semantically t)
-  (use-package highlight-defined
-    :hook ((emacs-lisp-mode inferior-emacs-lisp-mode) . highlight-defined-mode)))
-
-(use-package macrostep)
-
-;; A better *Help* buffer
-(use-package helpful
-  :bind (([remap describe-function] . helpful-callable)
-         ([remap describe-command]  . helpful-command)
-         ([remap describe-variable] . helpful-variable)
-         ([remap describe-key]      . helpful-key)
-         ([remap describe-symbol]   . helpful-symbol))
-  :hook (helpful-mode . cursor-sensor-mode) ; for remove-advice button
-  :init
-  (with-no-warnings
-    (with-eval-after-load 'apropos
-      ;; patch apropos buttons to call helpful instead of help
-      (dolist (fun-bt '(apropos-function apropos-macro apropos-command))
-        (button-type-put
-         fun-bt 'action
-         (lambda (button)
-           (helpful-callable (button-get button 'apropos-symbol)))))
-      (dolist (var-bt '(apropos-variable apropos-user-option))
-        (button-type-put
-         var-bt 'action
-         (lambda (button)
-           (helpful-variable (button-get button 'apropos-symbol))))))))
 #+end_src
 
 * Completion Framework
@@ -5428,14 +5101,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
 #+begin_src emacs-lisp
 (use-package tex
   :defer t
-  :ensure (auctex :repo "https://git.savannah.gnu.org/git/auctex.git"
-                  :branch "main"
-                  :pre-build (("make" "elpa"))
-                  :build (:not elpaca--compile-info)
-                  :files ("*.el" "doc/*.info*" "etc" "images" "latex" "style")
-                  :version (lambda (_) (require 'auctex) AUCTeX-version))
-
-  :defer t
+  :ensure auctex
   :hook ((LaTeX-mode . visual-line-mode)
          (LaTeX-mode . prettify-symbols-mode)
          (LaTeX-mode . TeX-source-correlate-mode)
@@ -5469,12 +5135,12 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
   (with-eval-after-load 'eglot
     (add-to-list 'eglot-server-programs
                  '((latex-mode LaTeX-mode tex-mode) "texlab")))
-  
+
   ;; ChkTeX Setup
   (let ((check-cmd (assoc "Check" TeX-command-list)))
     (when check-cmd
       (setcar (cdr check-cmd) "chktex -v6 -H %s")))
-  
+
   ;; Hooks
   (add-hook 'TeX-mode-hook
             (lambda ()
@@ -5483,7 +5149,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
               (when (fboundp 'texmathp)
                 (setq-local fill-nobreak-predicate
                             (cons #'texmathp fill-nobreak-predicate)))))
-  
+
   ;; Delay flymake in LaTeX to avoid sentinel errors
   (add-hook 'LaTeX-mode-hook
             (lambda ()
