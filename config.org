@@ -1330,9 +1330,9 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 #+begin_src emacs-lisp
 (defun ar/set-fonts ()
   "Set the default, fixed-pitch, and variable-pitch fonts for the current frame."
-  (set-face-attribute 'default nil :font "JetBrainsMono Nerd Font" :height 125 :weight 'medium)
-  (set-face-attribute 'fixed-pitch nil :font "JetBrainsMono Nerd Font" :height 125 :weight 'medium)
-  (set-face-attribute 'variable-pitch nil :font "JetBrainsMono Nerd Font" :height 125 :weight 'medium)
+  (set-face-attribute 'default nil :font "JetBrains Mono" :height 125 :weight 'medium) 
+  (set-face-attribute 'fixed-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
+  (set-face-attribute 'variable-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
   ;; Apply italic slant to comments and keywords
   (set-face-attribute 'font-lock-comment-face nil :slant 'italic)
   (set-face-attribute 'font-lock-keyword-face nil :slant 'italic))
@@ -2357,35 +2357,44 @@ Links back to the GTD task for execution tracking."
 
 ** Org Modern
 #+begin_src emacs-lisp
-(use-package org-modern
-  :defer t
-  :hook (org-mode . org-modern-mode)
-  :custom
+;; (use-package org-modern
+;;   :defer t
+;;   :hook (org-mode . org-modern-mode)
+;;   :custom
 
-  (org-modern-star '("◉" "○" "✸" "✿" "✤" "✜" "◇" "▷"))
+;;   (org-modern-star '("◉" "○" "✸" "✿" "✤" "✜" "◇" "▷"))
 
-  (org-modern-table-vertical 1)
-  (org-modern-table-horizontal 0.2)
-  (org-modern-table t)
+;;   (org-modern-table-vertical 1)
+;;   (org-modern-table-horizontal 0.2)
+;;   (org-modern-table t)
 
-  (org-modern-checkbox nil)   ; Let prettify-symbols handle checkboxes
-  (org-modern-todo nil)       ; Let your theme handle TODO colors
-  (org-modern-tag nil)        ; Let your theme handle Tags
-  (org-modern-priority nil)   ; Let your theme handle Priorities
+;;   (org-modern-checkbox nil)   ; Let prettify-symbols handle checkboxes
+;;   (org-modern-todo nil)       ; Let your theme handle TODO colors
+;;   (org-modern-tag nil)        ; Let your theme handle Tags
+;;   (org-modern-priority nil)   ; Let your theme handle Priorities
 
-  (org-modern-block-fringe nil)
-  (org-modern-hide-stars nil)
-  (org-modern-keyword t)      ; Prettify keywords (TITLE, AUTHOR, etc.)
+;;   (org-modern-block-fringe t)
+;;   (org-modern-hide-stars t)
+;;   (org-modern-keyword t)      ; Prettify keywords (TITLE, AUTHOR, etc.)
 
-  :config
-  ;; Font adjustments for the symbols
-  (set-face-attribute 'org-modern-symbol nil :family "Symbols Nerd Font Mono")
-  (set-face-attribute 'org-modern-label nil :height 0.9)
+;;   :config
+;;   ;; Font adjustments for the symbols
+;;   (set-face-attribute 'org-modern-symbol nil :family "Symbols Nerd Font Mono")
+;;   (set-face-attribute 'org-modern-label nil :height 0.9)
 
-  ;; Clean up standard Org settings to play nice with Modern
-  (setq org-auto-align-tags nil
-        org-tags-column 0
-        org-catch-invisible-edits 'show-and-error))
+;;   ;; Clean up standard Org settings to play nice with Modern
+;;   (setq org-auto-align-tags nil
+;;         org-tags-column 0
+;;         org-catch-invisible-edits 'show-and-error))
+#+end_src
+
+** Org iBullets
+#+begin_src emacs-lisp
+(use-package org-ibullets
+  :ensure t
+  :commands org-ibullets-mode
+  :vc (:url "https://github.com/jamescherti/org-ibullets.el.git")
+  :hook (org-mode . org-ibullets-mode))
 #+end_src
 
 ** Org Src Buffer Naming
@@ -3218,6 +3227,147 @@ Links back to the GTD task for execution tracking."
 
 * Prettify Symbols
 #+begin_src emacs-lisp
+(defun my/org-prettify-src-blocks ()
+  "Prettify org-mode src block delimiters using font-lock and nerd-icons."
+  (font-lock-add-keywords nil
+    '(;; #+begin_src (with language name)
+      ("^[ \t]*\\(#\\+begin_src\\)[ \t]*.*$"
+       (1 (prog1 nil
+            (let ((icon (nerd-icons-codicon "nf-cod-code")))
+              (compose-region (match-beginning 1) (match-end 1) icon)
+              (put-text-property (match-beginning 1) (match-end 1)
+                                'face '(:foreground "#9ece6a"))))))
+      ;; #+end_src
+      ("^[ \t]*\\(#\\+end_src\\)[ \t]*$"
+       (1 (prog1 nil
+            (let ((icon (nerd-icons-codicon "nf-cod-code")))
+              (compose-region (match-beginning 1) (match-end 1) icon)
+              (put-text-property (match-beginning 1) (match-end 1)
+                                'face '(:foreground "#9ece6a"))))))
+      ;; #+BEGIN_SRC (uppercase)
+      ("^[ \t]*\\(#\\+BEGIN_SRC\\)[ \t]*.*$"
+       (1 (prog1 nil
+            (let ((icon (nerd-icons-codicon "nf-cod-file_code")))
+              (compose-region (match-beginning 1) (match-end 1) icon)
+              (put-text-property (match-beginning 1) (match-end 1)
+                                'face '(:foreground "#9ece6a"))))))
+      ;; #+END_SRC (uppercase)
+      ("^[ \t]*\\(#\\+END_SRC\\)[ \t]*$"
+       (1 (prog1 nil
+            (let ((icon (nerd-icons-codicon "nf-cod-file_code")))
+              (compose-region (match-beginning 1) (match-end 1) icon)
+              (put-text-property (match-beginning 1) (match-end 1)
+                                'face '(:foreground "#7aa2f7"))))))
+      ;; #+begin_example
+      ("^[ \t]*\\(#\\+begin_example\\)[ \t]*$"
+       (1 (prog1 nil
+            (let ((icon (nerd-icons-faicon "nf-fa-quote_left")))
+              (compose-region (match-beginning 1) (match-end 1) icon)
+              (put-text-property (match-beginning 1) (match-end 1)
+                                'face '(:foreground "#bb9af7"))))))
+      ;; #+end_example
+      ("^[ \t]*\\(#\\+end_example\\)[ \t]*$"
+       (1 (prog1 nil
+            (let ((icon (nerd-icons-faicon "nf-fa-quote_right")))
+              (compose-region (match-beginning 1) (match-end 1) icon)
+              (put-text-property (match-beginning 1) (match-end 1)
+                                'face '(:foreground "#bb9af7"))))))
+      ;; #+BEGIN_EXAMPLE
+      ("^[ \t]*\\(#\\+BEGIN_EXAMPLE\\)[ \t]*$"
+       (1 (prog1 nil
+            (let ((icon (nerd-icons-faicon "nf-fa-quote_left")))
+              (compose-region (match-beginning 1) (match-end 1) icon)
+              (put-text-property (match-beginning 1) (match-end 1)
+                                'face '(:foreground "#bb9af7"))))))
+      ;; #+END_EXAMPLE
+      ("^[ \t]*\\(#\\+END_EXAMPLE\\)[ \t]*$"
+       (1 (prog1 nil
+            (let ((icon (nerd-icons-faicon "nf-fa-quote_right")))
+              (compose-region (match-beginning 1) (match-end 1) icon)
+              (put-text-property (match-beginning 1) (match-end 1)
+                                'face '(:foreground "#bb9af7"))))))
+      ;; #+header: or #+HEADER:
+      ("^[ \t]*\\(#\\+\\(?:header\\|HEADER\\):\\)[ \t]*"
+       (1 (prog1 nil
+            (let ((icon (nerd-icons-mdicon "nf-md-cog")))
+              (compose-region (match-beginning 1) (match-end 1) icon)
+              (put-text-property (match-beginning 1) (match-end 1)
+                                'face '(:foreground "#e0af68"))))))
+      ;; #+results: or #+RESULTS:
+      ("^[ \t]*\\(#\\+\\(?:results\\|RESULTS\\):\\)[ \t]*"
+       (1 (prog1 nil
+            (let ((icon (nerd-icons-mdicon "nf-md-chart_line")))
+              (compose-region (match-beginning 1) (match-end 1) icon)
+              (put-text-property (match-beginning 1) (match-end 1)
+                                'face '(:foreground "#7dcfff"))))))
+      ;; #+call: or #+CALL:
+      ("^[ \t]*\\(#\\+\\(?:call\\|CALL\\):\\)[ \t]*"
+       (1 (prog1 nil
+            (let ((icon (nerd-icons-mdicon "nf-md-phone")))
+              (compose-region (match-beginning 1) (match-end 1) icon)
+              (put-text-property (match-beginning 1) (match-end 1)
+                                'face '(:foreground "#9aa5ce"))))))
+      ;; :PROPERTIES: or :properties:
+      ("^[ \t]*\\(:\\(?:PROPERTIES\\|properties\\):\\)[ \t]*$"
+       (1 (prog1 nil
+            (let ((icon (nerd-icons-mdicon "nf-md-folder_cog")))
+              (compose-region (match-beginning 1) (match-end 1) icon)
+              (put-text-property (match-beginning 1) (match-end 1)
+                                'face '(:foreground "#ff9e64"))))))
+      ;; :LOGBOOK: or :logbook:
+      ("^[ \t]*\\(:\\(?:LOGBOOK\\|logbook\\):\\)[ \t]*$"
+       (1 (prog1 nil
+            (let ((icon (nerd-icons-mdicon "nf-md-notebook")))
+              (compose-region (match-beginning 1) (match-end 1) icon)
+              (put-text-property (match-beginning 1) (match-end 1)
+                                'face '(:foreground "#9ece6a")))))))
+    'append))
+
+(defvar-local my/org-prettify-overlays-to-restore nil
+  "List of overlays to restore after cursor leaves.")
+
+(defun my/org-reveal-composition-at-point ()
+  "Remove composition from current line if on a prettified org element."
+  (when (and (eq major-mode 'org-mode)
+             (save-excursion
+               (beginning-of-line)
+               (looking-at "^[ \t]*\\(?:#\\+\\(?:begin_src\\|end_src\\|BEGIN_SRC\\|END_SRC\\|begin_example\\|end_example\\|BEGIN_EXAMPLE\\|END_EXAMPLE\\|\\(?:header\\|HEADER\\|results\\|RESULTS\\|call\\|CALL\\):\\)\\|:\\(?:PROPERTIES\\|properties\\|LOGBOOK\\|logbook\\):\\)")))
+    (let ((line-start (line-beginning-position))
+          (line-end (line-end-position)))
+      ;; Store the composition for restoration
+      (setq my/org-prettify-overlays-to-restore
+            (list line-start line-end
+                  (get-text-property line-start 'composition)))
+      ;; Remove composition
+      (with-silent-modifications
+        (remove-text-properties line-start line-end '(composition nil face nil))))))
+
+(defun my/org-restore-composition-at-point ()
+  "Restore composition after leaving the line."
+  (when my/org-prettify-overlays-to-restore
+    (let ((line-start (line-beginning-position))
+          (line-end (line-end-position))
+          (old-line-start (nth 0 my/org-prettify-overlays-to-restore))
+          (old-line-end (nth 1 my/org-prettify-overlays-to-restore)))
+      ;; Only restore if we've moved to a different line
+      (when (or (< line-end old-line-start)
+                (> line-start old-line-end))
+        ;; Trigger font-lock to reapply
+        (font-lock-flush old-line-start old-line-end)
+        (setq my/org-prettify-overlays-to-restore nil)))))
+
+(defun my/org-setup-prettify-cursor-sensor ()
+  "Setup cursor sensor for revealing compositions."
+  (add-hook 'post-command-hook #'my/org-reveal-composition-at-point nil t)
+  (add-hook 'post-command-hook #'my/org-restore-composition-at-point nil t))
+
+(defun my/org-prettify-setup ()
+  "Complete setup for org-mode prettification."
+  (my/org-prettify-src-blocks)
+  (my/org-setup-prettify-cursor-sensor))
+
+;; Add to org-mode hook
+(add-hook 'org-mode-hook #'my/org-prettify-setup)
 #+end_src
 
 * Completion Framework
@@ -4636,13 +4786,15 @@ If completion fails in the future, check these:
 ** Persp Mode
 #+begin_src emacs-lisp
 (use-package persp-mode
-  :hook (after-init . persp-mode)
+  :commands persp-mode
   :custom
   ;; Auto-save and restore settings
   (persp-autokill-buffer-on-remove 'kill-weak)
-  (persp-auto-save-opt 2) ;; Save on exit and persp-mode deactivation
+  (persp-auto-save-opt 2)
   (persp-auto-save-num-of-backups 3)
-  (persp-auto-resume-time 2.0) ;; Auto-restore after 2 seconds
+  
+  ;; CRITICAL FIX: Delay auto-resume in daemon mode
+  (persp-auto-resume-time (if (daemonp) -1.0 2.0))
 
   ;; Naming and defaults
   (persp-nil-name "Default")
@@ -4658,10 +4810,20 @@ If completion fails in the future, check these:
 
   ;; Silence warnings
   (persp-auto-save-persps-to-their-file-before-kill nil)
+  
+  ;; CRITICAL FIX: Prevent frame initialization errors in daemon mode
+  (persp-emacsclient-init-frame-behaviour-override -1)
 
   :init
   ;; Set the autosave file location
   (setq persp-auto-save-fname (expand-file-name "persp-auto-save" user-emacs-directory))
+
+  ;; CRITICAL FIX: Use window-setup-hook for daemon compatibility
+  (add-hook 'window-setup-hook
+            (lambda ()
+              (require 'persp-mode)
+              (persp-mode 1))
+            100) ;; Run late to ensure frames are ready
 
   :config
   (let ((persp-dir (file-name-directory persp-auto-save-fname)))
@@ -4671,26 +4833,21 @@ If completion fails in the future, check these:
   (unless (file-exists-p persp-auto-save-fname)
     (with-temp-file persp-auto-save-fname
       (insert ";; Persp-mode auto-save file\n")
-      (insert "nil"))) 
+      (insert "nil")))
   
   ;; --- Buffer Filtering ---
-  ;; Exclude ephemeral buffers from perspectives
   (add-hook 'persp-common-buffer-filter-functions
             (lambda (b)
               (let ((name (buffer-name b)))
                 (or
-                 ;; Exclude dired-sidebar buffers
                  (string-prefix-p " *" name)
-                 ;; Exclude help/info buffers
                  (string-match-p "^\\*\\(Help\\|info\\|Apropos\\)" name)
-                 ;; Exclude completion buffers
                  (string-match-p "^\\*Completions\\*" name)
-                 ;; Exclude message buffers unless explicitly Messages
                  (and (string-prefix-p "*" name)
                       (not (string= name "*Messages*"))
                       (not (string= name "*scratch*")))))))
 
-  ;; Always include scratch and Messages in all perspectives
+  ;; Always include scratch and Messages
   (add-hook 'persp-activated-functions
             (lambda (type frame-or-window perspective)
               (persp-add-buffer "*scratch*")
@@ -4698,10 +4855,8 @@ If completion fails in the future, check these:
 
   ;; --- Consult Integration ---
   (with-eval-after-load 'consult
-    ;; Hide the default full buffer list
     (consult-customize consult-source-buffer :hidden t :default nil)
 
-    ;; Define perspective-aware buffer source
     (defvar consult--source-perspective
       (list :name     "Perspective Buffers"
             :narrow   ?p
@@ -4725,14 +4880,12 @@ If completion fails in the future, check these:
     (require 'treemacs-persp)
     (treemacs-set-scope-type 'Perspectives))
 
-  ;; --- Crash Prevention ---
-  ;; Clean up before saving
+  ;; --- Safe Crash Prevention ---
   (defun ar/persp-before-save-cleanup ()
     "Clean up child frames and markers before saving perspectives."
     (when (and (fboundp 'posframe-delete-all) (featurep 'posframe))
       (ignore-errors (posframe-delete-all)))
 
-    ;; Clean up dead markers
     (dolist (buf (buffer-list))
       (with-current-buffer buf
         (dolist (var (buffer-local-variables))
@@ -4744,11 +4897,15 @@ If completion fails in the future, check these:
 
   (advice-add 'persp-save-state-to-file :before #'ar/persp-before-save-cleanup)
 
-  ;; Safe save wrapper for auto-save timer
+  ;; Safe auto-save wrapper
   (defun ar/persp-safe-auto-save ()
     "Safely auto-save perspectives."
     (condition-case err
-        (when (and persp-mode (not (null (persp-names))))
+        (when (and persp-mode 
+                   (not (null (persp-names)))
+                   ;; CRITICAL: Don't auto-save in daemon without frames
+                   (or (not (daemonp))
+                       (> (length (frame-list)) 1)))
           (ar/persp-before-save-cleanup)
           (persp-save-state-to-file))
       (error
@@ -5632,6 +5789,10 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
   (cdlatex-env-alist
    '(("equation*" "\\begin{equation*}\n?\n\\end{equation*}" nil)
      ("align*" "\\begin{align*}\n?\n\\end{align*}" nil)))
+  
+  ;; FIX: Change CDLaTeX math symbol prefix from backtick to @ or another key
+  (cdlatex-math-symbol-prefix ?@)  ;; Use @ instead of `
+  
   :config
   (define-key cdlatex-mode-map (kbd "TAB") #'cdlatex-tab))
 #+end_src
