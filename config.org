@@ -1537,10 +1537,6 @@ If file doesn't exist, creates it with TEMPLATE content."
 ;; ============================================
 (mapc #'my/ensure-org-dir my/org-subdirs)
 
-;; ============================================
-;; CREATE ESSENTIAL ORG FILES
-;; ============================================
-
 ;; Journal file
 (my/ensure-org-file "journal.org"
   "#+title: Journal
@@ -1627,37 +1623,21 @@ If file doesn't exist, creates it with TEMPLATE content."
                              (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
 
   ;; Set faces for heading levels
-  (dolist (face '((org-level-1 . 1.20)
-                  (org-level-2 . 1.13)
+  (dolist (face '((org-level-1 . 1.17)
+                  (org-level-2 . 1.11)
                   (org-level-3 . 1.10)
                   (org-level-4 . 1.07)
                   (org-level-5 . 1.05)
                   (org-level-6 . 1.03)
                   (org-level-7 . 1.02)
                   (org-level-8 . 1)))
-    (set-face-attribute (car face) nil :font "JetBrains Mono" :weight 'bold :height (cdr face))))
+    (set-face-attribute (car face) nil :font "JetBrainsMono Nerd Font" :weight 'bold :height (cdr face))))
 #+end_src
 
 ** Core Configuration
 #+begin_src emacs-lisp
 (use-package org
-  :defer t
   :ensure nil
-  :commands (org-mode org-agenda org-capture org-store-link)
-  :hook ((org-mode . visual-line-mode)
-         (org-mode . ar/org-font-setup)
-         (org-mode . auto-fill-mode)
-         (org-mode . (lambda () (setq-local yas-parents '(latex-mode))))
-         (org-agenda-mode . (lambda ()
-                              (visual-line-mode -1)
-                              (toggle-truncate-lines 1)
-                              (display-line-numbers-mode -1)
-                              (setq mode-line-format nil)
-                              (setq header-line-format nil)))
-         (org-capture-mode . (lambda ()
-                               (setq mode-line-format nil)
-                               (setq header-line-format nil))))
-  
   :custom
   ;; Core settings
   (org-modules nil)
@@ -1689,79 +1669,84 @@ If file doesn't exist, creates it with TEMPLATE content."
   (org-startup-folded 'overview)
   (org-startup-with-inline-images nil)
   (org-startup-with-latex-preview nil)
-  (org-cycle-separator-lines 2)
+  (org-cycle-separator-lines 2))
+#+end_src
+
+** Hooks
+#+begin_src emacs-lisp
+(with-eval-after-load 'org
+  (add-hook 'org-mode-hook #'visual-line-mode)
+  (add-hook 'org-mode-hook #'ar/org-font-setup)
+  (add-hook 'org-mode-hook #'auto-fill-mode)
+  (add-hook 'org-mode-hook (lambda () (setq-local yas-parents '(latex-mode))))
+  (add-hook 'org-agenda-mode-hook (lambda ()
+                                    (visual-line-mode -1)
+                                    (toggle-truncate-lines 1)
+                                    (display-line-numbers-mode -1)
+                                    (setq mode-line-format nil)
+                                    (setq header-line-format nil)))
+  (add-hook 'org-capture-mode-hook (lambda ()
+                                     (setq mode-line-format nil)
+                                     (setq header-line-format nil))))
+#+end_src
+
+** TODO Keywords
+#+begin_src emacs-lisp
+(with-eval-after-load 'org
+  (setq org-todo-keywords
+        '((sequence "TODO(t)" "NEXT(n)" "PROG(p)" "WAIT(w@/!)" "|" "DONE(d)" "CANCEL(c@)")
+          (sequence "PLAN(P)" "ACTIVE(A)" "PAUSED(x)" "|" "ACHIEVED(a)" "DROPPED(D)")
+          (sequence "INBOX(i)" "GTD-NEXT(N)" "GTD-WAIT(W@/!)" "|" "GTD-DONE(D!)" "GTD-CNCL(C@)")
+          (sequence "CRITICAL(!)" "COMMENT(M)" "|" "RESOLVED(R)"  "DISABLED(d!)")))
   
-  ;; ============================================
-  ;; TODO KEYWORDS (Multiple Sequences)
-  ;; ============================================
-  (org-todo-keywords
-   '((sequence "TODO(t)" "NEXT(n)" "PROG(p)" "WAIT(w@/!)" "|" "DONE(d!)" "CANCEL(c@)")
-     (sequence "PLAN(P)" "ACTIVE(A)" "PAUSED(x)" "|" "ACHIEVED(a)" "DROPPED(D)")
-     (sequence "INBOX(i)" "GTD-NEXT(N)" "GTD-WAIT(W@/!)" "|" "GTD-DONE(D!)" "GTD-CNCL(C@)")))
+  (setq org-todo-keyword-faces
+        '(("TODO"      . (:foreground "#f7768e" :weight bold))
+          ("NEXT"      . (:foreground "#ff9e64" :weight bold))
+          ("PROG"      . (:foreground "#7aa2f7" :weight bold))
+          ("WAIT"      . (:foreground "#e0af68" :weight bold))
+          ("NOTE"      . (:foreground "#7dcfff" :weight bold))
+          ("DONE"      . (:foreground "#9ece6a" :weight bold))
+          ("CANCEL"    . (:foreground "#565f89" :weight bold))
+          ("PLAN"      . (:foreground "#7dcfff" :weight bold))
+          ("ACTIVE"    . (:foreground "#bb9af7" :weight bold))
+          ("PAUSED"    . (:foreground "#a9b1d6" :weight bold))
+          ("ACHIEVED"  . (:foreground "#9ece6a" :weight bold))
+          ("DROPPED"   . (:foreground "#565f89" :weight bold))
+          ("INBOX"     . (:foreground "#e0af68" :weight bold))
+          ("GTD-NEXT"  . (:foreground "#7aa2f7" :weight bold))
+          ("GTD-WAIT"  . (:foreground "#ff9e64" :weight bold))
+          ("GTD-DONE"  . (:foreground "#9ece6a" :weight bold))
+          ("GTD-CNCL"  . (:foreground "#565f89" :weight bold))
+          ("CRITICAL"  . (:foreground "#f7768e" :weight bold :underline t))
+          ("COMMENT"   . (:foreground "#c0caf5" :weight normal))
+          ("RESOLVED"  . (:foreground "#9ece6a" :weight bold))
+          ("DISABLED"   . (:foreground "#565f89" :weight bold)))))
+#+end_src
+
+** Tags & Priorities
+#+begin_src emacs-lisp
+(with-eval-after-load 'org
+  (setq org-tag-alist '(("@work"      . ?w)
+                        ("@home"      . ?h)
+                        ("@computer"  . ?c)
+                        ("@errands"   . ?e)
+                        ("read"       . ?r)
+                        ("meeting"    . ?m)
+                        ("urgent"     . ?u)
+                        ("someday"    . ?s)))
   
-  ;; ============================================
-  ;; TODO KEYWORD FACES
-  ;; ============================================
-  (org-todo-keyword-faces
-   '(("TODO"      . (:foreground "#f7768e" :weight bold))
-     ("NEXT"      . (:foreground "#ff9e64" :weight bold))
-     ("PROG"      . (:foreground "#7aa2f7" :weight bold))
-     ("WAIT"      . (:foreground "#e0af68" :weight bold))
-     ("DONE"      . (:foreground "#9ece6a" :weight bold))
-     ("CANCEL"    . (:foreground "#565f89" :weight bold))
-     ("PLAN"      . (:foreground "#7dcfff" :weight bold))
-     ("ACTIVE"    . (:foreground "#bb9af7" :weight bold))
-     ("PAUSED"    . (:foreground "#a9b1d6" :weight bold))
-     ("ACHIEVED"  . (:foreground "#9ece6a" :weight bold))
-     ("DROPPED"   . (:foreground "#565f89" :weight bold))
-     ("INBOX"     . (:foreground "#e0af68" :weight bold))
-     ("GTD-NEXT"  . (:foreground "#7aa2f7" :weight bold))
-     ("GTD-WAIT"  . (:foreground "#ff9e64" :weight bold))
-     ("GTD-DONE"  . (:foreground "#9ece6a" :weight bold))
-     ("GTD-CNCL"  . (:foreground "#565f89" :weight bold))))
+  (setq org-priority-faces '((?A . error)
+                             (?B . warning)
+                             (?C . success))))
+#+end_src
+
+** Org Structure Templates
+#+begin_src emacs-lisp
+(with-eval-after-load 'org
+  ;; Load org-tempo for structure templates
+  (require 'org-tempo)
   
-  ;; ============================================
-  ;; TAGS & PRIORITIES
-  ;; ============================================
-  (org-tag-alist '(("@work"      . ?w)
-                   ("@home"      . ?h)
-                   ("@computer"  . ?c)
-                   ("@errands"   . ?e)
-                   ("read"       . ?r)
-                   ("meeting"    . ?m)
-                   ("urgent"     . ?u)
-                   ("someday"    . ?s)))
-  
-  (org-priority-faces '((?A . error)
-                        (?B . warning)
-                        (?C . success)))
-  
-  ;; ============================================
-  ;; AGENDA SETTINGS
-  ;; ============================================
-  (org-agenda-files (list my/org-directory
-                          (expand-file-name "gtd" my/org-directory)))
-  
-  (org-agenda-block-separator ?─)
-  (org-agenda-time-grid
-   '((daily today require-timed)
-     (800 1000 1200 1400 1600 1800 2000)
-     " ┄┄┄┄┄ " "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"))
-  (org-agenda-current-time-string
-   "◀ now ─────────────────────────────────────────────────")
-  
-  (org-agenda-inhibit-startup t)
-  (org-agenda-dim-blocked-tasks nil)
-  (org-agenda-use-tag-inheritance nil)
-  (org-agenda-ignore-properties '(effort appt category))
-  (org-agenda-span 'day)
-  (org-tags-column -80)
-  
-  :config
-  ;; ============================================
-  ;; BABEL & TEMPO CONFIG
-  ;; ============================================
-  (require 'org-tempo) 
+  ;; Babel language configuration
   (setq org-confirm-babel-evaluate nil
         org-src-fontify-natively t
         org-src-tab-acts-natively t)
@@ -1779,12 +1764,12 @@ If file doesn't exist, creates it with TEMPLATE content."
                   ("py" . "src python")
                   ("jpy" . "src jupyter-python")
                   ("tex" . "src latex")))
-    (add-to-list 'org-structure-template-alist pair))
+    (add-to-list 'org-structure-template-alist pair)))
+#+end_src
 
-  ;; ============================================
-  ;; TRANSIENT TEMPLATE SYSTEM
-  ;; ============================================
-  
+** Transient Template System
+#+begin_src emacs-lisp
+(with-eval-after-load 'org
   ;; 1. Helper Function (Replaces 'hot-expand')
   (defun ar/org-template-expand (str &optional mod)
     "Expand org template STR with optional modifier MOD."
@@ -1817,53 +1802,47 @@ If file doesn't exist, creates it with TEMPLATE content."
 
   ;; 4. The Transient Definition
   (with-eval-after-load 'transient
-  (transient-define-prefix ar/org-template-transient ()
-    "Org Mode Structure Templates"
-    [:description ar/org-transient-title]
-    ["" ("<" "" transient-quit-one :format " ")] ;; Invisible quit key
-    
-    [;; One Row, 4 Columns
-     ["Basic"
-      ("a" "ascii" (lambda () (interactive) (ar/org-template-expand "<a")))
-      ("c" "center" (lambda () (interactive) (ar/org-template-expand "<c")))
-      ("C" "comment" (lambda () (interactive) (ar/org-template-expand "<C")))
-      ("x" "example" (lambda () (interactive) (ar/org-template-expand "<e")))
-      ("E" "export" (lambda () (interactive) (ar/org-template-expand "<E")))
-      ("h" "html" (lambda () (interactive) (ar/org-template-expand "<h")))
-      ("l" "latex" (lambda () (interactive) (ar/org-template-expand "<l")))
-      ("n" "note" (lambda () (interactive) (ar/org-template-expand "<n")))
-      ("o" "quote" (lambda () (interactive) (ar/org-template-expand "<q")))
-      ("v" "verse" (lambda () (interactive) (ar/org-template-expand "<v")))]
+    (transient-define-prefix ar/org-template-transient ()
+      "Org Mode Structure Templates"
+      [:description ar/org-transient-title]
+      ["" ("<" "" transient-quit-one :format " ")] ;; Invisible quit key
+      
+      [;; One Row, 4 Columns
+       ["Basic"
+        ("a" "ascii" (lambda () (interactive) (ar/org-template-expand "<a")))
+        ("c" "center" (lambda () (interactive) (ar/org-template-expand "<c")))
+        ("C" "comment" (lambda () (interactive) (ar/org-template-expand "<C")))
+        ("x" "example" (lambda () (interactive) (ar/org-template-expand "<e")))
+        ("E" "export" (lambda () (interactive) (ar/org-template-expand "<E")))
+        ("h" "html" (lambda () (interactive) (ar/org-template-expand "<h")))
+        ("l" "latex" (lambda () (interactive) (ar/org-template-expand "<l")))
+        ("n" "note" (lambda () (interactive) (ar/org-template-expand "<n")))
+        ("o" "quote" (lambda () (interactive) (ar/org-template-expand "<q")))
+        ("v" "verse" (lambda () (interactive) (ar/org-template-expand "<v")))]
 
-     ["Head"
-      ("i" "index" (lambda () (interactive) (ar/org-template-expand "<i")))
-      ("A" "ASCII" (lambda () (interactive) (ar/org-template-expand "<A")))
-      ("I" "INCLUDE" (lambda () (interactive) (ar/org-template-expand "<I")))
-      ("H" "HTML" (lambda () (interactive) (ar/org-template-expand "<H")))
-      ("L" "LaTeX" (lambda () (interactive) (ar/org-template-expand "<L")))]
+       ["Head"
+        ("i" "index" (lambda () (interactive) (ar/org-template-expand "<i")))
+        ("A" "ASCII" (lambda () (interactive) (ar/org-template-expand "<A")))
+        ("I" "INCLUDE" (lambda () (interactive) (ar/org-template-expand "<I")))
+        ("H" "HTML" (lambda () (interactive) (ar/org-template-expand "<H")))
+        ("L" "LaTeX" (lambda () (interactive) (ar/org-template-expand "<L")))]
 
-     ["Source"
-      ("s" "src" (lambda () (interactive) (ar/org-template-expand "<s")))
-      ("e" "emacs-lisp" (lambda () (interactive) (ar/org-template-expand "<s" "emacs-lisp")))
-      ("y" "python" (lambda () (interactive) (ar/org-template-expand "<s" "python")))
-      ("w" "powershell" (lambda () (interactive) (ar/org-template-expand "<s" "powershell")))
-      ("r" "ruby" (lambda () (interactive) (ar/org-template-expand "<s" "ruby")))
-      ("S" "sh" (lambda () (interactive) (ar/org-template-expand "<s" "sh")))
-      ("g" "golang" (lambda () (interactive) (ar/org-template-expand "<s" "go :imports '(\"fmt\")")))]
+       ["Source"
+        ("s" "src" (lambda () (interactive) (ar/org-template-expand "<s")))
+        ("e" "emacs-lisp" (lambda () (interactive) (ar/org-template-expand "<s" "emacs-lisp")))
+        ("y" "python" (lambda () (interactive) (ar/org-template-expand "<s" "python")))
+        ("w" "powershell" (lambda () (interactive) (ar/org-template-expand "<s" "powershell")))
+        ("r" "ruby" (lambda () (interactive) (ar/org-template-expand "<s" "ruby")))
+        ("S" "sh" (lambda () (interactive) (ar/org-template-expand "<s" "sh")))
+        ("g" "golang" (lambda () (interactive) (ar/org-template-expand "<s" "go :imports '(\"fmt\")")))]
 
-     ["Misc"
-      ("m" "mermaid" (lambda () (interactive) (ar/org-template-expand "<s" "mermaid :file chart.png")))
-      ("u" "plantuml" (lambda () (interactive) (ar/org-template-expand "<s" "plantuml :file chart.png")))
-      ("Y" "ipython" ar/org-insert-ipython)
-      ("P" "Perl tangled" ar/org-insert-perl-tangled)
-      ("<" "insert <" self-insert-command)]]))
+       ["Misc"
+        ("m" "mermaid" (lambda () (interactive) (ar/org-template-expand "<s" "mermaid :file chart.png")))
+        ("u" "plantuml" (lambda () (interactive) (ar/org-template-expand "<s" "plantuml :file chart.png")))
+        ("Y" "ipython" ar/org-insert-ipython)
+        ("P" "Perl tangled" ar/org-insert-perl-tangled)
+        ("<" "insert <" self-insert-command)]]))
 
-  ;; (define-key org-mode-map (kbd "<")
-  ;;             (lambda ()
-  ;;               (interactive)
-  ;;               (if (or (region-active-p) (looking-back "^[ \t]*" 1))
-  ;;                   (ar/org-template-transient)
-  ;;                 (self-insert-command 1))))
   (defun ar/org-smart-less-than ()
     "Smart less-than key: trigger transient menu or insert character."
     (interactive)
@@ -1875,6 +1854,44 @@ If file doesn't exist, creates it with TEMPLATE content."
       (self-insert-command 1)))
   
   (define-key org-mode-map (kbd "<") #'ar/org-smart-less-than))
+#+end_src
+
+** Org Agenda
+#+begin_src emacs-lisp
+(with-eval-after-load 'org
+  ;; ============================================
+  ;; AGENDA FILES
+  ;; ============================================
+  (setq org-agenda-files (list my/org-directory
+                               (expand-file-name "gtd" my/org-directory)))
+  
+  ;; ============================================
+  ;; VISUAL SETTINGS
+  ;; ============================================
+  (setq org-agenda-block-separator ?─
+        org-agenda-compact-blocks nil)
+  
+  (setq org-agenda-time-grid
+        '((daily today require-timed)
+          (800 1000 1200 1400 1600 1800 2000)
+          " ┄┄┄┄┄ " "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"))
+  
+  (setq org-agenda-current-time-string
+        "◀ now ─────────────────────────────────────────────────")
+  
+  ;; ============================================
+  ;; PERFORMANCE & BEHAVIOR
+  ;; ============================================
+  (setq org-agenda-inhibit-startup t
+        org-agenda-dim-blocked-tasks nil
+        org-agenda-use-tag-inheritance nil
+        org-agenda-ignore-properties '(effort appt category)
+        org-agenda-span 'day
+        org-tags-column -80)
+  
+  ;; Skip completed tasks
+  (setq org-agenda-skip-scheduled-if-done t
+        org-agenda-skip-deadline-if-done t))
 #+end_src
 
 ** Org GTD - Pure Task Management
@@ -1926,7 +1943,7 @@ If file doesn't exist, creates it with TEMPLATE content."
      (canceled . "GTD-CNCL")))
   
   ;; Disable mode-line clutter
-  ;;(org-gtd-mode nil)
+  (org-gtd-mode nil)
   
   :config
   ;; Add GTD directory to agenda (but NOT roam/)
@@ -1970,6 +1987,9 @@ If file doesn't exist, creates it with TEMPLATE content."
     (my/ensure-org-dir "roam/ideas")
     (my/ensure-org-dir "roam/projects")
     (my/ensure-org-dir "roam/daily")
+    (my/ensure-org-dir "roam/reference")
+    (my/ensure-org-dir "roam/concepts")
+    (my/ensure-org-dir "roam/people")
 
     (setq org-roam-directory my/org-roam-directory)
     
@@ -2016,12 +2036,48 @@ If file doesn't exist, creates it with TEMPLATE content."
              :target (file+head "ideas/fleeting.org"
                                 "#+title: Fleeting Notes\n#+filetags: :fleeting:\n\n")
              :prepend t
+             :unnarrowed t)
+            
+            ("r" "reference" plain
+             "* Metadata\n- Type: %?\n- Author: \n- Date: %<%Y-%m-%d>\n- URL/DOI: \n- Tags: \n\n* Summary\n\n* Key Points\n- \n\n* Relevant Quotes\n#+begin_quote\n\n#+end_quote\n\n* My Thoughts\n\n* Related Notes\n- \n"
+             :target (file+head "reference/${slug}.org"
+                                "#+title: ${title}\n#+filetags: :reference:\n#+date: %<%Y-%m-%d>\n\n")
+             :unnarrowed t)
+            
+            ("c" "concept" plain
+             "* Definition\n%?\n\n* Core Principles\n- \n\n* Examples\n- \n\n* Misconceptions\n- \n\n* Related Concepts\n- \n\n* Applications\n- \n\n* Further Reading\n- \n"
+             :target (file+head "concepts/${slug}.org"
+                                "#+title: ${title}\n#+filetags: :concept:\n#+date: %<%Y-%m-%d>\n\n")
+             :unnarrowed t)
+            
+            ("P" "person" plain
+             "* Basic Information\n- Full Name: %?\n- Role/Occupation: \n- Affiliation: \n- Contact: \n- Website: \n\n* Background\n\n* Notable Work/Contributions\n- \n\n* Key Ideas\n- \n\n* Related People\n- \n\n* References\n- \n"
+             :target (file+head "people/${slug}.org"
+                                "#+title: ${title}\n#+filetags: :person:\n#+date: %<%Y-%m-%d>\n\n")
+             :unnarrowed t)
+            
+            ("m" "meeting" plain
+             "* Attendees\n- %?\n\n* Agenda\n- \n\n* Discussion\n\n* Action Items\n- [ ] \n\n* Follow-up\n- \n"
+             :target (file+head "meetings/${slug}.org"
+                                "#+title: ${title}\n#+filetags: :meeting:\n#+date: %<%Y-%m-%d>\n\n")
              :unnarrowed t)))
     
     ;; Dailies configuration
     (setq org-roam-dailies-directory "daily/"
           org-roam-dailies-capture-templates
           '(("d" "default" entry "* %<%H:%M> %?"
+             :target (file+head "%<%Y-%m-%d>.org"
+                                "#+title: %<%Y-%m-%d %A>\n#+filetags: :daily:\n\n"))
+            
+            ("j" "journal" entry "* %<%H:%M> Journal\n%?"
+             :target (file+head "%<%Y-%m-%d>.org"
+                                "#+title: %<%Y-%m-%d %A>\n#+filetags: :daily:journal:\n\n"))
+            
+            ("m" "morning" entry "* %<%H:%M> Morning Review\n** Goals for Today\n- %?\n\n** Priorities\n1. \n\n** Notes\n"
+             :target (file+head "%<%Y-%m-%d>.org"
+                                "#+title: %<%Y-%m-%d %A>\n#+filetags: :daily:\n\n"))
+            
+            ("e" "evening" entry "* %<%H:%M> Evening Reflection\n** What went well?\n- %?\n\n** What could improve?\n- \n\n** Learnings\n- \n\n** Tomorrow's focus\n- \n"
              :target (file+head "%<%Y-%m-%d>.org"
                                 "#+title: %<%Y-%m-%d %A>\n#+filetags: :daily:\n\n"))))))
 
@@ -2128,95 +2184,70 @@ Links back to the GTD task for execution tracking."
     (message "Review fleeting notes and convert to permanent notes as needed")))
 
 (defun ar/weekly-review ()
-  "Launch comprehensive weekly review: GTD + Zettelkasten."
+  "Launch comprehensive weekly review: GTD + Zettelkasten with pre-populated stats."
   (interactive)
   (let* ((week-string (format-time-string "%Y-W%U"))
-         (review-file (expand-file-name 
+         (review-file (expand-file-name
                        (format "%s-review.org" week-string)
-                       my/org-reviews-directory)))
-    
-    ;; Create review file if it doesn't exist
+                       my/org-reviews-directory))
+         ;; Gather statistics
+         (inbox-count
+          (length (org-map-entries t "TODO=\"INBOX\""
+                                  (list (expand-file-name "inbox.org" my/org-gtd-directory)))))
+         (next-count
+          (length (org-map-entries t "TODO=\"GTD-NEXT\""
+                                  (list my/org-gtd-directory))))
+         (wait-count
+          (length (org-map-entries t "TODO=\"GTD-WAIT\""
+                                  (list my/org-gtd-directory))))
+         (fleeting-count
+          (with-temp-buffer
+            (let ((fleeting (expand-file-name "ideas/fleeting.org" my/org-roam-directory)))
+              (if (file-exists-p fleeting)
+                  (progn
+                    (insert-file-contents fleeting)
+                    (count-matches "^\\* " (point-min) (point-max)))
+                0)))))
+
+    ;; Create review file with live data
     (unless (file-exists-p review-file)
-      (let ((inbox-count 
-             (length (org-map-entries t "TODO=\"INBOX\"" 
-                                     (list (expand-file-name "inbox.org" my/org-gtd-directory)))))
-            (next-count
-             (length (org-map-entries t "TODO=\"NEXT\"" 
-                                     (list (expand-file-name "next.org" my/org-gtd-directory)))))
-            (wait-count
-             (length (org-map-entries t "TODO=\"WAIT\"" 
-                                     (list (expand-file-name "projects.org" my/org-gtd-directory)))))
-            (project-count
-             (length (org-map-entries t "LEVEL=1" 
-                                     (list (expand-file-name "projects.org" my/org-gtd-directory)))))
-            (fleeting-count
-             (with-temp-buffer
-               (let ((fleeting (expand-file-name "ideas/fleeting.org" my/org-roam-directory)))
-                 (if (file-exists-p fleeting)
-                     (progn
-                       (insert-file-contents fleeting)
-                       (count-matches "^\\* " (point-min) (point-max)))
-                   0)))))
-        
-        (with-temp-file review-file
-          (insert "#+title: Weekly Review - " week-string "\n")
-          (insert "#+date: " (format-time-string "%Y-%m-%d") "\n")
-          (insert "#+filetags: :review:\n\n")
-          
-          (insert "* GTD Review\n")
-          (insert "** INBOX Processing\n")
-          (insert (format "- [ ] Process GTD inbox to zero (%d items)\n" inbox-count))
-          (insert "  - Location: [[file:../gtd/inbox.org][GTD Inbox]]\n\n")
-          
-          (insert "** Calendar Review\n")
-          (insert "- [ ] Review past week's calendar\n")
-          (insert "- [ ] Review next 2 weeks ahead\n\n")
-          
-          (insert "** Next Actions\n")
-          (insert (format "- [ ] Review all NEXT actions (%d items)\n" next-count))
-          (insert "- [ ] Clean up stale items\n")
-          (insert "- [ ] Ensure actionable next actions\n\n")
-          
-          (insert "** Waiting For\n")
-          (insert (format "- [ ] Review WAIT items (%d items)\n" wait-count))
-          (insert "- [ ] Follow up as needed\n\n")
-          
-          (insert "** Projects\n")
-          (insert (format "- [ ] Review all active projects (%d items)\n" project-count))
-          (insert "- [ ] Ensure each project has at least one NEXT action\n")
-          (insert "- [ ] Move inactive projects to Someday/Maybe\n\n")
-          
-          (insert "** Someday/Maybe\n")
-          (insert "- [ ] Review Someday/Maybe list\n")
-          (insert "- [ ] Activate any projects ready to start\n\n")
-          
-          (insert "* Zettelkasten Review\n")
-          (insert "** Fleeting Notes\n")
-          (insert (format "- [ ] Process fleeting notes (%d notes)\n" fleeting-count))
-          (insert "  - Location: [[file:../roam/ideas/fleeting.org][Fleeting Notes]]\n\n")
-          
-          (insert "** Quality Check\n")
-          (insert "- [ ] Review notes created this week\n")
-          (insert "- [ ] Identify notes needing more connections\n")
-          (insert "- [ ] Tag drafts as permanent when ready\n\n")
-          
-          (insert "** Knowledge Gaps\n")
-          (insert "- [ ] Identify missing notes/connections\n")
-          (insert "- [ ] Plan next research directions\n\n")
-          
-          (insert "* Weekly Reflections\n")
-          (insert "** What Went Well?\n\n\n")
-          (insert "** What Could Improve?\n\n\n")
-          (insert "** Key Insights This Week\n\n\n")
-          (insert "** Next Week's Focus\n\n\n")
-          
-          (insert "* Weekly Metrics\n")
-          (insert "- GTD Tasks Completed: \n")
-          (insert "- Permanent Notes Created: \n")
-          (insert "- Literature Notes Added: \n")
-          (insert "- Projects Advanced: \n"))))
-    
-    ;; Open review file
+      (with-temp-file review-file
+        (insert "#+title: Weekly Review - " week-string "\n")
+        (insert "#+date: " (format-time-string "%Y-%m-%d") "\n")
+        (insert "#+filetags: :review:\n\n")
+
+        (insert "* GTD Health Check\n")
+        (insert (format "- Inbox items: *%d* %s\n"
+                       inbox-count
+                       (if (> inbox-count 10) "⚠ PROCESS URGENTLY" "✓")))
+        (insert (format "- NEXT actions: *%d*\n" next-count))
+        (insert (format "- WAIT items: *%d*\n" wait-count))
+        (insert (format "- Fleeting notes: *%d* %s\n\n"
+                       fleeting-count
+                       (if (> fleeting-count 20) "⚠ PROCESS" "✓")))
+
+        (insert "* Review Checklist\n")
+        (insert "** GTD Review\n")
+        (insert "- [ ] Process GTD inbox to zero\n")
+        (insert "- [ ] Review all GTD-WAIT items\n")
+        (insert "- [ ] Check stuck projects\n")
+        (insert "- [ ] Review calendar (past week + next 2 weeks)\n")
+        (insert "- [ ] Ensure each project has NEXT action\n")
+        (insert "- [ ] Review Someday/Maybe\n\n")
+
+        (insert "** Zettelkasten Review\n")
+        (insert "- [ ] Process fleeting notes\n")
+        (insert "- [ ] Review notes created this week\n")
+        (insert "- [ ] Identify missing connections\n")
+        (insert "- [ ] Update active project notes\n\n")
+
+        (insert "* Reflections\n")
+        (insert "** What Went Well?\n\n\n")
+        (insert "** What Could Improve?\n\n\n")
+        (insert "** Key Insights This Week\n\n\n")
+        (insert "** Next Week's Focus\n\n\n")))
+
+    ;; Open file
     (find-file review-file)
     (goto-char (point-min))
     (when (re-search-forward "^\\*\\* What Went Well" nil t)
@@ -2232,15 +2263,6 @@ Links back to the GTD task for execution tracking."
                  :unnarrowed t)
                t))
 #+end_src
-
-**How to Use:**
-
-- `ar/gtd-to-zettel`: In a GTD project → Creates Zettelkasten context note
-- `ar/zettel-to-gtd`: In Zettelkasten note → Extracts tasks to GTD inbox
-- `ar/weekly-review`: Generates comprehensive review template
-- `ar/fleeting-to-permanent`: Opens fleeting notes for processing
-
-These functions are now safe to use in org-mode source blocks without breaking rendering.
 
 ** Org Capture
 #+begin_src emacs-lisp
@@ -2333,24 +2355,14 @@ These functions are now safe to use in org-mode source blocks without breaking r
   (advice-add 'org-download-dnd :after #'org-download-display-inline-images))
 #+end_src
 
-** Org iBullets
-#+begin_src emacs-lisp
-(use-package org-ibullets
-  :commands org-ibullets-mode
-  :vc (:url "https://github.com/jamescherti/org-ibullets.el.git")
-  :hook (org-mode . org-ibullets-mode))
-#+end_src
-
 ** Org Modern
 #+begin_src emacs-lisp
 (use-package org-modern
   :defer t
   :hook (org-mode . org-modern-mode)
-  ;; :hook (org-agenda-finalize . org-modern-agenda)
   :custom
 
   (org-modern-star '("◉" "○" "✸" "✿" "✤" "✜" "◇" "▷"))
-  ;; (org-modern-list '((43 . "➤") (45 . "–") (42 . "•"))) ; + - *
 
   (org-modern-table-vertical 1)
   (org-modern-table-horizontal 0.2)
@@ -2714,37 +2726,187 @@ These functions are now safe to use in org-mode source blocks without breaking r
            :order 99))))
 #+end_src
 
-* Dashboard
-
+** Org Agenda Custom Commands
 #+begin_src emacs-lisp
-(use-package dashboard
-  :config
-  (dashboard-setup-startup-hook)
-  (setq initial-buffer-choice (lambda () (get-buffer-create dashboard-buffer-name)))
-  ;; Content is not centered by default. To center, set
-  (setq dashboard-center-content t)
-  ;; vertically center content
-  (setq dashboard-vertically-center-content t)
-  
-  ;; To disable shortcut "jump" indicators for each section, set
-  (setq dashboard-show-shortcuts nil)
-  (setq dashboard-items '((recents   . 5)
-                          (bookmarks . 5)
-                          (projects  . 5)
-                          (agenda    . 5)
-                          (registers . 5)))
-  (setq dashboard-navigation-cycle t)
-  (setq dashboard-heading-shorcut-format " [%s]")
-  (setq dashboard-item-shortcuts '((recents   . "r")
-                                   (bookmarks . "m")
-                                   (projects  . "p")
-                                   (agenda    . "a")
-                                   (registers . "e")))
-  (setq dashboard-item-names '(("Recent Files:"               . "Recently opened files:")
-                               ("Agenda for today:"           . "Today's agenda:")
-                               ("Agenda for the coming week:" . "Agenda:")))
-  (setq dashboard-display-icons-p t)     ; display icons on both GUI and terminal
-  (setq dashboard-icon-type 'nerd-icons))
+(with-eval-after-load 'org-super-agenda
+  (setq org-agenda-custom-commands
+        '(("d" "Daily Dashboard"
+           ((agenda ""
+                    ((org-agenda-span 'day)
+                     (org-agenda-start-day "0d")
+                     (org-super-agenda-groups
+                      '((:name "⏰ Time-Blocked Today"
+                         :time-grid t
+                         :date today
+                         :order 1)
+
+                        (:name "🔴 Overdue"
+                         :deadline past
+                         :scheduled past
+                         :order 2)
+
+                        (:name "🔥 GTD Inbox (Must Process)"
+                         :todo "INBOX"
+                         :order 3)))))
+
+            (alltodo ""
+                     ((org-agenda-overriding-header "")
+                      (org-super-agenda-groups
+                       '((:name "🎯 Priority A"
+                          :priority "A"
+                          :order 1)
+
+                         (:name "💻 @Computer"
+                          :and (:tag "@computer" :todo ("GTD-NEXT" "NEXT"))
+                          :order 2)
+
+                         (:name "🏠 @Home"
+                          :and (:tag "@home" :todo ("GTD-NEXT" "NEXT"))
+                          :order 3)
+
+                         (:name "📞 @Phone"
+                          :and (:tag "@phone" :todo ("GTD-NEXT" "NEXT"))
+                          :order 4)
+
+                         (:name "⏳ Waiting"
+                          :todo ("GTD-WAIT" "WAIT")
+                          :order 5)
+
+                         (:discard (:anything t))))))))
+
+
+          ("w" "Weekly Review"
+           ((todo "INBOX"
+                  ((org-agenda-overriding-header "🔥 GTD Inbox (Zero This Out)")
+                   (org-agenda-files (list (expand-file-name "gtd/inbox.org" my/org-directory)))
+                   (org-super-agenda-groups
+                    '((:auto-ts t)))))
+
+            (todo "GTD-WAIT"
+                  ((org-agenda-overriding-header "⏳ Waiting For (Follow-up Required)")
+                   (org-super-agenda-groups
+                    '((:auto-property "DELEGATED_TO")))))
+
+            (stuck ""
+                   ((org-agenda-overriding-header "🚫 Stuck Projects (No NEXT Actions)")
+                    (org-super-agenda-groups
+                     '((:auto-category t)))))
+
+            (todo "GTD-NEXT"
+                  ((org-agenda-overriding-header "✅ All NEXT Actions")
+                   (org-super-agenda-groups
+                    '((:auto-parent t)))))))
+
+
+          ("p" "Projects Dashboard"
+           ((tags "LEVEL=1"
+                  ((org-agenda-overriding-header "📋 GTD Projects (Execution Layer)")
+                   (org-agenda-files (list (expand-file-name "gtd/projects.org" my/org-directory)))
+                   (org-super-agenda-groups
+                    '((:name "🔴 Stuck (No NEXT)"
+                       :children ("GTD-WAIT" "TODO" "INBOX")
+                       :order 1)
+
+                      (:name "✅ Active (Has NEXT)"
+                       :children "GTD-NEXT"
+                       :order 2)
+
+                      (:name "⸻ Paused"
+                       :scheduled future
+                       :order 3)))))
+
+            (tags "+ACTIVE"
+                  ((org-agenda-overriding-header "💡 Knowledge Context (Zettelkasten)")
+                   (org-agenda-files (list (expand-file-name "roam/projects" my/org-roam-directory)))
+                   (org-super-agenda-groups
+                    '((:auto-tags t)))))))
+
+
+          ("g" . "GTD Views")
+
+          ("gn" "Next Actions"
+           ((todo "GTD-NEXT"
+                  ((org-agenda-overriding-header "✅ Next Actions")
+                   (org-agenda-sorting-strategy '(priority-down category-keep))
+                   (org-super-agenda-groups
+                    '((:auto-category t)))))))
+
+          ("gi" "Inbox (Unprocessed)"
+           ((todo "INBOX"
+                  ((org-agenda-overriding-header "🔥 GTD Inbox")
+                   (org-agenda-files (list (expand-file-name "gtd/inbox.org" my/org-directory)))
+                   (org-super-agenda-groups
+                    '((:auto-ts t)))))))
+
+          ("gw" "Waiting For"
+           ((todo "GTD-WAIT"
+                  ((org-agenda-overriding-header "⏳ Waiting For")
+                   (org-super-agenda-groups
+                    '((:auto-property "DELEGATED_TO")))))))
+
+          ("gs" "Stuck Projects"
+           ((stuck ""
+                   ((org-agenda-overriding-header "🚫 Stuck Projects")
+                    (org-super-agenda-groups
+                     '((:auto-category t)))))))
+
+          ("gc" "By Context"
+           ((tags-todo "@computer/GTD-NEXT"
+                       ((org-agenda-overriding-header "💻 @Computer")
+                        (org-super-agenda-groups
+                         '((:auto-priority t)))))
+
+            (tags-todo "@home/GTD-NEXT"
+                       ((org-agenda-overriding-header "🏠 @Home")
+                        (org-super-agenda-groups
+                         '((:auto-priority t)))))
+
+            (tags-todo "@errands/GTD-NEXT"
+                       ((org-agenda-overriding-header "🚗 @Errands")
+                        (org-super-agenda-groups
+                         '((:auto-priority t)))))
+
+            (tags-todo "@phone/GTD-NEXT"
+                       ((org-agenda-overriding-header "📞 @Phone")
+                        (org-super-agenda-groups
+                         '((:auto-priority t))))))))))
+#+end_src
+
+* Dashboard
+#+begin_src emacs-lisp
+(use-package dashboard)
+
+(use-package doom-dashboard
+  :vc (:url "https://github.com/emacs-dashboard/doom-dashboard.git" :rev :newest)
+  :after dashboard
+  :demand t
+  ;; Movement keys like doom.
+  :bind
+  (:map dashboard-mode-map
+        ("<remap> <dashboard-previous-line>" . widget-backward)
+        ("<remap> <dashboard-next-line>" . widget-forward)
+        ("<remap> <previous-line>" . widget-backward)
+        ("<remap> <next-line>"  . widget-forward)
+        ("<remap> <right-char>" . widget-forward)
+        ("<remap> <left-char>"  . widget-backward))
+  :custom
+  (dashboard-footer-icon 
+   (nerd-icons-faicon "nf-fa-github_alt" :face 'success :height 1.5))
+  (dashboard-page-separator "\n")
+  (dashboard-startupify-list `(dashboard-insert-banner
+                               dashboard-insert-banner-title
+                               dashboard-insert-newline
+                               dashboard-insert-items
+                               ,(dashboard-insert-newline 2)
+                               dashboard-insert-init-info
+                               ,(dashboard-insert-newline 2)
+                               doom-dashboard-insert-homepage-footer))
+  (dashboard-item-generators
+   '((recents   . doom-dashboard-insert-recents-shortmenu)
+     (bookmarks . doom-dashboard-insert-bookmark-shortmenu)
+     (projects  . doom-dashboard-insert-project-shortmenu)
+     (agenda    . doom-dashboard-insert-org-agenda-shortmenu)))
+  (dashboard-items '(projects agenda bookmarks recents)))
 #+end_src
 
 * Treesitter/Folding
@@ -4180,7 +4342,6 @@ If completion fails in the future, check these:
    '(diff-hl-delete ((t (:foreground "#f7768e" :background unspecified))))))
 #+end_src
 
-
 ** Git-Timemachine: Step Through File History
 #+begin_src emacs-lisp
 (use-package git-timemachine
@@ -4874,7 +5035,6 @@ Includes option to manually choose a directory like project.el."
     (define-key projectile-mode-map [remap projectile-switch-to-buffer]
       #'ar/consult-project-buffer)))
 #+end_src
-
 
 * Markdown
 #+begin_src emacs-lisp
