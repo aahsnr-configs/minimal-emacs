@@ -607,14 +607,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 
      (?< . ("<" . ">"))
      (?> . ("<" . ">"))))
-  :hook (elpaca-after-init . global-evil-surround-mode))
-
-(use-package goto-chg
-  :after evil
-  :commands (goto-last-change goto-last-change-reverse)
-  :config
-  (evil-define-key 'normal 'global (kbd "g;") 'goto-last-change)
-  (evil-define-key 'normal 'global (kbd "g,") 'goto-last-change-reverse))
+  :config (global-evil-surround-mode 1))
 
 ;; Text Objects for arguments (e.g., 'cia' to change inner argument)
 (use-package evil-args
