@@ -3886,7 +3886,6 @@ If completion fails in the future, check these:
   (eglot-booster-mode +1))
 
 (use-package eglot
-  :straight (:type built-in)
   :defer t
   :hook
   ((prog-mode . (lambda ()
