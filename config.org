@@ -94,7 +94,7 @@ Lower this if you experience freezing, raise if stuttering.")
 (when (file-exists-p custom-file)
   (condition-case err
       (load custom-file 'noerror 'nomessage)
-    (error 
+    (error
      (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
      (message "⚠️  WARNING: Failed to load custom-file!")
      (message "Error: %s" (error-message-string err))
@@ -108,7 +108,7 @@ Lower this if you experience freezing, raise if stuttering.")
      (message "")
      (message "The file will be regenerated when you use M-x customize")
      (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-     
+
      ;; Optionally, create a backup automatically
      (let ((backup-file (concat custom-file ".error-backup")))
        (when (not (file-exists-p backup-file))
@@ -151,32 +151,32 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (let* ((config-org (expand-file-name "config.org" user-emacs-directory))
          (init-el (expand-file-name "init.el" user-emacs-directory))
          (start-time (current-time)))
-    
+
     ;; Check if config.org exists
     (unless (file-exists-p config-org)
       (user-error "Configuration file %s not found!" config-org))
-    
+
     ;; Confirm before reloading
     (when (yes-or-no-p "Reload configuration? (This won't reset removed keybindings/hooks) ")
       (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
       (message "Tangling configuration from config.org...")
-      
+
       ;; Tangle the org file
       (condition-case err
           (org-babel-tangle-file config-org init-el "emacs-lisp")
         (error
          (user-error "Failed to tangle config.org: %s" (error-message-string err))))
-      
+
       (message "✓ Tangling complete")
       (message "Loading init.el...")
-      
+
       ;; Load the tangled init file
       (condition-case err
           (load-file init-el)
         (error
          (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
          (user-error "Failed to load init.el: %s" (error-message-string err))))
-      
+
       ;; Calculate load time
       (let ((elapsed-time (float-time (time-subtract (current-time) start-time))))
         (message "✓ Configuration loaded successfully")
@@ -248,6 +248,18 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 (setq-default bidi-display-reordering nil
               bidi-paragraph-direction 'left-to-right
               bidi-inhibit-bpa t)
+
+;; Mitigate Input Lag by disabling GTK input methods.
+;; The function `pgtk-use-im-context` MUST be called after a frame is
+;; created, otherwise it will error. We hook it into `after-make-frame-functions`
+;; to ensure it runs at the correct time, both on startup and for new frames
+;; created by emacsclient in daemon mode.
+;; (when (fboundp 'pgtk-use-im-context)
+;;   (add-hook 'after-make-frame-functions
+;;             (lambda (frame)
+;;               (with-selected-frame frame
+;;                 (pgtk-use-im-context nil)))))
+
 
 ;; Apply to common modes
 (defun my/bidi-optimizations ()
@@ -359,7 +371,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Environment
 #+begin_src emacs-lisp
 (use-package exec-path-from-shell
-  :defer t
   :custom
   (exec-path-from-shell-variables
    '("PATH" "MANPATH"
@@ -392,13 +403,13 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
           (lambda (file) (file-in-directory-p file package-user-dir))))
   :config
   (push (expand-file-name recentf-save-file) recentf-exclude)
-  
+
   ;; CRITICAL: Resolve symlinks FIRST, then abbreviate
   ;; This ensures ~/org/todo.org and ~/Git/.../org/todo.org become the same
   (setq recentf-filename-handlers
         '(file-truename        ; Resolve symlinks to real path
           abbreviate-file-name)) ; Then abbreviate for display
-  
+
   ;; Prevent org-agenda files from cluttering recent files
   ;; Dashboard opens these files, triggering recentf
   (defun ar/exclude-org-agenda-files (file)
@@ -408,7 +419,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
         (cl-some (lambda (agenda-file)
                    (string= file-true (file-truename agenda-file)))
                  (org-agenda-files t)))))
-  
+
   (add-to-list 'recentf-exclude #'ar/exclude-org-agenda-files))
 
 (use-package savehist
@@ -485,7 +496,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
           (command-error-default-function data context caller))))
 
 ;; Removes <dir> style
-(setq uniquify-buffer-name-style 'forward) 
+(setq uniquify-buffer-name-style 'forward)
 
 ;; Other Misc
 (setq inhibit-compacting-font-caches t
@@ -509,6 +520,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Undo Fu
 #+begin_src emacs-lisp
 (use-package undo-fu
+  :defer t
   :commands (undo-fu-only-undo
              undo-fu-only-redo
              undo-fu-only-redo-all
@@ -778,18 +790,25 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 * Transient
 #+begin_src emacs-lisp
 (use-package transient
+  :defer t
   :bind ("<f6>" . ar/toggles-transient)
   :init
   (setq resize-mini-windows t)
 
   :config
+  (require 'nerd-icons)
   (defun ar/transient-title ()
-    "Returns the menu title with a Nerd Icon, formatted like Doom Emacs."
     (concat
-     (if (and (fboundp 'nerd-icons-faicon) (display-graphic-p))
+     (if (fboundp 'nerd-icons-faicon)
          (nerd-icons-faicon "nf-fa-toggle_on" :face 'transient-heading :v-adjust 0.02)
        "")
-     (propertize " Doom Toggles" 'face 'transient-heading)))
+     (propertize " Emacs Toggles" 'face 'transient-heading)))
+
+  (defun ar/toggle-whitespace ()
+    (interactive)
+    (setq show-trailing-whitespace (not show-trailing-whitespace))
+    (redraw-display)
+    (message "Trailing whitespace %s" (if show-trailing-whitespace "ON" "OFF")))
 
   (defun ar/toggle-line-numbers ()
     "Toggle line numbers (Relative -> Absolute -> Off)."
@@ -803,22 +822,10 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
       (display-line-numbers-mode 1)
       (setq display-line-numbers 'relative))))
 
-  (defun ar/toggle-whitespace ()
-    "Toggle trailing whitespace visualization."
-    (interactive)
-    (setq show-trailing-whitespace (not show-trailing-whitespace))
-    (redraw-display)
-    (message "Trailing whitespace %s" (if show-trailing-whitespace "ON" "OFF")))
-
   (transient-define-prefix ar/toggles-transient ()
     "Global Toggles and Actions"
+    [:description ar/transient-title
 
-    [:description ar/transient-title]
-
-    ["" ("<f6>" "" transient-quit-one :format " ")]
-
-    [
-     ;; --- Col 1: Basic ---
      ["Basic"
       ("n" "Line numbers" ar/toggle-line-numbers :transient t)
       ("a" "Aggressive indent" global-aggressive-indent-mode :transient t
@@ -839,7 +846,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
                           (doom-modeline-mode 1)))
        :transient t :if (lambda () (fboundp 'doom-modeline-mode)))]
 
-     ;; --- Col 2: Highlight ---
      ["Highlight"
       ("h l" "Line" global-hl-line-mode :transient t)
       ("h p" "Paren" show-paren-mode :transient t)
@@ -865,7 +871,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
       ("v" "Gutter" diff-hl-mode :transient t
        :if (lambda () (fboundp 'diff-hl-mode)))]
 
-     ;; --- Col 4: Theme ---
      ["Theme"
       ("t d" "Light (Modus)" (lambda () (interactive) (load-theme 'modus-operandi t)))
       ("t k" "Dark (Modus)" (lambda () (interactive) (load-theme 'modus-vivendi t)))
@@ -878,13 +883,14 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
       ("t c" "Customize" customize-themes)
       ("t u" "Unload all" (lambda () (interactive) (mapc #'disable-theme custom-enabled-themes)))]
 
-     ;; --- Col 5: Package ---
      ["Package"
       ("p r" "Refresh archives" package-refresh-contents)
       ("p l" "List packages" package-list-packages)
       ("p i" "Install package" package-install)
       ("p d" "Delete package" package-delete)
-      ("p a" "Autoremove" package-autoremove)]]))
+      ("p a" "Autoremove" package-autoremove)
+      ;; Hidden Toggle
+      ("<f6>" "" transient-quit-one :format " ")]]))
 #+end_src
 
 * Editor Behaviour
@@ -895,16 +901,16 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 =============================================================================
 
 1. GLOBAL BEHAVIOR & PERFORMANCE
-   - eldoc-idle-delay (0.1s): 
+   - eldoc-idle-delay (0.1s):
      * What: The time Emacs waits after a cursor movement before showing docs.
      * Set: via :custom in the eldoc use-package block.
      * Debug: If docs feel "laggy," increase this. If they feel "slow," decrease.
-   - eldoc-echo-area-use-multiline-p (2): 
+   - eldoc-echo-area-use-multiline-p (2):
      * What: Allows ElDoc to expand the echo area up to 2 lines.
      * Set: via :custom.
      * Debug: Check variable value if docs are being cut off prematurely.
    - eldoc-documentation-strategy (eldoc-documentation-compose):
-     * What: Tells ElDoc to combine results from ALL active backends (e.g., LSP 
+     * What: Tells ElDoc to combine results from ALL active backends (e.g., LSP
        + Breadcrumbs) rather than just picking the first one.
      * Debug: Check 'eldoc-documentation-functions' to see which backends are active.
 
@@ -912,7 +918,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
    - ar/show-eldoc-buffer (C-h .):
      * What: A safe wrapper around 'eldoc-doc-buffer'. It forces a full buffer
        to open with complete documentation.
-     * Debug: If C-h . shows nothing, the current backend lacks a "long-form" 
+     * Debug: If C-h . shows nothing, the current backend lacks a "long-form"
        doc string. Check the *Messages* buffer for error logs.
 
 3. ORG-MODE BREADCRUMBS (ar/get-org-breadcrumb-string)
@@ -920,34 +926,34 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
      (Parent › Current) using 'org-get-outline-path'.
    - Specific Logic:
      a) EOB Check: Detects if you are at the bottom of the file.
-     b) Src-Block Check: Returns nil inside code blocks so that LSP/ElDoc can 
+     b) Src-Block Check: Returns nil inside code blocks so that LSP/ElDoc can
         show function signatures instead of headings.
-     c) Face Application: Uses 'shadow' for parents and 'bold-keyword' for 
+     c) Face Application: Uses 'shadow' for parents and 'bold-keyword' for
         the current heading to provide visual depth.
-   - Debug: Run (ar/get-org-breadcrumb-string) in M-x ielm while in an Org 
+   - Debug: Run (ar/get-org-breadcrumb-string) in M-x ielm while in an Org
      file to see the raw string generated.
 
 4. GENERIC CONTEXT FALLBACK (ar/generic-eldoc-backend)
    - What: When not in Org-mode and not using LSP, this uses 'which-function'
      to show which class/function your cursor is currently inside.
    - Dependency: Requires 'which-function-mode' to be 1.
-   - Debug: If context doesn't appear in programming modes, verify 
+   - Debug: If context doesn't appear in programming modes, verify
      'which-function-mode' is active.
 
 5. HOVER SUPPORT (eldoc-mouse)
-   - What: Displays ElDoc documentation in a floating childframe when the 
+   - What: Displays ElDoc documentation in a floating childframe when the
      mouse hovers over a symbol.
    - Set: Enabled via 'eldoc-mouse-mode' hook.
-   - Integration: Customizes 'posframe-border' to match your UI theme and 
+   - Integration: Customizes 'posframe-border' to match your UI theme and
      disables standard tooltips to prevent "double popups."
-   - Debug: Check if 'childframe-workable-p' returns T. Ensure 'posframe' 
+   - Debug: Check if 'childframe-workable-p' returns T. Ensure 'posframe'
      is installed.
 
 6. DEBUGGING BACKEND PRIORITY
    - Backend priority is managed via 'add-hook' depth values:
      * Org Breadcrumbs: -100 (Highest - always runs first).
      * Generic Context: 0 (Default - runs if others aren't managing).
-   - Debug: Run 'C-h v eldoc-documentation-functions' in any buffer to see 
+   - Debug: Run 'C-h v eldoc-documentation-functions' in any buffer to see
       the execution order.
 =============================================================================
 #+end_src
@@ -961,7 +967,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ;;   :config
 ;;   (which-function-mode 1)
 ;;   (setq which-func-format "")
-  
+
 ;;   ;; Disable in treemacs buffers
 ;;   (with-eval-after-load 'treemacs
 ;;     (add-hook 'treemacs-mode-hook
@@ -981,7 +987,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (eldoc-echo-area-use-multiline-p 2)
   (eldoc-documentation-strategy 'eldoc-documentation-compose)
   (eldoc-echo-area-display-truncation-message nil)
-  
+
   :config
   ;; === SAFE DOC BUFFER TOGGLE ===
   (defun ar/show-eldoc-buffer ()
@@ -1122,23 +1128,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 (use-package sudo-edit :defer t)
 #+end_src
 
-** Move Text
-#+begin_src emacs-lisp
-(use-package move-text
-  :defer t
-  :config
-  (defun ar/indent-after-move-text (&rest ignored)
-    "Indent the current line or region after moving, preserving mark state."
-    (let ((deactivate deactivate-mark))
-      (if (region-active-p)
-          (indent-region (region-beginning) (region-end))
-        (indent-region (line-beginning-position) (line-end-position)))
-      (setq deactivate-mark deactivate)))
-
-  (advice-add 'move-text-up :after #'ar/indent-after-move-text)
-  (advice-add 'move-text-down :after #'ar/indent-after-move-text))
-#+end_src
-
 ** Terminal
 #+begin_src emacs-lisp
 (use-package eshell
@@ -1155,23 +1144,23 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   ;; Kill processes without confirmation
   (eshell-kill-processes-on-exit t)
   (eshell-destroy-buffer-when-process-dies nil)
-  
+
   ;; Remove banner
   (eshell-banner-message "")
-  
+
   ;; Scrolling
   (eshell-scroll-to-bottom-on-input 'this)
   (eshell-scroll-show-maximum-output t)
   (eshell-scroll-to-bottom-on-output nil)
-  
+
   ;; History
   (eshell-history-size 10000)
   (eshell-hist-ignoredups t)
   (eshell-save-history-on-exit t)
-  
+
   ;; Buffer management
   (eshell-buffer-maximum-lines 20000)
-  
+
   ;; Visual commands (programs requiring terminal emulation)
   (eshell-visual-commands
    '("top" "htop" "btop" "less" "more" "vim" "vi" "nano" "emacs"
@@ -1183,15 +1172,15 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
      ("podman" "run" "exec" "logs" "attach")))
   (eshell-visual-options
    '(("git" "--help" "--paginate")))
-  
+
   ;; Prefer Lisp implementations
   (eshell-prefer-lisp-functions t)
   (eshell-prefer-lisp-variables t)
-  
+
   :config
   ;; Suppress PAGER
   (setenv "PAGER" "cat")
-  
+
   ;; === TOGGLE FUNCTION ===
   (defun ar/eshell-toggle ()
     "Toggle eshell popup window. Works from any Evil state."
@@ -1214,7 +1203,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
               (pop-to-buffer eshell-buffer)
             (eshell))
           (message "Eshell opened")))))
-  
+
   ;; === NEW ESHELL INSTANCE ===
   (defun ar/eshell-new ()
     "Create a new eshell buffer."
@@ -1223,7 +1212,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
       (with-current-buffer buf
         (eshell-mode))
       (pop-to-buffer buf)))
-  
+
   ;; === CLEAR BUFFER ===
   (defun ar/eshell-clear ()
     "Clear the eshell buffer."
@@ -1231,7 +1220,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
     (let ((inhibit-read-only t))
       (erase-buffer)
       (eshell-send-input)))
-  
+
   ;; === ALIASES ===
   (defalias 'eshell/clear #'ar/eshell-clear)
   (defalias 'eshell/ff #'find-file)
@@ -1242,7 +1231,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (defalias 'eshell/v #'view-file)
   (defalias 'eshell/l #'eshell/ls)
   (defalias 'eshell/ll #'eshell/ls)
-  
+
   ;; === GIT BRANCH HELPER ===
   (defun ar/eshell-git-branch ()
     "Get current git branch if in repository."
@@ -1250,13 +1239,13 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
                (executable-find "git")
                (locate-dominating-file default-directory ".git"))
       (let ((branch (string-trim
-                     (shell-command-to-string 
+                     (shell-command-to-string
                       "git rev-parse --abbrev-ref HEAD 2>/dev/null"))))
         (if (and branch (not (string-empty-p branch)))
             (concat " " (propertize (concat "(" branch ")")
                                    'face '(:foreground "#7aa2f7")))
           ""))))
-  
+
   ;; === CUSTOM PROMPT ===
   (setq eshell-prompt-function
         (lambda ()
@@ -1266,7 +1255,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
            (ar/eshell-git-branch)
            (propertize (if (zerop (user-uid)) " # " " $ ")
                       'face '(:foreground "#9ece6a" :weight bold)))))
-  
+
   (setq eshell-prompt-regexp "^[^#$\n]* [#$] "))
 
 ;; === GLOBAL TOGGLE KEYBINDING (works in ALL states) ===
@@ -1316,7 +1305,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
       (kbd "C-a") #'eshell-bol
       (kbd "C-e") #'end-of-line
       (kbd "C-u") #'eshell-kill-input)
-    
+
     ;; Normal state bindings
     (evil-define-key 'normal eshell-mode-map
       (kbd "C-r") #'ar/eshell-consult-history
@@ -1325,12 +1314,112 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
       (kbd "C-l") #'ar/eshell-clear)))
 #+end_src
 
+** Buffer Terminator
+#+begin_src emacs-lisp
+(use-package buffer-terminator
+  :defer t
+  :custom
+  ;; Enable/Disable verbose mode to log buffer cleanup events
+  (buffer-terminator-verbose nil)
+
+  ;; Set the inactivity timeout (in seconds) after which buffers are considered
+  ;; inactive (default is 30 minutes):
+  (buffer-terminator-inactivity-timeout (* 30 60)) ; 30 minutes
+
+  ;; Define how frequently the cleanup process should run (default is every 10
+  ;; minutes):
+  (buffer-terminator-interval (* 10 60)) ; 10 minutes
+
+  :config
+  (buffer-terminator-mode 1))
+#+end_src
+
+** Helpful
+#+begin_src emacs-lisp
+(use-package helpful
+  :defer t
+  :commands (helpful-callable
+             helpful-variable
+             helpful-key
+             helpful-command
+             helpful-at-point
+             helpful-function)
+  :bind
+  ([remap describe-command] . helpful-command)
+  ([remap describe-function] . helpful-callable)
+  ([remap describe-key] . helpful-key)
+  ([remap describe-symbol] . helpful-symbol)
+  ([remap describe-variable] . helpful-variable)
+  :custom
+  (helpful-max-buffers 7))
+#+end_src
+
+** Jinx
+#+begin_src emacs-lisp
+(use-package jinx
+  :hook (after-init . jinx-mode)
+  :custom
+  ;; Sensibly disable Jinx in modes where spell-checking is not desired.
+  ;; This includes programming modes, UI-centric modes, and special buffers.
+  (jinx-disabled-modes
+   '(prog-mode           ; All programming modes
+     conf-mode           ; All configuration file modes
+     emacs-lisp-mode     ; Specifically for elisp
+     dired-mode          ; File manager
+     ibuffer-mode        ; Buffer list
+     neotree-mode        ; File tree
+     magit-status-mode   ; Magit UI
+     magit-log-mode
+     magit-diff-mode
+     magit-branch-mode
+     org-agenda-mode     ; Agenda view is not for writing
+     org-src-mode        ; Don't check inside code blocks
+     dashboard-mode      ; Startup dashboard
+     which-key-mode      ; Keybinding helper
+     help-mode           ; Help buffers
+     Info-mode           ; Info documentation
+     embark-collect-mode ; Embark's special buffer
+     vterm-mode          ; Terminal emulator
+     pdf-view-mode))     ; PDF viewer
+
+    ;; Ensure the personal dictionary file exists, creating it if necessary.
+  (let ((dict-file (expand-file-name "dict.txt" user-emacs-directory)))
+    (unless (file-exists-p dict-file)
+      (write-region "" nil dict-file))))
+#+end_src
+
+** Stripspace
+#+begin_src emacs-lisp
+(use-package stripspace
+  :commands stripspace-local-mode
+
+  ;; Enable for prog-mode-hook, text-mode-hook, conf-mode-hook
+  :hook ((prog-mode . stripspace-local-mode)
+         (text-mode . stripspace-local-mode)
+         (conf-mode . stripspace-local-mode))
+
+  :custom
+  ;; The `stripspace-only-if-initially-clean' option:
+  ;; - nil to always delete trailing whitespace.
+  ;; - Non-nil to only delete whitespace when the buffer is clean initially.
+  ;; (The initial cleanliness check is performed when `stripspace-local-mode'
+  ;; is enabled.)
+  (stripspace-only-if-initially-clean nil)
+
+  ;; Enabling `stripspace-restore-column' preserves the cursor's column position
+  ;; even after stripping spaces. This is useful in scenarios where you add
+  ;; extra spaces and then save the file. Although the spaces are removed in the
+  ;; saved file, the cursor remains in the same position, ensuring a consistent
+  ;; editing experience without affecting cursor placement.
+  (stripspace-restore-column t))
+#+end_src
+
 * UI and Theming
 ** Fonts
 #+begin_src emacs-lisp
 (defun ar/set-fonts ()
   "Set the default, fixed-pitch, and variable-pitch fonts for the current frame."
-  (set-face-attribute 'default nil :font "JetBrains Mono" :height 125 :weight 'medium) 
+  (set-face-attribute 'default nil :font "JetBrains Mono" :height 125 :weight 'medium)
   (set-face-attribute 'fixed-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
   (set-face-attribute 'variable-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
   ;; Apply italic slant to comments and keywords
@@ -1425,9 +1514,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 (use-package nerd-icons
   :custom
   (nerd-icons-font-family "Symbols Nerd Font Mono")
-  (nerd-icons-color-icons t)
-  :config
-  (setq inhibit-compacting-font-caches t))
+  (nerd-icons-color-icons t))
 #+end_src
 
 ** Line Numbers
@@ -1645,7 +1732,7 @@ If file doesn't exist, creates it with TEMPLATE content."
   (org-log-done 'time)
   (org-log-into-drawer t)
   (org-return-follows-link t)
-  
+
   ;; Display settings
   (org-pretty-entities t)
   (org-hide-leading-stars t)
@@ -1653,18 +1740,18 @@ If file doesn't exist, creates it with TEMPLATE content."
   (org-fontify-whole-heading-line t)
   (org-fontify-done-headline t)
   (org-fontify-quote-and-verse-blocks t)
-  
+
   ;; Source block settings
   (org-src-fontify-natively t)
   (org-src-preserve-indentation t)
   (org-src-tab-acts-natively t)
   (org-edit-src-content-indentation 0)
-  
+
   ;; Performance optimizations
   (org-element-use-cache t)
   (org-element-cache-persistent t)
   (org-highlight-latex-and-related nil) ;; Performance: disable heavy fontification
-  
+
   ;; Startup settings
   (org-startup-folded 'overview)
   (org-startup-with-inline-images nil)
@@ -1698,7 +1785,7 @@ If file doesn't exist, creates it with TEMPLATE content."
           (sequence "PLAN(P)" "ACTIVE(A)" "PAUSED(x)" "|" "ACHIEVED(a)" "DROPPED(D)")
           (sequence "INBOX(i)" "GTD-NEXT(N)" "GTD-WAIT(W@/!)" "|" "GTD-DONE(D!)" "GTD-CNCL(C@)")
           (sequence "CRITICAL(!)" "COMMENT(M)" "|" "RESOLVED(R)"  "DISABLED(d!)")))
-  
+
   (setq org-todo-keyword-faces
         '(("TODO"      . (:foreground "#f7768e" :weight bold))
           ("NEXT"      . (:foreground "#ff9e64" :weight bold))
@@ -1734,7 +1821,7 @@ If file doesn't exist, creates it with TEMPLATE content."
                         ("meeting"    . ?m)
                         ("urgent"     . ?u)
                         ("someday"    . ?s)))
-  
+
   (setq org-priority-faces '((?A . error)
                              (?B . warning)
                              (?C . success))))
@@ -1745,19 +1832,19 @@ If file doesn't exist, creates it with TEMPLATE content."
 (with-eval-after-load 'org
   ;; Load org-tempo for structure templates
   (require 'org-tempo)
-  
+
   ;; Babel language configuration
   (setq org-confirm-babel-evaluate nil
         org-src-fontify-natively t
         org-src-tab-acts-natively t)
-  
+
   (defconst load-language-alist
-    '((emacs-lisp . t) (perl . t) (python . t) (ruby . t) 
-      (js . t) (css . t) (sass . t) (C . t) (java . t) 
+    '((emacs-lisp . t) (perl . t) (python . t) (ruby . t)
+      (js . t) (css . t) (sass . t) (C . t) (java . t)
       (shell . t) (plantuml . t)))
-  
+
   (org-babel-do-load-languages 'org-babel-load-languages load-language-alist)
-  
+
   ;; Add Structure Templates
   (dolist (pair '(("sh" . "src shell")
                   ("el" . "src emacs-lisp")
@@ -1770,7 +1857,6 @@ If file doesn't exist, creates it with TEMPLATE content."
 ** Transient Template System
 #+begin_src emacs-lisp
 (with-eval-after-load 'org
-  ;; 1. Helper Function (Replaces 'hot-expand')
   (defun ar/org-template-expand (str &optional mod)
     "Expand org template STR with optional modifier MOD."
     (let (text)
@@ -1782,7 +1868,6 @@ If file doesn't exist, creates it with TEMPLATE content."
       (when mod (insert mod) (forward-line))
       (when text (insert text))))
 
-  ;; 2. Specific Template Actions
   (defun ar/org-insert-perl-tangled ()
     (interactive)
     (insert "#+HEADERS: :results output :exports both :shebang \"#!/usr/bin/env perl\"\n")
@@ -1792,7 +1877,6 @@ If file doesn't exist, creates it with TEMPLATE content."
     (interactive)
     (ar/org-template-expand "<s" "ipython :session :exports both :results raw drawer\n$0"))
 
-  ;; 3. Title Generator
   (defun ar/org-transient-title ()
     (concat
      (if (and (fboundp 'nerd-icons-sucicon) (display-graphic-p))
@@ -1800,14 +1884,11 @@ If file doesn't exist, creates it with TEMPLATE content."
        "")
      (propertize " Org Template" 'face 'transient-heading)))
 
-  ;; 4. The Transient Definition
   (with-eval-after-load 'transient
     (transient-define-prefix ar/org-template-transient ()
       "Org Mode Structure Templates"
-      [:description ar/org-transient-title]
-      ["" ("<" "" transient-quit-one :format " ")] ;; Invisible quit key
-      
-      [;; One Row, 4 Columns
+      [:description ar/org-transient-title
+
        ["Basic"
         ("a" "ascii" (lambda () (interactive) (ar/org-template-expand "<a")))
         ("c" "center" (lambda () (interactive) (ar/org-template-expand "<c")))
@@ -1852,43 +1933,38 @@ If file doesn't exist, creates it with TEMPLATE content."
           (require 'transient)
           (ar/org-template-transient))
       (self-insert-command 1)))
-  
+
   (define-key org-mode-map (kbd "<") #'ar/org-smart-less-than))
 #+end_src
 
 ** Org Agenda
 #+begin_src emacs-lisp
-(with-eval-after-load 'org
-  ;; ============================================
-  ;; AGENDA FILES
-  ;; ============================================
+;; (with-eval-after-load 'org
+(use-package org-agenda
+  :ensure nil
+  :defer t
+  :config
   (setq org-agenda-files (list my/org-directory
                                (expand-file-name "gtd" my/org-directory)))
-  
-  ;; ============================================
-  ;; VISUAL SETTINGS
-  ;; ============================================
+
   (setq org-agenda-block-separator ?─
         org-agenda-compact-blocks nil)
-  
+
   (setq org-agenda-time-grid
         '((daily today require-timed)
           (800 1000 1200 1400 1600 1800 2000)
           " ┄┄┄┄┄ " "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"))
-  
+
   (setq org-agenda-current-time-string
         "◀ now ─────────────────────────────────────────────────")
-  
-  ;; ============================================
-  ;; PERFORMANCE & BEHAVIOR
-  ;; ============================================
+
   (setq org-agenda-inhibit-startup t
         org-agenda-dim-blocked-tasks nil
         org-agenda-use-tag-inheritance nil
         org-agenda-ignore-properties '(effort appt category)
         org-agenda-span 'day
         org-tags-column -80)
-  
+
   ;; Skip completed tasks
   (setq org-agenda-skip-scheduled-if-done t
         org-agenda-skip-deadline-if-done t))
@@ -1914,26 +1990,19 @@ If file doesn't exist, creates it with TEMPLATE content."
              org-gtd-show-all-next
              org-gtd-show-stuck-projects
              org-gtd-organize)
-  
+
   :init
   ;; Set GTD directory
   (setq org-gtd-directory my/org-gtd-directory)
-  
-  ;; ============================================
-  ;; AUTO-CREATE GTD STRUCTURE
-  ;; ============================================
-  ;; org-gtd will create its own files (inbox.org, next.org, etc.)
-  ;; but we can create the directory early to avoid race conditions
   (my/ensure-org-dir "gtd")
-  
+
   :custom
-  ;; CRITICAL: Separate TODO sequence to avoid conflicts
   (org-todo-keywords
    '((sequence "TODO(t)" "NEXT(n)" "PROG(p)" "WAIT(w@/!)" "|" "DONE(d!)" "CANCEL(c@)")
      (sequence "PLAN(P)" "ACTIVE(A)" "PAUSED(x)" "|" "ACHIEVED(a)" "DROPPED(D)")
      ;; GTD-specific (used only in ~/org/gtd/ files)
      (sequence "INBOX(i)" "GTD-NEXT(N)" "GTD-WAIT(W@/!)" "|" "GTD-DONE(D!)" "GTD-CNCL(C@)")))
-  
+
   ;; Map GTD semantic states
   (org-gtd-keyword-mapping
    '((todo . "INBOX")
@@ -1941,23 +2010,23 @@ If file doesn't exist, creates it with TEMPLATE content."
      (wait . "GTD-WAIT")
      (done . "GTD-DONE")
      (canceled . "GTD-CNCL")))
-  
+
   ;; Disable mode-line clutter
   (org-gtd-mode nil)
-  
+
   :config
   ;; Add GTD directory to agenda (but NOT roam/)
-  (setq org-agenda-files 
+  (setq org-agenda-files
         (list my/org-directory
               my/org-gtd-directory))
-  
+
   ;; Performance: Delay database sync until idle
   (run-with-idle-timer 5 nil
     (lambda ()
       (when (and (featurep 'org-gtd)
                  (not (bound-and-true-p org-gtd-mode)))
         (org-gtd-mode 1))))
-  
+
   ;; Custom TODO faces for GTD keywords
   (setq org-todo-keyword-faces
         (append org-todo-keyword-faces
@@ -1978,7 +2047,7 @@ If file doesn't exist, creates it with TEMPLATE content."
                org-roam-node-insert
                org-roam-capture
                org-roam-buffer-toggle)
-    
+
     :init
     ;; Ensure org-roam directory exists
     (my/ensure-org-dir "roam")
@@ -1992,25 +2061,25 @@ If file doesn't exist, creates it with TEMPLATE content."
     (my/ensure-org-dir "roam/people")
 
     (setq org-roam-directory my/org-roam-directory)
-    
+
     :custom
     (org-roam-completion-everywhere t)
     (org-roam-node-display-template
-     (concat "${title:60} " 
+     (concat "${title:60} "
              (propertize "${tags:20}" 'face 'org-tag)))
-    
+
     ;; Performance: Disable verbose messages
     (org-roam-verbose nil)
-    
+
     :hook
     ;; Delay database sync significantly to avoid startup lag
     ((after-init . (lambda ()
                      (run-with-idle-timer 10 nil #'org-roam-db-autosync-enable))))
-    
+
     :config
     ;; CRITICAL: Do NOT add roam directory to org-agenda-files
     ;; Knowledge notes should not appear in task views
-    
+
     ;; Capture templates for Zettelkasten
     (setq org-roam-capture-templates
           '(("z" "zettel" plain
@@ -2018,65 +2087,65 @@ If file doesn't exist, creates it with TEMPLATE content."
              :target (file+head "zettel/${slug}.org"
                                 "#+title: ${title}\n#+filetags: :zettel:permanent:\n#+date: %<%Y-%m-%d>\n\n")
              :unnarrowed t)
-            
+
             ("l" "literature" plain
              "* Source\n- Author: %?\n- Title: \n- Year: \n- Type: [Book/Article/Paper]\n- URL: \n\n* Summary\n\n* Key Takeaways\n\n* Quotes\n#+begin_quote\n\n#+end_quote\n\n* Personal Notes\n\n* Related Ideas\n"
              :target (file+head "literature/${slug}.org"
                                 "#+title: ${title}\n#+filetags: :literature:\n#+date: %<%Y-%m-%d>\n\n")
              :unnarrowed t)
-            
+
             ("p" "project note" plain
              "* Project Context\n%?\n\n* Why This Matters\n\n* Key Resources\n\n* Research Notes\n\n* Decision Log\n\n* Learnings\n\n* GTD Link\n- Tasks: [[file:../../gtd/projects.org][GTD Projects]]\n"
              :target (file+head "projects/${slug}.org"
                                 "#+title: Project: ${title}\n#+filetags: :project:context:\n#+date: %<%Y-%m-%d>\n\n")
              :unnarrowed t)
-            
+
             ("i" "fleeting" plain
              "* %?\n\n* Context\n\n* Process Later\n- [ ] Convert to permanent note OR\n- [ ] Extract actionable tasks\n"
              :target (file+head "ideas/fleeting.org"
                                 "#+title: Fleeting Notes\n#+filetags: :fleeting:\n\n")
              :prepend t
              :unnarrowed t)
-            
+
             ("r" "reference" plain
              "* Metadata\n- Type: %?\n- Author: \n- Date: %<%Y-%m-%d>\n- URL/DOI: \n- Tags: \n\n* Summary\n\n* Key Points\n- \n\n* Relevant Quotes\n#+begin_quote\n\n#+end_quote\n\n* My Thoughts\n\n* Related Notes\n- \n"
              :target (file+head "reference/${slug}.org"
                                 "#+title: ${title}\n#+filetags: :reference:\n#+date: %<%Y-%m-%d>\n\n")
              :unnarrowed t)
-            
+
             ("c" "concept" plain
              "* Definition\n%?\n\n* Core Principles\n- \n\n* Examples\n- \n\n* Misconceptions\n- \n\n* Related Concepts\n- \n\n* Applications\n- \n\n* Further Reading\n- \n"
              :target (file+head "concepts/${slug}.org"
                                 "#+title: ${title}\n#+filetags: :concept:\n#+date: %<%Y-%m-%d>\n\n")
              :unnarrowed t)
-            
+
             ("P" "person" plain
              "* Basic Information\n- Full Name: %?\n- Role/Occupation: \n- Affiliation: \n- Contact: \n- Website: \n\n* Background\n\n* Notable Work/Contributions\n- \n\n* Key Ideas\n- \n\n* Related People\n- \n\n* References\n- \n"
              :target (file+head "people/${slug}.org"
                                 "#+title: ${title}\n#+filetags: :person:\n#+date: %<%Y-%m-%d>\n\n")
              :unnarrowed t)
-            
+
             ("m" "meeting" plain
              "* Attendees\n- %?\n\n* Agenda\n- \n\n* Discussion\n\n* Action Items\n- [ ] \n\n* Follow-up\n- \n"
              :target (file+head "meetings/${slug}.org"
                                 "#+title: ${title}\n#+filetags: :meeting:\n#+date: %<%Y-%m-%d>\n\n")
              :unnarrowed t)))
-    
+
     ;; Dailies configuration
     (setq org-roam-dailies-directory "daily/"
           org-roam-dailies-capture-templates
           '(("d" "default" entry "* %<%H:%M> %?"
              :target (file+head "%<%Y-%m-%d>.org"
                                 "#+title: %<%Y-%m-%d %A>\n#+filetags: :daily:\n\n"))
-            
+
             ("j" "journal" entry "* %<%H:%M> Journal\n%?"
              :target (file+head "%<%Y-%m-%d>.org"
                                 "#+title: %<%Y-%m-%d %A>\n#+filetags: :daily:journal:\n\n"))
-            
+
             ("m" "morning" entry "* %<%H:%M> Morning Review\n** Goals for Today\n- %?\n\n** Priorities\n1. \n\n** Notes\n"
              :target (file+head "%<%Y-%m-%d>.org"
                                 "#+title: %<%Y-%m-%d %A>\n#+filetags: :daily:\n\n"))
-            
+
             ("e" "evening" entry "* %<%H:%M> Evening Reflection\n** What went well?\n- %?\n\n** What could improve?\n- \n\n** Learnings\n- \n\n** Tomorrow's focus\n- \n"
              :target (file+head "%<%Y-%m-%d>.org"
                                 "#+title: %<%Y-%m-%d %A>\n#+filetags: :daily:\n\n"))))))
@@ -2113,12 +2182,12 @@ Links back to the GTD task for execution tracking."
   (interactive)
   (unless (derived-mode-p 'org-mode)
     (user-error "Must be in an org-mode buffer"))
-  
+
   (let* ((heading (org-get-heading t t t t))
          (gtd-id (org-id-get-create))
          (context (or (org-entry-get nil "CONTEXT") ""))
          (node-title (concat "Project: " heading)))
-    
+
     ;; Create org-roam project note with template
     (org-roam-capture-
      :node (org-roam-node-create :title node-title)
@@ -2126,7 +2195,7 @@ Links back to the GTD task for execution tracking."
                   :gtd-id gtd-id
                   :heading heading
                   :context context))
-    
+
     ;; Add backlink to GTD project
     (save-excursion
       (org-back-to-heading t)
@@ -2135,7 +2204,7 @@ Links back to the GTD task for execution tracking."
         (insert "\n"))
       (insert (format "- Zettelkasten Note: [[id:%s][%s]]\n\n"
                       gtd-id node-title)))
-    
+
     (message "Created Zettelkasten project note: %s" node-title)))
 
 (defun ar/zettel-to-gtd ()
@@ -2144,11 +2213,11 @@ Links back to the GTD task for execution tracking."
   (unless (and (derived-mode-p 'org-mode)
                (string-prefix-p my/org-roam-directory (buffer-file-name)))
     (user-error "Must be in an org-roam buffer"))
-  
+
   (let* ((note-title (org-roam-node-title (org-roam-node-at-point)))
          (note-id (org-id-get-create))
          (tasks '()))
-    
+
     ;; Collect TODO items
     (org-map-entries
      (lambda ()
@@ -2157,7 +2226,7 @@ Links back to the GTD task for execution tracking."
          (when (and state (not (member state '("DONE" "CANCEL"))))
            (push heading tasks))))
      t 'tree)
-    
+
     (if (null tasks)
         (message "No actionable tasks found in current note")
       ;; Create GTD inbox entry
@@ -2427,6 +2496,7 @@ Links back to the GTD task for execution tracking."
 ** Org Remark
 #+begin_src emacs-lisp
 (use-package org-remark
+  :defer t
   :after org
   :config
   (org-remark-global-tracking-mode +1))
@@ -2448,7 +2518,7 @@ Links back to the GTD task for execution tracking."
              ((or (eobp)
                   (save-excursion (forward-line 1) (eobp)))
               (funcall callback (propertize "Bottom Level" 'face face-path)))
-             
+
              ;; Check heading hierarchy
              ((let ((path (ignore-errors (org-get-outline-path t))))
                 (when path
@@ -2460,7 +2530,7 @@ Links back to the GTD task for execution tracking."
                                 (propertize heading 'face face-path)))
                             path
                             sep-str)))))
-             
+
              ;; Default to Top Level
              (t
               (funcall callback (propertize "Top Level" 'face face-path)))))
@@ -2540,7 +2610,7 @@ Links back to the GTD task for execution tracking."
                           (propertize "Link: " 'face 'bold)
                           (propertize (concat type ":" path) 'face 'link)
                           (when desc
-                            (format " [%s]" 
+                            (format " [%s]"
                                    (propertize desc 'face 'font-lock-doc-face)))))))))
       (error nil))))
 
@@ -2557,10 +2627,10 @@ Links back to the GTD task for execution tracking."
                (formula (org-table-get-formula col)))
           (funcall callback
                    (concat
-                    (propertize (format "Cell[%d,%d]" row col) 
+                    (propertize (format "Cell[%d,%d]" row col)
                                'face 'font-lock-keyword-face)
                     (when (and formula (not (string-empty-p formula)))
-                      (format " Formula: %s" 
+                      (format " Formula: %s"
                              (propertize formula 'face 'font-lock-function-name-face))))))
       (error nil))))
 
@@ -2620,13 +2690,13 @@ Links back to the GTD task for execution tracking."
                   (widen)
                   (message (concat
                             (when (> words 0)
-                              (format "%s words" 
-                                     (propertize (number-to-string words) 
+                              (format "%s words"
+                                     (propertize (number-to-string words)
                                                'face 'font-lock-constant-face)))
                             (when (and (> words 0) (> tasks 0)) " │ ")
                             (when (> tasks 0)
-                              (format "Tasks: %s/%s" 
-                                     (propertize (number-to-string done) 
+                              (format "Tasks: %s/%s"
+                                     (propertize (number-to-string done)
                                                'face 'org-done)
                                      (propertize (number-to-string tasks)
                                                'face 'org-todo)))))))
@@ -2651,7 +2721,7 @@ Links back to the GTD task for execution tracking."
                         (when switches
                           (format " %s" (propertize switches 'face 'font-lock-comment-face)))
                         (when (and parameters (not (string-empty-p parameters)))
-                          (format " [%s]" 
+                          (format " [%s]"
                                  (propertize parameters 'face 'font-lock-comment-face))))))))
       (error (message "Not in a source block or failed to retrieve info")))))
 
@@ -2678,6 +2748,7 @@ Links back to the GTD task for execution tracking."
 ** Org Super Agenda
 #+begin_src emacs-lisp
 (use-package org-super-agenda
+  :defer t
   :after org-agenda
   :hook (org-agenda-mode . org-super-agenda-mode)
   :custom
@@ -2883,39 +2954,47 @@ Links back to the GTD task for execution tracking."
 
 * Dashboard
 #+begin_src emacs-lisp
-(use-package dashboard)
+(use-package dashboard
+  :init
+  (setq dashboard-banner-logo-title "Welcome to Emacs!")
+  (setq dashboard-startup-banner 'logo)
+  (setq dashboard-items '((recents   . 10)
+                         (bookmarks . 3)
+                         (projects  . 6)
+                         (agenda    . 5)))
 
-(use-package doom-dashboard
-  :vc (:url "https://github.com/emacs-dashboard/doom-dashboard.git" :rev :newest)
-  :after dashboard
-  :demand t
-  ;; Movement keys like doom.
-  :bind
-  (:map dashboard-mode-map
-        ("<remap> <dashboard-previous-line>" . widget-backward)
-        ("<remap> <dashboard-next-line>" . widget-forward)
-        ("<remap> <previous-line>" . widget-backward)
-        ("<remap> <next-line>"  . widget-forward)
-        ("<remap> <right-char>" . widget-forward)
-        ("<remap> <left-char>"  . widget-backward))
-  :custom
-  (dashboard-footer-icon 
-   (nerd-icons-faicon "nf-fa-github_alt" :face 'success :height 1.5))
-  (dashboard-page-separator "\n")
-  (dashboard-startupify-list `(dashboard-insert-banner
-                               dashboard-insert-banner-title
-                               dashboard-insert-newline
-                               dashboard-insert-items
-                               ,(dashboard-insert-newline 2)
-                               dashboard-insert-init-info
-                               ,(dashboard-insert-newline 2)
-                               doom-dashboard-insert-homepage-footer))
-  (dashboard-item-generators
-   '((recents   . doom-dashboard-insert-recents-shortmenu)
-     (bookmarks . doom-dashboard-insert-bookmark-shortmenu)
-     (projects  . doom-dashboard-insert-project-shortmenu)
-     (agenda    . doom-dashboard-insert-org-agenda-shortmenu)))
-  (dashboard-items '(projects agenda bookmarks recents)))
+  ;; CRITICAL: Close org files after reading them for agenda
+  (setq dashboard-agenda-release-buffers t)
+
+  (setq dashboard-center-content t)
+  (setq dashboard-set-heading-icons t)
+  (setq dashboard-set-file-icons t)
+  (setq dashboard-icon-type 'nerd-icons)
+
+  :config
+  ;; CRITICAL FIX: Suppress "Followed link to" messages in daemon mode
+  (defun ar/dashboard-setup-startup-hook-quiet ()
+    "Setup dashboard but suppress messages during daemon startup."
+    (if (daemonp)
+        ;; In daemon mode: suppress all messages during dashboard init
+        (let ((inhibit-message t)
+              (message-log-max nil))  ; Don't even log to *Messages*
+          (dashboard-setup-startup-hook))
+      ;; Normal mode: show messages as usual
+      (dashboard-setup-startup-hook)))
+
+  (ar/dashboard-setup-startup-hook-quiet)
+
+  ;; FIX: Use get-buffer-create instead of get-buffer to avoid nil error
+  ;; This creates the buffer if it doesn't exist
+  ;; Also handle command-line files gracefully
+  (setq initial-buffer-choice
+        (lambda ()
+          ;; If files were passed on command line, don't force dashboard
+          (if (> (length command-line-args) 2)
+              nil
+            (get-buffer-create "*dashboard*")))))
+
 #+end_src
 
 * Treesitter/Folding
@@ -2958,8 +3037,8 @@ Links back to the GTD task for execution tracking."
 #+begin_src emacs-lisp
 (use-package treesit-fold
   :vc (:url "https://github.com/emacs-tree-sitter/treesit-fold.git")
-  :custom
-  (treesit-fold-indicators-priority -1)
+  ;; :custom
+  ;; (treesit-fold-indicators-priority -1)
   :config
   (global-treesit-fold-mode 1)
   (global-treesit-fold-indicators-mode 1))
@@ -2984,7 +3063,7 @@ Links back to the GTD task for execution tracking."
   (define-key evil-outer-text-objects-map "f" (evil-textobj-tree-sitter-get-textobj "function.outer"))
   (define-key evil-inner-text-objects-map "c" (evil-textobj-tree-sitter-get-textobj "class.inner"))
   (define-key evil-outer-text-objects-map "c" (evil-textobj-tree-sitter-get-textobj "class.outer"))
-  
+
   (define-key evil-inner-text-objects-map "a" (evil-textobj-tree-sitter-get-textobj "parameter.inner"))
   (define-key evil-outer-text-objects-map "a" (evil-textobj-tree-sitter-get-textobj "parameter.outer")))
 #+end_src
@@ -3012,8 +3091,8 @@ Links back to the GTD task for execution tracking."
          ((dashboard-mode eshell-mode shell-mode term-mode vterm-mode) .
           (lambda () (setq-local global-hl-line-mode nil))))
   :config
-  ;; CRITICAL FIX: Disable hl-line in Evil Visual mode. 
-  ;; Otherwise, the current line highlight masks the selection, making it look 
+  ;; CRITICAL FIX: Disable hl-line in Evil Visual mode.
+  ;; Otherwise, the current line highlight masks the selection, making it look
   ;; like the selection starts "late" or is broken.
   (defun ar/disable-hl-line-in-visual ()
     (when (bound-and-true-p hl-line-mode)
@@ -3048,12 +3127,12 @@ Links back to the GTD task for execution tracking."
     (when (bound-and-true-p indent-bars-mode)
       (indent-bars-mode -1)
       (setq-local ar/indent-bars-was-on t)))
-  
+
   (defun ar/enable-indent-bars-after-visual ()
     (when (bound-and-true-p ar/indent-bars-was-on)
       (indent-bars-mode 1)
       (kill-local-variable 'ar/indent-bars-was-on)))
-  
+
   (add-hook 'evil-visual-state-entry-hook #'ar/disable-indent-bars-in-visual)
   (add-hook 'evil-visual-state-exit-hook #'ar/enable-indent-bars-after-visual)
   :config
@@ -3087,11 +3166,11 @@ Links back to the GTD task for execution tracking."
   (rainbow-delimiters-depth-5-face ((t (:foreground "#bb9af7"))))
   (rainbow-delimiters-depth-6-face ((t (:foreground "#e0af68"))))
   (rainbow-delimiters-depth-7-face ((t (:foreground "#f7768e"))))
-  (rainbow-delimiters-depth-8-face ((t (:foreground "#9d7cd8"))))  
+  (rainbow-delimiters-depth-8-face ((t (:foreground "#9d7cd8"))))
   (rainbow-delimiters-depth-9-face ((t (:foreground "#73daca")))))
 #+end_src
 
-** NEXT Parenthesis Matching & Context
+** Parenthesis Matching & Context
 #+begin_src emacs-lisp
 (use-package paren
   :ensure nil
@@ -3103,7 +3182,7 @@ Links back to the GTD task for execution tracking."
   (show-paren-when-point-in-periphery t)
   (show-paren-style 'parenthesis)
   (show-paren-context-when-offscreen nil)
-  
+
   :config
   ;; === CUSTOM ELDOC BACKEND FOR PARENTHESIS ===
   (defun ar/paren-eldoc-offscreen-context (callback &rest _)
@@ -3140,19 +3219,19 @@ Links back to the GTD task for execution tracking."
           (when match-pos
             (setq match-pos (1- match-pos))
             (setq label "Closing: ")))
-         
+
          ;; Case B: At Closing Bracket (Evil/Block cursor)
          ((eq syntax-at ?\))
           (setq match-pos (ignore-errors (scan-sexps (1+ pos) -1)))
           (setq label "Opening: "))
-         
+
          ;; Case C: After Closing Bracket (Standard Emacs)
          ((eq syntax-before ?\))
           (setq match-pos (ignore-errors (scan-sexps pos -1)))
           (setq label "Opening: ")))
 
         ;; 2. RETRIEVE CONTENT IF OFF-SCREEN
-        (when (and match-pos 
+        (when (and match-pos
                    label
                    (not (pos-visible-in-window-p match-pos)))
           (with-current-buffer (current-buffer)
@@ -3162,7 +3241,7 @@ Links back to the GTD task for execution tracking."
 
         ;; 3. DISPLAY
         (when line-content
-          (funcall callback 
+          (funcall callback
                    (concat
                     (propertize label 'face '(:inherit shadow :weight bold))
                     (propertize line-content 'face '(:inherit font-lock-keyword-face :weight bold))))))))
@@ -3173,22 +3252,22 @@ Links back to the GTD task for execution tracking."
               (add-hook 'eldoc-documentation-functions #'ar/paren-eldoc-offscreen-context -50 t))))
 #+end_src
 
-** Highlight TODO and similar keywords in comments and strings
+** Highlight TODO and similar keywords
 #+begin_src emacs-lisp
 (use-package hl-todo
   :defer t
   :commands (hl-todo-rg-project)
-  
+
   :custom-face
   (hl-todo ((t (:inherit default :height 0.9 :width condensed :weight bold :underline nil :inverse-video nil))))
-  
+
   :hook ((after-init . global-hl-todo-mode)
          (org-mode . hl-todo-mode))
-  
+
   :init
   (setq hl-todo-require-punctuation t
         hl-todo-highlight-punctuation ":")
-  
+
   :config
   ;; Define keywords with Tokyo Night colors
   (setq hl-todo-keyword-faces
@@ -3703,7 +3782,7 @@ If completion fails in the future, check these:
   (add-hook 'completion-at-point-functions #'cape-dabbrev)
   (add-hook 'completion-at-point-functions #'cape-file)
   (add-hook 'completion-at-point-functions #'cape-keyword)
-  
+
   ;; NOTE: We do NOT add cape-elisp-block globally here.
   ;; We use the custom function below for Org mode instead.
 
@@ -3734,8 +3813,8 @@ If completion fails in the future, check these:
                              (forward-line -1)
                              (point))))
             ;; ROBUSTNESS CHECK 1: Ensure boundaries are valid numbers
-            (when (and (numberp code-beg) 
-                       (numberp code-end) 
+            (when (and (numberp code-beg)
+                       (numberp code-end)
                        (< code-beg code-end))
               ;; ROBUSTNESS CHECK 2: Ensure point is strictly inside the code.
               ;; If we are on #+begin_src, narrowing would fail/crash.
@@ -3754,7 +3833,7 @@ If completion fails in the future, check these:
     (add-hook 'completion-at-point-functions #'ar/org-elisp-capf -100 t))
 
   (add-hook 'org-mode-hook #'ar/setup-org-cape-completion)
-  
+
   ;; -----------------------------------------------------------------------
   ;; 3. Advice Wrappers
   ;; -----------------------------------------------------------------------
@@ -3795,7 +3874,7 @@ If completion fails in the future, check these:
   :config
   ;; Add personal snippets to the list
   (add-to-list 'yas-snippet-dirs my/snippets-directory)
-  
+
   ;; --- Robust, Save-Based Automatic Snippet Reloading ---
   (defun ar/yas-reload-snippets-on-save ()
     "Reload all snippets if a snippet file is being saved."
@@ -3824,7 +3903,6 @@ If completion fails in the future, check these:
   :defer t
   :after cape
   :init
-  ;; Add with high depth (low priority) so it doesn't block other capfs
   (add-hook 'completion-at-point-functions #'yasnippet-capf 70))
 #+end_src
 
@@ -3900,45 +3978,72 @@ If completion fails in the future, check these:
 
 ** DAP
 #+begin_src emacs-lisp
-;; (use-package dape
-;;   :defer t
-;;   :bind (("<f5>" . dape)
-;;          ("M-<f5>" . dape-hydra/body))
-;;   :custom (dape-buffer-window-arrangment 'right)
-;;   :pretty-hydra
-;;   ((:title (pretty-hydra-title "Debug" 'codicon "nf-cod-debug")
-;;     :color pink :quit-key ("q" "C-g"))
-;;    ("Stepping"
-;;     (("n" dape-next "next")
-;;      ("s" dape-step-in "step in")
-;;      ("o" dape-step-out "step out")
-;;      ("c" dape-continue "continue")
-;;      ("p" dape-pause "pause")
-;;      ("k" dape-kill "kill")
-;;      ("r" dape-restart "restart")
-;;      ("D" dape-disconnect-quit "disconnect"))
-;;     "Switch"
-;;     (("m" dape-read-memory "memory")
-;;      ("t" dape-select-thread "thread")
-;;      ("w" dape-watch-dwim "watch")
-;;      ("S" dape-select-stack "stack")
-;;      ("i" dape-info "info")
-;;      ("R" dape-repl "repl"))
-;;     "Breakpoints"
-;;     (("b" dape-breakpoint-toggle "toggle")
-;;      ("l" dape-breakpoint-log "log")
-;;      ("e" dape-breakpoint-expression "expression")
-;;      ("B" dape-breakpoint-remove-all "clear"))
-;;     "Debug"
-;;     (("d" dape "dape")
-;;      ("Q" dape-quit "quit" :exit t))))
-;;   :config
-;;   ;; Save buffers on startup, useful for interpreted languages
-;;   (add-hook 'dape-on-start-hooks
-;;             (defun dape--save-on-start ()
-;;               (save-some-buffers t t)))
-;;   ;; Display hydra on startup
-;;   (add-hook 'dape-on-start-hooks #'dape-hydra/body))
+(use-package dape
+  :defer t
+  :bind (("<f5>" . dape)
+         ("M-<f5>" . ar/toggles-dape))
+  :custom (dape-buffer-window-arrangment 'right)
+  :config
+  ;; Save buffers on startup, useful for interpreted languages
+  (add-hook 'dape-on-start-hooks
+            (defun dape--save-on-start ()
+              (save-some-buffers t t)))
+
+  ;; Optional transient menu setup - only if transient is loaded
+  (with-eval-after-load 'transient
+    ;; Define title function
+    (defun ar/dape-title ()
+      (concat
+       (if (fboundp 'nerd-icons-codicon)
+           (nerd-icons-codicon "nf-cod-debug" :face 'transient-heading :v-adjust 0.02)
+         "")
+       (propertize " Debug" 'face 'transient-heading)))
+
+    ;; Define transient groups
+    (transient-define-group ar/toggles-dape-stepping ()
+      ["Stepping"
+       ("n" "next" dape-next :transient t)
+       ("s" "step in" dape-step-in :transient t)
+       ("o" "step out" dape-step-out :transient t)
+       ("c" "continue" dape-continue :transient t)
+       ("p" "pause" dape-pause :transient t)
+       ("k" "kill" dape-kill)
+       ("r" "restart" dape-restart :transient t)
+       ("d" "disconnect" dape-disconnect-quit)])
+
+    (transient-define-group ar/toggles-dape-switch ()
+      ["Switch"
+       ("m" "memory" dape-read-memory :transient t)
+       ("t" "thread" dape-select-thread :transient t)
+       ("w" "watch" dape-watch-dwim :transient t)
+       ("s" "stack" dape-select-stack :transient t)
+       ("i" "info" dape-info :transient t)
+       ("r" "repl" dape-repl :transient t)])
+
+    (transient-define-group ar/toggles-dape-breakpoints ()
+      ["Breakpoints"
+       ("b" "toggle" dape-breakpoint-toggle :transient t)
+       ("l" "log" dape-breakpoint-log :transient t)
+       ("e" "expression" dape-breakpoint-expression :transient t)
+       ("B" "clear" dape-breakpoint-remove-all :transient t)])
+
+    (transient-define-group ar/toggles-dape-debug ()
+      ["Debug"
+       ("d" "dape" dape)
+       ("Q" "quit" dape-quit)
+       ("q" "" transient-quit-one :format " ")])
+
+    ;; Define main transient prefix
+    (transient-define-prefix ar/toggles-dape ()
+      "Dape debugger transient menu"
+      [:description ar/dape-title
+                    'ar/toggles-dape-stepping
+                    'ar/toggles-dape-switch
+                    'ar/toggles-dape-breakpoints
+                    'ar/toggles-dape-debug])
+
+    ;; Display transient menu on startup
+    (add-hook 'dape-on-start-hooks #'ar/toggles-dape)))
 #+end_src
 
 ** Syntax Checking
@@ -4019,7 +4124,7 @@ If completion fails in the future, check these:
             ;; Silence eglot messages during the background format
             (cl-letf (((symbol-function 'message) #'ignore))
               (eglot-format-buffer))
-            ;; After eglot-format-buffer runs on the original, 
+            ;; After eglot-format-buffer runs on the original,
             ;; we copy the result to scratch so Apheleia can diff it.
             (with-current-buffer scratch
               (erase-buffer)
@@ -4035,6 +4140,18 @@ If completion fails in the future, check these:
   ;; Inhibit for prose where whitespace is sensitive
   (setq apheleia-inhibit-functions
         (list (lambda () (derived-mode-p 'org-mode)))))
+#+end_src
+
+** Symbols Outline
+#+begin_src emacs-lisp
+(use-package symbols-outline
+  :init
+  (add-hook 'eglot-managed-mode-hook
+            (lambda ()
+              (setq-local symbols-outline-fetch-fn #'symbols-outline-lsp-fetch)))
+  :config
+  (setq symbols-outline-window-position 'left)
+  (symbols-outline-follow-mode))
 #+end_src
 
 ** Hydra
@@ -4148,7 +4265,7 @@ If completion fails in the future, check these:
     (put 'dockerfile-ts-mode 'eglot-language-id "dockerfile")
     (add-to-list 'eglot-server-programs
                  '(dockerfile-ts-mode . ("docker-language-server" "start"))))
-  
+
   ;; Inject Bash grammar into RUN instructions for better syntax highlighting
   (defun ar/dockerfile-inject-bash ()
     "Inject Bash grammar into shell commands."
@@ -4159,7 +4276,7 @@ If completion fails in the future, check these:
                    :host 'dockerfile
                    '((run_instruction (shell_command) @injection.content))))
       (treesit-major-mode-setup)))
-  
+
   (add-hook 'dockerfile-ts-mode-hook #'ar/dockerfile-inject-bash))
 #+end_src
 
@@ -4174,7 +4291,7 @@ If completion fails in the future, check these:
 ;;   (setq docker-command "podman"
 ;;         docker-compose-command "podman-compose"
 ;;         docker-container-tramp-method "podman")
-  
+
 ;;   ;; Define the Hydra explicitly here to avoid 'use-package' keyword errors
 ;;   (pretty-hydra-define container-hydra
 ;;     (:title (pretty-hydra-title "Container Management" 'devicon "nf-dev-docker" :face 'nerd-icons-blue)
@@ -4186,13 +4303,13 @@ If completion fails in the future, check these:
 ;;       ("R" ar/podman-restart "restart")
 ;;       ("k" ar/podman-kill "kill")
 ;;       ("x" ar/podman-remove "destroy (rm)"))
-     
+
 ;;      "Access"
 ;;      (("o" ar/podman-open "open workspace" :exit t)
 ;;       ("t" ar/podman-shell "terminal" :exit t)
 ;;       ("e" ar/podman-exec "exec command" :exit t)
 ;;       ("l" ar/podman-logs "view logs" :exit t))
-     
+
 ;;      "Images & Info"
 ;;      (("b" ar/podman-build "build image" :exit t)
 ;;       ("c" docker-containers "list containers" :exit t)
@@ -4223,11 +4340,11 @@ If completion fails in the future, check these:
 ;;          (build-script (and dockerfile-dir (expand-file-name "build-podman.sh" dockerfile-dir))))
 ;;     (unless dockerfile-dir
 ;;       (user-error "No Dockerfile found in project hierarchy"))
-    
+
 ;;     (let ((default-directory dockerfile-dir)
 ;;           (compile-command (if (and build-script (file-exists-p build-script))
 ;;                                (format "./%s" (file-name-nondirectory build-script))
-;;                              (format "podman build --build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g) -t %s ." 
+;;                              (format "podman build --build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g) -t %s ."
 ;;                                      ar/dev-container-image))))
 ;;       (compile compile-command))))
 
@@ -4241,7 +4358,7 @@ If completion fails in the future, check these:
 ;;                              (project-root (project-current))
 ;;                            (read-directory-name "Project root: ")))
 ;;            (run-script (expand-file-name "run-podman.sh" project-root)))
-      
+
 ;;       (let ((command (if (file-exists-p run-script)
 ;;                          (format "./%s" (file-name-nondirectory run-script))
 ;;                        (format "podman run -d --name %s --hostname devbox --userns=keep-id -v %s:%s -p 3000:3000 -p 8080:8080 %s tail -f /dev/null"
@@ -4253,26 +4370,26 @@ If completion fails in the future, check these:
 ;;           (async-shell-command command "*podman-run*")
 ;;           (message "Creating container '%s'..." ar/dev-container-name))))))
 
-;; (defun ar/podman-start () 
+;; (defun ar/podman-start ()
 ;;   "Start the persistent container."
-;;   (interactive) 
+;;   (interactive)
 ;;   (if (ar/podman--running-p)
 ;;       (message "Container '%s' is already running." ar/dev-container-name)
 ;;     (async-shell-command (format "podman start %s" ar/dev-container-name) "*podman-start*")))
 
-;; (defun ar/podman-stop () 
+;; (defun ar/podman-stop ()
 ;;   "Stop the persistent container."
-;;   (interactive) 
+;;   (interactive)
 ;;   (if (ar/podman--running-p)
 ;;       (async-shell-command (format "podman stop %s" ar/dev-container-name) "*podman-stop*")
 ;;     (message "Container '%s' is not running." ar/dev-container-name)))
 
-;; (defun ar/podman-kill () 
-;;   (interactive) 
+;; (defun ar/podman-kill ()
+;;   (interactive)
 ;;   (when (yes-or-no-p (format "Force kill '%s'?" ar/dev-container-name))
 ;;     (async-shell-command (format "podman kill %s" ar/dev-container-name) "*podman-kill*")))
 
-;; (defun ar/podman-remove () 
+;; (defun ar/podman-remove ()
 ;;   (interactive)
 ;;   (if (ar/podman--running-p)
 ;;       (user-error "Stop container first.")
@@ -4295,10 +4412,10 @@ If completion fails in the future, check these:
 ;;     (when (y-or-n-p (format "Container '%s' is not running. Start it? "
 ;;                            ar/dev-container-name))
 ;;       ;; Cleanup TRAMP cache to prevent 'Error: can only create exec sessions'
-;;       (tramp-cleanup-connection 
-;;        (tramp-dissect-file-name (format "/podman:%s@%s:" 
-;;                                       ar/dev-container-user 
-;;                                       ar/dev-container-name)) 
+;;       (tramp-cleanup-connection
+;;        (tramp-dissect-file-name (format "/podman:%s@%s:"
+;;                                       ar/dev-container-user
+;;                                       ar/dev-container-name))
 ;;        nil nil)
 ;;       (ar/podman-start)
 ;;       (run-with-timer 2 nil
@@ -4370,8 +4487,8 @@ If completion fails in the future, check these:
 #+begin_src emacs-lisp
 (use-package magit
   :defer t
-  :commands (magit-status 
-             magit-blame 
+  :commands (magit-status
+             magit-blame
              magit-log-buffer-file
              magit-stage-file
              magit-unstage-file
@@ -4393,23 +4510,23 @@ If completion fails in the future, check these:
   ;; Display settings
   (magit-display-buffer-function #'magit-display-buffer-fullframe-status-v1)
   (magit-bury-buffer-function #'magit-restore-window-configuration)
-  
+
   ;; Performance
   (magit-refresh-status-buffer t)
   (magit-refresh-verbose nil)
   (magit-git-executable "git")
-  
+
   ;; Behavior
   (magit-save-repository-buffers 'dontask)
   (magit-commit-ask-to-stage 'stage)
   (magit-commit-show-diff t)
   (magit-revision-show-gravatars nil)
-  
+
   ;; Diff settings
   (magit-diff-refine-hunk 'all)
   (magit-diff-paint-whitespace t)
   (magit-diff-highlight-trailing t)
-  
+
   :config
   ;; Only use Git. Disables bzr, svn, hg, etc. to prevent TRAMP errors.
   (setq vc-handled-backends '(Git))
@@ -4438,11 +4555,11 @@ If completion fails in the future, check these:
   :hook (magit-status-mode . magit-todos-mode)
   :config
   (setq magit-todos-keywords-list '("TODO" "FIXME" "HACK" "REVIEW" "NOTE" "DEPRECATED"))
-  
+
   ;; Integrate with hl-todo for consistent highlighting
   (with-eval-after-load 'hl-todo
     (setq magit-todos-keyword-suffix "\\(?:([^)]+)\\)?:?"))
-  
+
   ;; Optional: Custom scanner for better performance
   (when (executable-find "rg")
     (setq magit-todos-scanner #'magit-todos--scan-with-rg)))
@@ -4471,11 +4588,11 @@ If completion fails in the future, check these:
   :custom
   (diff-hl-draw-borders nil)
   (diff-hl-flydiff-delay 0.1) ;; Update immediately while typing
-  
+
   :config
   ;; Enable real-time updates (equivalent to git-gutter+)
   (diff-hl-flydiff-mode 1)
-  
+
   ;; Force the custom thin bitmaps defined in :init
   (setq diff-hl-fringe-bmp-function
         (lambda (type pos)
@@ -4497,7 +4614,7 @@ If completion fails in the future, check these:
 (use-package git-timemachine
   :defer t
   :commands (git-timemachine git-timemachine-toggle)
-  
+
   :init
   ;; CRITICAL FIX: Only configure native-comp if it's actually available
   (when (and (fboundp 'native-comp-available-p)
@@ -4505,11 +4622,11 @@ If completion fails in the future, check these:
     (with-eval-after-load 'comp
       (when (boundp 'native-comp-deferred-compilation-deny-list)
         (add-to-list 'native-comp-deferred-compilation-deny-list "git-timemachine"))))
-  
+
   :custom
   (git-timemachine-abbreviation-length 7)
   (git-timemachine-show-minibuffer-details t)
-  
+
   :config
   (defun ar/git-timemachine-setup ()
     "Disable interfering modes when entering git-timemachine."
@@ -4520,30 +4637,30 @@ If completion fails in the future, check these:
     (when (bound-and-true-p eglot--managed-mode)
       (eglot-managed-mode -1)
       (setq-local ar/eglot-was-active t))
-    
+
     (when (bound-and-true-p flymake-mode)
       (flymake-mode -1)
       (setq-local ar/flymake-was-active t))
-    
+
     (read-only-mode 1))
-  
+
   (defun ar/git-timemachine-teardown ()
     "Re-enable modes when exiting git-timemachine."
     (when (bound-and-true-p ar/diff-hl-was-active)
       (diff-hl-mode 1)
       (kill-local-variable 'ar/diff-hl-was-active))
-    
+
     (when (bound-and-true-p ar/eglot-was-active)
       (eglot-ensure)
       (kill-local-variable 'ar/eglot-was-active))
-    
+
     (when (bound-and-true-p ar/flymake-was-active)
       (flymake-mode 1)
       (kill-local-variable 'ar/flymake-was-active))
-    
+
     ;; 4. Disable read-only
     (read-only-mode -1))
-  
+
   (add-hook 'git-timemachine-mode-hook #'ar/git-timemachine-setup)
   (add-hook 'git-timemachine-mode-exit-hook #'ar/git-timemachine-teardown))
 #+end_src
@@ -4606,16 +4723,16 @@ If completion fails in the future, check these:
   :commands (dired dired-jump)
   :hook (dired-mode . dired-hide-details-mode)
   :hook (dired-mode . hl-line-mode)
-  :custom 
+  :custom
   ;; Doom-like cleanup: Don't confirm simple recursive deletes
   (dired-recursive-copies 'always)
   (dired-recursive-deletes 'top)
   (delete-by-moving-to-trash t)
   (dired-dwim-target t)
-  
+
   ;; Performance & UX
   (dired-auto-revert-buffer t)
-  (dired-kill-when-opening-new-dired-buffer t) 
+  (dired-kill-when-opening-new-dired-buffer t)
   (insert-directory-program "/usr/bin/ls")
   (dired-listing-switches "-l --almost-all --human-readable --time-style=long-iso --group-directories-first --no-group"))
 
@@ -4628,10 +4745,10 @@ If completion fails in the future, check these:
   :init
   ;; MAGIC: This makes ALL dired commands use Dirvish interfaces
   (dirvish-override-dired-mode)
-  
+
   :custom
   (dirvish-cache-dir (expand-file-name "dirvish/" user-emacs-directory))
-  
+
   ;; Restored your specific layout ratios
   (dirvish-default-layout '(1 0.11 0.55))
   (dirvish-layout-recipes
@@ -4653,7 +4770,7 @@ If completion fails in the future, check these:
  ;; Attributes
   (dirvish-attributes
    '(subtree-state nerd-icons collapse vc-state))
-  
+
   ;; Doom-like UI: Headers and Mode lines
   (dirvish-use-header-line t)
   (dirvish-use-mode-line t)
@@ -4663,12 +4780,12 @@ If completion fails in the future, check these:
   (dirvish-mode-line-format
    '(:left (sort file-time " " file-size symlink)
      :right (omit yank index)))
-  
+
   ;; Restored: Ranger-like session behavior (kill on quit)
   (dirvish-reuse-session nil)
   (dirvish-hide-cursor t)
   (dirvish-hide-details '(dirvish dirvish-side))
-  
+
   ;; Restored: Emerge groups
   (dirvish-emerge-groups
    '(("Recent files" (predicate . recent-files-2h))
@@ -4677,11 +4794,11 @@ If completion fails in the future, check these:
      ("Pictures" (extensions "jpg" "png" "svg" "gif"))
      ("Audio" (extensions "mp3" "flac" "wav" "ape"))
      ("Archives" (extensions "gz" "rar" "zip"))))
-  
+
   ;; Previews
   (dirvish-preview-dispatchers
    '(image gif video audio epub archive pdf))
-  
+
   :config
   (setq dirvish-mode-line-format
         '(:left (sort symlink) :right (omit yank index)))
@@ -4691,11 +4808,11 @@ If completion fails in the future, check these:
   (require 'dirvish-emerge)
 
   (require 'dirvish-side)
-  
+
   ;; Side window configuration (Restored to Left side)
   (setq dirvish-side-width 30
         dirvish-side-follow-buffer-file t)
-        dirvish-side-display-alist '((side . bottom) (slot . -1)))      
+        dirvish-side-display-alist '((side . bottom) (slot . -1)))
 #+end_src
 
 ** File Management Extensions
@@ -4714,7 +4831,7 @@ If completion fails in the future, check these:
                 "\\|^\\.ccls-cache\\'"
                 "\\|\\(?:\\.js\\)?\\.meta\\'"
                 "\\|\\.\\(?:elc\\|o\\|pyo\\|swp\\|class\\)\\'"))
- 
+
   (setq dired-clean-confirm-killing-deleted-buffers nil))
 
 (use-package diredfl
@@ -4792,7 +4909,7 @@ If completion fails in the future, check these:
   (persp-autokill-buffer-on-remove 'kill-weak)
   (persp-auto-save-opt 2)
   (persp-auto-save-num-of-backups 3)
-  
+
   ;; CRITICAL FIX: Delay auto-resume in daemon mode
   (persp-auto-resume-time (if (daemonp) -1.0 2.0))
 
@@ -4810,7 +4927,7 @@ If completion fails in the future, check these:
 
   ;; Silence warnings
   (persp-auto-save-persps-to-their-file-before-kill nil)
-  
+
   ;; CRITICAL FIX: Prevent frame initialization errors in daemon mode
   (persp-emacsclient-init-frame-behaviour-override -1)
 
@@ -4829,12 +4946,12 @@ If completion fails in the future, check these:
   (let ((persp-dir (file-name-directory persp-auto-save-fname)))
     (unless (file-directory-p persp-dir)
       (make-directory persp-dir t)))
-  
+
   (unless (file-exists-p persp-auto-save-fname)
     (with-temp-file persp-auto-save-fname
       (insert ";; Persp-mode auto-save file\n")
       (insert "nil")))
-  
+
   ;; --- Buffer Filtering ---
   (add-hook 'persp-common-buffer-filter-functions
             (lambda (b)
@@ -4901,7 +5018,7 @@ If completion fails in the future, check these:
   (defun ar/persp-safe-auto-save ()
     "Safely auto-save perspectives."
     (condition-case err
-        (when (and persp-mode 
+        (when (and persp-mode
                    (not (null (persp-names)))
                    ;; CRITICAL: Don't auto-save in daemon without frames
                    (or (not (daemonp))
@@ -5173,20 +5290,20 @@ Includes option to manually choose a directory like project.el."
 
 *** consult-projectile buffer switching
 #+begin_src emacs-lisp
-;; Enhanced 
+;; Enhanced
 (with-eval-after-load 'consult
   (defun ar/consult-project-buffer ()
     "Enhanced project buffer switching with consult."
     (interactive)
     (if (projectile-project-root)
-        (let ((buffers (mapcar #'buffer-name 
+        (let ((buffers (mapcar #'buffer-name
                               (projectile-project-buffers))))
           (consult-buffer
-           (list (cons (concat "Project Buffers (" 
+           (list (cons (concat "Project Buffers ("
                               (projectile-project-name) ")")
                       buffers))))
       (consult-buffer)))
-  
+
   ;; Optionally rebind projectile's buffer switch
   (with-eval-after-load 'projectile
     (define-key projectile-mode-map [remap projectile-switch-to-buffer]
@@ -5215,11 +5332,11 @@ Includes option to manually choose a directory like project.el."
 
   ;; List indentation
   (setq markdown-list-indent-width 2)
-  
+
   ;; PERFORMANCE OPTIMIZATIONS - Reduce fontification overhead
   (setq markdown-fontify-whole-heading-line nil
         markdown-fontify-quote-and-verse-blocks nil)
-  
+
   ;; Defer expensive calculations
   (setq jit-lock-defer-time 0.05  ;; Small delay before fontifying
         jit-lock-stealth-time 1)   ;; Fontify invisible text after 1s idle
@@ -5233,31 +5350,31 @@ Includes option to manually choose a directory like project.el."
   ;; EGLOT & MARKSMAN SETUP
   (with-eval-after-load 'eglot
     (add-to-list 'eglot-server-programs '(markdown-mode . ("marksman"))))
-  
+
   ;; FORMATTING INTEGRATION
   (with-eval-after-load 'apheleia
     (setf (alist-get 'markdown-mode apheleia-mode-alist) '(eglot)))
 
   ;; FIX: Set imenu expression in :config after markdown-mode is loaded
-  (setq markdown-imenu-generic-expression 
+  (setq markdown-imenu-generic-expression
         '(("^\\(.*\\)[ \t]*\n=+$" 1)
           ("^\\(.*\\)[ \t]*\n-+$" 1)
           ("^\\(#+ .*\\)" 1)))
-  
+
   ;; OPTIMIZATION: Reduce fontification frequency
   (defun ar/markdown-optimize-fontification ()
     "Optimize font-lock for markdown to reduce sluggishness."
     (setq-local font-lock-multiline t)
-    (setq-local font-lock-maximum-decoration 2) 
+    (setq-local font-lock-maximum-decoration 2)
     (setq-local jit-lock-chunk-size 1000)
     (setq-local jit-lock-defer-time 0.1))
-  
+
   ;; DYNAMIC RENDERING: Detect when cursor is in markdown element
   (defun ar/markdown-in-element-p ()
     "Check if point is inside a markdown element that should show raw markup."
     (let ((face (get-text-property (point) 'face)))
       (or
-       (and face 
+       (and face
             (or (eq face 'markdown-code-face)
                 (eq face 'markdown-inline-code-face)
                 (eq face 'markdown-pre-face)
@@ -5283,11 +5400,11 @@ Includes option to manually choose a directory like project.el."
          (and (looking-at-p "[*_`\\[\\]()]")
               (or (looking-back "[*_`]" 1)
                   (looking-at "[*_`]")))))))
-  
+
   ;; ANTI-FLICKER: Throttled markup toggling
   (defvar ar/markdown-toggle-timer nil
     "Timer to throttle markup visibility toggling.")
-  
+
   (defun ar/markdown-toggle-markup-at-point ()
     "Toggle markup hiding based on cursor position."
     (when (derived-mode-p 'markdown-mode)
@@ -5303,15 +5420,15 @@ Includes option to manually choose a directory like project.el."
                                               '(display nil composition nil invisible nil))
                       (when markdown-hide-markup
                         (font-lock-flush (line-beginning-position) (line-end-position)))))))))))
-  
+
   (defun ar/markdown-setup-rendering ()
     (add-hook 'post-command-hook #'ar/markdown-toggle-markup-at-point nil t))
-  
+
   ;; CHECKBOX RENDERING
   (defface ar/markdown-checkbox-face
     '((t (:inherit markdown-list-face :box (:line-width 1 :style released-button))))
     "Face for markdown checkboxes.")
-  
+
   (defun ar/markdown-fontify-checkboxes (last)
     (when (markdown-match-generic-metadata "^[ \t]*- \\[[ X]\\]" last)
       (let ((checkbox-begin (match-beginning 0))
@@ -5323,7 +5440,7 @@ Includes option to manually choose a directory like project.el."
         (add-text-properties checkbox-begin checkbox-end
                            '(face ar/markdown-checkbox-face)))
       t))
-  
+
   (font-lock-add-keywords 'markdown-mode
                          '((ar/markdown-fontify-checkboxes)) 'append))
 
@@ -5393,9 +5510,10 @@ Includes option to manually choose a directory like project.el."
 Writable `grep' buffer
 #+begin_src emacs-lisp
 (use-package wgrep
-  :defer t
-  :init (setq wgrep-auto-save-buffer t
-              wgrep-change-readonly-file t))
+  :commands (wgrep-change-to-wgrep-mode)
+  :config
+  ;; evil-collection provides bindings like :wq to save and :q! to abort.
+  (setq wgrep-auto-save-buffer t))
 #+end_src
 
 ** Echo Area Context Display
@@ -5472,27 +5590,27 @@ Displays: Narrowed, Read-only, Macro recording, Evil state."
     ;; Check narrowing
     (when (buffer-narrowed-p)
       (push (propertize "NARROWED" 'face 'warning) states))
-    
+
     ;; Check read-only
     (when buffer-read-only
       (let ((icon (if (featurep 'nerd-icons) (nerd-icons-octicon "nf-oct-lock") "🔒")))
         (push (propertize (concat icon " READ-ONLY") 'face 'error) states)))
-    
+
     ;; Check macro recording
     (when defining-kbd-macro
       (push (propertize "● REC" 'face '(:foreground "#f7768e" :weight bold)) states))
-    
+
     ;; Check evil state
     (when (and (featurep 'evil) (bound-and-true-p evil-state))
-      (push (propertize 
+      (push (propertize
              (format "Evil: %s" (upcase (symbol-name evil-state)))
              'face 'font-lock-constant-face)
             states))
-    
+
     ;; Check modified
     (when (buffer-modified-p)
       (push (propertize "MODIFIED" 'face 'success) states))
-    
+
     (if states
         (message (string-join states " │ "))
       (message (propertize "Buffer State: Clean" 'face 'shadow)))))
@@ -5503,12 +5621,12 @@ Displays: Narrowed, Read-only, Macro recording, Evil state."
 ;; Show macro recording status in echo area automatically
 (defun ar/kmacro-start-message (&rest _)
   "Display message when macro recording starts."
-  (message (propertize "● Recording keyboard macro..." 
+  (message (propertize "● Recording keyboard macro..."
                        'face '(:foreground "#f7768e" :weight bold))))
 
 (defun ar/kmacro-end-message (&rest _)
   "Display message when macro recording ends."
-  (message (propertize "✓ Keyboard macro defined" 
+  (message (propertize "✓ Keyboard macro defined"
                        'face '(:foreground "#9ece6a" :weight bold))))
 
 (advice-add 'kmacro-start-macro :after #'ar/kmacro-start-message)
@@ -5789,10 +5907,10 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
   (cdlatex-env-alist
    '(("equation*" "\\begin{equation*}\n?\n\\end{equation*}" nil)
      ("align*" "\\begin{align*}\n?\n\\end{align*}" nil)))
-  
+
   ;; FIX: Change CDLaTeX math symbol prefix from backtick to @ or another key
   (cdlatex-math-symbol-prefix ?@)  ;; Use @ instead of `
-  
+
   :config
   (define-key cdlatex-mode-map (kbd "TAB") #'cdlatex-tab))
 #+end_src
@@ -5819,7 +5937,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
 ;; ============================================================================
 ;; Org-mode LaTeX Preview Configuration for lualatex + ImageMagick
 ;; ============================================================================
-;; This configuration creates high-quality LaTeX previews using lualatex 
+;; This configuration creates high-quality LaTeX previews using lualatex
 ;; and ImageMagick with FIXED density and resize values.
 
 (with-eval-after-load 'org
@@ -5836,7 +5954,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
                  :image-output-type "png"
                  :image-size-adjust (1.0 . 1.0)
                  :latex-compiler ("lualatex -interaction nonstopmode -output-directory %o %f")
-                 
+
                  ;; IMAGEMAGICK COMMAND - CRITICAL ARGUMENT ORDER:
                  ;; -------------------------------------------------------
                  ;; Correct order: input-settings → input-file → processing → output-settings → output-file
@@ -5864,7 +5982,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
   ;; SET DEFAULT PREVIEW PROCESS
   ;; --------------------------------------------------------------------------
   (setq org-preview-latex-default-process 'luamagick)
-  
+
   ;; --------------------------------------------------------------------------
   ;; LATEX FORMATTING OPTIONS
   ;; --------------------------------------------------------------------------
@@ -5973,7 +6091,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
 ;;                  :image-converter ("magick convert -density 600 -resize 200%% -antialias %f -quality 100 %O")))
 
 ;;   (setq org-preview-latex-default-process 'luamagick)
-  
+
 ;;   ;; Reset scale to 1.0
 ;;   (setq org-format-latex-options
 ;;         (plist-put org-format-latex-options :scale 2.0))
@@ -6362,7 +6480,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
     :states '(normal insert visual emacs)
     :prefix "SPC m"
     :global-prefix "C-SPC m")
-  
+
   (ar/global-leader
     "SPC" '(execute-extended-command :wk "M-x")
     ":" '(eval-expression :wk "Eval")
@@ -6396,7 +6514,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
     "d h" '(dirvish-show-history :wk "History")
     "d a" '(dirvish-quick-access :wk "Quick access")
     "d j" '(dirvish-fd-jump :wk "Jump fd"))
- 
+
   ;; File operations (SPC f)
   (ar/global-leader
     "f" '(:ignore t :wk "file")
@@ -6474,7 +6592,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
     "p R" '(projectile-replace-regexp :wk "Replace regexp in project")
     "p a" '(projectile-add-known-project :wk "Add known project"))
 
-  
+
   ;; Toggle operations (SPC t)
   (ar/global-leader
     "t" '(:ignore t :wk "toggle")
@@ -6490,7 +6608,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
     "t p" '(show-paren-mode :wk "Show paren")
     "t T" '(toggles-hydra/body :wk "Toggles hydra"))
 
- 
+
   ;; Open operations (SPC o)
   (ar/global-leader
     "o" '(:ignore t :wk "open")
@@ -6537,7 +6655,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
     "c f" '(apheleia-format-buffer :wk "Format buffer")
     "c r" '(eglot-rename :wk "Rename")
     "c a" '(eglot-code-actions :wk "Code action"))
-  
+
   ;; Git operations (SPC g)
   (ar/global-leader
     "g" '(:ignore t :wk "git")
@@ -6573,7 +6691,17 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
     "g d e" '(org-gtd-engage :wk "Daily engage")
     "g d n" '(org-gtd-show-all-next :wk "Show all NEXT")
     "g d s" '(org-gtd-show-stuck-projects :wk "Stuck projects"))
-  
+
+  (ar/global-leader
+    "j" '(:ignore t :wk "jinx (spellcheck)")
+    "j c" '(jinx-correct :wk "Correct word at point")
+    "j n" '(jinx-next-error :wk "Go to next error")
+    "j p" '(jinx-previous-error :wk "Go to previous error")
+    "j s" '(jinx-suggest :wk "Show suggestions")
+    "j a" '(jinx-add-word-to-personal-dictionary :wk "Add to dictionary")
+    "j l" '(jinx-languages :wk "Select language")
+    "j t" '(jinx-toggle-checking :wk "Toggle checking in buffer"))
+
   ;; Register/Bookmark operations (SPC r)
   (ar/global-leader
     "r" '(:ignore t :wk "register/bookmark")
@@ -6588,43 +6716,43 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
   ;; === NOTES OPERATIONS (SPC n) ===
   (ar/global-leader
     "n" '(:ignore t :wk "notes")
-    
+
     ;; Capture
     "n c" '(ar/capture-dispatch :wk "Smart capture")
-    
+
     ;; Find & Navigate
     "n f" '(org-roam-node-find :wk "Find node")
     "n F" '(consult-org-roam-file-find :wk "Find file")
     "n i" '(org-roam-node-insert :wk "Insert node")
     "n s" '(consult-org-roam-search :wk "Search notes")
-  
+
     ;; Links & Backlinks
     "n l" '(org-roam-buffer-toggle :wk "Backlinks panel")
     "n b" '(consult-org-roam-backlinks :wk "Backlinks")
     "n B" '(consult-org-roam-backlinks-recursive :wk "Backlinks recursive")
     "n L" '(consult-org-roam-forward-links :wk "Forward links")
-  
+
     ;; Visualization
     "n v" '(org-roam-graph :wk "Roam graph")
     "n u" '(org-roam-ui-open :wk "Roam UI")
-  
+
     ;; Daily Notes
     "n j" '(org-roam-dailies-capture-today :wk "Daily note")
-  
+
     ;; Bridge Operations (GTD ↔ Zettelkasten)
     "n g" '(ar/gtd-to-zettel :wk "GTD → Zettelkasten")
     "n G" '(ar/zettel-to-gtd :wk "Zettelkasten → GTD")
     "n p" '(ar/fleeting-to-permanent :wk "Process fleeting")
-  
+
     ;; Review
     "n w" '(ar/weekly-review :wk "Weekly review")
-  
+
     ;; Agenda Views (Submenu)
     "n a" '(:ignore t :wk "agenda")
     "n a d" '((lambda () (interactive) (org-agenda nil "d")) :wk "Daily")
     "n a w" '((lambda () (interactive) (org-agenda nil "w")) :wk "Weekly")
     "n a p" '((lambda () (interactive) (org-agenda nil "p")) :wk "Projects")
-  
+
     ;; Table Operations (Submenu)
     "n t" '(:ignore t :wk "table")
     "n t c" '(org-table-create :wk "Create table")
@@ -6650,7 +6778,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
   (general-define-key
    "C-=" 'text-scale-increase
    "C--" 'text-scale-decrease)
-  
+
   ;; Workspace operations (SPC TAB)
   ;; (ar/global-leader
   ;;   "TAB" '(:ignore t :wk "workspace")
@@ -6781,18 +6909,18 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
    "<right>" 'dired-find-file
    "<up>"    'dired-previous-line
    "<down>"  'dired-next-line
-   
+
    ;; Core Actions
    "q"   'dirvish-quit
    "TAB" 'dirvish-subtree-toggle
    "?"   'dirvish-dispatch
-   
+
    ;; Layout & History
    "M-t" 'dirvish-layout-switch
    "F"   'dirvish-layout-toggle
    "b"   'dirvish-history-go-backward
    "f"   'dirvish-history-go-forward
-   
+
    ;; Menus & Tools
    "a"   'dirvish-quick-access
    "s"   'dirvish-quicksort
@@ -6801,7 +6929,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
    "M-e" 'dirvish-emerge-menu
    "M-j" 'dirvish-fd-jump
    "M-s" 'dirvish-setup-menu)
-  
+
   (general-define-key
    :states 'normal
    :keymaps 'helpful-mode-map
@@ -6847,7 +6975,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
    :states '(normal visual insert)
    "M-j" 'move-text-down
    "M-k" 'move-text-up)
-  
+
   (ar/local-leader
     :keymaps 'org-mode-map
     "," '(org-ctrl-c-ctrl-c :wk "Ctrl-c Ctrl-c")
