@@ -4172,73 +4172,7 @@ If completion fails in the future, check these:
 ;;     ("t p" flymake-popon-mode "popon tooltips" :toggle t))))
 #+end_src
 
-* Podman
-** Container Configuration
-#+begin_src emacs-lisp
-;; (defcustom ar/dev-container-name "dev-env"
-;;   "Name of the development container."
-;;   :type 'string
-;;   :group 'ar)
-
-;; (defcustom ar/dev-container-image "dev-env:latest"
-;;   "Podman image name for the development container."
-;;   :type 'string
-;;   :group 'ar)
-
-;; (defcustom ar/dev-container-user "devuser"
-;;   "Username inside the container."
-;;   :type 'string
-;;   :group 'ar)
-
-;; (defcustom ar/dev-container-workspace "/home/devuser/workspace"
-;;   "Workspace path inside the container."
-;;   :type 'string
-;;   :group 'ar)
-#+end_src
-
-** TRAMP Configuration for Podman
-#+begin_src emacs-lisp
-;; (with-eval-after-load 'tramp
-;;   (setq remote-file-name-inhibit-locks t
-;;         remote-file-name-inhibit-auto-save-visited t
-;;         tramp-use-scp-direct-remote-copying t
-;;         tramp-verbose 1
-;;         tramp-default-remote-shell "/bin/bash")
-
-;;   ;; Enable direct async process (Critical for Eglot performance)
-;;   (connection-local-set-profile-variables
-;;    'remote-direct-async
-;;    '((tramp-direct-async-process . t)))
-
-;;   ;; Add all paths where LSP servers are installed
-;;   (connection-local-set-profile-variables
-;;    'container-path
-;;    '((tramp-remote-path . (tramp-own-remote-path
-;;                            "/usr/local/bin"
-;;                            "/home/devuser/.cargo/bin"
-;;                            tramp-default-remote-path))))
-
-;;   (connection-local-set-profiles
-;;    '(:application tramp :protocol "podman")
-;;    'container-path 'remote-direct-async))
-#+end_src
-
-** Eglot Integration
-#+begin_src emacs-lisp
-;; (with-eval-after-load 'eglot
-;;   ;; Optimize Eglot for TRAMP
-;;   (connection-local-set-profile-variables
-;;    'eglot-container
-;;    '((eglot-connect-timeout . 60)
-;;      (eglot-sync-connect . nil)
-;;      (eglot-events-buffer-config . (:size 0))))
-
-;;   (connection-local-set-profiles
-;;    '(:application tramp :protocol "podman")
-;;    'eglot-container))
-#+end_src
-
-** Dockerfile Editing Support
+* Dockerfile Editing Support
 #+begin_src emacs-lisp
 (use-package dockerfile-ts-mode
   :defer t
@@ -4264,208 +4198,6 @@ If completion fails in the future, check these:
       (treesit-major-mode-setup)))
 
   (add-hook 'dockerfile-ts-mode-hook #'ar/dockerfile-inject-bash))
-#+end_src
-
-** Docker/Podman Management
-#+begin_src emacs-lisp
-;; (use-package docker
-;;   :defer t
-;;   :commands (docker docker-containers docker-images)
-;;   :bind ("C-c C-p" . container-hydra/body)
-;;   :config
-;;   ;; Force docker.el to use Podman
-;;   (setq docker-command "podman"
-;;         docker-compose-command "podman-compose"
-;;         docker-container-tramp-method "podman")
-
-;;   ;; Define the Hydra explicitly here to avoid 'use-package' keyword errors
-;;   (pretty-hydra-define container-hydra
-;;     (:title (pretty-hydra-title "Container Management" 'devicon "nf-dev-docker" :face 'nerd-icons-blue)
-;;      :color amaranth :quit-key ("q" "C-g"))
-;;     ("Lifecycle"
-;;      (("r" ar/podman-run "create new (run)" :exit t)
-;;       ("s" ar/podman-start "resume (start)")
-;;       ("S" ar/podman-stop "pause (stop)")
-;;       ("R" ar/podman-restart "restart")
-;;       ("k" ar/podman-kill "kill")
-;;       ("x" ar/podman-remove "destroy (rm)"))
-
-;;      "Access"
-;;      (("o" ar/podman-open "open workspace" :exit t)
-;;       ("t" ar/podman-shell "terminal" :exit t)
-;;       ("e" ar/podman-exec "exec command" :exit t)
-;;       ("l" ar/podman-logs "view logs" :exit t))
-
-;;      "Images & Info"
-;;      (("b" ar/podman-build "build image" :exit t)
-;;       ("c" docker-containers "list containers" :exit t)
-;;       ("i" docker-images "list images" :exit t)
-;;       ("?" ar/podman-status "status check")))))
-#+end_src
-
-** Container Management Functions
-#+begin_src emacs-lisp
-;; (defun ar/podman--exists-p ()
-;;   "Check if container exists (running or stopped).
-;; Checks if 'podman ps -a' returns a non-empty string."
-;;   (with-temp-buffer
-;;     (call-process "podman" nil t nil "ps" "-a" "-q" "-f" (format "name=^%s$" ar/dev-container-name))
-;;     (> (length (string-trim (buffer-string))) 0)))
-
-;; (defun ar/podman--running-p ()
-;;   "Check if container is currently running.
-;; Checks if 'podman ps' returns a non-empty string."
-;;   (with-temp-buffer
-;;     (call-process "podman" nil t nil "ps" "-q" "-f" (format "name=^%s$" ar/dev-container-name))
-;;     (> (length (string-trim (buffer-string))) 0)))
-
-;; (defun ar/podman-build ()
-;;   "Build the container image. Prefers 'build-podman.sh' if available."
-;;   (interactive)
-;;   (let* ((dockerfile-dir (locate-dominating-file default-directory "Dockerfile"))
-;;          (build-script (and dockerfile-dir (expand-file-name "build-podman.sh" dockerfile-dir))))
-;;     (unless dockerfile-dir
-;;       (user-error "No Dockerfile found in project hierarchy"))
-
-;;     (let ((default-directory dockerfile-dir)
-;;           (compile-command (if (and build-script (file-exists-p build-script))
-;;                                (format "./%s" (file-name-nondirectory build-script))
-;;                              (format "podman build --build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g) -t %s ."
-;;                                      ar/dev-container-image))))
-;;       (compile compile-command))))
-
-;; (defun ar/podman-run ()
-;;   "Create and run a new persistent development container. Prefers 'run-podman.sh'."
-;;   (interactive)
-;;   (if (ar/podman--exists-p)
-;;       (user-error "Container '%s' exists. Use 'ar/podman-start' or remove it first"
-;;                   ar/dev-container-name)
-;;     (let* ((project-root (if (project-current)
-;;                              (project-root (project-current))
-;;                            (read-directory-name "Project root: ")))
-;;            (run-script (expand-file-name "run-podman.sh" project-root)))
-
-;;       (let ((command (if (file-exists-p run-script)
-;;                          (format "./%s" (file-name-nondirectory run-script))
-;;                        (format "podman run -d --name %s --hostname devbox --userns=keep-id -v %s:%s -p 3000:3000 -p 8080:8080 %s tail -f /dev/null"
-;;                                ar/dev-container-name
-;;                                (expand-file-name project-root)
-;;                                ar/dev-container-workspace
-;;                                ar/dev-container-image))))
-;;         (let ((default-directory project-root))
-;;           (async-shell-command command "*podman-run*")
-;;           (message "Creating container '%s'..." ar/dev-container-name))))))
-
-;; (defun ar/podman-start ()
-;;   "Start the persistent container."
-;;   (interactive)
-;;   (if (ar/podman--running-p)
-;;       (message "Container '%s' is already running." ar/dev-container-name)
-;;     (async-shell-command (format "podman start %s" ar/dev-container-name) "*podman-start*")))
-
-;; (defun ar/podman-stop ()
-;;   "Stop the persistent container."
-;;   (interactive)
-;;   (if (ar/podman--running-p)
-;;       (async-shell-command (format "podman stop %s" ar/dev-container-name) "*podman-stop*")
-;;     (message "Container '%s' is not running." ar/dev-container-name)))
-
-;; (defun ar/podman-kill ()
-;;   (interactive)
-;;   (when (yes-or-no-p (format "Force kill '%s'?" ar/dev-container-name))
-;;     (async-shell-command (format "podman kill %s" ar/dev-container-name) "*podman-kill*")))
-
-;; (defun ar/podman-remove ()
-;;   (interactive)
-;;   (if (ar/podman--running-p)
-;;       (user-error "Stop container first.")
-;;     (when (yes-or-no-p (format "Remove container '%s'?" ar/dev-container-name))
-;;       (async-shell-command (format "podman rm %s" ar/dev-container-name) "*podman-rm*"))))
-
-;; (defun ar/podman-restart ()
-;;   (interactive)
-;;   (async-shell-command (format "podman restart %s" ar/dev-container-name) "*podman-restart*"))
-
-;; (defun ar/podman-open ()
-;;   "Open workspace in container via TRAMP.
-;; Includes TRAMP cleanup to fix connection errors if container was restarted."
-;;   (interactive)
-;;   (if (ar/podman--running-p)
-;;       (find-file (format "/podman:%s@%s:%s"
-;;                         ar/dev-container-user
-;;                         ar/dev-container-name
-;;                         ar/dev-container-workspace))
-;;     (when (y-or-n-p (format "Container '%s' is not running. Start it? "
-;;                            ar/dev-container-name))
-;;       ;; Cleanup TRAMP cache to prevent 'Error: can only create exec sessions'
-;;       (tramp-cleanup-connection
-;;        (tramp-dissect-file-name (format "/podman:%s@%s:"
-;;                                       ar/dev-container-user
-;;                                       ar/dev-container-name))
-;;        nil nil)
-;;       (ar/podman-start)
-;;       (run-with-timer 2 nil
-;;                      (lambda ()
-;;                        (find-file (format "/podman:%s@%s:%s"
-;;                                         ar/dev-container-user
-;;                                         ar/dev-container-name
-;;                                         ar/dev-container-workspace)))))))
-
-;; ;; ;; Uses 'vterm' to open in the running container
-;; ;; (defun ar/podman-shell ()
-;; ;;   "Open Vterm in the running container."
-;; ;;   (interactive)
-;; ;;   (if (ar/podman--running-p)
-;; ;;       (let ((default-directory (format "/podman:%s@%s:%s"
-;; ;;                                       ar/dev-container-user
-;; ;;                                       ar/dev-container-name
-;; ;;                                       ar/dev-container-workspace)))
-;; ;;         ;; Opens vterm. If a vterm buffer exists, it opens a new one.
-;; ;;         (vterm (format "*vterm-%s*" ar/dev-container-name)))
-;; ;;     (user-error "Container '%s' is not running." ar/dev-container-name)))
-
-
-;; ;; Uses 'eshell' to open in the running container
-;; (defun ar/podman-shell ()
-;;   "Open Eshell in the running container."
-;;   (interactive)
-;;   (if (ar/podman--running-p)
-;;       (let ((default-directory (format "/podman:%s@%s:%s"
-;;                                       ar/dev-container-user
-;;                                       ar/dev-container-name
-;;                                       ar/dev-container-workspace)))
-;;         ;; Pass 't' to create a new eshell buffer if one exists
-;;         (eshell t))
-;;     (user-error "Container '%s' is not running." ar/dev-container-name)))
-
-;; (defun ar/podman-exec (command)
-;;   "Execute COMMAND in the running container."
-;;   (interactive "sCommand: ")
-;;   (if (ar/podman--running-p)
-;;       (async-shell-command
-;;        (format "podman exec %s %s" ar/dev-container-name command)
-;;        (format "*podman-exec-%s*" ar/dev-container-name))
-;;     (user-error "Container '%s' is not running" ar/dev-container-name)))
-
-;; (defun ar/podman-logs ()
-;;   "View logs from the container."
-;;   (interactive)
-;;   (if (ar/podman--exists-p)
-;;       (async-shell-command
-;;        (format "podman logs -f %s" ar/dev-container-name)
-;;        (format "*podman-logs-%s*" ar/dev-container-name))
-;;     (user-error "Container '%s' doesn't exist" ar/dev-container-name)))
-
-;; (defun ar/podman-status ()
-;;   "Display container status information."
-;;   (interactive)
-;;   (cond
-;;    ((not (ar/podman--exists-p))
-;;     (message "Container '%s' does not exist" ar/dev-container-name))
-;;    ((ar/podman--running-p)
-;;     (message "Container '%s' is RUNNING" ar/dev-container-name))
-;;    (t
-;;     (message "Container '%s' exists but is STOPPED" ar/dev-container-name))))
 #+end_src
 
 * Version Control
@@ -5598,6 +5330,7 @@ Displays: Narrowed, Read-only, Macro recording, Evil state."
 #+end_src
 
 * LaTeX Writing Environment
+** Project Awareness
 #+begin_src emacs-lisp
 (defun ar/get-project-bibliographies ()
   "Find .bib files in the current project root recursively.
@@ -5737,6 +5470,10 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
      (note ,(nerd-icons-mdicon "nf-md-note_text") . " ")
      (link ,(nerd-icons-mdicon "nf-md-link") . " ")))
   :config
+  (setq org-cite-insert-processor 'citar-
+        org-cite-follow-processor 'citar
+        org-cite-activate-processor 'citar)
+
   ;; === Project.el Integration ===
   (defun ar/citar-set-local-bibliography ()
     "Set buffer-local bibliography variables if in a project."
@@ -5762,18 +5499,6 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
   :config
   (citar-org-roam-mode 1)
   (setq citar-org-roam-subdir "literature"))
-#+end_src
-
-*** Org-Cite Integration
-#+begin_src emacs-lisp
-(use-package oc
-  :ensure nil
-  :after org
-  :config
-  (require 'citar)
-  (setq org-cite-insert-processor 'citar
-        org-cite-follow-processor 'citar
-        org-cite-activate-processor 'citar))
 #+end_src
 
 *** RefTeX
