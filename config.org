@@ -5187,7 +5187,7 @@ Displays: Narrowed, Read-only, Macro recording, Evil state."
 #+begin_src emacs-lisp
 (use-package pdf-view
   :defer t
-  :ensure pdf-tools
+  :straight pdf-tools
   :defines pdf-annot-activate-created-annotations
   :functions pdf-tools-install
   :hook ((pdf-tools-enabled . pdf-view-auto-slice-minor-mode)
