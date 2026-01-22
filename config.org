@@ -116,6 +116,17 @@ Lower this if you experience freezing, raise if stuttering.")
          (message "✓ Automatic backup created: %s" backup-file))))))
 #+end_src
 
+** Nerd Icons
+#+begin_src emacs-lisp
+(use-package nerd-icons
+  :demand t
+  :custom
+  (nerd-icons-font-family "Symbols Nerd Font Mono")
+  (nerd-icons-color-icons t))
+#+end_src
+
+
+
 ** Custom Functions
 #+begin_src emacs-lisp
 (defun childframe-workable-p ()
@@ -1507,14 +1518,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
            term-mode vterm-mode
            embark-collect-mode lsp-ui-imenu-mode
            pdf-annot-list-mode) . turn-on-hide-mode-line-mode)))
-#+end_src
-
-** Nerd Icons
-#+begin_src emacs-lisp
-(use-package nerd-icons
-  :custom
-  (nerd-icons-font-family "Symbols Nerd Font Mono")
-  (nerd-icons-color-icons t))
 #+end_src
 
 ** Line Numbers
