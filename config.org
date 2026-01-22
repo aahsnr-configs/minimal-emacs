@@ -5470,7 +5470,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
      (note ,(nerd-icons-mdicon "nf-md-note_text") . " ")
      (link ,(nerd-icons-mdicon "nf-md-link") . " ")))
   :config
-  (setq org-cite-insert-processor 'citar-
+  (setq org-cite-insert-processor 'citar
         org-cite-follow-processor 'citar
         org-cite-activate-processor 'citar)
 
