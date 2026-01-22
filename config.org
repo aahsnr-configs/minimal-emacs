@@ -23,7 +23,7 @@ Lower this if you experience freezing, raise if stuttering.")
   "GC percentage of heap to trigger collection.")
 
 ;; Restore GC settings after startup
-(add-hook 'elpaca-after-init-hook
+(add-hook 'emacs-startup-hook
           (lambda ()
             (setq gc-cons-threshold better-gc-cons-threshold
                   gc-cons-percentage better-gc-cons-percentage)
@@ -40,7 +40,7 @@ Lower this if you experience freezing, raise if stuttering.")
           101) ;; Run late to ensure accurate timing
 
 ;; Increase GC threshold in minibuffer to prevent slowdowns during completion
-(add-hook 'elpaca-after-init-hook
+(add-hook 'emacs-startup-hook
           (lambda ()
             (defun gc-minibuffer-setup-hook ()
               (setq gc-cons-threshold (* better-gc-cons-threshold 2)))
@@ -61,56 +61,30 @@ Lower this if you experience freezing, raise if stuttering.")
 
 ** Package Management
 #+begin_src emacs-lisp
-(defvar elpaca-installer-version 0.11)
-(defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
-(defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
-(defvar elpaca-repos-directory (expand-file-name "repos/" elpaca-directory))
-(defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
-                              :ref nil :depth 1 :inherit ignore
-                              :files (:defaults "elpaca-test.el" (:exclude "extensions"))
-                              :build (:not elpaca--activate-package)))
-(let* ((repo  (expand-file-name "elpaca/" elpaca-repos-directory))
-       (build (expand-file-name "elpaca/" elpaca-builds-directory))
-       (order (cdr elpaca-order))
-       (default-directory repo))
-  (add-to-list 'load-path (if (file-exists-p build) build repo))
-  (unless (file-exists-p repo)
-    (make-directory repo t)
-    (when (<= emacs-major-version 28) (require 'subr-x))
-    (condition-case-unless-debug err
-        (if-let* ((buffer (pop-to-buffer-same-window "*elpaca-bootstrap*"))
-                  ((zerop (apply #'call-process `("git" nil ,buffer t "clone"
-                                                  ,@(when-let* ((depth (plist-get order :depth)))
-                                                      (list (format "--depth=%d" depth) "--no-single-branch"))
-                                                  ,(plist-get order :repo) ,repo))))
-                  ((zerop (call-process "git" nil buffer t "checkout"
-                                        (or (plist-get order :ref) "--"))))
-                  (emacs (concat invocation-directory invocation-name))
-                  ((zerop (call-process emacs nil buffer nil "-Q" "-L" "." "--batch"
-                                        "--eval" "(byte-recompile-directory \".\" 0 'force)")))
-                  ((require 'elpaca))
-                  ((elpaca-generate-autoloads "elpaca" repo)))
-            (progn (message "%s" (buffer-string)) (kill-buffer buffer))
-          (error "%s" (with-current-buffer buffer (buffer-string))))
-      ((error) (warn "%s" err) (delete-directory repo 'recursive))))
-  (unless (require 'elpaca-autoloads nil t)
-    (require 'elpaca)
-    (elpaca-generate-autoloads "elpaca" repo)
-    (let ((load-source-file-function nil)) (load "./elpaca-autoloads"))))
-(add-hook 'after-init-hook #'elpaca-process-queues)
-(elpaca `(,@elpaca-order))
+(defvar bootstrap-version)
+(let ((bootstrap-file
+       (expand-file-name
+        "straight/repos/straight.el/bootstrap.el"
+        (or (bound-and-true-p straight-base-dir)
+            user-emacs-directory)))
+      (bootstrap-version 7))
+  (unless (file-exists-p bootstrap-file)
+    (with-current-buffer
+        (url-retrieve-synchronously
+         "https://raw.githubusercontent.com/radian-software/straight.el/develop/install.el"
+         'silent 'inhibit-cookies)
+      (goto-char (point-max))
+      (eval-print-last-sexp)))
+  (load bootstrap-file nil 'nomessage))
 
-(elpaca elpaca-use-package
-  ;; Enable use-package :ensure support for Elpaca.
-  (elpaca-use-package-mode))
 
-(require 'use-package)
-(require 'bind-key)
+(straight-use-package 'use-package)
+
+(setq straight-use-package-by-default t)
 
 ;; --- USE-PACKAGE CONFIGURATION ---
 (setq use-package-verbose nil
       use-package-expand-minimally t
-      use-package-always-ensure t
       use-package-compute-statistics nil
       use-package-enable-imenu-support t)
 #+end_src
@@ -118,7 +92,7 @@ Lower this if you experience freezing, raise if stuttering.")
 ** Custom File
 #+begin_src emacs-lisp
 (setq custom-file (expand-file-name "customs.el" user-emacs-directory))
-(add-hook 'elpaca-after-init-hook (lambda () (load custom-file 'noerror)))
+(add-hook 'emacs-startup-hook (lambda () (load custom-file 'noerror)))
 #+end_src
 
 ** Nerd Icons
@@ -361,7 +335,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Garbage Collector Magic Hack
 #+begin_src emacs-lisp
 (use-package gcmh
-  :hook (elpaca-after-init . gcmh-mode)
+  :hook (after-init . gcmh-mode)
   :init
   ;; Match early-init.el restoration value
   (setq gcmh-idle-delay 'auto
@@ -400,13 +374,13 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 #+begin_src emacs-lisp
 ;; Save place
 (use-package saveplace
-  :ensure nil
-  :hook (elpaca-after-init . save-place-mode))
+  :straight (:type built-in)
+  :hook (after-init . save-place-mode))
 
 ;; History with symlink resolution
 (use-package recentf
-  :ensure nil
-  :hook (elpaca-after-init . recentf-mode)
+  :straight (:type built-in)
+  :hook (after-init . recentf-mode)
   :init
   (setq recentf-max-saved-items 300
         recentf-exclude
@@ -437,8 +411,8 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (add-to-list 'recentf-exclude #'ar/exclude-org-agenda-files))
 
 (use-package savehist
-  :ensure nil
-  :hook (elpaca-after-init . savehist-mode)
+  :straight (:type built-in)
+  :hook (after-init . savehist-mode)
   :init
   (setq enable-recursive-minibuffers t
         history-length 1000
@@ -453,7 +427,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Misc
 #+begin_src emacs-lisp
 (use-package simple
-  :ensure nil
+  :straight (:type built-in)
   :hook ((text-mode . visual-line-mode)
          ((prog-mode markdown-mode conf-mode) . enable-trailing-whitespace))
   :init
@@ -546,7 +520,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 
 (use-package undo-fu-session
   :commands undo-fu-session-global-mode
-  :hook (elpaca-after-init . undo-fu-session-global-mode))
+  :hook (after-init . undo-fu-session-global-mode))
 #+end_src
 
 ** Core Evil
@@ -554,7 +528,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 (setq evil-undo-system 'undo-fu)
 
 (use-package evil
-  :ensure (:wait t)
   :demand t
   :init
   (setq evil-want-integration t)
@@ -798,7 +771,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 * Transient
 #+begin_src emacs-lisp
 (use-package transient
-  :ensure (:wait t)
+  :demand t
   :bind ("<f6>" . ar/toggles-transient)
   :init
   (setq resize-mini-windows t)
@@ -971,7 +944,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 #+begin_src emacs-lisp
 ;; Dependency: Enable which-function-mode globally
 ;; (use-package which-func
-;;   :ensure nil
+;;   :straight (:type built-in)
 ;;   :config
 ;;   (which-function-mode 1)
 ;;   (setq which-func-format "")
@@ -983,7 +956,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ;;                 (which-function-mode -1)))))
 
 (use-package eldoc
-  :ensure nil
+  :straight (:type built-in)
   :defer t
   :init
   (global-eldoc-mode)
@@ -1041,7 +1014,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Cross Referencing Commands
 #+begin_src emacs-lisp
 (use-package xref
-  :ensure nil
+  :straight (:type built-in)
   :defer t
   :autoload xref-show-definitions-completing-read
   :bind (("M-g ." . xref-find-definitions)
@@ -1059,7 +1032,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Automatically reload files was modified by external program
 #+begin_src emacs-lisp
 (use-package autorevert
-  :ensure nil
+  :straight (:type built-in)
   :hook (after-init . global-auto-revert-mode))
 #+end_src
 
@@ -1067,7 +1040,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 #+begin_src emacs-lisp
 ;; Jump to things in Emacs tree-style
 (use-package avy
-  :hook (elpaca-after-init . avy-setup-default)
+  :hook (after-init . avy-setup-default)
   :config (setq avy-all-windows nil
                 avy-all-windows-alt t
                 avy-background t
@@ -1079,7 +1052,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 
 ;; Quickly follow links
 (use-package ace-link
-  :hook (elpaca-after-init . ace-link-setup-default))
+  :hook (after-init . ace-link-setup-default))
 #+end_src
 
 ** Anzu
@@ -1090,7 +1063,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
          :map isearch-mode-map
          ([remap isearch-query-replace] . anzu-isearch-query-replace)
          ([remap isearch-query-replace-regexp] . anzu-isearch-query-replace-regexp))
-  :hook (elpaca-after-init . global-anzu-mode))
+  :hook (after-init . global-anzu-mode))
 
 (use-package evil-anzu :after evil)
 #+end_src
@@ -1099,7 +1072,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 #+begin_src emacs-lisp
 (use-package ediff
   :defer t
-  :ensure nil
+  :straight (:type built-in)
   :hook(;; show org ediffs unfolded
         (ediff-prepare-buffer . outline-show-all)
         ;; restore window layout when done
@@ -1113,8 +1086,8 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Automatic parenthesis pairing
 #+begin_src emacs-lisp
 (use-package elec-pair
-  :ensure nil
-  :hook (elpaca-after-init . electric-pair-mode)
+  :straight (:type built-in)
+  :hook (after-init . electric-pair-mode)
   :init (setq electric-pair-inhibit-predicate 'electric-pair-conservative-inhibit))
 #+end_src
 
@@ -1126,7 +1099,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Subword: Handling capitalized subwords in a nomenclature
 #+begin_src emacs-lisp
 (use-package subword
-  :ensure nil
+  :straight (:type built-in)
   :hook ((prog-mode . subword-mode)
          (minibuffer-setup . subword-mode)))
 #+end_src
@@ -1139,7 +1112,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Terminal
 #+begin_src emacs-lisp
 (use-package eshell
-  :ensure nil
+  :straight (:type built-in)
   :defer t
   :commands (eshell ar/eshell-toggle ar/eshell-new)
   :hook ((eshell-mode . (lambda ()
@@ -1365,7 +1338,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Jinx
 #+begin_src emacs-lisp
 (use-package jinx
-  :hook (elpaca-after-init . jinx-mode)
+  :hook (after-init . jinx-mode)
   :custom
   ;; Sensibly disable Jinx in modes where spell-checking is not desired.
   ;; This includes programming modes, UI-centric modes, and special buffers.
@@ -1421,7 +1394,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (set-face-attribute 'font-lock-keyword-face nil :slant 'italic))
 
 (if (daemonp)
-    (add-hook 'elpaca-after-init-hook
+    (add-hook 'emacs-startup-hook
               (lambda ()
                 (add-hook 'after-make-frame-functions
                           (lambda (frame)
@@ -1460,7 +1433,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Solaire Mode
 #+begin_src emacs-lisp
 (use-package solaire-mode
-  :hook (elpaca-after-init . solaire-global-mode))
+  :hook (after-init . solaire-global-mode))
 #+end_src
 
 ** Modeline
@@ -1470,7 +1443,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 
 (use-package doom-modeline
   :defer 0.1
-  :hook (elpaca-after-init . doom-modeline-mode)
+  :hook (after-init . doom-modeline-mode)
   :hook (doom-modeline-mode . column-number-mode)
   :init
   (setq doom-modeline-bar-width 3
@@ -1506,7 +1479,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Line Numbers
 #+begin_src emacs-lisp
 (use-package display-line-numbers
-  :ensure nil
+  :straight (:type built-in)
   :hook ((prog-mode
           conf-mode toml-ts-mode
           yaml-mode yaml-ts-mode)
@@ -1525,7 +1498,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Text Scaling
 #+begin_src emacs-lisp
 (use-package default-text-scale
-  :hook (elpaca-after-init . default-text-scale-mode))
+  :hook (after-init . default-text-scale-mode))
 #+end_src
 
 ** Scrolling
@@ -1546,7 +1519,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 (when (fboundp 'pixel-scroll-precision-mode) ;; 29+
   (use-package ultra-scroll
     :functions (hl-todo-mode diff-hl-flydiff-mode)
-    :hook (elpaca-after-init . ultra-scroll-mode)
+    :hook (after-init . ultra-scroll-mode)
     :config
     (add-hook 'ultra-scroll-hide-functions #'diff-hl-flydiff-mode)
     (add-hook 'ultra-scroll-hide-functions #'hl-todo-mode)
@@ -1710,7 +1683,7 @@ If file doesn't exist, creates it with TEMPLATE content."
 ** Core Configuration
 #+begin_src emacs-lisp
 (use-package org
-  :ensure nil
+  :straight (:type built-in)
   :custom
   ;; Core settings
   (org-modules nil)
@@ -1927,7 +1900,7 @@ If file doesn't exist, creates it with TEMPLATE content."
 #+begin_src emacs-lisp
 ;; (with-eval-after-load 'org
 (use-package org-agenda
-  :ensure nil
+  :straight (:type built-in)
   :defer t
   :config
   (setq org-agenda-files (list my/org-directory
@@ -2322,7 +2295,7 @@ Links back to the GTD task for execution tracking."
 ** Org Capture
 #+begin_src emacs-lisp
 (use-package org-capture
-  :ensure nil
+  :straight (:type built-in)
   :defer t
   :after org
   :init
@@ -2380,7 +2353,7 @@ Links back to the GTD task for execution tracking."
 ** Org Habit
 #+begin_src emacs-lisp
 (use-package org-habit
-  :ensure nil
+  :straight (:type built-in)
   :defer t
   :after org
   :custom
@@ -2447,7 +2420,7 @@ Links back to the GTD task for execution tracking."
 #+begin_src emacs-lisp
 (use-package org-ibullets
   :commands org-ibullets-mode
-  :ensure (:host github :repo "jamescherti/org-ibullets.el")
+  :straight (:host github :repo "jamescherti/org-ibullets.el")
   :hook (org-mode . org-ibullets-mode))
 #+end_src
 
@@ -2986,7 +2959,7 @@ Links back to the GTD task for execution tracking."
 ** Treesit
 #+begin_src emacs-lisp
 (use-package treesit
-  :ensure nil
+  :straight (:type built-in)
   :mode (("\\.tsx\\'" . tsx-ts-mode))
   :init
   (defvar ar/treesit-grammar-dir
@@ -3021,7 +2994,7 @@ Links back to the GTD task for execution tracking."
 ** Treesit-Fold
 #+begin_src emacs-lisp
 (use-package treesit-fold
-  :ensure (:host github :repo "emacs-tree-sitter/treesit-fold")
+  :straight (:host github :repo "emacs-tree-sitter/treesit-fold")
   ;; :custom
   ;; (treesit-fold-indicators-priority -1)
   :config
@@ -3071,8 +3044,8 @@ Links back to the GTD task for execution tracking."
 ** Highlight the current line
 #+begin_src emacs-lisp
 (use-package hl-line
-  :ensure nil
-  :hook ((elpaca-after-init . global-hl-line-mode)
+  :straight (:type built-in)
+  :hook ((after-init . global-hl-line-mode)
          ((dashboard-mode eshell-mode shell-mode term-mode vterm-mode) .
           (lambda () (setq-local global-hl-line-mode nil))))
   :config
@@ -3158,7 +3131,7 @@ Links back to the GTD task for execution tracking."
 ** Parenthesis Matching & Context
 #+begin_src emacs-lisp
 (use-package paren
-  :ensure nil
+  :straight (:type built-in)
   :hook (after-init . show-paren-mode)
   :custom
   (show-paren-delay 0.1)
@@ -3697,7 +3670,7 @@ targets."
 ** Basic Completion
 #+begin_src emacs-lisp
 (use-package emacs
-  :ensure nil
+  :straight (:type built-in)
   :custom
   (tab-always-indent 'complete)
   (text-mode-ispell-word-completion nil)
@@ -3832,7 +3805,7 @@ If completion fails in the future, check these:
 ** Dabbrev
 #+begin_src emacs-lisp
 (use-package dabbrev
-  :ensure nil
+  :straight (:type built-in)
   :config
   (add-to-list 'dabbrev-ignored-buffer-regexps "\\` ")
   (add-to-list 'dabbrev-ignored-buffer-modes 'doc-view-mode)
@@ -3895,13 +3868,13 @@ If completion fails in the future, check these:
 ** Direnv
 #+begin_src emacs-lisp
 (use-package envrc
-  :hook (elpaca-after-init . envrc-global-mode))
+  :hook (after-init . envrc-global-mode))
 #+end_src
 
 ** LSP
 #+begin_src emacs-lisp
 (use-package eglot-booster
-  :ensure (:host github :repo "jdtsmith/eglot-booster")
+  :straight (:host github :repo "jdtsmith/eglot-booster")
   :after eglot
   :init
   (setq eglot-booster-io-only
@@ -3913,7 +3886,7 @@ If completion fails in the future, check these:
   (eglot-booster-mode +1))
 
 (use-package eglot
-  :ensure nil
+  :straight (:type built-in)
   :defer t
   :hook
   ((prog-mode . (lambda ()
@@ -3935,7 +3908,7 @@ If completion fails in the future, check these:
   (setq eglot-autoshutdown t)) ;consider setting this to nil
 
 (use-package org-src-context
-  :ensure nil ; Relies on lisp/org-src-context.el
+  :straight (:type built-in) ; Relies on lisp/org-src-context.el
   :hook (after-init . org-src-context-mode)
   :custom
   ;; Visual: Set to 'nil' to see the grayed-out context surrounding your block.
@@ -4034,7 +4007,7 @@ If completion fails in the future, check these:
 ** Syntax Checking
 #+begin_src emacs-lisp
 (use-package flymake
-  :ensure nil
+  :straight (:type built-in)
   :hook (prog-mode . flymake-mode)
   :custom
   ;; Doom-inspired behavior: better navigation and visual density
@@ -4093,7 +4066,7 @@ If completion fails in the future, check these:
 ** Formatting
 #+begin_src emacs-lisp
 (use-package apheleia
-  :hook (elpaca-after-init . apheleia-global-mode)
+  :hook (after-init . apheleia-global-mode)
   :custom
   (apheleia-log-only-errors t)
   :config
@@ -4176,7 +4149,7 @@ If completion fails in the future, check these:
 #+begin_src emacs-lisp
 (use-package dockerfile-ts-mode
   :defer t
-  :ensure nil
+  :straight (:type built-in)
   :mode ("Dockerfile\\'" "\\.dockerfile\\'"
          "Containerfile\\'" "\\.containerfile\\'"
          "Dockerfile\\..*\\'" "Containerfile\\..*\\'")
@@ -4292,7 +4265,7 @@ If completion fails in the future, check these:
 ** Diff-hl
 #+begin_src emacs-lisp
 (use-package diff-hl
-  :hook ((elpaca-after-init . global-diff-hl-mode)
+  :hook ((after-init . global-diff-hl-mode)
          (dired-mode . diff-hl-dired-mode))
   :hook (magit-pre-refresh . diff-hl-magit-pre-refresh)
   :hook (magit-post-refresh . diff-hl-magit-post-refresh)
@@ -4437,7 +4410,7 @@ If completion fails in the future, check these:
 ** Dired
 #+begin_src emacs-lisp
 (use-package dired
-  :ensure nil
+  :straight (:type built-in)
   :commands (dired dired-jump)
   :hook (dired-mode . dired-hide-details-mode)
   :hook (dired-mode . hl-line-mode)
@@ -4536,7 +4509,7 @@ If completion fails in the future, check these:
 ** File Management Extensions
 #+begin_src emacs-lisp
 (use-package dired-x
-  :ensure nil
+  :straight (:type built-in)
   :hook (dired-mode . dired-omit-mode)
   :config
   (setq dired-omit-verbose nil
@@ -4562,7 +4535,7 @@ If completion fails in the future, check these:
 
 
 (use-package wdired
-  :ensure nil
+  :straight (:type built-in)
   :after dired
   :custom
   (wdired-allow-to-change-permissions t)
@@ -4574,7 +4547,7 @@ If completion fails in the future, check these:
 #+begin_src emacs-lisp
 (use-package ibuffer
   :defer t
-  :ensure nil
+  :straight (:type built-in)
   :init (setq ibuffer-filter-group-name-face '(:inherit (font-lock-string-face bold))))
 
 ;; Display icons for buffers
@@ -4876,7 +4849,7 @@ Opens only the current project, removing all other projects."
 *** Core
 #+begin_src emacs-lisp
 (use-package projectile
-  :hook (elpaca-after-init . projectile-mode)
+  :hook (after-init . projectile-mode)
   :custom
   (projectile-enable-caching t)
   (projectile-completion-system 'default)
@@ -5144,7 +5117,7 @@ Includes option to manually choose a directory like project.el."
 #+begin_src emacs-lisp
 (use-package which-key
   :defer 0.5
-  :hook (elpaca-after-init . which-key-mode)
+  :hook (after-init . which-key-mode)
   :custom
   (which-key-idle-delay 0.1)
   (which-key-separator " → ")
@@ -5356,12 +5329,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
 #+begin_src emacs-lisp
 (use-package tex
   :defer t
-  :ensure (auctex :repo "https://git.savannah.gnu.org/git/auctex.git"
-                  :branch "main"
-                  :pre-build (("make" "elpa"))
-                  :build (:not elpaca--compile-info)
-                  :files ("*.el" "doc/*.info*" "etc" "images" "latex" "style")
-                  :version (lambda (_) (require 'auctex) AUCTeX-version))
+  :straight auctex
   :hook ((LaTeX-mode . visual-line-mode)
          (LaTeX-mode . prettify-symbols-mode)
          (LaTeX-mode . TeX-source-correlate-mode)
@@ -5504,7 +5472,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
 *** RefTeX
 #+begin_src emacs-lisp
 (use-package reftex
-  :ensure nil
+  :straight (:type built-in)
   :after tex
   :hook (LaTeX-mode . reftex-mode)
   :custom
@@ -5540,7 +5508,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
 ** Preview LaTeX (AUCTeX)
 #+begin_src emacs-lisp
 (use-package preview
-  :ensure nil
+  :straight (:type built-in)
   :after tex
   :hook (LaTeX-mode . LaTeX-preview-setup)
   :custom
@@ -5757,7 +5725,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
 ** Winner
 #+begin_src emacs-lisp
 (use-package winner
-  :ensure nil
+  :straight (:type built-in)
   :commands (winner-undo winner-redo)
   :hook (after-init . winner-mode)
   :init (setq winner-boring-buffers '("*Completions*"
@@ -5990,7 +5958,6 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
 #+begin_src emacs-lisp
 (use-package general
   :after evil
-  :ensure (:wait t)
   :demand t
   :config
   ;; Set up leader keys
