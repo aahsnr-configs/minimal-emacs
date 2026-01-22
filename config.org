@@ -126,7 +126,6 @@ Lower this if you experience freezing, raise if stuttering.")
 #+end_src
 
 
-
 ** Custom Functions
 #+begin_src emacs-lisp
 (defun childframe-workable-p ()
@@ -4032,7 +4031,7 @@ If completion fails in the future, check these:
 
     (transient-define-group ar/toggles-dape-debug ()
       ["Debug"
-       ("d" "dape" dape)
+       ("d" "dape" dape :transient t)
        ("Q" "quit" dape-quit)
        ("q" "" transient-quit-one :format " ")])
 
