@@ -1,0 +1,5 @@
+# -*- mode: snippet -*-
+# name: long-implies_big
+# key: Limpl
+# --
+\Longrightarrow

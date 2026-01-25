@@ -71,7 +71,7 @@ Lower this if you experience freezing, raise if stuttering.")
       (eval-print-last-sexp)))
   (load bootstrap-file nil 'nomessage))
 
-
+(straight-use-package 'bind-key)
 (straight-use-package 'use-package)
 
 (setq straight-use-package-by-default t)
@@ -3702,7 +3702,7 @@ VERTical Interactive COmpletion
 #+begin_src emacs-lisp
 (use-package vertico
   :custom
-  (vertico-count 10)
+  (vertico-count 13)
   (vertico-resize nil)
   (vertico-cycle t)
   :init
@@ -4948,21 +4948,17 @@ operators and other column-based navigation."
 (defvar my/snippets-directory (expand-file-name "snippets" user-emacs-directory)
   "Directory for personal yasnippet snippets.")
 
-;; Create the custom snippets directory if it doesn't exist.
 (unless (file-directory-p my/snippets-directory)
   (make-directory my/snippets-directory t))
 
-;; The engine itself
 (use-package yasnippet
   :defer t
   :hook ((prog-mode text-mode LaTeX-mode org-mode) . yas-minor-mode)
   :custom
   (yas-prompt-functions '(yas-completing-prompt))
   :config
-  ;; Add personal snippets to the list
   (add-to-list 'yas-snippet-dirs my/snippets-directory)
 
-  ;; --- Robust, Save-Based Automatic Snippet Reloading ---
   (defun ar/yas-reload-snippets-on-save ()
     "Reload all snippets if a snippet file is being saved."
     (when (string-prefix-p my/snippets-directory (buffer-file-name))
@@ -4971,21 +4967,18 @@ operators and other column-based navigation."
 
   (add-hook 'after-save-hook #'ar/yas-reload-snippets-on-save))
 
-;; The official snippet collection
 (use-package yasnippet-snippets
   :defer t
   :after yasnippet
   :config
   (yas-reload-all))
 
-;; Search snippets with Consult
 (use-package consult-yasnippet
   :defer t
   :after (consult yasnippet)
   :config
   (consult-customize consult-yasnippet :preview-key 'any))
 
-;; Add snippets to completion-at-point (Corfu)
 (use-package yasnippet-capf
   :defer t
   :after cape
@@ -5340,7 +5333,6 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
             (delete-window window)))))
     (advice-add #'keyboard-quit :before #'popper-close-window-hack)))
 #+end_src
-
 
 * General Keybindings
 #+begin_src emacs-lisp
