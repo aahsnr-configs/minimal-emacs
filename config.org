@@ -689,7 +689,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (define-key evil-normal-state-map "O" #'ar/evil-open-above-smart))
 #+end_src
 
-* Editor Behaviour
+* TODO Editor Behaviour
 ** DONE Child Frame
 #+begin_src emacs-lisp
 (use-package posframe
@@ -733,7 +733,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** DONE Transient
 #+begin_src emacs-lisp
 (use-package transient
-  :bind ("<f6>" . ar/toggles-transient)
   :init
   (setq resize-mini-windows t)
 
@@ -832,7 +831,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
       ("p d" "Delete package" package-delete)
       ("p a" "Autoremove" package-autoremove)
       ;; Hidden Toggle
-      ("<f6>" "" transient-quit-one :format " ")]]))
+      ("<escape>" "" transient-quit-one :format " ")]]))
 #+end_src
 
 ** DONE Cross Referencing Commands
@@ -1347,29 +1346,145 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 (add-hook 'org-mode-hook #'my/org-prettify-setup)
 #+end_src
 
-** Ediff
+** TODO Ediff
+#+begin_src emacs-lisp
+;; (use-package ediff
+;;   :straight (:type built-in)
+;;   :custom
+;;   (ediff-window-setup-function 'ediff-setup-windows-plain)
+;;   (ediff-split-window-function 'split-window-horizontally)
+;;   :hook (ediff-startup . (lambda ()
+;;                           (ediff-toggle-help))))
+#+end_src
+
 #+begin_src emacs-lisp
 (use-package ediff
   :straight (:type built-in)
-  :custom
-  (ediff-window-setup-function 'ediff-setup-windows-plain)
-  (ediff-split-window-function 'split-window-horizontally)
-  :hook (ediff-startup . (lambda ()
-                          (ediff-toggle-help))))
-#+end_src
-
-** Scroll Mode
-#+begin_src emacs-lisp
-(use-package scroll-all
   :defer t
-  :hook ((ediff-startup . scroll-all-mode)
-         (ediff-quit . (lambda () (scroll-all-mode -1))))
+  :commands (ediff ediff-files ediff-buffers ediff-files3 ediff-buffers3
+             ediff-revision ediff-current-file ediff-merge ediff-merge-with-ancestor
+             ediff-patch-file ediff-patch-buffer)
+
+  :init
+  ;; Window and display configuration
+  (setq ediff-window-setup-function 'ediff-setup-windows-plain
+        ediff-split-window-function 'split-window-horizontally
+        ediff-merge-split-window-function 'split-window-horizontally)
+
+  ;; Start with minimal control panel
+  (setq ediff-use-long-help-message nil)
+
+  ;; Highlight options
+  (setq ediff-highlight-all-diffs t)
+
   :config
-  (setq scroll-preserve-screen-position t
-        scroll-conservatively 0))
+  ;; Window configuration management
+  (defvar ar/ediff-window-config nil
+    "Window configuration before ediff.")
+
+  (defun ar/ediff-save-window-config ()
+    "Save current window configuration before ediff."
+    (setq ar/ediff-window-config (current-window-configuration)))
+
+  (defun ar/ediff-restore-window-config ()
+    "Restore window configuration after ediff."
+    (when ar/ediff-window-config
+      (set-window-configuration ar/ediff-window-config)
+      (setq ar/ediff-window-config nil)))
+
+  (add-hook 'ediff-before-setup-hook #'ar/ediff-save-window-config)
+  (add-hook 'ediff-quit-hook #'ar/ediff-restore-window-config)
+
+  ;; Define transient menu
+  (with-eval-after-load 'transient
+    (defun ar/ediff-title ()
+      (concat
+       (if (fboundp 'nerd-icons-faicon)
+           (nerd-icons-faicon "nf-fa-columns" :face 'transient-heading :v-adjust 0.02)
+         "")
+       (propertize " Ediff Control Panel" 'face 'transient-heading)))
+
+    (transient-define-prefix ar/ediff-transient ()
+      "Ediff commands - call from control panel"
+      [:description ar/ediff-title
+
+       ["Navigate"
+        ("n" "next diff" ediff-next-difference :transient t)
+        ("p" "previous diff" ediff-previous-difference :transient t)
+        ("d" "jump to diff" ediff-jump-to-difference :transient t)
+        ("g" "goto point" ediff-jump-to-difference-at-point :transient t)
+        ("v" "scroll down" ediff-scroll-vertically :transient t)
+        ("V" "scroll up" (lambda () (interactive) (ediff-scroll-vertically '-)) :transient t)
+        ("<" "scroll left" ediff-scroll-horizontally :transient t)
+        (">" "scroll right" (lambda () (interactive) (ediff-scroll-horizontally '-)) :transient t)]
+
+       ["Copy & Restore"
+        ("a" "copy A → B" ediff-copy-A-to-B :transient t)
+        ("b" "copy B → A" ediff-copy-B-to-A :transient t)
+        ("r" "restore diff" ediff-restore-diff :transient t)
+        ("*" "refine region" ediff-make-or-kill-fine-diffs :transient t)]
+
+       ["Toggle"
+        ("h" "highlighting" ediff-toggle-hilit :transient t)
+        ("@" "auto-refine" ediff-toggle-autorefine :transient t)
+        ("#" "skip similar" ediff-toggle-skip-similar :transient t)
+        ("|" "split H/V" ediff-toggle-split :transient t)
+        ("m" "wide display" ediff-toggle-wide-display :transient t)]
+
+       ["Actions"
+        ("!" "update diffs" ediff-update-diffs :transient t)
+        ("w" "save buffers" ediff-save-buffer :transient t)
+        ("i" "status info" ediff-status-info :transient t)
+        ("E" "manual" ediff-documentation :transient t)]
+
+       ["Exit"
+        ("?" "toggle help" ediff-toggle-help :transient t)
+        ("z" "suspend" ediff-suspend)
+        ("q" "quit" ediff-quit)
+        ("<escape>" "" transient-quit-one :format " ")]])
+
+    ;; Function to check if transient is active
+    (defun ar/ediff-transient-active-p ()
+      "Check if ediff transient is currently active."
+      (and (boundp 'transient--prefix)
+           transient--prefix
+           (eq transient-current-command 'ar/ediff-transient))))
+
+  ;; Setup custom keybindings in control panel
+  (defun ar/ediff-setup-keys ()
+    "Setup custom keybindings for ediff control panel.
+This function unbinds SPC and other keys that conflict with general.el,
+and sets up vim-style navigation."
+    ;; CRITICAL: Unbind SPC to prevent conflicts with general.el leader key
+    (define-key ediff-mode-map (kbd "SPC") nil)
+
+    ;; Unbind other potentially conflicting keys
+    (define-key ediff-mode-map (kbd "C-c") nil)
+
+    ;; Vim-style navigation (j/k for next/previous)
+    (define-key ediff-mode-map (kbd "j") 'ediff-next-difference)
+    (define-key ediff-mode-map (kbd "k") 'ediff-previous-difference)
+    (define-key ediff-mode-map (kbd "h") 'ediff-previous-difference)
+    (define-key ediff-mode-map (kbd "l") 'ediff-next-difference)
+
+    ;; Bind transient menu to ? (toggles between transient and help)
+    (when (featurep 'transient)
+      (define-key ediff-mode-map (kbd "?")
+        (lambda ()
+          (interactive)
+          (if (ar/ediff-transient-active-p)
+              (ediff-toggle-help)
+            (ar/ediff-transient))))))
+
+  (add-hook 'ediff-keymap-setup-hook #'ar/ediff-setup-keys)
+
+  ;; Ensure control panel gets focus on startup
+  (add-hook 'ediff-startup-hook
+            (lambda ()
+              (select-window (get-buffer-window ediff-control-buffer)))))
 #+end_src
 
-
+** DONE Scroll Mode
 * DONE Markdown
 #+begin_src emacs-lisp
 (use-package markdown-mode
@@ -1718,7 +1833,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ;;       ("R" magit-refresh "refresh")
 ;;       ("?" magit-dispatch "dispatch" :exit t)))))
 #+end_src
-
 
 * DONE Org Mode
 ** DONE Dynamic Directory Structure
@@ -2407,7 +2521,6 @@ If file doesn't exist, creates it with TEMPLATE content."
             (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-breadcrumb -10 t)))
 #+end_src
 
-
 * DONE Second Brain & Productivity
 ** DONE Org Agenda
 #+begin_src emacs-lisp
@@ -3052,10 +3165,6 @@ Links back to the GTD task for execution tracking."
                         (org-super-agenda-groups
                          '((:auto-priority t))))))))))
 #+end_src
-
-
-
-
 
 * TODO Workflow Management
 ** DONE Dired
@@ -4010,8 +4119,7 @@ If completion fails in the future, check these:
   (add-to-list 'dabbrev-ignored-buffer-modes 'tags-table-mode))
 #+end_src
 
-
-* TODO Consult Roam - combine these keybindings with general
+* DONE Consult Roam
 #+begin_src emacs-lisp
 (use-package consult-org-roam
   :after org-roam
@@ -4029,7 +4137,7 @@ If completion fails in the future, check these:
 #+end_src
 
 * TODO Development Tools
-** OKAY Direnv
+** Direnv
 #+begin_src emacs-lisp
 (use-package envrc
   :hook (after-init . envrc-global-mode))
@@ -4037,6 +4145,7 @@ If completion fails in the future, check these:
 
 ** TODO LSP - handle the org-src-context.el file
 #+begin_src emacs-lisp
+;; TODO Modify some settings according to https://andreyor.st/posts/2023-09-09-migrating-from-lsp-mode-to-eglot/
 (use-package eglot
   :straight (:type built-in)
   :defer t
@@ -4050,11 +4159,8 @@ If completion fails in the future, check these:
    ((markdown-mode yaml-mode yaml-ts-mode) . eglot-ensure))
 
   :init
-  ;; Optimization: disable logging events to improve performance
   (setq eglot-events-buffer-size 0)
-  ;; Optimization: delay sending changes to the server slightly (0.5s)
   (setq eglot-send-changes-idle-time 0.5)
-  ;; Shutdown server when the last buffer managed by it is closed
   (setq eglot-autoshutdown nil))
 
 (use-package eglot-booster
@@ -4062,7 +4168,6 @@ If completion fails in the future, check these:
   :after eglot
   :init
   (setq eglot-booster-io-only
-        ;; JSON parser on 30+ is faster, so we only exploit eglot-booster's IO buffering (benefits more talkative LSP servers).
         (and (> emacs-major-version 29)
              (not (functionp 'json-rpc-connection))))
   :config
@@ -4097,7 +4202,7 @@ If completion fails in the future, check these:
 (use-package consult-eglot-embark :defer t)
 #+end_src
 
-** DONE Syntax Checking
+** Syntax Checking
 #+begin_src emacs-lisp
 (use-package flymake
   :straight (:type built-in)
@@ -4150,7 +4255,7 @@ If completion fails in the future, check these:
 ;;                       :background (face-attribute 'posframe-border :background nil t)))
 #+end_src
 
-** DONE Formatting
+** Formatting
 #+begin_src emacs-lisp
 (use-package apheleia
   :hook (after-init . apheleia-global-mode)
@@ -4187,7 +4292,7 @@ If completion fails in the future, check these:
         (list (lambda () (derived-mode-p 'org-mode)))))
 #+end_src
 
-** DONE Symbols Outline
+** Symbols Outline
 #+begin_src emacs-lisp
 (use-package symbols-outline
   :defer t
@@ -4200,11 +4305,10 @@ If completion fails in the future, check these:
   (symbols-outline-follow-mode))
 #+end_src
 
-** TODO Dape - Add transient menu
+** Dape - Add transient menu
 #+begin_src emacs-lisp
 (use-package dape
   :defer t
-  :bind ("<f5>" . ar/toggles-dape)
   :hook
   (kill-emacs . dape-breakpoint-save)
   (after-init . dape-breakpoint-load)
@@ -4262,42 +4366,29 @@ If completion fails in the future, check these:
                      ("D" "disconnect" dape-disconnect-quit)
                      ("k" "kill" dape-kill)
                      ("Q" "quit" dape-quit)
-                     ("<f5>" "" transient-quit-one :format " ")]]))
+                     ("<escape>" "" transient-quit-one :format " ")]]))
   )
 #+end_src
 
-** TODO Eldoc-box
+** Eldoc-box
 #+begin_src emacs-lisp
 (use-package eldoc-box
   :defer t
   :commands (eldoc-box-help-at-point eldoc-box-eglot-help-at-point)
   :init
-  ;; Bind K in normal/visual mode for on-demand documentation
   (with-eval-after-load 'evil
     (evil-define-key '(normal visual) 'global (kbd "K") #'eldoc-box-help-at-point))
 
   :custom
-  ;; Dimensions optimized for JetBrains Mono at height 125
   (eldoc-box-max-pixel-width 800)
   (eldoc-box-max-pixel-height 600)
-
-  ;; Display multi-line in childframe, single-line in minibuffer
   (eldoc-box-only-multi-line t)
-
-  ;; Quick cleanup for responsive feel
   (eldoc-box-cleanup-interval 0.5)
-
-  ;; Match posframe fringe behavior
   (eldoc-box-fringe-use-same-bg t)
-
-  ;; Clean mode-line
   (eldoc-box-lighter nil)
-
-  ;; Offset from point (left, right, top) - nice positioning
   (eldoc-box-offset '(16 16 16))
 
   :config
-  ;; === Theme Integration ===
   ;; Match doom-tokyo-night and posframe border styling
   (defface eldoc-box-border
     `((t (:background ,(face-attribute 'region :background nil t)
@@ -4312,14 +4403,12 @@ If completion fails in the future, check these:
     "Eldoc-box body face with JetBrains Mono font."
     :group 'eldoc-box)
 
-  ;; === Buffer Enhancements ===
   ;; Better text wrapping and font rendering
   (add-hook 'eldoc-box-buffer-hook
             (lambda ()
               (visual-line-mode 1)
               (face-remap-add-relative 'default :family "JetBrains Mono" :height 125)))
 
-  ;; === Frame Styling ===
   ;; Match posframe aesthetics
   (add-hook 'eldoc-box-frame-hook
             (lambda (frame)
@@ -4328,7 +4417,6 @@ If completion fails in the future, check these:
                                    (face-attribute 'posframe-border :background nil t)
                                    frame)))
 
-  ;; === Eglot Integration ===
   ;; Configure eldoc strategy for LSP documentation
   (with-eval-after-load 'eglot
     (defun ar/eldoc-box-eglot-setup ()
@@ -4336,14 +4424,14 @@ If completion fails in the future, check these:
       (setq-local eldoc-documentation-strategy #'eldoc-documentation-compose))
     (add-hook 'eglot-managed-mode-hook #'ar/eldoc-box-eglot-setup))
 
-  ;; === System Compatibility Check ===
   (when (not (childframe-workable-p))
     (message "Warning: eldoc-box childframes may not work on this system")))
 #+end_src
 
-** TODO Eldoc Mouse
+** Eldoc Mouse
 #+begin_src emacs-lisp
 (use-package eldoc-mouse
+  :defer t
   :hook (eldoc-mode . eldoc-mouse-mode)
   :init
   (setq eldoc-mouse-posframe-border-color (face-background 'posframe-border nil t))
@@ -4351,13 +4439,47 @@ If completion fails in the future, check these:
   (tooltip-mode -1)
   (add-to-list 'eldoc-mouse-posframe-override-parameters
                `(background-color . ,(face-background 'tooltip nil t))))
-
 #+end_src
 
-
-
 ** TODO Breadcrumbs
+*Disable breadcrumbs in org buffers*
 #+begin_src emacs-lisp
+(use-package breadcrumb
+  :straight (:host github :repo "joaotavora/breadcrumb")
+  :custom
+  (breadcrumb-project-crumb-separator " > ")
+  (breadcrumb-imenu-crumb-separator " > ")
+
+  ;; Max length settings (values are in characters, not percentages)
+  (breadcrumb-project-max-length 0.5)  ;; Proportion of available space
+  (breadcrumb-imenu-max-length 0.5)
+
+  ;; Idle time before updating breadcrumbs (in seconds)
+  (breadcrumb-idle-time 0.5)
+
+  :config
+  ;; Function to determine if breadcrumb should be enabled
+  (defun my/breadcrumb-mode-p ()
+    "Return nil if breadcrumb should be disabled in current buffer."
+    (or (derived-mode-p 'org-mode)
+        (derived-mode-p 'text-mode)))
+
+  ;; Hook to disable breadcrumb in specific modes
+  (defun my/breadcrumb-setup ()
+    "Conditionally enable breadcrumb-local-mode."
+    (unless (my/breadcrumb-mode-p)
+      (breadcrumb-local-mode 1)))
+
+  :hook
+  ;; Enable breadcrumb-local-mode in appropriate modes
+  ;; breadcrumb-local-mode automatically uses headerline (not modeline or echo area)
+  ((prog-mode
+    conf-mode
+    yaml-mode
+    json-mode) . my/breadcrumb-setup)
+
+  ;; Explicitly disable for org and text modes
+  ((org-mode text-mode markdown-mode) . (lambda () (breadcrumb-local-mode -1))))
 #+end_src
 
 ** TODO Transient Menu
@@ -4496,12 +4618,13 @@ If completion fails in the future, check these:
 
   :custom
   (hl-todo-require-punctuation t)
-  (hl-todo-highlight-punctuation ":")
+  (hl-todo-highlight-punctuation "")
 
   :config
   ;; Define keywords with Tokyo Night colors
   (setq hl-todo-keyword-faces
         '(("TODO"       . "#e0af68")  ; Yellow
+          ("COMMENT"    . "#e0af68")  ; Yellow
           ("FIXME"      . "#f7768e")  ; Red
           ("BUG"        . "#f7768e")  ; Red
           ("ISSUE"      . "#f7768e")  ; Red
@@ -4858,7 +4981,7 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
   :init (setq-default adaptive-wrap-extra-indent 0))
 #+end_src
 
-* Utils
+* TODO Utils
 ** Which Key
 #+begin_src emacs-lisp
 (use-package which-key
@@ -4992,6 +5115,21 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
     "d a" '(dirvish-quick-access :wk "Quick access")
     "d j" '(dirvish-fd-jump :wk "Jump fd"))
 
+  ;; Debug operations (SPC x) - "execute/run"
+  (ar/global-leader
+    "x" '(:ignore t :wk "execute/debug")
+    "x x" '(ar/toggles-dape :wk "Debug menu")
+    "x d" '(dape :wk "Start debugging")
+    "x b" '(dape-breakpoint-toggle :wk "Toggle breakpoint")
+    "x n" '(dape-next :wk "Next")
+    "x s" '(dape-step-in :wk "Step in")
+    "x o" '(dape-step-out :wk "Step out")
+    "x c" '(dape-continue :wk "Continue")
+    "x q" '(dape-quit :wk "Quit debugger")
+    "x k" '(dape-kill :wk "Kill debugger")
+    "x r" '(dape-restart :wk "Restart")
+    "x w" '(dape-watch-dwim :wk "Watch"))
+
   ;; File operations (SPC f)
   (ar/global-leader
     "f" '(:ignore t :wk "file")
@@ -5007,6 +5145,22 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
     "f e i" '((lambda () (interactive) (find-file user-init-file)) :wk "Open init.el")
     "f d" '(consult-dir :wk "Change directory")
     "f j" '(consult-dir-jump-file :wk "Jump to file in dir"))
+
+  ;; Diff/Ediff operations (SPC v) - "view/compare"
+  (ar/global-leader
+    "v" '(:ignore t :wk "view/diff")
+    "v v" '(ar/ediff-transient :wk "Ediff menu")
+    "v d" '(ediff :wk "Ediff")
+    "v f" '(ediff-files :wk "Ediff files")
+    "v b" '(ediff-buffers :wk "Ediff buffers")
+    "v c" '(ediff-current-file :wk "Ediff current file")
+    "v r" '(ediff-revision :wk "Ediff revision")
+    "v 3" '(ediff3 :wk "Ediff3")
+    "v m" '(ediff-merge :wk "Merge")
+    "v M" '(ediff-merge-with-ancestor :wk "Merge with ancestor")
+    "v p" '(ediff-patch-file :wk "Patch file")
+    "v P" '(ediff-patch-buffer :wk "Patch buffer"))
+
 
   ;; Search operations (SPC s)
   (ar/global-leader
@@ -5077,13 +5231,12 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
     "t w" '(whitespace-mode :wk "Whitespace")
     "t f" '(toggle-frame-fullscreen :wk "Fullscreen")
     "t m" '(markdown-toggle-markup-hiding :wk "Markdown markup")
-    "t t" '(consult-theme :wk "Theme")
     "t v" '(visual-line-mode :wk "Visual line mode")
     "t r" '(rainbow-mode :wk "Rainbow mode")
     "t h" '(global-hl-line-mode :wk "Highlight line")
     "t s" '(global-prettify-symbols-mode :wk "Prettify symbols")
     "t p" '(show-paren-mode :wk "Show paren")
-    "t T" '(toggles-hydra/body :wk "Toggles hydra"))
+    "t t" '(ar/toggles-transient :wk "Toggles menu"))
 
 
   ;; Open operations (SPC o)
