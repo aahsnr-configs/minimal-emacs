@@ -4316,12 +4316,6 @@ If completion fails in the future, check these:
   :custom
   (dape-breakpoint-global-mode +1)
   (dape-buffer-window-arrangement 'right)
-  ;; Info buffers like gud (gdb-mi)
-  ;; (dape-buffer-window-arrangement 'gud)
-  ;; (dape-info-hide-mode-line nil)
-
-  ;; Projectile users
-  ;; (dape-cwd-function #'projectile-project-root)
 
   :config
   (add-hook 'dape-display-source-hook #'pulse-momentary-highlight-one-line)
@@ -4949,6 +4943,56 @@ operators and other column-based navigation."
   (setq dtrt-indent-mode-exclude-list '(org-mode)))
 #+end_src
 
+* DONE Snippet Engine
+#+begin_src emacs-lisp
+(defvar my/snippets-directory (expand-file-name "snippets" user-emacs-directory)
+  "Directory for personal yasnippet snippets.")
+
+;; Create the custom snippets directory if it doesn't exist.
+(unless (file-directory-p my/snippets-directory)
+  (make-directory my/snippets-directory t))
+
+;; The engine itself
+(use-package yasnippet
+  :defer t
+  :hook ((prog-mode text-mode LaTeX-mode org-mode) . yas-minor-mode)
+  :custom
+  (yas-prompt-functions '(yas-completing-prompt))
+  :config
+  ;; Add personal snippets to the list
+  (add-to-list 'yas-snippet-dirs my/snippets-directory)
+
+  ;; --- Robust, Save-Based Automatic Snippet Reloading ---
+  (defun ar/yas-reload-snippets-on-save ()
+    "Reload all snippets if a snippet file is being saved."
+    (when (string-prefix-p my/snippets-directory (buffer-file-name))
+      (yas-reload-all)
+      (message "Yasnippet collection reloaded.")))
+
+  (add-hook 'after-save-hook #'ar/yas-reload-snippets-on-save))
+
+;; The official snippet collection
+(use-package yasnippet-snippets
+  :defer t
+  :after yasnippet
+  :config
+  (yas-reload-all))
+
+;; Search snippets with Consult
+(use-package consult-yasnippet
+  :defer t
+  :after (consult yasnippet)
+  :config
+  (consult-customize consult-yasnippet :preview-key 'any))
+
+;; Add snippets to completion-at-point (Corfu)
+(use-package yasnippet-capf
+  :defer t
+  :after cape
+  :init
+  (add-hook 'completion-at-point-functions #'yasnippet-capf 70))
+#+end_src
+
 * LaTeX Writing Environment
 ** Project Awareness
 #+begin_src emacs-lisp
@@ -5063,6 +5107,240 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
 (dolist (hook '(prog-mode-hook text-mode-hook conf-mode-hook))
   (add-hook hook #'ar/vi-tilde-mode))
 #+end_src
+
+* TODO Window
+** Winner
+#+begin_src emacs-lisp
+(use-package winner
+  :straight (:type built-in)
+  :commands (winner-undo winner-redo)
+  :hook (after-init . winner-mode)
+  :init (setq winner-boring-buffers '("*Completions*"
+                                      "*Compile-Log*"
+                                      "*inferior-lisp*"
+                                      "*Fuzzy Completions*"
+                                      "*Apropos*"
+                                      "*Help*"
+                                      "*cvs*"
+                                      "*Buffer List*"
+                                      "*Ibuffer*"
+                                      "*esh command on file*")))
+#+end_src
+
+** Popper
+#+begin_src emacs-lisp
+(use-package popper
+  :custom
+  (popper-group-function #'popper-group-by-directory)
+  (popper-echo-dispatch-actions t)
+  :hook (after-init . popper-echo-mode)
+  :init
+  (setq popper-mode-line ""
+        popper-reference-buffers
+        '("\\*Messages\\*$"
+          "\\*Warnings\\*$"
+          "Output\\*$"
+          "\\*Pp Eval Output\\*$"
+          "\\*Pp Macroexpand Output\\*$"
+          "^\\*eldoc.*\\*$"
+          "\\*Compile-Log\\*$"
+          "\\*compilation\\*$"
+          "\\*Completions\\*$"
+          "\\*Async Shell Command\\*$"
+          "\\*Shell Command Output\\*$"
+          "\\*Apropos\\*$"
+          "\\*Backtrace\\*$"
+          "\\*Calendar\\*$"
+          "\\*Calculator\\*$"
+          "\\*Calc Trail\\*$"
+          "\\*Fd\\*$"
+          "\\*Find\\*$"
+          "\\*Finder\\*$"
+          "\\*Kill Ring\\*$"
+          "\\*Occur\\*$"
+          "\\*xref\\*$"
+          "\\*Embark \\(Collect\\|Live\\|Export\\):.*\\*$"
+          "\\*Embark Actions\\*$"
+          "\\*Org Select\\*$"
+          "\\*Org Agenda.*\\*$"
+          "\\*Agenda Commands\\*$"
+          "\\*Capture\\*$"
+          "^CAPTURE-.*\\.org*"
+          "\\*Local variables\\*$"
+          "\\*Org-Babel Error Output\\*$"
+          "\\*Org Export Dispatcher\\*$"
+          "\\*Org Note\\*$"
+
+          ;; Helpful, Help, Info
+          bookmark-bmenu-mode
+          comint-mode
+          compilation-mode
+          help-mode
+          helpful-mode
+          tabulated-list-mode
+          Buffer-menu-mode
+          Info-mode
+          Custom-mode
+          special-mode
+          org-agenda-mode
+
+          ;; Flycheck/Flymake
+          flymake-diagnostics-buffer-mode
+          flymake-project-diagnostics-mode
+          flycheck-error-list-mode
+          flycheck-verify-mode
+
+          ;; Dictionary and translation
+          gnus-article-mode
+          devdocs-mode
+          dictionary-mode
+          youdao-dictionary-mode
+          osx-dictionary-mode
+          fanyi-mode
+          "^\\*gt-result\\*$"
+          "^\\*gt-log\\*$"
+          "^\\*DeepL\\*$"
+          "^\\*Google Translate\\*$"
+
+          ;; Search results
+          grep-mode
+          occur-mode
+          rg-mode
+          deadgrep-mode
+          ag-mode
+          pt-mode
+          ivy-occur-grep-mode
+          ivy-occur-mode
+
+          ;; Process and environment
+          "^\\*Process List\\*$"
+          process-menu-mode
+          list-environment-mode
+          cargo-process-mode
+
+          ;; Terminals
+          "^\\*.*eat.*\\*.*$"
+          "^\\*.*eshell.*\\*.*$"
+          "^\\*.*shell.*\\*.*$"
+          "^\\*.*terminal.*\\*.*$"
+          "^\\*.*vterm[inal]*.*\\*.*$"
+          "^\\*.*ansi-term.*\\*.*$"
+
+          ;; Development tools
+          "\\*DAP Templates\\*$"
+          dap-server-log-mode
+          "^\\*dap-ui.*\\*$"
+          "\\*ELP Profiling Results\\*$"
+          profiler-report-mode
+          "\\*package update results\\*$"
+          "\\*Package-Lint\\*$"
+          "\\*Packages\\*$"
+          "\\*Native-compile-Log\\*$"
+          "\\*Paradox Report\\*$"
+          "^\\*straight-.*\\*$"
+          "^\\*elpaca-.*\\*$"
+
+          ;; Documentation
+          "\\*[Wo]*Man.*\\*$"
+          woman-mode
+          Man-mode
+
+          ;; Testing
+          "\\*ert\\*$"
+          overseer-buffer-mode
+          "^\\*Buttercup\\*$"
+          "\\*cider-test-report\\*$"
+
+          ;; Debugging
+          "\\*gud-debug\\*$"
+          "\\*LLDB.*\\*$"
+          "\\*breakpoints of.*\\*$"
+          "\\*gdb-.*\\*$"
+
+          ;; LSP
+          "\\*lsp-help\\*$"
+          "\\*lsp session\\*$"
+          "\\*lsp-log\\*$"
+          "\\*lsp-ui-doc\\*$"
+          "\\*lsp-ui-imenu\\*$"
+          "\\*LSP Error\\*$"
+          "\\*eglot.*\\*$"
+
+          ;; Misc development
+          "\\*quickrun\\*$"
+          "\\*tldr\\*$"
+          "\\*vc-.*\\*$"
+          "\\*vc-diff\\*$"
+          "\\*vc-change-log\\*$"
+          "\\*diff-hl\\*$"
+          "^\\*macro expansion\\*$"
+          "^\\*Macrostep\\*$"
+          "\\*ediff-.*\\*$"
+          "\\*grep\\*$"
+          "\\*nosetests\\*$"
+          "\\*pytest\\*$"
+
+          ;; Language-specific
+          "\\*Gofmt Errors\\*$"
+          "\\*Go Test\\*$"
+          godoc-mode
+          "\\*rustfmt\\*$"
+          "\\*cargo-.*\\*$"
+          rustic-compilation-mode
+          rustic-cargo-clippy-mode
+          rustic-cargo-outdated-mode
+          rustic-cargo-run-mode
+          rustic-cargo-test-mode
+          "\\*Python\\*$"
+          "\\*inferior-python.*\\*$"
+          inferior-python-mode
+          inf-ruby-mode
+          swift-repl-mode
+          "\\*prolog\\*$"
+          "\\*sly-.*\\*$"
+          "\\*slime-.*\\*$"
+
+          ;; Docker
+          "\\*docker-.+\\*"
+          "\\*docker-compose.*\\*$"
+          "\\*dockerfile.*\\*$"
+
+          ;; Miscellaneous
+          "\\*Semantic SymRef\\*$"
+          "\\*Messages\\*$"
+          "\\*Warnings\\*$"
+          "\\*Error\\*$"
+          "\\*Flycheck.*\\*$"
+          "\\*Format All Errors\\*$"
+          "\\*Pp Eval Output\\*$"
+          ;; ADDED: Transient buffer
+          "^\\*transient.*"))
+  :config
+  (with-no-warnings
+    (defun my-popper-fit-window-height (win)
+      "Adjust the height of popup window WIN to fit the buffer's content."
+      (let ((desired-height (floor (/ (frame-height) 3))))
+        (fit-window-to-buffer win desired-height desired-height)))
+    (setq popper-window-height #'my-popper-fit-window-height)
+
+    (defun popper-close-window-hack (&rest _args)
+      "Close popper window via `C-g'."
+      (when (and (not (region-active-p))
+                 popper-open-popup-alist)
+        (let ((window (caar popper-open-popup-alist))
+              (buffer (cdar popper-open-popup-alist)))
+          (when (and (window-live-p window)
+                     (buffer-live-p buffer)
+                     (not (with-current-buffer buffer
+                            (derived-mode-p 'eshell-mode
+                                            'shell-mode
+                                            'term-mode
+                                            'vterm-mode
+                                            'eat-mode))))
+            (delete-window window)))))
+    (advice-add #'keyboard-quit :before #'popper-close-window-hack)))
+#+end_src
+
 
 * General Keybindings
 #+begin_src emacs-lisp
