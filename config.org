@@ -326,17 +326,17 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 
 ** DONE Environment
 #+begin_src emacs-lisp
-(use-package exec-path-from-shell
-  :defer t
-  :custom
-  (exec-path-from-shell-variables
-   '("PATH" "MANPATH"
-     "OPENAI_API_KEY" "ANTHROPIC_API_KEY"
-     "XAI_API_KEY" "DEEPSEEK_API_KEY"
-     "OPENROUTER_API_KEY" "GEMINI_API_KEY"))
-  :config
-  (when (daemonp)
-    (exec-path-from-shell-initialize)))
+;; (use-package exec-path-from-shell
+;;   :defer t
+;;   :custom
+;;   (exec-path-from-shell-variables
+;;    '("PATH" "MANPATH"
+;;      "OPENAI_API_KEY" "ANTHROPIC_API_KEY"
+;;      "XAI_API_KEY" "DEEPSEEK_API_KEY"
+;;      "OPENROUTER_API_KEY" "GEMINI_API_KEY"))
+;;   :config
+;;   (when (daemonp)
+;;     (exec-path-from-shell-initialize)))
 #+end_src
 
 ** DONE Session Management
@@ -4450,7 +4450,7 @@ If completion fails in the future, check these:
                `(background-color . ,(face-background 'tooltip nil t))))
 #+end_src
 
-** TODO Breadcrumbs
+** DONE Breadcrumbs
 *Disable breadcrumbs in org buffers*
 #+begin_src emacs-lisp
 (use-package breadcrumb
@@ -4480,10 +4480,8 @@ If completion fails in the future, check these:
       (breadcrumb-local-mode 1)))
 
   :hook
-  ;; Enable breadcrumb-local-mode in appropriate modes
-  ;; breadcrumb-local-mode automatically uses headerline (not modeline or echo area)
   ((prog-mode
-    conf-mode
+    conf-mode-hook
     yaml-mode
     json-mode) . my/breadcrumb-setup)
 
@@ -5001,7 +4999,7 @@ operators and other column-based navigation."
   (add-hook 'completion-at-point-functions #'yasnippet-capf 70))
 #+end_src
 
-* TODO LaTeX Writing Environment
+* DONE LaTeX Writing Environment
 ** Utility Autoload Functions
 #+begin_src emacs-lisp
 ;;;###autoload
@@ -5326,6 +5324,174 @@ operators and other column-based navigation."
   :defer t
   :after (tex evil)
   :hook (LaTeX-mode . evil-tex-mode))
+#+end_src
+
+** Bibliography Management
+#+begin_src emacs-lisp
+(use-package citar
+  :defer t
+  :custom
+  (citar-bibliography '("~/references.bib"))
+  (citar-library-paths '("~/Zotero/storage"))
+  (citar-notes-paths (list my/org-roam-directory))
+  (citar-symbols
+   `((file ,(nerd-icons-mdicon "nf-md-file_document") . " ")
+     (note ,(nerd-icons-mdicon "nf-md-note_text") . " ")
+     (link ,(nerd-icons-mdicon "nf-md-link") . " ")))
+  :config
+  (setq org-cite-insert-processor 'citar
+        org-cite-follow-processor 'citar
+        org-cite-activate-processor 'citar)
+
+  (defun ar/citar-set-local-bibliography ()
+    "Set buffer-local bibliography from project."
+    (when-let ((bibs (ar/get-project-bibliographies)))
+      (setq-local citar-bibliography bibs)
+      (setq-local org-cite-global-bibliography bibs)))
+
+  (add-hook 'LaTeX-mode-hook #'ar/citar-set-local-bibliography)
+  (add-hook 'org-mode-hook #'ar/citar-set-local-bibliography))
+
+(use-package citar-embark
+  :after (citar embark)
+  :config
+  (citar-embark-mode)
+  (with-eval-after-load 'embark
+    (add-to-list 'embark-keymap-alist '(citar-reference . citar-embark-map))))
+
+(use-package citar-org-roam
+  :after (citar org-roam)
+  :config
+  (citar-org-roam-mode 1)
+  (setq citar-org-roam-subdir "literature"))
+
+(use-package reftex
+  :straight (:type built-in)
+  :after tex
+  :hook (LaTeX-mode . reftex-mode)
+  :custom
+  (reftex-plug-into-AUCTeX t)
+  (reftex-default-bibliography nil)
+  (reftex-toc-split-windows-horizontally t)
+  (reftex-toc-split-windows-fraction 0.2))
+#+end_src
+
+** Fast LaTeX Input
+#+begin_src emacs-lisp
+(use-package cdlatex
+  :defer t
+  :hook ((LaTeX-mode . cdlatex-mode)
+         (org-mode . org-cdlatex-mode))
+  :custom
+  (cdlatex-math-modify-alist
+   '((?B "\\mathbb" nil t nil nil)
+     (?C "\\mathcal" nil t nil nil)
+     (?F "\\mathfrak" nil t nil nil)
+     (?S "\\mathscr" nil t nil nil)))
+
+  (cdlatex-env-alist
+   '(("equation*" "\\begin{equation*}\n?\n\\end{equation*}" nil)
+     ("align*" "\\begin{align*}\n?\n\\end{align*}" nil)))
+
+  (cdlatex-math-symbol-prefix ?@)
+  (cdlatex-use-dollar-to-ensure-math nil)
+
+  :config
+  ;; Disable overlapping keys
+  (define-key cdlatex-mode-map "$" nil)
+  (define-key cdlatex-mode-map "(" nil)
+  (define-key cdlatex-mode-map "{" nil)
+  (define-key cdlatex-mode-map "[" nil)
+  (define-key cdlatex-mode-map "^" nil)
+  (define-key cdlatex-mode-map "_" nil)
+  (define-key cdlatex-mode-map (kbd "TAB") nil)
+  (define-key cdlatex-mode-map [(control return)] nil))
+#+end_src
+
+** Preview LaTeX
+#+begin_src emacs-lisp
+(use-package preview
+  :straight (:type built-in)
+  :after tex
+  :hook (LaTeX-mode . LaTeX-preview-setup)
+  :custom
+  (preview-auto-cache-preamble t)
+  (preview-fast-conversion t)
+  :config
+  (setq-default preview-scale 1.4
+                preview-scale-function
+                (lambda ()
+                  (* (/ 10.0 (face-attribute 'default :height))
+                     (face-attribute 'default :height)))))
+#+end_src
+
+** Org Mode Integration
+#+begin_src emacs-lisp
+(with-eval-after-load 'org
+  (add-to-list 'org-preview-latex-process-alist
+               '(luamagick
+                 :programs ("lualatex" "magick")
+                 :description "pdf > png"
+                 :message "you need to install: lualatex and imagemagick."
+                 :use-xcolor t
+                 :image-input-type "pdf"
+                 :image-output-type "png"
+                 :image-size-adjust (1.0 . 1.0)
+                 :latex-compiler ("lualatex -interaction nonstopmode -output-directory %o %f")
+                 :image-converter ("magick convert -density 600 -antialias %f -trim -resize 20%% -sharpen 0x1.0 -quality 100 %O")))
+
+  (setq org-preview-latex-default-process 'luamagick)
+
+  (setq org-format-latex-options
+        (plist-put org-format-latex-options :scale 1.0))
+  (setq org-format-latex-options
+        (plist-put org-format-latex-options :foreground 'default))
+  (setq org-format-latex-options
+        (plist-put org-format-latex-options :background 'default))
+
+  (setq org-preview-latex-image-directory "ltximg/")
+
+  (setq org-latex-packages-alist
+        '(("" "fontspec" t ("lualatex" "xelatex"))
+          ("" "amsmath" t)
+          ("" "mathtools" t)
+          ("" "unicode-math" t ("lualatex" "xelatex")))))
+
+(use-package org-fragtog
+  :hook (org-mode . org-fragtog-mode)
+  :config
+  (setq org-fragtog-preview-delay 0.2))
+#+end_src
+
+** Completions: LSP + AUCTeX + Company Integration
+#+begin_src emacs-lisp
+(use-package company-math :defer t)
+(use-package company-auctex :defer t)
+
+(defun ar/latex-setup-completion ()
+  "Configure LaTeX completion: Eglot + AUCTeX + company-math via Cape.
+
+VERIFIED: cape-company-to-capf only converts backend functions.
+It does NOT activate company-mode - completely safe with Corfu."
+  (require 'cape)
+
+  ;; Convert company backends to CAPFs (does NOT enable company-mode)
+  (setq-local completion-at-point-functions
+              (list
+               ;; PRIMARY: Merge LSP + AUCTeX + Math
+               (cape-capf-super
+                #'eglot-completion-at-point
+                #'LaTeX-completion-at-point
+                #'TeX--completion-at-point
+                (cape-company-to-capf #'company-math-symbols-latex)
+                (cape-company-to-capf #'company-auctex-macros))
+
+               ;; SECONDARY: Additional backends
+               (cape-company-to-capf #'company-auctex-environments)
+               #'cape-dabbrev
+               #'cape-file)))
+
+(add-hook 'LaTeX-mode-hook #'ar/latex-setup-completion)
 #+end_src
 
 * DONE Utils
