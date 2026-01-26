@@ -4157,7 +4157,8 @@ If completion fails in the future, check these:
   :hook (after-init . envrc-global-mode))
 #+end_src
 
-** TODO LSP - handle the org-src-context.el file
+** DONE LSP - handle the org-src-context.el file
+- State "DONE"       from "TODO"       [2026-01-26 Mon 23:23]
 #+begin_src emacs-lisp
 ;; TODO Modify some settings according to https://andreyor.st/posts/2023-09-09-migrating-from-lsp-mode-to-eglot/
 (use-package eglot
