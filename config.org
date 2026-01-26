@@ -77,6 +77,11 @@ Lower this if you experience freezing, raise if stuttering.")
 (setq straight-use-package-by-default t)
 #+end_src
 
+** Esup
+#+begin_src emacs-lisp
+(use-package esup :demand t)
+#+end_src
+
 ** DONE Custom Functions
 #+begin_src emacs-lisp
 (defun childframe-workable-p ()
@@ -318,9 +323,11 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 (setq locale-coding-system 'utf-8)
 #+end_src
 
+
 ** DONE Environment
 #+begin_src emacs-lisp
 (use-package exec-path-from-shell
+  :defer t
   :custom
   (exec-path-from-shell-variables
    '("PATH" "MANPATH"

@@ -35,16 +35,12 @@
   ;; ====================
   ;; NATIVE COMPILATION
   ;; ====================
-  (setq native-comp-async-query-on-exit t
-        native-comp-speed 2)
-  ;; Ensure Emacs loads the most recent byte-compiled files.
-  (setq load-prefer-newer t)
 
   ;; Make Emacs Native-compile .elc files asynchronously by setting
   ;; `native-comp-jit-compilation' to t.
-  (setq native-comp-jit-compilation t)
-  (setq native-comp-deferred-compilation native-comp-jit-compilation)  ; Deprecated
-
+  ; (setq native-comp-jit-compilation t)
+  ; (setq native-comp-deferred-compilation native-comp-jit-compilation)  ; Deprecated
+  ;
 
 
   (setq byte-compile-warnings '(not free-vars unresolved noruntime lexical make-local))
