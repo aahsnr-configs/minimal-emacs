@@ -5001,7 +5001,7 @@ operators and other column-based navigation."
   (add-hook 'completion-at-point-functions #'yasnippet-capf 70))
 #+end_src
 
-* LaTeX Writing Environment
+* TODO LaTeX Writing Environment
 ** Utility Autoload Functions
 #+begin_src emacs-lisp
 ;;;###autoload
@@ -5172,7 +5172,6 @@ operators and other column-based navigation."
         LaTeX-item-indent 0
         TeX-brace-indent-level 2)
 
-
   ;; TeX Command list
   (add-to-list 'TeX-command-list
                '("LuaLaTeXmk"
@@ -5188,7 +5187,7 @@ operators and other column-based navigation."
 
   (setq-default TeX-command-default "LuaLaTeXmk")
 
-  ;; Eglot
+  ;; Eglot Integration
   (with-eval-after-load 'eglot
     (add-to-list 'eglot-server-programs
                  '(LaTeX-mode . ("texlab")))
@@ -5240,6 +5239,93 @@ operators and other column-based navigation."
               (when (fboundp 'texmathp)
                 (setq-local fill-nobreak-predicate
                             (cons #'texmathp fill-nobreak-predicate))))))
+#+end_src
+
+** Flymake Integration
+#+begin_src emacs-lisp
+(with-eval-after-load 'tex
+  (with-eval-after-load 'flymake
+    (when (boundp 'LaTeX-flymake-chktex-options)
+      (setq LaTeX-flymake-chktex-options
+            '("-n2"   ; Disable "non-breaking space (~) should be used"
+              "-n8"   ; Disable "wrong length of dash"
+              "-n13"  ; Disable "Intersentence spacing"
+              "-n21"  ; Disable "This command might not be intended"
+              ))))
+
+  ;; Delayed flymake activation to prevent sentinel errors
+  (add-hook 'LaTeX-mode-hook
+            (lambda ()
+              (run-with-idle-timer 0.5 nil
+                                   (lambda ()
+                                     (when (and (derived-mode-p 'LaTeX-mode)
+                                                (not (bound-and-true-p flymake-mode)))
+                                       (flymake-mode 1)))))))
+#+end_src
+
+** TeX Folding
+#+begin_src emacs-lisp
+(use-package tex-fold
+  :straight (:type built-in)
+  :after tex
+  :commands (TeX-fold-mode TeX-fold-buffer)
+  :config
+  (setq TeX-fold-auto-reveal t)
+
+  (defun ar/latex-fold-buffer-delayed ()
+    "Fold buffer after idle delay."
+    (run-with-idle-timer 0 nil 'TeX-fold-buffer))
+
+  (add-hook 'LaTeX-mode-hook #'ar/latex-fold-buffer-delayed)
+
+  ;; Fold after AUCTeX macro insertions
+  (add-hook 'TeX-fold-mode-hook
+            (lambda ()
+              (advice-add 'TeX-insert-macro :after #'ar/latex-fold-last-macro)))
+
+  ;; Fold after CDLaTeX macros
+  (with-eval-after-load 'cdlatex
+    (add-hook 'TeX-fold-mode-hook
+              (lambda ()
+                (advice-add 'cdlatex-math-symbol :after #'ar/latex-fold-last-macro)
+                (advice-add 'cdlatex-math-modify :after #'ar/latex-fold-last-macro))))
+
+  ;; Fold after snippet expansion
+  (with-eval-after-load 'yasnippet
+    (defun ar/latex-fold-snippet-contents ()
+      "Fold contents of last expanded snippet."
+      (when (and (derived-mode-p 'LaTeX-mode)
+                 (bound-and-true-p TeX-fold-mode)
+                 yas-snippet-beg
+                 yas-snippet-end)
+        (TeX-fold-region yas-snippet-beg yas-snippet-end)))
+
+    (add-hook 'yas-after-exit-snippet-hook #'ar/latex-fold-snippet-contents)))
+#+end_src
+
+** Electric Pair Disabling
+#+begin_src emacs-lisp
+(add-hook 'LaTeX-mode-hook
+          (lambda ()
+            (setq-local electric-pair-inhibit-predicate
+                        (lambda (c)
+                          (or
+                           ;; Inhibit $ (let CDLaTeX handle it)
+                           (char-equal c ?\$)
+                           ;; Inhibit ` (backticks in LaTeX)
+                           (char-equal c ?\`)
+                           ;; Inhibit ' (quotes handled by AUCTeX)
+                           (char-equal c ?\')
+                           ;; Call default predicate for other characters
+                           (funcall (default-value 'electric-pair-inhibit-predicate) c))))))
+#+end_src
+
+** Evil Integration
+#+begin_src emacs-lisp
+(use-package evil-tex
+  :defer t
+  :after (tex evil)
+  :hook (LaTeX-mode . evil-tex-mode))
 #+end_src
 
 * DONE Utils
