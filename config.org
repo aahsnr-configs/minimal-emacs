@@ -2559,17 +2559,16 @@ If file doesn't exist, creates it with TEMPLATE content."
 
 ** DONE Org GTD - Pure Task Management
 #+begin_src emacs-lisp
-(use-package org-edna
-  :defer t
-  :after org
-  :commands (org-edna-mode org-edna-load)
-  :hook (org-mode . org-edna-mode)
-  :custom
-  (org-edna-use-inheritance t))
+;; (use-package org-edna
+;;   :defer t
+;;   :commands (org-edna-mode org-edna-load)
+;;   :hook (org-mode . org-edna-mode)
+;;   :custom
+;;   (org-edna-use-inheritance t))
 
 (use-package org-gtd
   :defer t
-  :after (org org-edna)
+  :after org
   :commands (org-gtd-capture
              org-gtd-process-inbox
              org-gtd-engage
@@ -2601,6 +2600,7 @@ If file doesn't exist, creates it with TEMPLATE content."
   (org-gtd-mode nil)
 
   :config
+  (org-edna-mode 1)
   ;; Add GTD directory to agenda (but NOT roam/)
   (setq org-agenda-files
         (list my/org-directory
@@ -4313,16 +4313,11 @@ If completion fails in the future, check these:
 #+begin_src emacs-lisp
 (use-package dape
   :defer t
-  :init
-    ;; Load breakpoints manually when first starting dape
-  (with-eval-after-load 'dape
-    (dape-breakpoint-load))
-
-  ;; Save on exit - this doesn't load the package
-  (add-hook 'kill-emacs-hook
-            (lambda ()
-              (when (featurep 'dape)
-                (dape-breakpoint-save))))
+  :hook
+  ;; Save breakpoints on quit
+  (kill-emacs . dape-breakpoint-save)
+  ;; Load breakpoints on startup
+  (after-init . dape-breakpoint-load)
 
   :custom
   (dape-breakpoint-global-mode +1)
@@ -4332,7 +4327,8 @@ If completion fails in the future, check these:
 
   (add-hook 'dape-display-source-hook #'pulse-momentary-highlight-one-line)
   (add-hook 'dape-start-hook (lambda () (save-some-buffers t t)))
-  (add-hook 'dape-compile-hook #'kill-buffer)
+  (add-hook 'dape-repl-mode-hook #'hide-mode-line-mode)
+  ;;(add-hook 'dape-compile-hook #'kill-buffer)
 
   (with-eval-after-load 'transient
     (defun ar/dape-title ()
