@@ -4339,7 +4339,7 @@ If completion fails in the future, check these:
   (add-hook 'dape-display-source-hook #'pulse-momentary-highlight-one-line)
   (add-hook 'dape-start-hook (lambda () (save-some-buffers t t)))
   (add-hook 'dape-repl-mode-hook #'hide-mode-line-mode)
-  ;;(add-hook 'dape-compile-hook #'kill-buffer)
+  (add-hook 'dape-compile-hook #'kill-buffer)
 
   (with-eval-after-load 'transient
     (defun ar/dape-title ()
@@ -4454,7 +4454,7 @@ If completion fails in the future, check these:
                `(background-color . ,(face-background 'tooltip nil t))))
 #+end_src
 
-** DONE Breadcrumbs
+** Breadcrumbs
 *Disable breadcrumbs in org buffers*
 #+begin_src emacs-lisp
 (use-package breadcrumb
@@ -4495,34 +4495,66 @@ If completion fails in the future, check these:
 
 ** TODO Transient Menu
 #+begin_src emacs-lisp
-;; (pretty-hydra-define dev-hydra
-;;   (:title (pretty-hydra-title "Development" 'codicon "nf-cod-code" :face 'nerd-icons-blue)
-;;    :color amaranth :quit-key ("q" "C-g"))
-;;   ("LSP (Eglot)"
-;;    (("a" eglot-code-actions "actions")
-;;     ("r" eglot-rename "rename")
-;;     ("d" xref-find-definitions "definition")
-;;     ("D" xref-find-references "references")
-;;     ("s" consult-eglot-symbols "symbols")
-;;     ("h" eldoc "hover doc"))
+(with-eval-after-load 'transient
+  (defun ar/devtools-title ()
+    (concat
+     (if (fboundp 'nerd-icons-faicon)
+         (nerd-icons-faicon "nf-fa-laptop_code" :face 'transient-heading :v-adjust 0.02)
+       "")
+     (propertize " Development Tools" 'face 'transient-heading)))
 
-;;    "Syntax (Flymake)"
-;;    (("n" ar/flymake-next-error "next error")
-;;     ("p" ar/flymake-prev-error "prev error")
-;;     ("b" flymake-show-buffer-diagnostics "buffer list")
-;;     ("B" consult-flymake "project list")
-;;     ("!" flymake-running-backends "backends"))
+  (transient-define-prefix ar/toggles-devtools ()
+    "Development Tools Dashboard"
+    [:description ar/devtools-title
 
-;;    "Formatting"
-;;    (("f" apheleia-format-buffer "format buffer")
-;;     ("F" (lambda () (interactive) (let ((apheleia-formatter 'eglot)) (apheleia-format-buffer))) "format w/ LSP"))
+     ;; Group 1: LSP Code Actions
+     ["Actions"
+      ("a" "Code Actions" eglot-code-actions)
+      ("r" "Rename Symbol" eglot-rename)
+      ("f" "Format Buffer" apheleia-format-buffer)
+      ("i" "Org. Imports" eglot-code-action-organize-imports)
+      ("h" "Toggle Hints" eglot-inlay-hints-mode :transient t :if (lambda () (fboundp 'eglot-inlay-hints-mode)))
+      ("R" "Reconnect LSP" eglot-reconnect)]
 
-;;    "Toggles"
-;;    (("t l" eglot-managed-p "LSP mode" :toggle t)
-;;     ("t s" flymake-mode "syntax mode" :toggle t)
-;;     ("t f" apheleia-mode "auto-format" :toggle t)
-;;     ("t e" eldoc-mode "eldoc" :toggle t)
-;;     ("t p" flymake-popon-mode "popon tooltips" :toggle t))))
+     ;; Group 2: Navigation & Lookup
+     ["Navigation"
+      ("d" "Definition" xref-find-definitions)
+      ("D" "References" xref-find-references)
+      ("t" "Type Def" eglot-find-typeDefinition)
+      ("I" "Implementation" eglot-find-implementation)
+      ("A" "Apropos" xref-find-apropos)
+      ("." "Go Back" xref-go-back)]
+
+     ;; Group 3: Search & Outline
+     ["Search"
+      ("s" "LSP Symbols" consult-eglot-symbols)
+      ("o" "Outline" consult-outline)
+      ("m" "Imenu" consult-imenu)
+      ("M" "Imenu Multi" consult-imenu-multi)
+      ("l" "Search Line" consult-line)]
+
+     ;; Group 4: Error Management
+     ["Diagnostics"
+      ("n" "Next Error" ar/flymake-next-error :transient t)
+      ("p" "Prev Error" ar/flymake-prev-error :transient t)
+      ("e" "Buf Errors" flymake-show-buffer-diagnostics)
+      ("E" "Proj Errors" consult-flymake)
+      ("!" "Start Check" flymake-start :transient t)]
+
+     ;; Group 5: Code Folding
+     ["Folding"
+      ("TAB" "Toggle Node" treesit-fold-toggle :transient t)
+      ("O" "Open All" treesit-fold-open-all :transient t)
+      ("C" "Close All" treesit-fold-close-all :transient t)
+      ("v" "Vimish Toggle" vimish-fold-toggle :transient t)]
+
+     ;; Group 6: Documentation
+     ["Docs"
+      ("k" "Hover Box" eldoc-box-help-at-point :transient t)
+      ("K" "Echo Doc" eldoc)
+      ("?" "Info Manual" consult-info)
+      ("M" "Man Page" woman)
+      ("<escape>" "" transient-quit-one :format " ")]]))
 #+end_src
 
 * DONE Treesitter/Folding
