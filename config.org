@@ -2004,8 +2004,11 @@ If file doesn't exist, creates it with TEMPLATE content."
   ;; Core settings
   (org-modules nil)
   (org-directory my/org-directory)
-  (org-log-done 'time)
-  (org-log-into-drawer t)
+  (org-log-done nil)
+  (org-log-into-drawer nil)
+  (org-log-repeat nil)
+  (org-log-reschedule nil)
+  (org-log-redeadline nil)
   (org-return-follows-link t)
 
   ;; Display settings
