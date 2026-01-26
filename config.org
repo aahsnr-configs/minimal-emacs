@@ -71,15 +71,22 @@ Lower this if you experience freezing, raise if stuttering.")
       (eval-print-last-sexp)))
   (load bootstrap-file nil 'nomessage))
 
-(straight-use-package 'bind-key)
 (straight-use-package 'use-package)
 
 (setq straight-use-package-by-default t)
+(setq use-package-verbose nil
+      use-package-expand-minimally t
+      use-package-compute-statistics nil
+      use-package-enable-imenu-support t)
 #+end_src
 
-** Esup
+** Profile Init
 #+begin_src emacs-lisp
-(use-package esup :demand t)
+(use-package benchmark-init
+  :ensure t
+  :config
+  ;; To disable collection of benchmark data after init is done.
+  (add-hook 'after-init-hook 'benchmark-init/deactivate))
 #+end_src
 
 ** DONE Custom Functions
@@ -2000,6 +2007,7 @@ If file doesn't exist, creates it with TEMPLATE content."
 #+begin_src emacs-lisp
 (use-package org
   :straight (:type built-in)
+  :defer t
   :custom
   ;; Core settings
   (org-modules nil)
@@ -2569,12 +2577,12 @@ If file doesn't exist, creates it with TEMPLATE content."
 
 ** DONE Org GTD - Pure Task Management
 #+begin_src emacs-lisp
-;; (use-package org-edna
-;;   :defer t
-;;   :commands (org-edna-mode org-edna-load)
-;;   :hook (org-mode . org-edna-mode)
-;;   :custom
-;;   (org-edna-use-inheritance t))
+(use-package org-edna
+  :defer t
+  :commands (org-edna-mode org-edna-load)
+  :hook (org-mode . org-edna-mode)
+  :custom
+  (org-edna-use-inheritance t))
 
 (use-package org-gtd
   :defer t
@@ -2610,7 +2618,7 @@ If file doesn't exist, creates it with TEMPLATE content."
   (org-gtd-mode nil)
 
   :config
-  (org-edna-mode 1)
+  ;; (org-edna-mode 1)
   ;; Add GTD directory to agenda (but NOT roam/)
   (setq org-agenda-files
         (list my/org-directory
@@ -3185,6 +3193,7 @@ Links back to the GTD task for execution tracking."
 #+begin_src emacs-lisp
 (use-package dired
   :straight (:type built-in)
+  :defer t
   :commands (dired dired-jump)
   :hook (dired-mode . dired-hide-details-mode)
   :hook (dired-mode . hl-line-mode)
@@ -3206,6 +3215,7 @@ Links back to the GTD task for execution tracking."
 #+begin_src emacs-lisp
 (use-package dired-x
   :straight (:type built-in)
+  :defer t
   :hook (dired-mode . dired-omit-mode)
   :config
   (setq dired-omit-verbose nil
@@ -3222,6 +3232,7 @@ Links back to the GTD task for execution tracking."
   (setq dired-clean-confirm-killing-deleted-buffers nil))
 
 (use-package diredfl
+  :defer t
   :hook
   ((dired-mode . diredfl-mode)
    ;; highlight parent and directory preview as well
@@ -3232,6 +3243,7 @@ Links back to the GTD task for execution tracking."
 
 (use-package wdired
   :straight (:type built-in)
+  :defer t
   :after dired
   :custom
   (wdired-allow-to-change-permissions t)
@@ -3318,7 +3330,7 @@ Links back to the GTD task for execution tracking."
 
 ** DONE Project.el
 #+begin_src emacs-lisp
-(use-package project :straight (:type built-in))
+(use-package project :straight (:type built-in) :defer t)
 
 (defun ar/open-emacs-config-project ()
   "Open Emacs config directory as a project."
@@ -3396,6 +3408,7 @@ Links back to the GTD task for execution tracking."
 #+begin_src emacs-lisp
 (use-package tabspaces
   :straight (:type git :host github :repo "mclear-tools/tabspaces")
+  :defer t
   :hook (after-init . tabspaces-mode)
   :commands (tabspaces-switch-or-create-workspace
              tabspaces-open-or-create-project-and-workspace)
@@ -4136,6 +4149,7 @@ If completion fails in the future, check these:
 * DONE Consult Roam
 #+begin_src emacs-lisp
 (use-package consult-org-roam
+  :defer t
   :after org-roam
   :init
   (require 'consult-org-roam)
@@ -4459,6 +4473,7 @@ If completion fails in the future, check these:
 #+begin_src emacs-lisp
 (use-package breadcrumb
   :straight (:host github :repo "joaotavora/breadcrumb")
+  :defer t
   :custom
   (breadcrumb-project-crumb-separator " > ")
   (breadcrumb-imenu-crumb-separator " > ")
@@ -4493,7 +4508,7 @@ If completion fails in the future, check these:
   ((org-mode text-mode markdown-mode) . (lambda () (breadcrumb-local-mode -1))))
 #+end_src
 
-** TODO Transient Menu
+** Transient Menu
 #+begin_src emacs-lisp
 (with-eval-after-load 'transient
   (defun ar/devtools-title ()
@@ -4509,19 +4524,19 @@ If completion fails in the future, check these:
 
      ;; Group 1: LSP Code Actions
      ["Actions"
-      ("a" "Code Actions" eglot-code-actions)
-      ("r" "Rename Symbol" eglot-rename)
-      ("f" "Format Buffer" apheleia-format-buffer)
-      ("i" "Org. Imports" eglot-code-action-organize-imports)
-      ("h" "Toggle Hints" eglot-inlay-hints-mode :transient t :if (lambda () (fboundp 'eglot-inlay-hints-mode)))
-      ("R" "Reconnect LSP" eglot-reconnect)]
+      ("a" "Code Action" eglot-code-actions)
+      ("r" "Rename Symb" eglot-rename)
+      ("f" "Frmt Buf" apheleia-format-buffer)
+      ("i" "Org Imports" eglot-code-action-organize-imports)
+      ("h" "Toggle Hint" eglot-inlay-hints-mode :transient t :if (lambda () (fboundp 'eglot-inlay-hints-mode)))
+      ("R" "Reconn LSP" eglot-reconnect)]
 
      ;; Group 2: Navigation & Lookup
-     ["Navigation"
-      ("d" "Definition" xref-find-definitions)
-      ("D" "References" xref-find-references)
+     ["Navigate"
+      ("d" "Define" xref-find-definitions)
+      ("D" "Refer" xref-find-references)
       ("t" "Type Def" eglot-find-typeDefinition)
-      ("I" "Implementation" eglot-find-implementation)
+      ("I" "Implem" eglot-find-implementation)
       ("A" "Apropos" xref-find-apropos)
       ("." "Go Back" xref-go-back)]
 
@@ -4534,25 +4549,25 @@ If completion fails in the future, check these:
       ("l" "Search Line" consult-line)]
 
      ;; Group 4: Error Management
-     ["Diagnostics"
-      ("n" "Next Error" ar/flymake-next-error :transient t)
-      ("p" "Prev Error" ar/flymake-prev-error :transient t)
-      ("e" "Buf Errors" flymake-show-buffer-diagnostics)
-      ("E" "Proj Errors" consult-flymake)
-      ("!" "Start Check" flymake-start :transient t)]
+     ["Diagn"
+      ("n" "Next Err" ar/flymake-next-error :transient t)
+      ("p" "Prev Err" ar/flymake-prev-error :transient t)
+      ("e" "Buf Err" flymake-show-buffer-diagnostics)
+      ("E" "Proj Err" consult-flymake)
+      ("!" "Check" flymake-start :transient t)]
 
      ;; Group 5: Code Folding
      ["Folding"
-      ("TAB" "Toggle Node" treesit-fold-toggle :transient t)
+      ("TAB" "Toggle" treesit-fold-toggle :transient t)
       ("O" "Open All" treesit-fold-open-all :transient t)
       ("C" "Close All" treesit-fold-close-all :transient t)
-      ("v" "Vimish Toggle" vimish-fold-toggle :transient t)]
+      ("v" "Vim Toggle" vimish-fold-toggle :transient t)]
 
      ;; Group 6: Documentation
      ["Docs"
       ("k" "Hover Box" eldoc-box-help-at-point :transient t)
       ("K" "Echo Doc" eldoc)
-      ("?" "Info Manual" consult-info)
+      ("?" "Info Man" consult-info)
       ("M" "Man Page" woman)
       ("<escape>" "" transient-quit-one :format " ")]]))
 #+end_src
@@ -4812,6 +4827,7 @@ Falls back to `hl-todo-rgrep' if consult-ripgrep is not available."
 * DONE Rainbow Mode
 #+begin_src emacs-lisp
 (use-package rainbow-mode
+  :defer t
   :hook ((prog-mode . rainbow-mode)
          (LaTeX-mode . rainbow-mode)
          (org-mode . rainbow-mode))
@@ -4979,6 +4995,7 @@ operators and other column-based navigation."
 ** DONE Dirt Indent
 #+begin_src emacs-lisp
 (use-package dtrt-indent
+  :defer t
   :config
   (dtrt-indent-global-mode 1)
   ;; Optional: Adjust verbosity
@@ -5154,6 +5171,7 @@ operators and other column-based navigation."
 ** Adaptive Wrap
 #+begin_src emacs-lisp
 (use-package adaptive-wrap
+  :defer t
   :hook (LaTeX-mode . adaptive-wrap-prefix-mode)
   :init (setq-default adaptive-wrap-extra-indent 0))
 #+end_src
@@ -5300,6 +5318,7 @@ operators and other column-based navigation."
 ** TeX Folding
 #+begin_src emacs-lisp
 (use-package tex-fold
+  :defer t
   :straight (:type built-in)
   :after tex
   :commands (TeX-fold-mode TeX-fold-buffer)
@@ -5447,6 +5466,7 @@ operators and other column-based navigation."
 ** Preview LaTeX
 #+begin_src emacs-lisp
 (use-package preview
+  :defer t
   :straight (:type built-in)
   :after tex
   :hook (LaTeX-mode . LaTeX-preview-setup)
@@ -5494,6 +5514,7 @@ operators and other column-based navigation."
           ("" "unicode-math" t ("lualatex" "xelatex")))))
 
 (use-package org-fragtog
+  :defer t
   :hook (org-mode . org-fragtog-mode)
   :config
   (setq org-fragtog-preview-delay 0.2))
@@ -5501,6 +5522,7 @@ operators and other column-based navigation."
 
 ** Completions: LSP + AUCTeX + Company Integration
 #+begin_src emacs-lisp
+(use-package company :defer t)
 (use-package company-math :defer t)
 (use-package company-auctex :defer t)
 
@@ -5617,6 +5639,7 @@ It does NOT activate company-mode - completely safe with Corfu."
 ** Winner
 #+begin_src emacs-lisp
 (use-package winner
+  :defer t
   :straight (:type built-in)
   :commands (winner-undo winner-redo)
   :hook (after-init . winner-mode)
@@ -5635,6 +5658,7 @@ It does NOT activate company-mode - completely safe with Corfu."
 ** Popper
 #+begin_src emacs-lisp
 (use-package popper
+  :defer t
   :custom
   (popper-group-function #'popper-group-by-directory)
   (popper-echo-dispatch-actions t)
@@ -5849,8 +5873,8 @@ It does NOT activate company-mode - completely safe with Corfu."
 * General Keybindings
 #+begin_src emacs-lisp
 (use-package general
+  :defer t
   :after evil
-  :demand t
   :config
   ;; Set up leader keys
   (general-create-definer ar/global-leader
