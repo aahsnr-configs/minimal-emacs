@@ -286,6 +286,8 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 
 (delete-selection-mode 1)
 
+(setq window-sides-vertical t)
+
 ;; File associations
 (add-to-list 'auto-mode-alist '("\\.in\\'" . text-mode))
 (add-to-list 'auto-mode-alist '("\\.out\\'" . text-mode))
@@ -2604,12 +2606,14 @@ If file doesn't exist, creates it with TEMPLATE content."
         (list my/org-directory
               my/org-gtd-directory))
 
-  ;; Performance: Delay database sync until idle
-  (run-with-idle-timer 5 nil
-    (lambda ()
-      (when (and (featurep 'org-gtd)
-                 (not (bound-and-true-p org-gtd-mode)))
-        (org-gtd-mode 1))))
+  ;; ;; Performance: Delay database sync until idle
+  ;; ;; Defer mode activation until actually needed
+  ;; ;; Remove this if you don't need org-gtd-mode active globally
+  ;; (run-with-idle-timer 30 nil
+  ;;   (lambda ()
+  ;;     (when (and (featurep 'org-gtd)
+  ;;                (not (bound-and-true-p org-gtd-mode)))
+  ;;       (org-gtd-mode 1))))
 
   ;; Custom TODO faces for GTD keywords
   (setq org-todo-keyword-faces
@@ -4309,15 +4313,23 @@ If completion fails in the future, check these:
 #+begin_src emacs-lisp
 (use-package dape
   :defer t
-  :hook
-  (kill-emacs . dape-breakpoint-save)
-  (after-init . dape-breakpoint-load)
+  :init
+    ;; Load breakpoints manually when first starting dape
+  (with-eval-after-load 'dape
+    (dape-breakpoint-load))
+
+  ;; Save on exit - this doesn't load the package
+  (add-hook 'kill-emacs-hook
+            (lambda ()
+              (when (featurep 'dape)
+                (dape-breakpoint-save))))
 
   :custom
   (dape-breakpoint-global-mode +1)
   (dape-buffer-window-arrangement 'right)
 
   :config
+
   (add-hook 'dape-display-source-hook #'pulse-momentary-highlight-one-line)
   (add-hook 'dape-start-hook (lambda () (save-some-buffers t t)))
   (add-hook 'dape-compile-hook #'kill-buffer)
