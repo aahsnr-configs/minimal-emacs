@@ -1,9 +1,9 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.45
+#+VERSION: 0.47
 #+STARTUP: overview
-#+PROPERTY: header-args:emacs-lisp :tangle ./init.el :mkdirp yes
+#+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
 * Core Emacs
 ** Lexical Binding
@@ -116,50 +116,49 @@ Lower this if you experience freezing, raise if stuttering.")
 
 (defun reload-init-file ()
   "Tangle and reload the Emacs configuration from config.org.
-This function is designed for use with package.el.
-
-IMPORTANT: This does NOT fully restart Emacs. Some changes (especially
-removed keybindings, hooks, or modes) will persist until you restart Emacs."
+This function is optimized for use with straight.el by ensuring stale
+byte-compiled files do not interfere with the reload."
   (interactive)
   (let* ((config-org (expand-file-name "config.org" user-emacs-directory))
          (init-el (expand-file-name "init.el" user-emacs-directory))
+         (init-elc (expand-file-name "init.elc" user-emacs-directory))
          (start-time (current-time)))
 
-    ;; Check if config.org exists
     (unless (file-exists-p config-org)
       (user-error "Configuration file %s not found!" config-org))
 
-    ;; Confirm before reloading
-    (when (yes-or-no-p "Reload configuration? (This won't reset removed keybindings/hooks) ")
+    (when (yes-or-no-p "Tangle and reload configuration? ")
       (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
       (message "Tangling configuration from config.org...")
 
-      ;; Tangle the org file
       (condition-case err
-          (org-babel-tangle-file config-org init-el "emacs-lisp")
+          (progn
+            ;; Ensure Org Babel is loaded for tangling
+            (require 'org)
+            (require 'ob-tangle)
+            (org-babel-tangle-file config-org init-el "emacs-lisp"))
         (error
          (user-error "Failed to tangle config.org: %s" (error-message-string err))))
 
       (message "✓ Tangling complete")
-      (message "Loading init.el...")
 
-      ;; Load the tangled init file
+      (when (file-exists-p init-elc)
+        (delete-file init-elc)
+        (message "✓ Removed stale init.elc"))
+
+      (message "Loading init.el...")
       (condition-case err
           (load-file init-el)
         (error
          (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
          (user-error "Failed to load init.el: %s" (error-message-string err))))
 
-      ;; Calculate load time
       (let ((elapsed-time (float-time (time-subtract (current-time) start-time))))
         (message "✓ Configuration loaded successfully")
         (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         (message "Reload completed in %.2f seconds" elapsed-time)
         (message "")
-        (message "NOTE: Some changes require a full Emacs restart:")
-        (message "  • Removed keybindings, hooks, or modes")
-        (message "  • Package installations/removals")
-        (message "  • Major structural changes")
+        (message "NOTE: Some changes (removed hooks/packages) require a full restart.")
         (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")))))
 
 (defun my/auto-tangle-config-org ()
@@ -485,20 +484,20 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
       word-wrap-by-category t)
 #+end_src
 
-** DONE Setup User
+** Setup User
 #+begin_src emacs-lisp
 (setq user-full-name "Ahsanur Rahman"
       user-mail-address "ahsanur041@proton.me")
 #+end_src
 
-** DONE Title
+** Title
 #+begin_src emacs-lisp
 (setq frame-title-format '("Emacs - %b")
       icon-title-format frame-title-format)
 #+end_src
 
 * Vim Emulation
-** DONE Undo Fu
+** Undo Fu
 #+begin_src emacs-lisp
 (use-package undo-fu :defer t)
 
@@ -507,9 +506,10 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   :hook (after-init . undo-fu-session-global-mode))
 #+end_src
 
-** DONE Goto Chg
+** Goto Chg
 #+begin_src emacs-lisp
 (use-package goto-chg
+  :defer t
   :after evil
   :commands (goto-last-change goto-last-change-reverse)
   :config
@@ -517,14 +517,29 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (evil-define-key 'normal 'global (kbd "g,") 'goto-last-change-reverse))
 #+end_src
 
-** DONE Evil
+** Evil
 #+begin_src emacs-lisp
-(setq evil-undo-system 'undo-fu)
-
 (use-package evil
+  :demand t
   :init
-  (setq evil-want-integration t)
-  (setq evil-want-keybinding nil)
+  ;; Core Settings
+  (setq evil-want-integration t
+        evil-want-keybinding nil
+        evil-want-minibuffer t
+        evil-mode-line-format nil
+        evil-kbd-macro-suppress-motion-error t
+        evil-symbol-word-search t
+        evil-kill-on-visual-paste nil)
+
+  ;; Extended Keybindings Configuration
+  (setq evil-want-C-g-bindings t
+        evil-want-C-i-jump nil
+        evil-want-C-u-scroll t
+        evil-want-C-u-delete t
+        evil-want-C-w-delete t
+        evil-want-Y-yank-to-eol t
+        evil-want-abbrev-expand-on-insert-exit nil
+        evil-respect-visual-line-mode nil)
 
   :custom
   (evil-ex-visual-char-range t)
@@ -539,13 +554,60 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (evil-want-fine-undo t)
   (evil-move-beyond-eol t)
   (evil-search-wrap nil)
-  (evil-want-Y-yank-to-eol t)
+  (select-enable-clipboard t)
+  (evil-visual-update-x-selection-p nil)
+
+  ;; Search Improvements
+  (evil-ex-search-case 'smart)
+  (evil-ex-search-incremental t)
+  (evil-ex-search-highlight-all t)
+
   :config
   (evil-mode 1)
-  (evil-select-search-module 'evil-search-module 'isearch))
+
+  ;; Correctly select the search module and the search engine
+  (evil-select-search-module 'evil-search-module 'evil-search)
+
+  (setq-default evil-shift-width tab-width)
+
+  ;; Smart Visual Line Navigation
+  (define-key evil-motion-state-map "j" 'evil-next-visual-line)
+  (define-key evil-motion-state-map "k" 'evil-previous-visual-line)
+  (define-key evil-motion-state-map "gj" 'evil-next-line)
+  (define-key evil-motion-state-map "gk" 'evil-previous-line)
+
+  ;; === Robust Minibuffer Escape Logic =====
+  (defun ar/minibuffer-escape-quit ()
+    "Abort recursive edit (minibuffer) on Escape, overriding Evil states."
+    (interactive)
+    (abort-recursive-edit))
+
+  (defun ar/setup-minibuffer-escape ()
+    "Setup Escape to quit in the minibuffer."
+    ;; Bind in the standard local map
+    (local-set-key [escape] #'ar/minibuffer-escape-quit)
+    ;; Forcefully override Evil's local state maps if Evil is active.
+    ;; This ensures ESC quits instead of switching to Normal state.
+  (when (bound-and-true-p evil-local-mode)
+    (evil-local-set-key 'insert [escape] #'ar/minibuffer-escape-quit)
+    (evil-local-set-key 'normal [escape] #'ar/minibuffer-escape-quit)
+    (evil-local-set-key 'visual [escape] #'ar/minibuffer-escape-quit)
+    (evil-local-set-key 'replace [escape] #'ar/minibuffer-escape-quit)))
+
+;; Apply via hook to ensure it catches every minibuffer instance
+(add-hook 'minibuffer-setup-hook #'ar/setup-minibuffer-escape)
+
+;; Also handle Evil's Ex command line (:)
+(when (boundp 'evil-ex-completion-map)
+  (define-key evil-ex-completion-map [escape] #'ar/minibuffer-escape-quit))
+
+;; Better Initial States
+(evil-set-initial-state 'messages-buffer-mode 'normal)
+(evil-set-initial-state 'dashboard-mode 'normal)
+(evil-select-search-module 'evil-search-module 'evil-search))
 #+end_src
 
-** DONE Evil Collection
+** Evil Collection
 #+begin_src emacs-lisp
 (use-package evil-collection
   :ensure t
@@ -553,7 +615,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (evil-collection-init))
 #+end_src
 
-** DONE Evil Surround
+** Evil Surround
 #+begin_src emacs-lisp
 (use-package evil-surround
   :after evil
@@ -573,7 +635,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   :config (global-evil-surround-mode 1))
 #+end_src
 
-** DONE Evil Args
+** Evil Args
 #+begin_src emacs-lisp
 (use-package evil-args
   :after evil
@@ -583,7 +645,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (define-key evil-outer-text-objects-map "a" 'evil-outer-arg))
 #+end_src
 
-** DONE Evil Numbers
+** Evil Numbers
 #+begin_src emacs-lisp
 ;; Increment/Decrement numbers with C-a/C-x
 (use-package evil-numbers
@@ -593,7 +655,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (define-key evil-normal-state-map (kbd "C-x") 'evil-numbers/dec-at-pt))
 #+end_src
 
-** DONE Evil Exchange
+** Evil Exchange
 #+begin_src emacs-lisp
 ;; Swap two regions of text with 'gx'
 (use-package evil-exchange
@@ -602,7 +664,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (evil-exchange-install))
 #+end_src
 
-** DONE Evil Goggles
+** Evil Goggles
 #+begin_src emacs-lisp
 ;; Visual feedback when editing (pulsing regions on yank/paste)
 (use-package evil-goggles
@@ -612,7 +674,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (setq evil-goggles-duration 0.1))
 #+end_src
 
-** DONE Evil Lion
+** Evil Lion
 #+begin_src emacs-lisp
 ;; Align text with 'gl' (e.g., 'glip=' aligns paragraph on = signs)
 (use-package evil-lion
@@ -621,7 +683,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (evil-lion-mode))
 #+end_src
 
-** DONE Evil Window Movement Enhancements
+** Evil Window Movement Enhancements
 #+begin_src emacs-lisp
 (defcustom ar/evil-want-move-window-to-wrap-around nil
   "If non-nil, window movement commands wrap around."
@@ -661,7 +723,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
     (windmove-down)))
 #+end_src
 
-** DONE Native Commenting Operator
+** Native Commenting Operator
 #+begin_src emacs-lisp
 (with-eval-after-load 'evil
   (evil-define-operator ar/evil-comment-operator (beg end type)
@@ -676,7 +738,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (define-key evil-visual-state-map (kbd "gc") #'ar/evil-comment-operator))
 #+end_src
 
-** DONE Smart Comment Continuation
+** Smart Comment Continuation
 #+begin_src emacs-lisp
 (defcustom ar/evil-want-o/O-to-continue-comments t
   "If non-nil, o/O keys will continue comment lines."
@@ -809,8 +871,8 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 
 ** Remap C-g to Escape
 #+begin_src emacs-lisp
-(keymap-set key-translation-map "C-g" "<escape>")
-(keymap-global-set "C-M-g" #'keyboard-quit)
+;; (keymap-set key-translation-map "C-g" "<escape>")
+;; (keymap-global-set "C-M-g" #'keyboard-quit)
 #+end_src
 
 ** Nerd Icons
@@ -1576,6 +1638,30 @@ and sets up vim-style navigation."
 #+end_src
 
 ** Scroll Mode
+** Visual Fill Column
+#+begin_src emacs-lisp
+(use-package visual-fill-column
+  :straight (:host codeberg :repo "joostkremers/visual-fill-column")
+  :hook ((org-mode . ar/visual-fill-setup)
+         (markdown-mode . ar/visual-fill-setup)
+         (text-mode . ar/visual-fill-setup)
+         (dired-mode . ar/visual-fill-setup)
+
+         ) ; Optional: Centers dired for a cleaner look
+  :custom
+  ;; width of the text area (default is fill-column, usually 80)
+  (visual-fill-column-width 110)
+  ;; Center the text within the window
+  (visual-fill-column-center-text t)
+  ;; Allow splitting windows without the text getting squashed
+  (visual-fill-column-enable-sensible-window-split t)
+  :config
+  (defun ar/visual-fill-setup ()
+    "Setup visual wrap and centering."
+    (visual-line-mode 1)
+    (visual-fill-column-mode 1)))
+#+end_src
+
 * Markdown
 #+begin_src emacs-lisp
 (use-package markdown-mode
@@ -1977,8 +2063,8 @@ and sets up vim-style navigation."
       ("?" magit-dispatch "dispatch" :exit t)))))
 #+end_src
 
-* DONE Org Mode
-** DONE Dynamic Directory Structure
+* Org Mode
+** Dynamic Directory Structure
 #+begin_src emacs-lisp
 ;; Define base directory with symlinks resolved
 (defvar my/org-directory (file-truename (expand-file-name "~/org/"))
@@ -2110,7 +2196,7 @@ If file doesn't exist, creates it with TEMPLATE content."
 (defvar my/org-reviews-directory (my/org-subdir "reviews/"))
 #+end_src
 
-** DONE Better Font Faces
+** Better Font Faces
 #+begin_src emacs-lisp
 (defun ar/org-font-setup ()
   ;; Replace list hyphen with dot
@@ -2130,7 +2216,7 @@ If file doesn't exist, creates it with TEMPLATE content."
     (set-face-attribute (car face) nil :font "JetBrainsMono Nerd Font" :weight 'bold :height (cdr face))))
 #+end_src
 
-** DONE Core Configuration
+** Core Configuration
 #+begin_src emacs-lisp
 (use-package org
   :straight (:type built-in)
@@ -2170,12 +2256,11 @@ If file doesn't exist, creates it with TEMPLATE content."
   (org-cycle-separator-lines 2))
 #+end_src
 
-** DONE Hooks
+** Hooks
 #+begin_src emacs-lisp
 (with-eval-after-load 'org
   (add-hook 'org-mode-hook #'visual-line-mode)
   (add-hook 'org-mode-hook #'ar/org-font-setup)
-  (add-hook 'org-mode-hook #'auto-fill-mode)
   (add-hook 'org-mode-hook (lambda () (setq-local yas-parents '(latex-mode))))
   (add-hook 'org-agenda-mode-hook (lambda ()
                                     (visual-line-mode -1)
@@ -2188,7 +2273,7 @@ If file doesn't exist, creates it with TEMPLATE content."
                                      (setq header-line-format nil))))
 #+end_src
 
-** DONE Keywords
+** Keywords
 #+begin_src emacs-lisp
 (with-eval-after-load 'org
   (setq org-todo-keywords
@@ -2221,7 +2306,7 @@ If file doesn't exist, creates it with TEMPLATE content."
           ("DISABLED"   . (:foreground "#565f89" :weight bold)))))
 #+end_src
 
-** DONE Tags & Priorities
+** Tags & Priorities
 #+begin_src emacs-lisp
 (with-eval-after-load 'org
   (setq org-tag-alist '(("@work"      . ?w)
@@ -2238,7 +2323,7 @@ If file doesn't exist, creates it with TEMPLATE content."
                              (?C . success))))
 #+end_src
 
-** DONE Org Structure Templates
+** Org Structure Templates
 #+begin_src emacs-lisp
 (with-eval-after-load 'org
   ;; Load org-tempo for structure templates
@@ -2265,7 +2350,7 @@ If file doesn't exist, creates it with TEMPLATE content."
     (add-to-list 'org-structure-template-alist pair)))
 #+end_src
 
-** DONE Transient Template System
+** Transient Template System
 #+begin_src emacs-lisp
 (with-eval-after-load 'org
   (defun ar/org-template-expand (str &optional mod)
@@ -2418,7 +2503,7 @@ If file doesn't exist, creates it with TEMPLATE content."
 
 #+end_src
 
-** DONE Org iBullets
+** Org iBullets
 #+begin_src emacs-lisp
 ;; (use-package org-ibullets
 ;;   :defer t
@@ -2427,7 +2512,7 @@ If file doesn't exist, creates it with TEMPLATE content."
 ;;   :hook (org-mode . org-ibullets-mode))
 #+end_src
 
-** DONE Org Src Buffer Naming
+** Org Src Buffer Naming
 #+begin_src emacs-lisp
 (defun ar/org-src-simplify-buffer-name (base-buffer-name lang)
   "Return static buffer name 'src code' for Org source blocks."
@@ -2436,7 +2521,7 @@ If file doesn't exist, creates it with TEMPLATE content."
 (advice-add 'org-src--construct-edit-buffer-name :override #'ar/org-src-simplify-buffer-name)
 #+end_src
 
-** DONE Org Habit
+** Org Habit
 #+begin_src emacs-lisp
 (use-package org-habit
   :straight (:type built-in)
@@ -2453,7 +2538,7 @@ If file doesn't exist, creates it with TEMPLATE content."
    (string-to-char (nerd-icons-codicon "nf-cod-circle_filled"))))
 #+end_src
 
-** DONE Org Pomodoro
+** Org Pomodoro
 #+begin_src emacs-lisp
 (use-package org-pomodoro
   :defer t
@@ -2468,7 +2553,7 @@ If file doesn't exist, creates it with TEMPLATE content."
                                (alert-default-style))))
 #+end_src
 
-** DONE Org Download
+** Org Download
 #+begin_src emacs-lisp
 (use-package org-download
   :defer t
@@ -2484,7 +2569,7 @@ If file doesn't exist, creates it with TEMPLATE content."
   (advice-add 'org-download-dnd :after #'org-download-display-inline-images))
 #+end_src
 
-** DONE Org Remark
+** Org Remark
 #+begin_src emacs-lisp
 (use-package org-remark
   :defer t
@@ -2493,7 +2578,7 @@ If file doesn't exist, creates it with TEMPLATE content."
   (org-remark-global-tracking-mode +1))
 #+end_src
 
-** DONE Eldoc for Org Mode
+** Eldoc for Org Mode
 #+begin_src emacs-lisp
 (defun ar/org-eldoc-breadcrumb (callback &rest _)
   "Show org heading breadcrumb path in eldoc."
@@ -2736,8 +2821,8 @@ If file doesn't exist, creates it with TEMPLATE content."
             (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-breadcrumb -10 t)))
 #+end_src
 
-* DONE Second Brain & Productivity
-** DONE Org Agenda
+* Second Brain & Productivity
+** Org Agenda
 #+begin_src emacs-lisp
 (use-package org-agenda
   :straight (:type built-in)
@@ -2770,7 +2855,7 @@ If file doesn't exist, creates it with TEMPLATE content."
         org-agenda-skip-deadline-if-done t))
 #+end_src
 
-** DONE Org GTD - Pure Task Management
+** Org GTD - Pure Task Management
 #+begin_src emacs-lisp
 ;; (use-package org-edna
 ;;   :defer t
@@ -2838,7 +2923,7 @@ If file doesn't exist, creates it with TEMPLATE content."
                   ("GTD-CNCL"  . (:foreground "#565f89" :weight bold))))))
 #+end_src
 
-** DONE Org Roam
+** Org Roam
 #+begin_src emacs-lisp
 (use-package org-roam
   :defer t
@@ -2959,7 +3044,7 @@ If file doesn't exist, creates it with TEMPLATE content."
   (org-roam-ui-open-on-start nil))
 #+end_src
 
-** DONE Zettelkasten ↔ GTD Bridges
+** Zettelkasten ↔ GTD Bridges
 #+begin_src emacs-lisp
 (defun ar/gtd-to-zettel ()
   "Create a Zettelkasten project note from current GTD project.
@@ -3118,7 +3203,7 @@ Links back to the GTD task for execution tracking."
                t))
 #+end_src
 
-** DONE Org Capture
+** Org Capture
 #+begin_src emacs-lisp
 (use-package org-capture
   :straight (:type built-in)
@@ -3176,7 +3261,7 @@ Links back to the GTD task for execution tracking."
   (remove-hook 'org-capture-prepare-finalize-hook 'org-capture-insert-template-here))
 #+end_src
 
-** DONE Org Super Agenda
+** Org Super Agenda
 #+begin_src emacs-lisp
 (use-package org-super-agenda
   :defer t
@@ -3237,7 +3322,7 @@ Links back to the GTD task for execution tracking."
            :order 99))))
 #+end_src
 
-** DONE Org Agenda Custom Commands
+** Org Agenda Custom Commands
 #+begin_src emacs-lisp
 (with-eval-after-load 'org-super-agenda
   (setq org-agenda-custom-commands
@@ -4653,7 +4738,9 @@ If completion fails in the future, check these:
 #+begin_src emacs-lisp
 (use-package eldoc-mouse
   :defer t
-  :hook (eldoc-mode . eldoc-mouse-mode)
+  :hook (eldoc-mode . (lambda ()
+                        (unless (derived-mode-p 'org-mode)
+                          (eldoc-mouse-mode 1))))
   :init
   (setq eldoc-mouse-posframe-border-color (face-background 'posframe-border nil t))
   :config
@@ -4790,6 +4877,8 @@ If completion fails in the future, check these:
           (bash "https://github.com/tree-sitter/tree-sitter-bash")
           (dockerfile "https://github.com/camdencheek/tree-sitter-dockerfile.git")
           (json "https://github.com/tree-sitter/tree-sitter-json")
+          (latex "https://github.com/latex-lsp/tree-sitter-latex")
+          (bibtex "https://github.com/latex-lsp/tree-sitter-bibtex")
           (nix "https://github.com/nix-community/tree-sitter-nix")
           (typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
           (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")))
@@ -5204,6 +5293,7 @@ operators and other column-based navigation."
 #+end_src
 
 * Snippet Engine
+** Yasnippet
 #+begin_src emacs-lisp
 (defvar my/snippets-directory (expand-file-name "snippets" user-emacs-directory)
   "Directory for personal yasnippet snippets.")
@@ -6015,6 +6105,22 @@ It does NOT activate company-mode - completely safe with Corfu."
       (kbd "C-l") #'ar/eshell-clear)))
 
 #+end_src
+* Languages
+** Nix
+#+begin_src emacs-lisp
+(use-package nix-mode
+  :defer t
+  :mode "\\.nix\\'")
+
+(use-package nix-ts-mode
+  :defer t
+  :mode "\\.nix\\'")
+
+(use-package nix-update
+  :defer t
+  :commands nix-update-fetch)
+#+end_src
+
 * Window
 ** Winner
 #+begin_src emacs-lisp
