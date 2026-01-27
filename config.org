@@ -5,17 +5,17 @@
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el :mkdirp yes
 
-* TODO Core Emacs
-** DONE Lexical Binding
+* Core Emacs
+** Lexical Binding
 #+begin_src emacs-lisp
 ;;; init.el --- Main Configuration File -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; Commentary:
 #+end_src
 
-** DONE Garbage Collection
+** Garbage Collection
 #+begin_src emacs-lisp
 ;; CRITICAL: Restore GC after startup with optimized values
-(defvar better-gc-cons-threshold (* 80 1024 1024)  ;; 128MB
+(defvar better-gc-cons-threshold (* 128 1024 1024)  ;; 128MB
   "Optimal GC threshold for modern LSP-heavy workflows.
 Lower this if you experience freezing, raise if stuttering.")
 
@@ -53,7 +53,7 @@ Lower this if you experience freezing, raise if stuttering.")
             (add-hook 'minibuffer-exit-hook #'gc-minibuffer-exit-hook)))
 #+end_src
 
-** DONE Package Management
+** Package Management
 #+begin_src emacs-lisp
 (defvar bootstrap-version)
 (let ((bootstrap-file
@@ -89,7 +89,7 @@ Lower this if you experience freezing, raise if stuttering.")
   (add-hook 'after-init-hook 'benchmark-init/deactivate))
 #+end_src
 
-** DONE Custom Functions
+** Custom Functions
 #+begin_src emacs-lisp
 (defun childframe-workable-p ()
   "Whether childframe is workable."
@@ -181,7 +181,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
     (thing-at-point 'symbol t)))
 #+end_src
 
-** DONE Constants
+** Constants
 #+begin_src emacs-lisp
 (defconst sys/linuxp
   (eq system-type 'gnu/linux)
@@ -209,7 +209,19 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   "Emacs is 31 or above.")
 #+end_src
 
-** DONE Performance Tuning
+** Custom File
+#+begin_src emacs-lisp
+(setq custom-file (expand-file-name "customs.el" user-emacs-directory))
+(add-hook 'emacs-startup-hook (lambda () (load custom-file 'noerror)))
+#+end_src
+
+** Load File
+#+begin_src emacs-lisp
+;; Prioritize local lisp directory in load-path
+(add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
+#+end_src
+
+** Performance Tuning
 #+begin_src emacs-lisp
 (setq-default bidi-display-reordering nil
               bidi-paragraph-direction 'left-to-right
@@ -220,11 +232,11 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ;; created, otherwise it will error. We hook it into `after-make-frame-functions`
 ;; to ensure it runs at the correct time, both on startup and for new frames
 ;; created by emacsclient in daemon mode.
-;; (when (fboundp 'pgtk-use-im-context)
-;;   (add-hook 'after-make-frame-functions
-;;             (lambda (frame)
-;;               (with-selected-frame frame
-;;                 (pgtk-use-im-context nil)))))
+(when (fboundp 'pgtk-use-im-context)
+  (add-hook 'after-make-frame-functions
+            (lambda (frame)
+              (with-selected-frame frame
+                (pgtk-use-im-context nil)))))
 
 
 ;; Apply to common modes
@@ -262,7 +274,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 (setq inhibit-compacting-font-caches t)  ;; Don't compact font cache
 #+end_src
 
-** DONE Small Configs
+** Small Configs
 #+begin_src emacs-lisp
 ;; Move backup files to dedicated directory
 (setq backup-directory-alist `(("." . ,(expand-file-name ".backup" user-emacs-directory))))
@@ -309,17 +321,17 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 (add-to-list 'auto-mode-alist '("\\.Rmd\\'" . markdown-mode))
 #+end_src
 
-** DONE Garbage Collector Magic Hack
+** Garbage Collector Magic Hack
 #+begin_src emacs-lisp
 (use-package gcmh
   :hook (after-init . gcmh-mode)
   :init
   ;; Match early-init.el restoration value
   (setq gcmh-idle-delay 'auto
-        gcmh-high-cons-threshold (* 80 1024 1024)))
+        gcmh-high-cons-threshold (* 128 1024 1024)))
 #+end_src
 
-** DONE UTF-8 Coding System
+** UTF-8 Coding System
 #+begin_src emacs-lisp
 (set-selection-coding-system 'utf-8)
 (prefer-coding-system 'utf-8)
@@ -330,8 +342,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 (setq locale-coding-system 'utf-8)
 #+end_src
 
-
-** DONE Environment
+** Environment
 #+begin_src emacs-lisp
 ;; (use-package exec-path-from-shell
 ;;   :defer t
@@ -346,7 +357,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ;;     (exec-path-from-shell-initialize)))
 #+end_src
 
-** DONE Session Management
+** Session Management
 #+begin_src emacs-lisp
 ;; Save place
 (use-package saveplace
@@ -400,7 +411,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
         savehist-autosave-interval 300))
 #+end_src
 
-** DONE Misc
+** Misc
 #+begin_src emacs-lisp
 (use-package simple
   :straight (:type built-in)
@@ -486,7 +497,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
       icon-title-format frame-title-format)
 #+end_src
 
-* DONE Vim Emulation
+* Vim Emulation
 ** DONE Undo Fu
 #+begin_src emacs-lisp
 (use-package undo-fu :defer t)
@@ -705,8 +716,72 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (define-key evil-normal-state-map "O" #'ar/evil-open-above-smart))
 #+end_src
 
-* TODO Editor Behaviour
-** DONE Child Frame
+* Editor Behaviour
+** Eldoc Behaviour Documentation
+#+begin_src comment
+=============================================================================
+  ELDOC ARCHITECTURE & BREADCRUMB INTEGRATION GUIDE
+=============================================================================
+
+1. GLOBAL BEHAVIOR & PERFORMANCE
+   - eldoc-idle-delay (0.1s):
+     * What: The time Emacs waits after a cursor movement before showing docs.
+     * Set: via :custom in the eldoc use-package block.
+     * Debug: If docs feel "laggy," increase this. If they feel "slow," decrease.
+   - eldoc-echo-area-use-multiline-p (2):
+     * What: Allows ElDoc to expand the echo area up to 2 lines.
+     * Set: via :custom.
+     * Debug: Check variable value if docs are being cut off prematurely.
+   - eldoc-documentation-strategy (eldoc-documentation-compose):
+     * What: Tells ElDoc to combine results from ALL active backends (e.g., LSP
+       + Breadcrumbs) rather than just picking the first one.
+     * Debug: Check 'eldoc-documentation-functions' to see which backends are active.
+
+2. UI & MANUAL INTERACTION
+   - ar/show-eldoc-buffer (C-h .):
+     * What: A safe wrapper around 'eldoc-doc-buffer'. It forces a full buffer
+       to open with complete documentation.
+     * Debug: If C-h . shows nothing, the current backend lacks a "long-form"
+       doc string. Check the *Messages* buffer for error logs.
+
+3. ORG-MODE BREADCRUMBS (ar/get-org-breadcrumb-string)
+   - What: A structural context engine. It calculates the heading hierarchy
+     (Parent › Current) using 'org-get-outline-path'.
+   - Specific Logic:
+     a) EOB Check: Detects if you are at the bottom of the file.
+     b) Src-Block Check: Returns nil inside code blocks so that LSP/ElDoc can
+        show function signatures instead of headings.
+     c) Face Application: Uses 'shadow' for parents and 'bold-keyword' for
+        the current heading to provide visual depth.
+   - Debug: Run (ar/get-org-breadcrumb-string) in M-x ielm while in an Org
+     file to see the raw string generated.
+
+4. GENERIC CONTEXT FALLBACK (ar/generic-eldoc-backend)
+   - What: When not in Org-mode and not using LSP, this uses 'which-function'
+     to show which class/function your cursor is currently inside.
+   - Dependency: Requires 'which-function-mode' to be 1.
+   - Debug: If context doesn't appear in programming modes, verify
+     'which-function-mode' is active.
+
+5. HOVER SUPPORT (eldoc-mouse)
+   - What: Displays ElDoc documentation in a floating childframe when the
+     mouse hovers over a symbol.
+   - Set: Enabled via 'eldoc-mouse-mode' hook.
+   - Integration: Customizes 'posframe-border' to match your UI theme and
+     disables standard tooltips to prevent "double popups."
+   - Debug: Check if 'childframe-workable-p' returns T. Ensure 'posframe'
+     is installed.
+
+6. DEBUGGING BACKEND PRIORITY
+   - Backend priority is managed via 'add-hook' depth values:
+     * Org Breadcrumbs: -100 (Highest - always runs first).
+     * Generic Context: 0 (Default - runs if others aren't managing).
+   - Debug: Run 'C-h v eldoc-documentation-functions' in any buffer to see
+      the execution order.
+=============================================================================
+#+end_src
+
+** Child Frame
 #+begin_src emacs-lisp
 (use-package posframe
   :defer t
@@ -732,13 +807,13 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
                2)))))
 #+end_src
 
-** DONE Remap C-g to Escape
+** Remap C-g to Escape
 #+begin_src emacs-lisp
 (keymap-set key-translation-map "C-g" "<escape>")
 (keymap-global-set "C-M-g" #'keyboard-quit)
 #+end_src
 
-** DONE Nerd Icons
+** Nerd Icons
 #+begin_src emacs-lisp
 (use-package nerd-icons
   :custom
@@ -746,7 +821,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (nerd-icons-color-icons t))
 #+end_src
 
-** DONE Transient
+** Transient
 #+begin_src emacs-lisp
 (use-package transient
   :init
@@ -850,7 +925,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
       ("<escape>" "" transient-quit-one :format " ")]]))
 #+end_src
 
-** DONE Cross Referencing Commands
+** Cross Referencing Commands
 #+begin_src emacs-lisp
 (use-package xref
   :straight (:type built-in)
@@ -868,33 +943,34 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
         xref-show-xrefs-function #'xref-show-definitions-completing-read))
 #+end_src
 
-** DONE Autorevert
+** Autorevert
 #+begin_src emacs-lisp
 (use-package autorevert
+  :defer t
   :straight (:type built-in)
   :hook (after-init . global-auto-revert-mode))
 #+end_src
 
-** DONE Avy/Ace
+** Avy/Ace
 #+begin_src emacs-lisp
-;; Jump to things in Emacs tree-style
-(use-package avy
-  :hook (after-init . avy-setup-default)
-  :config (setq avy-all-windows nil
-                avy-all-windows-alt t
-                avy-background t
-                avy-style 'pre))
+;; ;; Jump to things in Emacs tree-style
+;; (use-package avy
+;;   :hook (after-init . avy-setup-default)
+;;   :config (setq avy-all-windows nil
+;;                 avy-all-windows-alt t
+;;                 avy-background t
+;;                 avy-style 'pre))
 
-;; Kill text between the point and the character CHAR
-(use-package avy-zap
-  :defer t)
+;; ;; Kill text between the point and the character CHAR
+;; (use-package avy-zap
+;;   :defer t)
 
-;; Quickly follow links
-(use-package ace-link
-  :hook (after-init . ace-link-setup-default))
+;; ;; Quickly follow links
+;; (use-package ace-link
+;;   :hook (after-init . ace-link-setup-default))
 #+end_src
 
-** DONE Anzu
+** Anzu
 #+begin_src emacs-lisp
 (use-package anzu
   :bind (([remap query-replace] . anzu-query-replace)
@@ -907,7 +983,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 (use-package evil-anzu :after evil)
 #+end_src
 
-** DONE Automatic parenthesis pairing
+** Automatic parenthesis pairing
 #+begin_src emacs-lisp
 (use-package elec-pair
   :straight (:type built-in)
@@ -915,28 +991,28 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   :init (setq electric-pair-inhibit-predicate 'electric-pair-conservative-inhibit))
 #+end_src
 
-** DONE Edit multiple regions simultaneously
+** Edit multiple regions simultaneously
 #+begin_src emacs-lisp
 (use-package iedit :defer t)
 #+end_src
 
-** DONE Sudo edit
+** Sudo edit
 #+begin_src emacs-lisp
 (use-package sudo-edit :defer t)
 #+end_src
 
-** DONE Subword: Handling capitalized subwords in a nomenclature
+** Subword: Handling capitalized subwords in a nomenclature
 #+begin_src emacs-lisp
 (use-package subword
+  :defer t
   :straight (:type built-in)
   :hook ((prog-mode . subword-mode)
          (minibuffer-setup . subword-mode)))
 #+end_src
 
-** DONE Buffer Terminator
+** Buffer Terminator
 #+begin_src emacs-lisp
 (use-package buffer-terminator
-  :defer t
   :hook (after-init . buffer-terminator-mode)
   :custom
   (buffer-terminator-verbose nil)
@@ -944,7 +1020,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (buffer-terminator-interval (* 10 60)))
 #+end_src
 
-** DONE Helpful
+** Helpful
 #+begin_src emacs-lisp
 (use-package helpful
   :defer t
@@ -964,7 +1040,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (helpful-max-buffers 7))
 #+end_src
 
-** DONE Jinx
+** Jinx
 #+begin_src emacs-lisp
 (use-package jinx
   :hook (after-init . jinx-mode)
@@ -998,7 +1074,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
       (write-region "" nil dict-file))))
 #+end_src
 
-** DONE Stripspace
+** Stripspace
 #+begin_src emacs-lisp
 (use-package stripspace
   :commands stripspace-local-mode
@@ -1010,16 +1086,18 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (stripspace-restore-column t))
 #+end_src
 
-** DONE Fonts
+** Fonts
 #+begin_src emacs-lisp
 (defun ar/set-fonts ()
   "Set the default, fixed-pitch, and variable-pitch fonts for the current frame."
   (set-face-attribute 'default nil :font "JetBrains Mono" :height 125 :weight 'medium)
   (set-face-attribute 'fixed-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
   (set-face-attribute 'variable-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
-  ;; Apply italic slant to comments and keywords
+  ;; Apply italic slant to comments
   (set-face-attribute 'font-lock-comment-face nil :slant 'italic)
-  (set-face-attribute 'font-lock-keyword-face nil :slant 'italic))
+
+  ;; Apply BOTH Bold and Italic to keywords
+  (set-face-attribute 'font-lock-keyword-face nil :weight 'bold :slant 'italic))
 
 (if (daemonp)
     (add-hook 'emacs-startup-hook
@@ -1038,7 +1116,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
       inhibit-compacting-font-caches t)
 #+end_src
 
-** DONE Doom Themes
+** Doom Themes
 #+begin_src emacs-lisp
 (use-package doom-themes
   :custom
@@ -1052,13 +1130,13 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (doom-themes-org-config))
 #+end_src
 
-** DONE Solaire Mode
+** Solaire Mode
 #+begin_src emacs-lisp
 (use-package solaire-mode
   :hook (after-init . solaire-global-mode))
 #+end_src
 
-** DONE Modeline
+** Modeline
 #+begin_src emacs-lisp
 (size-indication-mode -1)
 (setq-default mode-line-percent-position nil)
@@ -1086,7 +1164,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
         doom-modeline-vcs-max-length 0))
 #+end_src
 
-** DONE Hide Modeline
+** Hide Modeline
 #+begin_src emacs-lisp
 (use-package hide-mode-line
   :autoload turn-off-hide-mode-line-mode
@@ -1097,7 +1175,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
            pdf-annot-list-mode) . turn-on-hide-mode-line-mode)))
 #+end_src
 
-** DONE Line Numbers
+** Line Numbers
 #+begin_src emacs-lisp
 (use-package display-line-numbers
   :straight (:type built-in)
@@ -1108,7 +1186,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   :init (setq display-line-numbers-width-start t))
 #+end_src
 
-** DONE Display dividers between windows
+** Display dividers between windows
 #+begin_src emacs-lisp
 (setq window-divider-default-places t
       window-divider-default-bottom-width 1
@@ -1116,13 +1194,13 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 (add-hook 'window-setup-hook #'window-divider-mode)
 #+end_src
 
-** DONE Text Scaling
+** Text Scaling
 #+begin_src emacs-lisp
 (use-package default-text-scale
   :hook (after-init . default-text-scale-mode))
 #+end_src
 
-** DONE Scrolling
+** Scrolling
 #+begin_src emacs-lisp
 ;; Scroll one line at a time (less "jumpy" than defaults)
 (setq hscroll-step 1
@@ -1147,7 +1225,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
     (add-hook 'ultra-scroll-hide-functions #'jit-lock-mode)))
 
 #+end_src
-** DONE Dashboard
+** Dashboard
 #+begin_src emacs-lisp
 (use-package dashboard
   :init
@@ -1192,7 +1270,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 
 #+end_src
 
-** DONE Highlight the current line
+** Highlight the current line
 #+begin_src emacs-lisp
 (use-package hl-line
   :straight (:type built-in)
@@ -1200,9 +1278,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
          ((dashboard-mode eshell-mode shell-mode term-mode vterm-mode) .
           (lambda () (setq-local global-hl-line-mode nil))))
   :config
-  ;; CRITICAL FIX: Disable hl-line in Evil Visual mode.
-  ;; Otherwise, the current line highlight masks the selection, making it look
-  ;; like the selection starts "late" or is broken.
   (defun ar/disable-hl-line-in-visual ()
     (when (bound-and-true-p hl-line-mode)
       (hl-line-mode -1)
@@ -1217,149 +1292,149 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (add-hook 'evil-visual-state-exit-hook #'ar/enable-hl-line-after-visual))
 #+end_src
 
-** DONE Prettify Symbols
+** Prettify Symbols
 #+begin_src emacs-lisp
-(defun my/org-prettify-src-blocks ()
-  "Prettify org-mode src block delimiters using font-lock and nerd-icons."
-  (font-lock-add-keywords nil
-    '(;; #+begin_src (with language name)
-      ("^[ \t]*\\(#\\+begin_src\\)[ \t]*.*$"
-       (1 (prog1 nil
-            (let ((icon (nerd-icons-codicon "nf-cod-code")))
-              (compose-region (match-beginning 1) (match-end 1) icon)
-              (put-text-property (match-beginning 1) (match-end 1)
-                                'face '(:foreground "#9ece6a"))))))
-      ;; #+end_src
-      ("^[ \t]*\\(#\\+end_src\\)[ \t]*$"
-       (1 (prog1 nil
-            (let ((icon (nerd-icons-codicon "nf-cod-code")))
-              (compose-region (match-beginning 1) (match-end 1) icon)
-              (put-text-property (match-beginning 1) (match-end 1)
-                                'face '(:foreground "#9ece6a"))))))
-      ;; #+BEGIN_SRC (uppercase)
-      ("^[ \t]*\\(#\\+BEGIN_SRC\\)[ \t]*.*$"
-       (1 (prog1 nil
-            (let ((icon (nerd-icons-codicon "nf-cod-file_code")))
-              (compose-region (match-beginning 1) (match-end 1) icon)
-              (put-text-property (match-beginning 1) (match-end 1)
-                                'face '(:foreground "#9ece6a"))))))
-      ;; #+END_SRC (uppercase)
-      ("^[ \t]*\\(#\\+END_SRC\\)[ \t]*$"
-       (1 (prog1 nil
-            (let ((icon (nerd-icons-codicon "nf-cod-file_code")))
-              (compose-region (match-beginning 1) (match-end 1) icon)
-              (put-text-property (match-beginning 1) (match-end 1)
-                                'face '(:foreground "#7aa2f7"))))))
-      ;; #+begin_example
-      ("^[ \t]*\\(#\\+begin_example\\)[ \t]*$"
-       (1 (prog1 nil
-            (let ((icon (nerd-icons-faicon "nf-fa-quote_left")))
-              (compose-region (match-beginning 1) (match-end 1) icon)
-              (put-text-property (match-beginning 1) (match-end 1)
-                                'face '(:foreground "#bb9af7"))))))
-      ;; #+end_example
-      ("^[ \t]*\\(#\\+end_example\\)[ \t]*$"
-       (1 (prog1 nil
-            (let ((icon (nerd-icons-faicon "nf-fa-quote_right")))
-              (compose-region (match-beginning 1) (match-end 1) icon)
-              (put-text-property (match-beginning 1) (match-end 1)
-                                'face '(:foreground "#bb9af7"))))))
-      ;; #+BEGIN_EXAMPLE
-      ("^[ \t]*\\(#\\+BEGIN_EXAMPLE\\)[ \t]*$"
-       (1 (prog1 nil
-            (let ((icon (nerd-icons-faicon "nf-fa-quote_left")))
-              (compose-region (match-beginning 1) (match-end 1) icon)
-              (put-text-property (match-beginning 1) (match-end 1)
-                                'face '(:foreground "#bb9af7"))))))
-      ;; #+END_EXAMPLE
-      ("^[ \t]*\\(#\\+END_EXAMPLE\\)[ \t]*$"
-       (1 (prog1 nil
-            (let ((icon (nerd-icons-faicon "nf-fa-quote_right")))
-              (compose-region (match-beginning 1) (match-end 1) icon)
-              (put-text-property (match-beginning 1) (match-end 1)
-                                'face '(:foreground "#bb9af7"))))))
-      ;; #+header: or #+HEADER:
-      ("^[ \t]*\\(#\\+\\(?:header\\|HEADER\\):\\)[ \t]*"
-       (1 (prog1 nil
-            (let ((icon (nerd-icons-mdicon "nf-md-cog")))
-              (compose-region (match-beginning 1) (match-end 1) icon)
-              (put-text-property (match-beginning 1) (match-end 1)
-                                'face '(:foreground "#e0af68"))))))
-      ;; #+results: or #+RESULTS:
-      ("^[ \t]*\\(#\\+\\(?:results\\|RESULTS\\):\\)[ \t]*"
-       (1 (prog1 nil
-            (let ((icon (nerd-icons-mdicon "nf-md-chart_line")))
-              (compose-region (match-beginning 1) (match-end 1) icon)
-              (put-text-property (match-beginning 1) (match-end 1)
-                                'face '(:foreground "#7dcfff"))))))
-      ;; #+call: or #+CALL:
-      ("^[ \t]*\\(#\\+\\(?:call\\|CALL\\):\\)[ \t]*"
-       (1 (prog1 nil
-            (let ((icon (nerd-icons-mdicon "nf-md-phone")))
-              (compose-region (match-beginning 1) (match-end 1) icon)
-              (put-text-property (match-beginning 1) (match-end 1)
-                                'face '(:foreground "#9aa5ce"))))))
-      ;; :PROPERTIES: or :properties:
-      ("^[ \t]*\\(:\\(?:PROPERTIES\\|properties\\):\\)[ \t]*$"
-       (1 (prog1 nil
-            (let ((icon (nerd-icons-mdicon "nf-md-folder_cog")))
-              (compose-region (match-beginning 1) (match-end 1) icon)
-              (put-text-property (match-beginning 1) (match-end 1)
-                                'face '(:foreground "#ff9e64"))))))
-      ;; :LOGBOOK: or :logbook:
-      ("^[ \t]*\\(:\\(?:LOGBOOK\\|logbook\\):\\)[ \t]*$"
-       (1 (prog1 nil
-            (let ((icon (nerd-icons-mdicon "nf-md-notebook")))
-              (compose-region (match-beginning 1) (match-end 1) icon)
-              (put-text-property (match-beginning 1) (match-end 1)
-                                'face '(:foreground "#9ece6a")))))))
-    'append))
+;; (defun my/org-prettify-src-blocks ()
+;;   "Prettify org-mode src block delimiters using font-lock and nerd-icons."
+;;   (font-lock-add-keywords nil
+;;     '(;; #+begin_src (with language name)
+;;       ("^[ \t]*\\(#\\+begin_src\\)[ \t]*.*$"
+;;        (1 (prog1 nil
+;;             (let ((icon (nerd-icons-codicon "nf-cod-code")))
+;;               (compose-region (match-beginning 1) (match-end 1) icon)
+;;               (put-text-property (match-beginning 1) (match-end 1)
+;;                                 'face '(:foreground "#9ece6a"))))))
+;;       ;; #+end_src
+;;       ("^[ \t]*\\(#\\+end_src\\)[ \t]*$"
+;;        (1 (prog1 nil
+;;             (let ((icon (nerd-icons-codicon "nf-cod-code")))
+;;               (compose-region (match-beginning 1) (match-end 1) icon)
+;;               (put-text-property (match-beginning 1) (match-end 1)
+;;                                 'face '(:foreground "#9ece6a"))))))
+;;       ;; #+BEGIN_SRC (uppercase)
+;;       ("^[ \t]*\\(#\\+BEGIN_SRC\\)[ \t]*.*$"
+;;        (1 (prog1 nil
+;;             (let ((icon (nerd-icons-codicon "nf-cod-file_code")))
+;;               (compose-region (match-beginning 1) (match-end 1) icon)
+;;               (put-text-property (match-beginning 1) (match-end 1)
+;;                                 'face '(:foreground "#9ece6a"))))))
+;;       ;; #+END_SRC (uppercase)
+;;       ("^[ \t]*\\(#\\+END_SRC\\)[ \t]*$"
+;;        (1 (prog1 nil
+;;             (let ((icon (nerd-icons-codicon "nf-cod-file_code")))
+;;               (compose-region (match-beginning 1) (match-end 1) icon)
+;;               (put-text-property (match-beginning 1) (match-end 1)
+;;                                 'face '(:foreground "#7aa2f7"))))))
+;;       ;; #+begin_example
+;;       ("^[ \t]*\\(#\\+begin_example\\)[ \t]*$"
+;;        (1 (prog1 nil
+;;             (let ((icon (nerd-icons-faicon "nf-fa-quote_left")))
+;;               (compose-region (match-beginning 1) (match-end 1) icon)
+;;               (put-text-property (match-beginning 1) (match-end 1)
+;;                                 'face '(:foreground "#bb9af7"))))))
+;;       ;; #+end_example
+;;       ("^[ \t]*\\(#\\+end_example\\)[ \t]*$"
+;;        (1 (prog1 nil
+;;             (let ((icon (nerd-icons-faicon "nf-fa-quote_right")))
+;;               (compose-region (match-beginning 1) (match-end 1) icon)
+;;               (put-text-property (match-beginning 1) (match-end 1)
+;;                                 'face '(:foreground "#bb9af7"))))))
+;;       ;; #+BEGIN_EXAMPLE
+;;       ("^[ \t]*\\(#\\+BEGIN_EXAMPLE\\)[ \t]*$"
+;;        (1 (prog1 nil
+;;             (let ((icon (nerd-icons-faicon "nf-fa-quote_left")))
+;;               (compose-region (match-beginning 1) (match-end 1) icon)
+;;               (put-text-property (match-beginning 1) (match-end 1)
+;;                                 'face '(:foreground "#bb9af7"))))))
+;;       ;; #+END_EXAMPLE
+;;       ("^[ \t]*\\(#\\+END_EXAMPLE\\)[ \t]*$"
+;;        (1 (prog1 nil
+;;             (let ((icon (nerd-icons-faicon "nf-fa-quote_right")))
+;;               (compose-region (match-beginning 1) (match-end 1) icon)
+;;               (put-text-property (match-beginning 1) (match-end 1)
+;;                                 'face '(:foreground "#bb9af7"))))))
+;;       ;; #+header: or #+HEADER:
+;;       ("^[ \t]*\\(#\\+\\(?:header\\|HEADER\\):\\)[ \t]*"
+;;        (1 (prog1 nil
+;;             (let ((icon (nerd-icons-mdicon "nf-md-cog")))
+;;               (compose-region (match-beginning 1) (match-end 1) icon)
+;;               (put-text-property (match-beginning 1) (match-end 1)
+;;                                 'face '(:foreground "#e0af68"))))))
+;;       ;; #+results: or #+RESULTS:
+;;       ("^[ \t]*\\(#\\+\\(?:results\\|RESULTS\\):\\)[ \t]*"
+;;        (1 (prog1 nil
+;;             (let ((icon (nerd-icons-mdicon "nf-md-chart_line")))
+;;               (compose-region (match-beginning 1) (match-end 1) icon)
+;;               (put-text-property (match-beginning 1) (match-end 1)
+;;                                 'face '(:foreground "#7dcfff"))))))
+;;       ;; #+call: or #+CALL:
+;;       ("^[ \t]*\\(#\\+\\(?:call\\|CALL\\):\\)[ \t]*"
+;;        (1 (prog1 nil
+;;             (let ((icon (nerd-icons-mdicon "nf-md-phone")))
+;;               (compose-region (match-beginning 1) (match-end 1) icon)
+;;               (put-text-property (match-beginning 1) (match-end 1)
+;;                                 'face '(:foreground "#9aa5ce"))))))
+;;       ;; :PROPERTIES: or :properties:
+;;       ("^[ \t]*\\(:\\(?:PROPERTIES\\|properties\\):\\)[ \t]*$"
+;;        (1 (prog1 nil
+;;             (let ((icon (nerd-icons-mdicon "nf-md-folder_cog")))
+;;               (compose-region (match-beginning 1) (match-end 1) icon)
+;;               (put-text-property (match-beginning 1) (match-end 1)
+;;                                 'face '(:foreground "#ff9e64"))))))
+;;       ;; :LOGBOOK: or :logbook:
+;;       ("^[ \t]*\\(:\\(?:LOGBOOK\\|logbook\\):\\)[ \t]*$"
+;;        (1 (prog1 nil
+;;             (let ((icon (nerd-icons-mdicon "nf-md-notebook")))
+;;               (compose-region (match-beginning 1) (match-end 1) icon)
+;;               (put-text-property (match-beginning 1) (match-end 1)
+;;                                 'face '(:foreground "#9ece6a")))))))
+;;     'append))
 
-(defvar-local my/org-prettify-overlays-to-restore nil
-  "List of overlays to restore after cursor leaves.")
+;; (defvar-local my/org-prettify-overlays-to-restore nil
+;;   "List of overlays to restore after cursor leaves.")
 
-(defun my/org-reveal-composition-at-point ()
-  "Remove composition from current line if on a prettified org element."
-  (when (and (eq major-mode 'org-mode)
-             (save-excursion
-               (beginning-of-line)
-               (looking-at "^[ \t]*\\(?:#\\+\\(?:begin_src\\|end_src\\|BEGIN_SRC\\|END_SRC\\|begin_example\\|end_example\\|BEGIN_EXAMPLE\\|END_EXAMPLE\\|\\(?:header\\|HEADER\\|results\\|RESULTS\\|call\\|CALL\\):\\)\\|:\\(?:PROPERTIES\\|properties\\|LOGBOOK\\|logbook\\):\\)")))
-    (let ((line-start (line-beginning-position))
-          (line-end (line-end-position)))
-      ;; Store the composition for restoration
-      (setq my/org-prettify-overlays-to-restore
-            (list line-start line-end
-                  (get-text-property line-start 'composition)))
-      ;; Remove composition
-      (with-silent-modifications
-        (remove-text-properties line-start line-end '(composition nil face nil))))))
+;; (defun my/org-reveal-composition-at-point ()
+;;   "Remove composition from current line if on a prettified org element."
+;;   (when (and (eq major-mode 'org-mode)
+;;              (save-excursion
+;;                (beginning-of-line)
+;;                (looking-at "^[ \t]*\\(?:#\\+\\(?:begin_src\\|end_src\\|BEGIN_SRC\\|END_SRC\\|begin_example\\|end_example\\|BEGIN_EXAMPLE\\|END_EXAMPLE\\|\\(?:header\\|HEADER\\|results\\|RESULTS\\|call\\|CALL\\):\\)\\|:\\(?:PROPERTIES\\|properties\\|LOGBOOK\\|logbook\\):\\)")))
+;;     (let ((line-start (line-beginning-position))
+;;           (line-end (line-end-position)))
+;;       ;; Store the composition for restoration
+;;       (setq my/org-prettify-overlays-to-restore
+;;             (list line-start line-end
+;;                   (get-text-property line-start 'composition)))
+;;       ;; Remove composition
+;;       (with-silent-modifications
+;;         (remove-text-properties line-start line-end '(composition nil face nil))))))
 
-(defun my/org-restore-composition-at-point ()
-  "Restore composition after leaving the line."
-  (when my/org-prettify-overlays-to-restore
-    (let ((line-start (line-beginning-position))
-          (line-end (line-end-position))
-          (old-line-start (nth 0 my/org-prettify-overlays-to-restore))
-          (old-line-end (nth 1 my/org-prettify-overlays-to-restore)))
-      ;; Only restore if we've moved to a different line
-      (when (or (< line-end old-line-start)
-                (> line-start old-line-end))
-        ;; Trigger font-lock to reapply
-        (font-lock-flush old-line-start old-line-end)
-        (setq my/org-prettify-overlays-to-restore nil)))))
+;; (defun my/org-restore-composition-at-point ()
+;;   "Restore composition after leaving the line."
+;;   (when my/org-prettify-overlays-to-restore
+;;     (let ((line-start (line-beginning-position))
+;;           (line-end (line-end-position))
+;;           (old-line-start (nth 0 my/org-prettify-overlays-to-restore))
+;;           (old-line-end (nth 1 my/org-prettify-overlays-to-restore)))
+;;       ;; Only restore if we've moved to a different line
+;;       (when (or (< line-end old-line-start)
+;;                 (> line-start old-line-end))
+;;         ;; Trigger font-lock to reapply
+;;         (font-lock-flush old-line-start old-line-end)
+;;         (setq my/org-prettify-overlays-to-restore nil)))))
 
-(defun my/org-setup-prettify-cursor-sensor ()
-  "Setup cursor sensor for revealing compositions."
-  (add-hook 'post-command-hook #'my/org-reveal-composition-at-point nil t)
-  (add-hook 'post-command-hook #'my/org-restore-composition-at-point nil t))
+;; (defun my/org-setup-prettify-cursor-sensor ()
+;;   "Setup cursor sensor for revealing compositions."
+;;   (add-hook 'post-command-hook #'my/org-reveal-composition-at-point nil t)
+;;   (add-hook 'post-command-hook #'my/org-restore-composition-at-point nil t))
 
-(defun my/org-prettify-setup ()
-  "Complete setup for org-mode prettification."
-  (my/org-prettify-src-blocks)
-  (my/org-setup-prettify-cursor-sensor))
+;; (defun my/org-prettify-setup ()
+;;   "Complete setup for org-mode prettification."
+;;   (my/org-prettify-src-blocks)
+;;   (my/org-setup-prettify-cursor-sensor))
 
-;; Add to org-mode hook
-(add-hook 'org-mode-hook #'my/org-prettify-setup)
+;; ;; Add to org-mode hook
+;; (add-hook 'org-mode-hook #'my/org-prettify-setup)
 #+end_src
 
 ** TODO Ediff
@@ -1500,8 +1575,8 @@ and sets up vim-style navigation."
               (select-window (get-buffer-window ediff-control-buffer)))))
 #+end_src
 
-** DONE Scroll Mode
-* DONE Markdown
+** Scroll Mode
+* Markdown
 #+begin_src emacs-lisp
 (use-package markdown-mode
   :defer t
@@ -1644,8 +1719,8 @@ and sets up vim-style navigation."
         markdown-toc-user-toc-structure-manipulation-fn 'cdr))
 #+end_src
 
-* DONE Version Control
-** DONE Magit: The Git Porcelain
+* Version Control
+** Magit: The Git Porcelain
 #+begin_src emacs-lisp
 (use-package magit
   :defer t
@@ -1696,7 +1771,7 @@ and sets up vim-style navigation."
     (setq magit-revision-show-gravatars '("^Author:     " . "^Commit:     "))))
 #+end_src
 
-** DONE Forge: GitHub/GitLab Integration
+** Forge: GitHub/GitLab Integration
 #+begin_src emacs-lisp
 (use-package forge
   :after magit
@@ -1706,7 +1781,7 @@ and sets up vim-style navigation."
   (setq forge-database-connector 'sqlite-builtin))
 #+end_src
 
-** DONE Diff-hl
+** Diff-hl
 #+begin_src emacs-lisp
 (use-package diff-hl
   :hook ((after-init . global-diff-hl-mode)
@@ -1744,7 +1819,7 @@ and sets up vim-style navigation."
    '(diff-hl-delete ((t (:foreground "#f7768e" :background unspecified))))))
 #+end_src
 
-** DONE Git-Timemachine: Step Through File History
+** Git-Timemachine: Step Through File History
 #+begin_src emacs-lisp
 (use-package git-timemachine
   :defer t
@@ -1800,7 +1875,7 @@ and sets up vim-style navigation."
   (add-hook 'git-timemachine-mode-exit-hook #'ar/git-timemachine-teardown))
 #+end_src
 
-** DONE Magit Custom Functions
+** Magit Custom Functions
 #+begin_src emacs-lisp
 (defun ar/magit-stage-all ()
   "Stage all changes in the project (equivalent to 'git add .')."
@@ -1809,45 +1884,97 @@ and sets up vim-style navigation."
   (message "Staged all changes."))
 #+end_src
 
-** DONE Comprehensive VC Hydra
+** Comprehensive VC Hydra
 #+begin_src emacs-lisp
-;; (with-eval-after-load 'hydra
-;;   (pretty-hydra-define version-control-hydra
-;;     (:title (pretty-hydra-title "Version Control" 'octicon "nf-oct-git_branch" :face 'nerd-icons-green)
-;;      :color amaranth
-;;      :quit-key ("q" "C-g"))
+(with-eval-after-load 'transient
+  ;; 1. Define Title Generator
+  (defun ar/vc-menu-title ()
+    (concat
+     (if (fboundp 'nerd-icons-octicon)
+         (nerd-icons-octicon "nf-oct-git_branch" :face 'nerd-icons-green :v-adjust 0.02)
+       "")
+     (propertize " Version Control" 'face 'transient-heading)))
 
-;;     ("Magit Core"
-;;      (("s" magit-status "status" :exit t)
-;;       ("a" ar/magit-stage-all "stage all")
-;;       ("c" magit-commit "commit" :exit t)
-;;       ("p" magit-push-current-to-pushremote "push")
-;;       ("P" magit-pull-from-upstream "pull")
-;;       ("f" magit-fetch "fetch")
-;;       ("F" magit-fetch-all "fetch all"))
+  ;; 2. Define the Menu
+  (transient-define-prefix ar/vc-menu-transient ()
+    "Version Control Dashboard"
+    [:description ar/vc-menu-title
 
-;;      "Branch & Log"
-;;      (("b" magit-branch "branches" :exit t)
-;;       ("B" magit-checkout "checkout" :exit t)
-;;       ("m" magit-merge "merge" :exit t)
-;;       ("r" magit-rebase "rebase" :exit t)
-;;       ("l" ar/magit-log-buffer-file-and-follow "log file" :exit t)
-;;       ("L" magit-log-current "log branch" :exit t))
+     ;; Group 1: Core Magit Actions
+     ["Magit Core"
+      ("s" "Status" magit-status)
+      ("a" "Stage All" ar/magit-stage-all)
+      ("c" "Commit" magit-commit)
+      ("p" "Push" magit-push-current-to-pushremote)
+      ("P" "Pull" magit-pull-from-upstream)
+      ("f" "Fetch" magit-fetch)
+      ("F" "Fetch All" magit-fetch-all)]
 
-;;      "Diff & Stage"
-;;      (("d" magit-diff-unstaged "diff unstaged" :exit t)
-;;       ("D" magit-diff-staged "diff staged" :exit t)
-;;       ("S" magit-stage-file "stage file")
-;;       ("u" magit-unstage-file "unstage file")
-;;       ("U" magit-unstage-all "unstage all"))
+     ;; Group 2: Branching & History
+     ["Branch & Log"
+      ("b" "Branches" magit-branch)
+      ("B" "Checkout" magit-checkout)
+      ("m" "Merge" magit-merge)
+      ("r" "Rebase" magit-rebase)
+      ("l" "File Log" magit-log-buffer-file)
+      ("L" "Branch Log" magit-log-current)]
 
-;;      "Advanced"
-;;      (("z" magit-stash "stash" :exit t)
-;;       ("Z" magit-stash-pop "stash pop" :exit t)
-;;       ("x" magit-reset "reset" :exit t)
-;;       ("!" magit-run "run cmd" :exit t)
-;;       ("R" magit-refresh "refresh")
-;;       ("?" magit-dispatch "dispatch" :exit t)))))
+     ;; Group 3: Diffs & Staging
+     ["Diff & Stage"
+      ("d" "Diff Unstaged" magit-diff-unstaged)
+      ("D" "Diff Staged" magit-diff-staged)
+      ("S" "Stage File" magit-stage-file :transient t)
+      ("u" "Unstage File" magit-unstage-file :transient t)
+      ("U" "Unstage All" magit-unstage-all :transient t)]
+
+     ;; Group 4: Advanced Operations
+     ["Advanced"
+      ("z" "Stash" magit-stash)
+      ("Z" "Pop Stash" magit-stash-pop)
+      ("x" "Reset" magit-reset)
+      ("!" "Run Cmd" magit-run)
+      ("R" "Refresh" magit-refresh :transient t)
+      ("?" "Dispatch" magit-dispatch)
+      ("<escape>" "" transient-quit-one :format " ")]]))
+
+
+(with-eval-after-load 'hydra
+  (pretty-hydra-define version-control-hydra
+    (:title (pretty-hydra-title "Version Control" 'octicon "nf-oct-git_branch" :face 'nerd-icons-green)
+     :color amaranth
+     :quit-key ("q" "C-g"))
+
+    ("Magit Core"
+     (("s" magit-status "status" :exit t)
+      ("a" ar/magit-stage-all "stage all")
+      ("c" magit-commit "commit" :exit t)
+      ("p" magit-push-current-to-pushremote "push")
+      ("P" magit-pull-from-upstream "pull")
+      ("f" magit-fetch "fetch")
+      ("F" magit-fetch-all "fetch all"))
+
+     "Branch & Log"
+     (("b" magit-branch "branches" :exit t)
+      ("B" magit-checkout "checkout" :exit t)
+      ("m" magit-merge "merge" :exit t)
+      ("r" magit-rebase "rebase" :exit t)
+      ("l" ar/magit-log-buffer-file-and-follow "log file" :exit t)
+      ("L" magit-log-current "log branch" :exit t))
+
+     "Diff & Stage"
+     (("d" magit-diff-unstaged "diff unstaged" :exit t)
+      ("D" magit-diff-staged "diff staged" :exit t)
+      ("S" magit-stage-file "stage file")
+      ("u" magit-unstage-file "unstage file")
+      ("U" magit-unstage-all "unstage all"))
+
+     "Advanced"
+     (("z" magit-stash "stash" :exit t)
+      ("Z" magit-stash-pop "stash pop" :exit t)
+      ("x" magit-reset "reset" :exit t)
+      ("!" magit-run "run cmd" :exit t)
+      ("R" magit-refresh "refresh")
+      ("?" magit-dispatch "dispatch" :exit t)))))
 #+end_src
 
 * DONE Org Mode
@@ -2015,6 +2142,7 @@ If file doesn't exist, creates it with TEMPLATE content."
   (org-log-done nil)
   (org-log-into-drawer nil)
   (org-log-repeat nil)
+  (org-treat-insert-todo-heading-as-state-change nil)
   (org-log-reschedule nil)
   (org-log-redeadline nil)
   (org-return-follows-link t)
@@ -2024,6 +2152,7 @@ If file doesn't exist, creates it with TEMPLATE content."
   (org-hide-leading-stars t)
   (org-hide-emphasis-markers t)
   (org-fontify-whole-heading-line t)
+  (org-adapt-indentation nil)
   (org-fontify-done-headline t)
   (org-fontify-quote-and-verse-blocks t)
 
@@ -2223,13 +2352,84 @@ If file doesn't exist, creates it with TEMPLATE content."
   (define-key org-mode-map (kbd "<") #'ar/org-smart-less-than))
 #+end_src
 
+#+begin_src emacs-lisp
+;; (use-package org-modern
+;;   :defer t
+;;   :hook (org-mode . org-modern-mode)
+;;   :custom
+;;   (org-modern-table-vertical 1)
+;;   (org-modern-table-horizontal 0.2)
+;;   (org-modern-table t)
+
+;;   (org-modern-checkbox nil)   ; Let prettify-symbols handle checkboxes
+;;   (org-modern-todo nil)       ; Let your theme handle TODO colors
+;;   (org-modern-tag nil)        ; Let your theme handle Tags
+;;   (org-modern-priority nil)   ; Let your theme handle Priorities
+
+;;   (org-modern-block-fringe t)
+;;   (org-modern-hide-stars nil)
+;;   (org-modern-keyword t)      ; Prettify keywords (TITLE, AUTHOR, etc.)
+
+;;   :config
+;;   ;; Font adjustments for the symbols
+;;   (set-face-attribute 'org-modern-symbol nil :family "Symbols Nerd Font Mono")
+;;   (set-face-attribute 'org-modern-label nil :height 0.9)
+
+;;   ;; Clean up standard Org settings to play nice with Modern
+;;   (setq org-auto-align-tags nil
+;;         org-tags-column 0
+;;         org-catch-invisible-edits 'show-and-error))
+#+end_src
+
+** Org Modern
+#+begin_src emacs-lisp
+;; (use-package org-modern
+;;   :hook (org-mode . org-modern-mode)
+;;   :hook (org-agenda-finalize . org-modern-agenda)
+;;   :custom
+;;   (org-modern-checkbox nil)
+;;   (org-modern-todo nil)
+;;   (org-modern-tag nil)         ; Use your custom tag styling
+;;   (org-modern-priority nil)    ; Use your custom priority faces
+
+;;   ;; --- (3) Enabled Features ---
+;;   (org-modern-keyword t)           ; Badges for #+TITLE, #+AUTHOR
+;;   (org-modern-block t)             ; Subtle background for blocks
+;;   (org-modern-block-fringe nil)    ; Remove fringe marker (cleaner)
+;;   (org-modern-horizontal-rule t)   ; Draw lines for '-----'
+;;   (org-modern-timestamp nil)
+;;   (org-modern-statistics nil)
+;;   (org-modern-progress t)
+
+;;   ;; --- Tables & Lists ---
+;;   (org-modern-table t)             ; Nice table borders
+;;   (org-modern-table-vertical 1)    ; Row padding
+;;   (org-modern-table-horizontal 0.2); Cell padding
+;;   (org-modern-list '((43 . "➤")    ; + becomes Arrow
+;;                      (45 . "•")    ; - becomes Dot
+;;                      (42 . "•")))  ; * becomes Dot
+
+;;   ;; Org-Modern alignment settings
+;;   (setq org-auto-align-tags nil
+;;         org-tags-column 0
+;;         org-fold-catch-invisible-edits 'show-and-error
+;;         org-special-ctrl-a/e t)
+
+;;   :config
+;;   ;; Font adjustments for alignment
+;;   (custom-set-faces
+;;    '(org-modern-keyword ((t (:inherit font-lock-keyword-face :slant italic :weight bold))))
+;;    '(org-modern-label ((t (:height 0.9 :weight medium :family "JetBrains Mono"))))
+;;    '(org-modern-symbol ((t (:height 1.0 :family "Symbols Nerd Font Mono"))))))
+#+end_src
+
 ** DONE Org iBullets
 #+begin_src emacs-lisp
-(use-package org-ibullets
-  :defer t
-  :commands org-ibullets-mode
-  :straight (:host github :repo "jamescherti/org-ibullets.el")
-  :hook (org-mode . org-ibullets-mode))
+;; (use-package org-ibullets
+;;   :defer t
+;;   :commands org-ibullets-mode
+;;   :straight (:host github :repo "jamescherti/org-ibullets.el")
+;;   :hook (org-mode . org-ibullets-mode))
 #+end_src
 
 ** DONE Org Src Buffer Naming
@@ -2577,12 +2777,12 @@ If file doesn't exist, creates it with TEMPLATE content."
 
 ** DONE Org GTD - Pure Task Management
 #+begin_src emacs-lisp
-(use-package org-edna
-  :defer t
-  :commands (org-edna-mode org-edna-load)
-  :hook (org-mode . org-edna-mode)
-  :custom
-  (org-edna-use-inheritance t))
+;; (use-package org-edna
+;;   :defer t
+;;   :commands (org-edna-mode org-edna-load)
+;;   :hook (org-mode . org-edna-mode)
+;;   :custom
+;;   (org-edna-use-inheritance t))
 
 (use-package org-gtd
   :defer t
@@ -2618,7 +2818,7 @@ If file doesn't exist, creates it with TEMPLATE content."
   (org-gtd-mode nil)
 
   :config
-  ;; (org-edna-mode 1)
+  (org-edna-mode 1)
   ;; Add GTD directory to agenda (but NOT roam/)
   (setq org-agenda-files
         (list my/org-directory
@@ -2627,11 +2827,11 @@ If file doesn't exist, creates it with TEMPLATE content."
   ;; ;; Performance: Delay database sync until idle
   ;; ;; Defer mode activation until actually needed
   ;; ;; Remove this if you don't need org-gtd-mode active globally
-  ;; (run-with-idle-timer 30 nil
-  ;;   (lambda ()
-  ;;     (when (and (featurep 'org-gtd)
-  ;;                (not (bound-and-true-p org-gtd-mode)))
-  ;;       (org-gtd-mode 1))))
+  (run-with-idle-timer 30 nil
+    (lambda ()
+      (when (and (featurep 'org-gtd)
+                 (not (bound-and-true-p org-gtd-mode)))
+        (org-gtd-mode 1))))
 
   ;; Custom TODO faces for GTD keywords
   (setq org-todo-keyword-faces
@@ -3188,8 +3388,8 @@ Links back to the GTD task for execution tracking."
                          '((:auto-priority t))))))))))
 #+end_src
 
-* TODO Workflow Management
-** DONE Dired
+* Workflow Management
+** Dired
 #+begin_src emacs-lisp
 (use-package dired
   :straight (:type built-in)
@@ -3211,7 +3411,7 @@ Links back to the GTD task for execution tracking."
   (dired-listing-switches "-l --almost-all --human-readable --time-style=long-iso --group-directories-first --no-group"))
 #+end_src
 
-** DONE Dired Extensions
+** Dired Extensions
 #+begin_src emacs-lisp
 (use-package dired-x
   :straight (:type built-in)
@@ -3250,7 +3450,7 @@ Links back to the GTD task for execution tracking."
   (wdired-create-parent-directories t))
 #+end_src
 
-** DONE Dirvish
+** Dirvish
 #+begin_src emacs-lisp
 (use-package dirvish
   :defer t
@@ -3328,7 +3528,7 @@ Links back to the GTD task for execution tracking."
         dirvish-side-display-alist '((side . bottom) (slot . -1)))
 #+end_src
 
-** DONE Project.el
+** Project.el
 #+begin_src emacs-lisp
 (use-package project :straight (:type built-in) :defer t)
 
@@ -3350,7 +3550,7 @@ Links back to the GTD task for execution tracking."
   (call-interactively #'project-switch-project))
 #+end_src
 
-** DONE iBuffer
+** iBuffer
 #+begin_src emacs-lisp
 (use-package ibuffer
   :straight (:type built-in)
@@ -3404,7 +3604,7 @@ Links back to the GTD task for execution tracking."
 ;;   (ibuffer-show-empty-filter-groups nil))
 #+end_src
 
-** DONE Tabspaces
+** Tabspaces
 #+begin_src emacs-lisp
 (use-package tabspaces
   :straight (:type git :host github :repo "mclear-tools/tabspaces")
@@ -3549,7 +3749,7 @@ Links back to the GTD task for execution tracking."
   (add-hook 'after-init-hook #'ar/tabspaces-startup))
 #+end_src
 
-** TODO Ace Window
+** Ace Window
 #+begin_src emacs-lisp
 ;; (use-package ace-window
 ;;   :defer t
@@ -3649,7 +3849,7 @@ Links back to the GTD task for execution tracking."
 ;;                 (aw--select-window (1+ n))))))
 #+end_src
 
-** DONE Treemacs
+** Treemacs
 #+begin_src emacs-lisp
 (use-package treemacs
   :defer t
@@ -3713,8 +3913,8 @@ Links back to the GTD task for execution tracking."
     [drag-mouse-1] #'treemacs-dragleftclick-action))
 #+end_src
 
-* DONE Completion Framework
-** DONE Orderless
+* Completion Framework
+** Orderless
 #+begin_src emacs-lisp
 (use-package orderless
   :custom
@@ -3724,7 +3924,7 @@ Links back to the GTD task for execution tracking."
   (completion-pcm-leading-wildcard t)) ;; Emacs 31: partial-completion behaves like substring
 #+end_src
 
-** DONE Vertico
+** Vertico
 VERTical Interactive COmpletion
 #+begin_src emacs-lisp
 (use-package vertico
@@ -3742,7 +3942,7 @@ VERTical Interactive COmpletion
   :hook ((rfn-eshadow-update-overlay . vertico-directory-tidy)))
 #+end_src
 
-** DONE Marginalia
+** Marginalia
 Enrich existing commands with completion annotations
 #+begin_src emacs-lisp
 (use-package marginalia
@@ -3753,7 +3953,7 @@ Enrich existing commands with completion annotations
         marginalia-align 'right))
 #+end_src
 
-** DONE Nerd Icons Completion
+** Nerd Icons Completion
 #+begin_src emacs-lisp
 (use-package nerd-icons-completion
   :after marginalia
@@ -3762,7 +3962,7 @@ Enrich existing commands with completion annotations
   (add-hook 'marginalia-mode-hook #'nerd-icons-completion-marginalia-setup))
 #+end_src
 
-** DONE Consult
+** Consult
 #+begin_src emacs-lisp
 (use-package consult
   :defines (xref-show-xrefs-function xref-show-definitions-function)
@@ -3859,12 +4059,12 @@ Enrich existing commands with completion annotations
 
 #+end_src
 
-** DONE Consult Dir
+** Consult Dir
 #+begin_src emacs-lisp
 (use-package consult-dir :defer t)
 #+end_src
 
-** DONE Consult-Project-Extra
+** Consult-Project-Extra
 #+begin_src emacs-lisp
 (use-package consult-project-extra
   :defer t
@@ -3890,7 +4090,7 @@ Enrich existing commands with completion annotations
    ("C-c p o" . consult-project-extra-find-other-window)))
 #+end_src
 
-** DONE Embark
+** Embark
 #+begin_src emacs-lisp
 (use-package embark
   :commands embark-prefix-help-command
@@ -3953,7 +4153,7 @@ targets."
                   :around #'embark-hide-which-key-indicator))))
 #+end_src
 
-** DONE Embark Consult
+** Embark Consult
 #+begin_src emacs-lisp
 (use-package embark-consult
   :defer t
@@ -3962,7 +4162,7 @@ targets."
   (embark-collect-mode . consult-preview-at-point-mode))
 #+end_src
 
-** DONE Corfu
+** Corfu
 #+begin_src emacs-lisp
 (use-package corfu
   :autoload (corfu-quit consult-completion-in-region)
@@ -3999,7 +4199,7 @@ targets."
   (advice-add #'persistent-scratch-save :before #'corfu-quit))
 #+end_src
 
-** DONE Basic Completion
+** Basic Completion
 #+begin_src emacs-lisp
 (use-package emacs
   :straight (:type built-in)
@@ -4009,7 +4209,7 @@ targets."
   (read-extended-command-predicate #'command-completion-default-include-p))
 #+end_src
 
-** DONE Nerd Icons Corfu
+** Nerd Icons Corfu
 #+begin_src emacs-lisp
 (use-package nerd-icons-corfu
   :autoload nerd-icons-corfu-formatter
@@ -4017,7 +4217,7 @@ targets."
   :init (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
 #+end_src
 
-** DONE Cape
+** Cape
 
 #+begin_comment
 ===========================================================================
@@ -4133,7 +4333,7 @@ If completion fails in the future, check these:
   (advice-add #'pcomplete-completions-at-point :around #'cape-wrap-nonexclusive))
 #+end_src
 
-** DONE Dabbrev
+** Dabbrev
 #+begin_src emacs-lisp
 (use-package dabbrev
   :straight (:type built-in)
@@ -4146,7 +4346,7 @@ If completion fails in the future, check these:
   (add-to-list 'dabbrev-ignored-buffer-modes 'tags-table-mode))
 #+end_src
 
-* DONE Consult Roam
+* Consult Roam
 #+begin_src emacs-lisp
 (use-package consult-org-roam
   :defer t
@@ -4164,15 +4364,14 @@ If completion fails in the future, check these:
    :preview-key "M-."))
 #+end_src
 
-* TODO Development Tools
+* Development Tools
 ** Direnv
 #+begin_src emacs-lisp
 (use-package envrc
   :hook (after-init . envrc-global-mode))
 #+end_src
 
-** DONE LSP - handle the org-src-context.el file
-- State "DONE"       from "TODO"       [2026-01-26 Mon 23:23]
+** LSP
 #+begin_src emacs-lisp
 ;; TODO Modify some settings according to https://andreyor.st/posts/2023-09-09-migrating-from-lsp-mode-to-eglot/
 (use-package eglot
@@ -4202,24 +4401,24 @@ If completion fails in the future, check these:
   :config
   (eglot-booster-mode))
 
-;; (use-package org-src-context
-;;   :straight (:type built-in) ; Relies on lisp/org-src-context.el
-;;   :hook (after-init . org-src-context-mode)
-;;   :custom
-;;   ;; Visual: Set to 'nil' to see the grayed-out context surrounding your block.
-;;   ;; Set to 't' if you prefer a focused view (narrowed to just your code).
-;;   (org-src-context-narrow-p nil)
+(use-package org-src-context
+  :straight (:type built-in) ; Relies on lisp/org-src-context.el
+  :hook (after-init . org-src-context-mode)
+  :custom
+  ;; Visual: Set to 'nil' to see the grayed-out context surrounding your block.
+  ;; Set to 't' if you prefer a focused view (narrowed to just your code).
+  (org-src-context-narrow-p nil)
 
-;;   ;; Safety: Disable context injection for files larger than 500KB to prevent lag.
-;;   (org-src-context-max-filesize 500000)
+  ;; Safety: Disable context injection for files larger than 500KB to prevent lag.
+  (org-src-context-max-filesize 500000)
 
-;;   :config
-;;   ;; Enable Apheleia (auto-formatting) inside the edit buffer.
-;;   ;; The patched org-src-context ensures a valid file path exists for this to work.
-;;   (with-eval-after-load 'apheleia
-;;     (add-hook 'org-src-mode-hook
-;;               (lambda ()
-;;                 (apheleia-mode 1)))))
+  :config
+  ;; Enable Apheleia (auto-formatting) inside the edit buffer.
+  ;; The patched org-src-context ensures a valid file path exists for this to work.
+  (with-eval-after-load 'apheleia
+    (add-hook 'org-src-mode-hook
+              (lambda ()
+                (apheleia-mode 1)))))
 
 ;; Integration with Consult for searching symbols
 (use-package consult-eglot
@@ -4572,8 +4771,8 @@ If completion fails in the future, check these:
       ("<escape>" "" transient-quit-one :format " ")]]))
 #+end_src
 
-* DONE Treesitter/Folding
-** DONE Treesit
+* Treesitter/Folding
+** Treesit
 #+begin_src emacs-lisp
 (use-package treesit
   :straight (:type built-in)
@@ -4608,7 +4807,7 @@ If completion fails in the future, check these:
           (conf-toml-mode . toml-ts-mode))))
 #+end_src
 
-** DONE Treesit-Fold
+** Treesit-Fold
 #+begin_src emacs-lisp
 (use-package treesit-fold
   :defer t
@@ -4620,7 +4819,7 @@ If completion fails in the future, check these:
   (global-treesit-fold-indicators-mode 1))
 #+end_src
 
-** DONE Evil Text Objects
+** Evil Text Objects
 #+begin_src emacs-lisp
 (use-package evil-textobj-tree-sitter
   :defer t
@@ -4645,7 +4844,7 @@ If completion fails in the future, check these:
   (define-key evil-outer-text-objects-map "a" (evil-textobj-tree-sitter-get-textobj "parameter.outer")))
 #+end_src
 
-** DONE Vimish Fold
+** Vimish Fold
 #+begin_src emacs-lisp
 (use-package vimish-fold
   :defer t
@@ -4661,7 +4860,7 @@ If completion fails in the future, check these:
   :config (global-evil-vimish-fold-mode))
 #+end_src
 
-* DONE Highlight TODOs
+* Highlight TODOs
 ** hl-todo
 #+begin_src emacs-lisp
 (use-package hl-todo
@@ -4824,7 +5023,7 @@ Falls back to `hl-todo-rgrep' if consult-ripgrep is not available."
    '(hl-todo-STUB ((t (:foreground "#e0af68" :weight bold))))))
 #+end_src
 
-* DONE Rainbow Mode
+* Rainbow Mode
 #+begin_src emacs-lisp
 (use-package rainbow-mode
   :defer t
@@ -4837,7 +5036,7 @@ Falls back to `hl-todo-rgrep' if consult-ripgrep is not available."
   (setq rainbow-latex-colors t))
 #+end_src
 
-* DONE Delimiters
+* Delimiters
 ** show-paren-mode
 #+begin_src emacs-lisp
 (use-package paren
@@ -4939,8 +5138,8 @@ Falls back to `hl-todo-rgrep' if consult-ripgrep is not available."
   (rainbow-delimiters-depth-9-face ((t (:foreground "#7aa2f7")))))
 #+end_src
 
-* DONE Indentations
-** DONE Indent Bars
+* Indentations
+** Indent Bars
 #+begin_src emacs-lisp
 (use-package indent-bars
   :defer t
@@ -4992,7 +5191,7 @@ operators and other column-based navigation."
   :hook ((prog-mode text-mode conf-mode yaml-mode) . ar/indent-bars-maybe-enable))
 #+end_src
 
-** DONE Dirt Indent
+** Dirt Indent
 #+begin_src emacs-lisp
 (use-package dtrt-indent
   :defer t
@@ -5009,7 +5208,7 @@ operators and other column-based navigation."
   (setq dtrt-indent-mode-exclude-list '(org-mode)))
 #+end_src
 
-* DONE Snippet Engine
+* Snippet Engine
 #+begin_src emacs-lisp
 (defvar my/snippets-directory (expand-file-name "snippets" user-emacs-directory)
   "Directory for personal yasnippet snippets.")
@@ -5052,7 +5251,7 @@ operators and other column-based navigation."
   (add-hook 'completion-at-point-functions #'yasnippet-capf 70))
 #+end_src
 
-* DONE LaTeX Writing Environment
+* LaTeX Writing Environment
 ** Utility Autoload Functions
 #+begin_src emacs-lisp
 ;;;###autoload
@@ -5552,7 +5751,7 @@ It does NOT activate company-mode - completely safe with Corfu."
 (add-hook 'LaTeX-mode-hook #'ar/latex-setup-completion)
 #+end_src
 
-* DONE Utils
+* Utils
 ** Which Key
 #+begin_src emacs-lisp
 (use-package which-key
@@ -5635,7 +5834,193 @@ It does NOT activate company-mode - completely safe with Corfu."
   (add-hook hook #'ar/vi-tilde-mode))
 #+end_src
 
-* DONE Window
+* Terminal
+#+begin_src emacs-lisp
+(use-package eshell
+  :straight (:type built-in)
+  :defer t
+  :commands (eshell ar/eshell-toggle ar/eshell-new)
+  :hook ((eshell-mode . (lambda ()
+                          ;; Disable line numbers
+                          (when (bound-and-true-p display-line-numbers-mode)
+                            (display-line-numbers-mode -1))
+                          ;; Corfu manual completion only
+                          (setq-local corfu-auto nil))))
+  :custom
+  ;; Kill processes without confirmation
+  (eshell-kill-processes-on-exit t)
+  (eshell-destroy-buffer-when-process-dies nil)
+
+  ;; Remove banner
+  (eshell-banner-message "")
+
+  ;; Scrolling
+  (eshell-scroll-to-bottom-on-input 'this)
+  (eshell-scroll-show-maximum-output t)
+  (eshell-scroll-to-bottom-on-output nil)
+
+  ;; History
+  (eshell-history-size 10000)
+  (eshell-hist-ignoredups t)
+  (eshell-save-history-on-exit t)
+
+  ;; Buffer management
+  (eshell-buffer-maximum-lines 20000)
+
+  ;; Visual commands (programs requiring terminal emulation)
+  (eshell-visual-commands
+   '("top" "htop" "btop" "less" "more" "vim" "vi" "nano" "emacs"
+     "ssh" "tail" "watch" "ncdu" "ranger" "htop" "tmux" "screen"
+     "python" "ipython" "node" "ruby" "irb"))
+  (eshell-visual-subcommands
+   '(("git" "log" "diff" "show" "help")
+     ("docker" "run" "exec" "logs" "attach")
+     ("podman" "run" "exec" "logs" "attach")))
+  (eshell-visual-options
+   '(("git" "--help" "--paginate")))
+
+  ;; Prefer Lisp implementations
+  (eshell-prefer-lisp-functions t)
+  (eshell-prefer-lisp-variables t)
+
+  :config
+  ;; Suppress PAGER
+  (setenv "PAGER" "cat")
+
+  ;; === TOGGLE FUNCTION ===
+  (defun ar/eshell-toggle ()
+    "Toggle eshell popup window. Works from any Evil state."
+    (interactive)
+    (let* ((eshell-buffer-name "*eshell*")
+           (eshell-buffer (get-buffer eshell-buffer-name))
+           (eshell-window (and eshell-buffer (get-buffer-window eshell-buffer))))
+      (if eshell-window
+          ;; If visible, hide it
+          (progn
+            (delete-window eshell-window)
+            (message "Eshell hidden"))
+        ;; Otherwise, show it
+        (let ((display-buffer-alist
+               '(("\\*eshell\\*"
+                  (display-buffer-at-bottom)
+                  (window-height . 0.33)
+                  (dedicated . t)))))
+          (if eshell-buffer
+              (pop-to-buffer eshell-buffer)
+            (eshell))
+          (message "Eshell opened")))))
+
+  ;; === NEW ESHELL INSTANCE ===
+  (defun ar/eshell-new ()
+    "Create a new eshell buffer."
+    (interactive)
+    (let ((buf (generate-new-buffer "*eshell*")))
+      (with-current-buffer buf
+        (eshell-mode))
+      (pop-to-buffer buf)))
+
+  ;; === CLEAR BUFFER ===
+  (defun ar/eshell-clear ()
+    "Clear the eshell buffer."
+    (interactive)
+    (let ((inhibit-read-only t))
+      (erase-buffer)
+      (eshell-send-input)))
+
+  ;; === ALIASES ===
+  (defalias 'eshell/clear #'ar/eshell-clear)
+  (defalias 'eshell/ff #'find-file)
+  (defalias 'eshell/fo #'find-file-other-window)
+  (defalias 'eshell/d #'dired)
+  (defalias 'eshell/e #'find-file)
+  (defalias 'eshell/eh #'find-file-other-window)
+  (defalias 'eshell/v #'view-file)
+  (defalias 'eshell/l #'eshell/ls)
+  (defalias 'eshell/ll #'eshell/ls)
+
+  ;; === GIT BRANCH HELPER ===
+  (defun ar/eshell-git-branch ()
+    "Get current git branch if in repository."
+    (when (and (not (file-remote-p default-directory))
+               (executable-find "git")
+               (locate-dominating-file default-directory ".git"))
+      (let ((branch (string-trim
+                     (shell-command-to-string
+                      "git rev-parse --abbrev-ref HEAD 2>/dev/null"))))
+        (if (and branch (not (string-empty-p branch)))
+            (concat " " (propertize (concat "(" branch ")")
+                                   'face '(:foreground "#7aa2f7")))
+          ""))))
+
+  ;; === CUSTOM PROMPT ===
+  (setq eshell-prompt-function
+        (lambda ()
+          (concat
+           (propertize (abbreviate-file-name (eshell/pwd))
+                      'face '(:foreground "#bb9af7"))
+           (ar/eshell-git-branch)
+           (propertize (if (zerop (user-uid)) " # " " $ ")
+                      'face '(:foreground "#9ece6a" :weight bold)))))
+
+  (setq eshell-prompt-regexp "^[^#$\n]* [#$] "))
+
+;; === GLOBAL TOGGLE KEYBINDING (works in ALL states) ===
+(global-set-key (kbd "C-c e") #'ar/eshell-toggle)
+
+;; === COMPLETION WITH CAPE ===
+(with-eval-after-load 'eshell
+  (with-eval-after-load 'cape
+    (defun ar/eshell-setup-completion ()
+      "Setup completion for eshell."
+      (setq-local completion-at-point-functions
+                  (list (cape-capf-super
+                         #'pcomplete-completions-at-point
+                         #'cape-file))))
+    (add-hook 'eshell-mode-hook #'ar/eshell-setup-completion)))
+
+;; === HISTORY WITH CONSULT ===
+(with-eval-after-load 'eshell
+  (with-eval-after-load 'consult
+    (defun ar/eshell-consult-history ()
+      "Browse eshell history with Consult."
+      (interactive)
+      (require 'em-hist)
+      (let* ((start-pos (save-excursion (eshell-bol) (point)))
+             (end-pos (point))
+             (input (buffer-substring-no-properties start-pos end-pos))
+             (history (delete-dups
+                      (mapcar (lambda (x) (substring-no-properties x))
+                              (ring-elements eshell-history-ring)))))
+        (let ((selected (consult--read history
+                                      :prompt "History: "
+                                      :initial input
+                                      :sort nil
+                                      :category 'eshell-history)))
+          (when selected
+            (delete-region start-pos end-pos)
+            (insert selected)))))))
+
+;; === EVIL INTEGRATION ===
+(with-eval-after-load 'evil
+  (with-eval-after-load 'eshell
+    ;; Insert state bindings
+    (evil-define-key 'insert eshell-mode-map
+      (kbd "C-r") #'ar/eshell-consult-history
+      (kbd "M-r") #'ar/eshell-consult-history
+      (kbd "C-d") #'eshell-delchar-or-maybe-eof
+      (kbd "C-a") #'eshell-bol
+      (kbd "C-e") #'end-of-line
+      (kbd "C-u") #'eshell-kill-input)
+
+    ;; Normal state bindings
+    (evil-define-key 'normal eshell-mode-map
+      (kbd "C-r") #'ar/eshell-consult-history
+      (kbd "M-r") #'ar/eshell-consult-history
+      (kbd "C-d") #'eshell-life-is-too-much
+      (kbd "C-l") #'ar/eshell-clear)))
+
+#+end_src
+* Window
 ** Winner
 #+begin_src emacs-lisp
 (use-package winner

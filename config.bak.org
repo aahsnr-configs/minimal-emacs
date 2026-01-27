@@ -5,7 +5,8 @@
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el :mkdirp yes
 
-* TODO Core Emacs Configuration
+* DONE ore Emacs Configuration
+- State "DONE"       from "TODO"       [2026-01-27 Tue 05:07]
 ** DONE Lexical Binding
 #+begin_src emacs-lisp
 ;;; init.el --- Main Configuration File -*- no-byte-compile: t; lexical-binding: t; -*-
@@ -53,7 +54,8 @@ Lower this if you experience freezing, raise if stuttering.")
             (add-hook 'minibuffer-exit-hook #'gc-minibuffer-exit-hook)))
 #+end_src
 
-** TODO Load Path
+** DONE Load Path
+- State "DONE"       from "TODO"       [2026-01-27 Tue 05:06]
 #+begin_src emacs-lisp
 ;; Prioritize local lisp directory in load-path
 (add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
@@ -89,7 +91,8 @@ Lower this if you experience freezing, raise if stuttering.")
       use-package-enable-imenu-support t)
 #+end_src
 
-** TODO Custom File
+** DONE Custom File
+- State "DONE"       from "TODO"       [2026-01-27 Tue 05:06]
 #+begin_src emacs-lisp
 (setq custom-file (expand-file-name "customs.el" user-emacs-directory))
 (add-hook 'emacs-startup-hook (lambda () (load custom-file 'noerror)))
@@ -1105,7 +1108,8 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 (use-package sudo-edit :defer t)
 #+end_src
 
-** TODO Terminal
+** DONE Terminal
+- State "DONE"       from "TODO"       [2026-01-27 Tue 05:07]
 #+begin_src emacs-lisp
 (use-package eshell
   :straight (:type built-in)
@@ -3885,13 +3889,15 @@ If completion fails in the future, check these:
 #+end_src
 
 * TODO Development Tools
-** TODO Direnv
+** DONE Direnv
+- State "DONE"       from "TODO"       [2026-01-27 Tue 04:26]
 #+begin_src emacs-lisp
 (use-package envrc
   :hook (after-init . envrc-global-mode))
 #+end_src
 
-** TODO LSP
+** DONE LSP
+- State "DONE"       from "TODO"       [2026-01-27 Tue 04:26]
 #+begin_src emacs-lisp
 (use-package eglot-booster
   :straight (:host github :repo "jdtsmith/eglot-booster")
@@ -3953,7 +3959,8 @@ If completion fails in the future, check these:
          ("C-M-." . consult-eglot-symbols)))
 #+end_src
 
-** TODO Syntax Checking
+** DONE Syntax Checking
+- State "DONE"       from "TODO"       [2026-01-27 Tue 04:26]
 #+begin_src emacs-lisp
 (use-package flymake
   :straight (:type built-in)
@@ -4012,7 +4019,8 @@ If completion fails in the future, check these:
 ;;                       :background (face-attribute 'posframe-border :background nil t)))
 #+end_src
 
-** TODO Formatting
+** DONE Formatting
+- State "DONE"       from "TODO"       [2026-01-27 Tue 04:26]
 #+begin_src emacs-lisp
 (use-package apheleia
   :hook (after-init . apheleia-global-mode)
@@ -4049,7 +4057,8 @@ If completion fails in the future, check these:
         (list (lambda () (derived-mode-p 'org-mode)))))
 #+end_src
 
-** TODO Symbols Outline
+** DONE Symbols Outline
+- State "DONE"       from "TODO"       [2026-01-27 Tue 04:26]
 #+begin_src emacs-lisp
 (use-package symbols-outline
   :defer t
@@ -4062,7 +4071,8 @@ If completion fails in the future, check these:
   (symbols-outline-follow-mode))
 #+end_src
 
-** TODO Hydra
+** DONE Hydra
+- State "DONE"       from "TODO"       [2026-01-27 Tue 04:26]
 #+begin_src emacs-lisp
 ;; (pretty-hydra-define dev-hydra
 ;;   (:title (pretty-hydra-title "Development" 'codicon "nf-cod-code" :face 'nerd-icons-blue)
@@ -5249,7 +5259,8 @@ Displays: Narrowed, Read-only, Macro recording, Evil state."
   (advice-add 'save-place-to-alist :around #'saveplace-pdf-view-to-alist-advice))
 #+end_src
 
-* LaTeX Writing Environment
+* DONE LaTeX Writing Environment
+- State "DONE"       from              [2026-01-27 Tue 04:25]
 ** Project Awareness
 #+begin_src emacs-lisp
 (defun ar/get-project-bibliographies ()
@@ -5690,7 +5701,8 @@ Returns a list of absolute paths to bibliography files, or nil if none found."
 (add-hook 'LaTeX-mode-hook #'ar/latex-setup-completion)
 #+end_src
 
-* TODO Window
+* DONE Window
+- State "DONE"       from "TODO"       [2026-01-27 Tue 04:25]
 ** Winner
 #+begin_src emacs-lisp
 (use-package winner
