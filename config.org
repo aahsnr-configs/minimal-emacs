@@ -5336,6 +5336,305 @@ operators and other column-based navigation."
   (add-hook 'completion-at-point-functions #'yasnippet-capf 70))
 #+end_src
 
+** File Templates
+#+begin_src emacs-lisp
+;; File Templates - Automatic template insertion for new files
+(defvar ar/file-templates-dir
+  (expand-file-name "templates/" user-emacs-directory)
+  "Directory containing yasnippet templates for file templates.
+This should point to where you copied Doom's templates folder.")
+
+(defvar ar/file-templates-default-trigger "__"
+  "Default yasnippet trigger key for file template rules.
+This is used when a rule doesn't specify its own :trigger.")
+
+(defvar ar/file-templates-inhibit nil
+  "When non-nil, file template expansion is disabled.
+Useful for temporarily disabling the feature.")
+
+(defvar ar/file-templates-alist
+  '(;; General configuration files
+    (gitignore-mode)
+    (dockerfile-mode)
+    ("/docker-compose\\.yml$" :mode yaml-mode)
+    ("/Makefile$" :mode makefile-gmake-mode)
+
+    ;; Emacs Lisp
+    ("/\\.dir-locals\\.el$")
+    ("\\.el$" :trigger "__package" :mode emacs-lisp-mode)
+    ("-test\\.el$" :mode emacs-ert-mode)
+    (emacs-lisp-mode :trigger "__package")
+    (snippet-mode)
+
+    ;; C/C++
+    ("/main\\.c\\(?:c\\|pp\\)$" :trigger "__main.cpp" :mode c++-mode)
+    ("\\.c\\(?:c\\|pp\\)$" :trigger "__cpp" :mode c++-mode)
+    ("\\.h\\(?:h\\|pp\\|xx\\)$" :trigger "__hpp" :mode c++-mode)
+    ("\\.h$" :trigger "__h" :mode c-mode)
+    (c-mode :trigger "__c")
+
+    ;; Go
+    ("/main\\.go$" :trigger "__main.go" :mode go-mode :project t)
+    (go-mode :trigger "__.go")
+
+    ;; Web development
+    ("/normalize\\.scss$" :trigger "__normalize.scss" :mode scss-mode)
+    ("/master\\.scss$" :trigger "__master.scss" :mode scss-mode)
+    ("\\.html$" :trigger "__.html" :mode web-mode)
+    (scss-mode)
+
+    ;; Java
+    ("/main\\.java$" :trigger "__main" :mode java-mode)
+    ("/build\\.gradle$" :trigger "__build.gradle" :mode android-mode)
+    ("/src/.+\\.java$" :mode java-mode)
+
+    ;; JavaScript/Node.js
+    ("/package\\.json$" :trigger "__package.json" :mode json-mode)
+    ("/bower\\.json$" :trigger "__bower.json" :mode json-mode)
+    ("/gulpfile\\.js$" :trigger "__gulpfile.js" :mode js-mode)
+    ("/webpack\\.config\\.js$" :trigger "__webpack.config.js" :mode js-mode)
+
+    ;; Lua
+    ("/main\\.lua$" :trigger "__main.lua" :mode lua-mode)
+    ("/conf\\.lua$" :trigger "__conf.lua" :mode lua-mode)
+
+    ;; Markdown and Org
+    (markdown-mode)
+    (org-mode)
+
+    ;; Nix
+    ("/shell\\.nix$" :trigger "__shell.nix")
+    (nix-mode)
+
+    ;; PHP
+    ("\\.class\\.php$" :trigger "__.class.php" :mode php-mode)
+    (php-mode)
+
+    ;; Python
+    (python-mode)
+
+    ;; Ruby
+    ("/lib/.+\\.rb$" :trigger "__module" :mode ruby-mode :project t)
+    ("/spec_helper\\.rb$" :trigger "__helper" :mode rspec-mode :project t)
+    ("_spec\\.rb$" :mode rspec-mode :project t)
+    ("/\\.rspec$" :trigger "__.rspec" :mode rspec-mode :project t)
+    ("\\.gemspec$" :trigger "__.gemspec" :mode ruby-mode :project t)
+    ("/Gemfile$" :trigger "__Gemfile" :mode ruby-mode :project t)
+    ("/Rakefile$" :trigger "__Rakefile" :mode ruby-mode :project t)
+    (ruby-mode)
+
+    ;; Rust
+    ("/Cargo\\.toml$" :trigger "__Cargo.toml" :mode rust-mode)
+    ("/main\\.rs$" :trigger "__main.rs" :mode rust-mode)
+
+    ;; Shell scripts
+    ("\\.zunit$" :trigger "__zunit" :mode sh-mode)
+    (fish-mode)
+    (sh-mode)
+
+    ;; Solidity
+    (solidity-mode :trigger "__sol"))
+  "Alist of file template rules.
+Each element is of the form (PREDICATE . PLIST) where:
+
+PREDICATE is either:
+  - A major mode symbol (e.g., `python-mode')
+  - A regexp matching the file path (e.g., \"/main\\.py$\")
+
+PLIST is a property list that may contain:
+  :mode SYMBOL      - Major mode to get the template from
+  :trigger STRING   - Yasnippet key to expand (default: `ar/file-templates-default-trigger')
+  :trigger FUNCTION - Function to call for custom insertion
+  :project BOOLEAN  - If non-nil, only expand in projects
+  :when FUNCTION    - Additional predicate function taking filename
+  :ignore BOOLEAN   - If non-nil, skip this file entirely")
+
+(defun ar/file-template-p (rule)
+  "Check if RULE applies to the current buffer.
+RULE is a cons cell (PREDICATE . PLIST)."
+  (let ((pred (car rule))
+        (plist (cdr rule)))
+    (and
+     ;; Check if the predicate matches
+     (or (and (symbolp pred)
+              (derived-mode-p pred))
+         (and (stringp pred)
+              (stringp buffer-file-name)
+              (string-match-p pred buffer-file-name)))
+     ;; Check the :when condition if present
+     (or (not (plist-member plist :when))
+         (funcall (plist-get plist :when) buffer-file-name))
+     ;; Return the rule if all checks pass
+     rule)))
+
+(defun ar/file-templates-check ()
+  "Check if current buffer should have a template inserted.
+Returns non-nil if a template was successfully applied."
+  (and
+   ;; Not inhibited
+   (not ar/file-templates-inhibit)
+   ;; Has a file name
+   buffer-file-name
+   ;; Not read-only
+   (not buffer-read-only)
+   ;; Buffer is empty
+   (bobp) (eobp)
+   ;; Not a special buffer
+   (not (string-match-p "^[*[:space:]]" (buffer-name)))
+   ;; Not an org-capture buffer
+   (not (bound-and-true-p org-capture-current-plist))
+   ;; File doesn't exist yet
+   (not (file-exists-p buffer-file-name))
+   ;; Not modified
+   (not (buffer-modified-p))
+   ;; Not an indirect buffer
+   (null (buffer-base-buffer))
+   ;; Try to apply a template
+   (ar/file-templates-apply)))
+
+(defun ar/file-templates-apply ()
+  "Find and expand a file template for the current buffer.
+Returns non-nil if a template was expanded."
+  (interactive)
+  (when-let ((rule (cl-find-if #'ar/file-template-p ar/file-templates-alist)))
+    (apply #'ar/file-templates--expand rule)))
+
+(cl-defun ar/file-templates--expand (pred &key project mode trigger ignore _when)
+  "Expand a file template.
+PRED is the matching predicate.
+PROJECT, MODE, TRIGGER, IGNORE, and WHEN are from the rule's plist."
+  (when (and pred (not ignore))
+    ;; Check project requirement
+    (when (if project
+              (and (fboundp 'project-current) (project-current))
+            t)
+      ;; Determine the mode
+      (unless mode
+        (setq mode
+              (if (and (symbolp pred) (not (booleanp pred)))
+                  pred
+                major-mode)))
+      (unless mode
+        (user-error "Couldn't determine mode for file template"))
+
+      ;; Determine the trigger
+      (unless trigger
+        (setq trigger ar/file-templates-default-trigger))
+
+      ;; Expand the template
+      (if (functionp trigger)
+          ;; Custom function
+          (funcall trigger)
+        ;; Yasnippet expansion
+        (when (require 'yasnippet nil t)
+          (unless yas-minor-mode
+            (yas-minor-mode 1))
+          (when yas-minor-mode
+            (let ((templates (yas--all-templates (yas--get-snippet-tables mode))))
+              (when-let ((template (cl-find trigger templates
+                                            :key #'yas--template-key
+                                            :test #'equal)))
+                (yas-expand-snippet (yas--template-content template))
+                ;; Enter insert state if using Evil
+                (when (and (bound-and-true-p evil-local-mode)
+                          yas--active-field-overlay
+                          (overlay-buffer yas--active-field-overlay)
+                          (overlay-get yas--active-field-overlay 'yas--field))
+                  (evil-change-state 'insert))
+                t))))))))
+
+;; Public API for adding custom templates
+
+(defun ar/file-templates--set (pred plist)
+  "Internal function to set or remove a file template rule.
+PRED is the predicate, PLIST is the property list.
+If PLIST is effectively empty, remove the rule for PRED."
+  (if (null (car-safe plist))
+      (setq ar/file-templates-alist
+            (delq (assoc pred ar/file-templates-alist)
+                  ar/file-templates-alist))
+    (push `(,pred ,@plist) ar/file-templates-alist)))
+
+(defun ar/set-file-template! (pred &rest plist)
+  "Register a file template rule.
+
+PRED can be:
+  - A major mode symbol (e.g., `python-mode')
+  - A regexp string matching file paths
+
+PLIST can contain:
+  :when FUNCTION    - Extra predicate taking filename, must return non-nil
+  :trigger STRING   - Yasnippet key to expand
+  :trigger FUNCTION - Custom function to insert template
+  :mode SYMBOL      - Mode to get snippet from (defaults to PRED if it's a mode)
+  :project BOOLEAN  - Only expand in projects if non-nil
+  :ignore BOOLEAN   - Skip template expansion if non-nil
+
+Example:
+  (ar/set-file-template! 'python-mode
+    :trigger \"__init\"
+    :mode 'python-mode)"
+  (ar/file-templates--set pred plist))
+
+(defun ar/set-file-templates! (&rest templates)
+  "Register multiple file template rules at once.
+
+TEMPLATES is a list of (PRED . PLIST) rules.
+
+Example:
+  (ar/set-file-templates!
+   '(python-mode :trigger \"__init\")
+   '(\"/setup\\.py$\" :trigger \"__setup\" :mode python-mode))"
+  (dolist (template templates)
+    (ar/file-templates--set (car template) (cdr template))))
+
+;; Helper function for use in templates
+
+(defun ar/file-templates-get-short-path ()
+  "Get a shortened file path for use in template headers.
+Returns a path relative to `user-emacs-directory' if possible,
+otherwise an abbreviated path."
+  (if buffer-file-name
+      (let ((path (file-truename buffer-file-name)))
+        (or (when (file-in-directory-p path user-emacs-directory)
+              (file-relative-name path user-emacs-directory))
+            (abbreviate-file-name path)))
+    ""))
+
+;; Integration with yasnippet
+
+(with-eval-after-load 'yasnippet
+  ;; Add templates directory to yasnippet's search path
+  (when (file-directory-p ar/file-templates-dir)
+    (add-to-list 'yas-snippet-dirs ar/file-templates-dir t)
+    ;; Reload to pick up the new directory
+    (yas-reload-all)))
+
+;; Activate file templates on new files
+(add-hook 'find-file-hook #'ar/file-templates-check)
+
+;; Provide a way to test which rule would match
+(defun ar/file-templates-debug ()
+  "Debug which file template rule would apply to the current buffer.
+Displays the matching rule or an error if no rule matches."
+  (interactive)
+  (if-let ((rule (cl-find-if #'ar/file-template-p ar/file-templates-alist)))
+      (let ((pred (car rule))
+            (plist (cdr rule)))
+        (message "Found matching rule: %S
+  Predicate: %S
+  Properties: %S
+  Trigger: %S
+  Mode: %S"
+                 rule
+                 pred
+                 plist
+                 (or (plist-get plist :trigger) ar/file-templates-default-trigger)
+                 (or (plist-get plist :mode)
+                     (if (symbolp pred) pred major-mode))))
+    (user-error "No file template rule matches this buffer")))
+#+end_src
+
 * LaTeX Writing Environment
 ** Utility Autoload Functions
 #+begin_src emacs-lisp
