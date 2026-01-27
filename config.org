@@ -526,7 +526,7 @@ byte-compiled files do not interfere with the reload."
   (setq evil-want-integration t
         evil-want-keybinding nil
         evil-want-minibuffer t
-        evil-mode-line-format nil
+        ;; evil-mode-line-format nil ; COMMENT Don't turn this on
         evil-kbd-macro-suppress-motion-error t
         evil-symbol-word-search t
         evil-kill-on-visual-paste nil)
@@ -5601,14 +5601,12 @@ otherwise an abbreviated path."
             (abbreviate-file-name path)))
     ""))
 
-;; Integration with yasnippet
-
+;; PERFORMANCE: Register templates directory without loading
+;; YASnippet will load snippets just-in-time when modes are activated
 (with-eval-after-load 'yasnippet
-  ;; Add templates directory to yasnippet's search path
   (when (file-directory-p ar/file-templates-dir)
-    (add-to-list 'yas-snippet-dirs ar/file-templates-dir t)
-    ;; Reload to pick up the new directory
-    (yas-reload-all)))
+    ;; Simply add to search path - YASnippet handles JIT loading automatically
+    (add-to-list 'yas-snippet-dirs ar/file-templates-dir t)))
 
 ;; Activate file templates on new files
 (add-hook 'find-file-hook #'ar/file-templates-check)
@@ -5621,11 +5619,7 @@ Displays the matching rule or an error if no rule matches."
   (if-let ((rule (cl-find-if #'ar/file-template-p ar/file-templates-alist)))
       (let ((pred (car rule))
             (plist (cdr rule)))
-        (message "Found matching rule: %S
-  Predicate: %S
-  Properties: %S
-  Trigger: %S
-  Mode: %S"
+        (message "Found matching rule: %S\n  Predicate: %S\n  Properties: %S\n  Trigger: %S\n  Mode: %S"
                  rule
                  pred
                  plist
