@@ -2139,12 +2139,8 @@ If file doesn't exist, creates it with TEMPLATE content."
   ;; Core settings
   (org-modules nil)
   (org-directory my/org-directory)
-  (org-log-done nil)
-  (org-log-into-drawer nil)
-  (org-log-repeat nil)
-  (org-treat-insert-todo-heading-as-state-change nil)
-  (org-log-reschedule nil)
-  (org-log-redeadline nil)
+  (org-log-done 'time)
+  (org-log-into-drawer t)
   (org-return-follows-link t)
 
   ;; Display settings
@@ -2383,44 +2379,43 @@ If file doesn't exist, creates it with TEMPLATE content."
 
 ** Org Modern
 #+begin_src emacs-lisp
-;; (use-package org-modern
-;;   :hook (org-mode . org-modern-mode)
-;;   :hook (org-agenda-finalize . org-modern-agenda)
-;;   :custom
-;;   (org-modern-checkbox nil)
-;;   (org-modern-todo nil)
-;;   (org-modern-tag nil)         ; Use your custom tag styling
-;;   (org-modern-priority nil)    ; Use your custom priority faces
+(use-package org-modern
+  :hook (org-mode . org-modern-mode)
+  :hook (org-agenda-finalize . org-modern-agenda)
+  :config
+  (setq org-modern-hide-stars nil
+        org-modern-star '("◉" "○" "✸" "✿" "✤" "✜" "◇" "▷"))
 
-;;   ;; --- (3) Enabled Features ---
-;;   (org-modern-keyword t)           ; Badges for #+TITLE, #+AUTHOR
-;;   (org-modern-block t)             ; Subtle background for blocks
-;;   (org-modern-block-fringe nil)    ; Remove fringe marker (cleaner)
-;;   (org-modern-horizontal-rule t)   ; Draw lines for '-----'
-;;   (org-modern-timestamp nil)
-;;   (org-modern-statistics nil)
-;;   (org-modern-progress t)
+  ;;  Disabled Features
+  (setq org-modern-checkbox nil
+        org-modern-todo nil
+        org-modern-tag nil
+        org-modern-priority nil)
 
-;;   ;; --- Tables & Lists ---
-;;   (org-modern-table t)             ; Nice table borders
-;;   (org-modern-table-vertical 1)    ; Row padding
-;;   (org-modern-table-horizontal 0.2); Cell padding
-;;   (org-modern-list '((43 . "➤")    ; + becomes Arrow
-;;                      (45 . "•")    ; - becomes Dot
-;;                      (42 . "•")))  ; * becomes Dot
+  ;; Enabled Features
+  (setq org-modern-keyword t ; Badges for #+TITLE, #+AUTHOR
+        org-modern-block- t  ; Subtle background for blocks
+        org-modern-block-fringe nil ; Remove fringe marker (cleaner)
+        org-modern-horizontal-rule t ; Draw lines for '-----'
+        org-modern-timestamp t  ; Badges for timestamps
+        org-modern-statistics t ; Badges for [3/5]
+        org-modern-progress t) ; Progress bar in stats
 
-;;   ;; Org-Modern alignment settings
-;;   (setq org-auto-align-tags nil
-;;         org-tags-column 0
-;;         org-fold-catch-invisible-edits 'show-and-error
-;;         org-special-ctrl-a/e t)
+  ;; Tables & Lists - 43 = +, 45 = -, 42 = *
+  (setq org-modern-list '((43 . "➤") (45 . "–") (42 . "•"))
+        org-modern-table t ; Nice table borders
+        org-modern-table-vertical 1 ; Row padding
+        org-modern-table-horizontal 0.2 ; Cell padding
+        org-modern-block-name
+        '(("src" "»" "«")
+          ("example" "»" "«")
+          ("quote" """ """))))
 
-;;   :config
-;;   ;; Font adjustments for alignment
-;;   (custom-set-faces
-;;    '(org-modern-keyword ((t (:inherit font-lock-keyword-face :slant italic :weight bold))))
-;;    '(org-modern-label ((t (:height 0.9 :weight medium :family "JetBrains Mono"))))
-;;    '(org-modern-symbol ((t (:height 1.0 :family "Symbols Nerd Font Mono"))))))
+
+        ;; org-modern-tag-faces
+        ;; `((:foreground "#a9b1d6" :weight bold :box (:line-width (1 . -1) :color "#414868")))
+        ;; org-modern-checkbox '((todo . "☐") (done . "☑") (cancel . "☑") (priority . "⚑") (on . "◉") (off . "◯"))))
+
 #+end_src
 
 ** DONE Org iBullets
