@@ -310,6 +310,10 @@ byte-compiled files do not interfere with the reload."
 (add-to-list 'auto-mode-alist '("\\.bb\\'" . shell-script-mode))
 (add-to-list 'auto-mode-alist '("\\.bbclass\\'" . shell-script-mode))
 (add-to-list 'auto-mode-alist '("\\.Rmd\\'" . markdown-mode))
+
+;; Autosave
+(auto-save-visited-mode +1)
+(setq auto-save-visited-interval 60)
 #+end_src
 
 ** Garbage Collector Magic Hack
@@ -335,17 +339,17 @@ byte-compiled files do not interfere with the reload."
 
 ** Environment
 #+begin_src emacs-lisp
-;; (use-package exec-path-from-shell
-;;   :defer t
-;;   :custom
-;;   (exec-path-from-shell-variables
-;;    '("PATH" "MANPATH"
-;;      "OPENAI_API_KEY" "ANTHROPIC_API_KEY"
-;;      "XAI_API_KEY" "DEEPSEEK_API_KEY"
-;;      "OPENROUTER_API_KEY" "GEMINI_API_KEY"))
-;;   :config
-;;   (when (daemonp)
-;;     (exec-path-from-shell-initialize)))
+(use-package exec-path-from-shell
+  :defer t
+  :custom
+  (exec-path-from-shell-variables
+   '("PATH" "MANPATH"
+     "OPENAI_API_KEY" "ANTHROPIC_API_KEY"
+     "XAI_API_KEY" "DEEPSEEK_API_KEY"
+     "OPENROUTER_API_KEY" "GEMINI_API_KEY"))
+  :config
+  (when (daemonp)
+    (exec-path-from-shell-initialize)))
 #+end_src
 
 ** Session Management
@@ -6084,6 +6088,487 @@ It does NOT activate company-mode - completely safe with Corfu."
       (kbd "C-l") #'ar/eshell-clear)))
 
 #+end_src
+* Prettify Symbols
+** Common Prettify Symbols
+#+begin_src emacs-lisp
+;; Common prettify symbols for general programming modes
+(defun my/prog-mode/load-prettify-symbols ()
+  "Load common prettify symbols for programming modes."
+  (interactive)
+  (setq prettify-symbols-alist
+        '(;; Operators
+          ("!=" . ?≠)
+          ("/=" . ?≠)
+          ("==" . ?≡)
+          ("<=" . ?≤)
+          (">=" . ?≥)
+          ("&&" . ?∧)
+          ("||" . ?∨)
+          ;; Arrows
+          ("->" . ?→)
+          ("=>" . ?⇒)
+          ("<-" . ?←)
+          ;; Special symbols
+          ("sqrt" . ?√)
+          ("lambda" . ?λ)
+          ("..." . ?…)
+          ("sum" . ?∑)
+          ("product" . ?∏)
+          ("pi" . ?π)
+          ("infinity" . ?∞)
+          ("null" . ?∅)
+          ("true" . ?⊤)
+          ("false" . ?⊥)))
+  (prettify-symbols-mode 1))
+#+end_src
+
+** Python
+#+begin_src emacs-lisp
+(defun my/python-mode/load-prettify-symbols ()
+  "Load prettify symbols for Python mode."
+  (interactive)
+  (setq prettify-symbols-alist
+        `(;; Keywords with nerd-icons-
+          ("def" . ,(nerd-icons-codicon "nf-cod-symbol_method"))
+          ("class" . ,(nerd-icons-codicon "nf-cod-symbol_class"))
+          ("return" . ,(nerd-icons-codicon "nf-cod-arrow_left"))
+          ("yield" . ,(nerd-icons-codicon "nf-cod-output"))
+          ("import" . ,(nerd-icons-codicon "nf-cod-package"))
+          ("from" . ,(nerd-icons-codicon "nf-cod-library"))
+          ;; Operators
+          ("!=" . ?≠)
+          ("==" . ?≡)
+          ("<=" . ?≤)
+          (">=" . ?≥)
+          ("->" . ?→)
+          ;; Logical operators
+          ("and" . ?∧)
+          ("or" . ?∨)
+          ("not" . ?¬)
+          ("in" . ?∈)
+          ("not in" . ?∉)
+          ;; Special keywords
+          ("lambda" . ?λ)
+          ("None" . ?∅)
+          ("True" . ?⊤)
+          ("False" . ?⊥)
+          ;; Type hints
+          ("int" . ?ℤ)
+          ("float" . ?ℝ)
+          ("bool" . ?𝔹)
+          ("str" . ?𝕊)
+          ("list" . ?ℒ)
+          ("dict" . ?𝔻)
+          ("set" . ?ℙ)
+          ("tuple" . ?𝕋)
+          ("..." . ?…)
+          ("sum" . ?∑)
+          ("sqrt" . ?√)
+          ("pi" . ?π)
+          ("inf" . ?∞)
+          ("for" . ?∀)
+          ("exists" . ?∃)))
+  (prettify-symbols-mode 1))
+#+end_src
+
+** JavaScript/TypeScript
+#+begin_src emacs-lisp
+(defun my/javascript-mode/load-prettify-symbols ()
+  "Load prettify symbols for JavaScript/TypeScript modes."
+  (interactive)
+  (setq prettify-symbols-alist
+        `(;; Keywords with nerd-icons
+          ("function" . ,(nerd-icons-codicon "nf-cod-symbol_method"))
+          ("class" . ,(nerd-icons-codicon "nf-cod-symbol_class"))
+          ("const" . ,(nerd-icons-codicon "nf-cod-symbol_constant"))
+          ("return" . ,(nerd-icons-codicon "nf-cod-arrow_left"))
+          ("import" . ,(nerd-icons-codicon "nf-cod-package"))
+          ("export" . ,(nerd-icons-codicon "nf-cod-export"))
+          ;; Operators
+          ("!=" . ?≠)
+          ("!==" . ?≢)
+          ("==" . ?≡)
+          ("===" . ?≣)
+          ("<=" . ?≤)
+          (">=" . ?≥)
+          ("=>" . ?⇒)
+          ("->" . ?→)
+          ;; Logical operators
+          ("&&" . ?∧)
+          ("||" . ?∨)
+          ("!" . ?¬)
+          ;; Special values
+          ("null" . ?∅)
+          ("undefined" . ?⊘)
+          ("true" . ?⊤)
+          ("false" . ?⊥)
+          ("..." . ?…)
+          ("Infinity" . ?∞)
+          ("Math.PI" . ?π)
+          ("Math.sqrt" . ?√)))
+  (prettify-symbols-mode 1))
+#+end_src
+
+** Emacs Lisp
+#+begin_src emacs-lisp
+(defun my/emacs-lisp-mode/load-prettify-symbols ()
+  "Load prettify symbols for Emacs Lisp mode."
+  (interactive)
+  (setq prettify-symbols-alist
+        `(;; Keywords
+          ("lambda" . ?λ)
+          ("defun" . ,(nerd-icons-codicon "nf-cod-symbol_method"))
+          ("defvar" . ,(nerd-icons-codicon "nf-cod-symbol_variable"))
+          ("defconst" . ,(nerd-icons-codicon "nf-cod-symbol_constant"))
+          ("defmacro" . ,(nerd-icons-codicon "nf-cod-symbol_misc"))
+          ("defclass" . ,(nerd-icons-codicon "nf-cod-symbol_class"))
+          ;; Operators
+          ("!=" . ?≠)
+          ("/=" . ?≠)
+          ("==" . ?≡)
+          ("<=" . ?≤)
+          (">=" . ?≥)
+          ;; Special values
+          ("nil" . ?∅)
+          ("t" . ?⊤)
+          ;; Common functions
+          ("->" . ?→)
+          ("->>" . ?↠)
+          ("<-" . ?←)
+          ("<<-" . ?↞)))
+  (prettify-symbols-mode 1))
+#+end_src
+
+** Common Lisp
+#+begin_src emacs-lisp
+;; Common Lisp mode
+(defun my/lisp-mode/load-prettify-symbols ()
+  "Load prettify symbols for Common Lisp mode."
+  (interactive)
+  (setq prettify-symbols-alist
+        `(;; Keywords
+          ("lambda" . ?λ)
+          ("defun" . ,(nerd-icons-codicon "nf-cod-symbol_method"))
+          ("defvar" . ,(nerd-icons-codicon "nf-cod-symbol_variable"))
+          ("defparameter" . ,(nerd-icons-codicon "nf-cod-symbol_parameter"))
+          ("defconstant" . ,(nerd-icons-codicon "nf-cod-symbol_constant"))
+          ("defmacro" . ,(nerd-icons-codicon "nf-cod-symbol_misc"))
+          ("defclass" . ,(nerd-icons-codicon "nf-cod-symbol_class"))
+          ;; Operators
+          ("/=" . ?≠)
+          ("=" . ?≡)
+          ("<=" . ?≤)
+          (">=" . ?≥)
+          ;; Special values
+          ("nil" . ?∅)
+          ("t" . ?⊤)
+          ;; Logic
+          ("and" . ?∧)
+          ("or" . ?∨)
+          ("not" . ?¬)))
+  (prettify-symbols-mode 1))
+#+end_src
+
+** C/C++ modes
+#+begin_src emacs-lisp
+(defun my/c-mode-common/load-prettify-symbols ()
+  "Load prettify symbols for C/C++ modes."
+  (interactive)
+  (setq prettify-symbols-alist
+        `(;; Keywords
+          ("return" . ,(nerd-icons-codicon "nf-cod-arrow_left"))
+          ("struct" . ,(nerd-icons-codicon "nf-cod-symbol_structure"))
+          ("class" . ,(nerd-icons-codicon "nf-cod-symbol_class"))
+          ("typedef" . ,(nerd-icons-codicon "nf-cod-symbol_type_parameter"))
+          ("enum" . ,(nerd-icons-codicon "nf-cod-symbol_enum"))
+          ;; Operators
+          ("!=" . ?≠)
+          ("==" . ?≡)
+          ("<=" . ?≤)
+          (">=" . ?≥)
+          ("->" . ?→)
+          ("&&" . ?∧)
+          ("||" . ?∨)
+          ("!" . ?¬)
+          ;; Special values
+          ("NULL" . ?∅)
+          ("nullptr" . ?∅)
+          ("true" . ?⊤)
+          ("false" . ?⊥)
+          ;; Common constants
+          ("M_PI" . ?π)
+          ("sqrt" . ?√)
+          ("INFINITY" . ?∞)))
+  (prettify-symbols-mode 1))
+#+end_src
+
+** TypeScript
+#+begin_src emacs-lisp
+(defun my/typescript-mode/load-prettify-symbols ()
+  "Load prettify symbols for TypeScript mode."
+  (interactive)
+  (setq prettify-symbols-alist
+        `(;; Keywords with nerd-icons
+          ("function" . ,(nerd-icons-codicon "nf-cod-symbol_method"))
+          ("class" . ,(nerd-icons-codicon "nf-cod-symbol_class"))
+          ("interface" . ,(nerd-icons-codicon "nf-cod-symbol_interface"))
+          ("type" . ,(nerd-icons-codicon "nf-cod-symbol_type_parameter"))
+          ("enum" . ,(nerd-icons-codicon "nf-cod-symbol_enum"))
+          ("const" . ,(nerd-icons-codicon "nf-cod-symbol_constant"))
+          ("return" . ,(nerd-icons-codicon "nf-cod-arrow_left"))
+          ("import" . ,(nerd-icons-codicon "nf-cod-package"))
+          ("export" . ,(nerd-icons-codicon "nf-cod-export"))
+          ;; Operators
+          ("!=" . ?≠)
+          ("!==" . ?≢)
+          ("==" . ?≡)
+          ("===" . ?≣)
+          ("<=" . ?≤)
+          (">=" . ?≥)
+          ("=>" . ?⇒)
+          ("->" . ?→)
+          ;; Logical operators
+          ("&&" . ?∧)
+          ("||" . ?∨)
+          ("!" . ?¬)
+          ;; Special values
+          ("null" . ?∅)
+          ("undefined" . ?⊘)
+          ("true" . ?⊤)
+          ("false" . ?⊥)
+          ("..." . ?…)
+          ("Infinity" . ?∞)
+          ("Math.PI" . ?π)
+          ("Math.sqrt" . ?√)))
+  (prettify-symbols-mode 1))
+#+end_src
+
+** Shell Script
+#+begin_src emacs-lisp
+(defun my/shell-script-mode/load-prettify-symbols ()
+  "Load prettify symbols for shell script modes."
+  (interactive)
+  (setq prettify-symbols-alist
+        `(;; Keywords with nerd-icons
+          ("function" . ,(nerd-icons-codicon "nf-cod-symbol_method"))
+          ;; Operators
+          ("!=" . ?≠)
+          ("-eq" . ?≡)
+          ("-ne" . ?≠)
+          ("-le" . ?≤)
+          ("-ge" . ?≥)
+          ("-lt" . ?<)
+          ("-gt" . ?>)
+          ;; Logical operators
+          ("&&" . ?∧)
+          ("||" . ?∨)
+          ;; Redirection with icons
+          (">&" . ,(nerd-icons-codicon "nf-cod-output"))
+          ("<&" . ,(nerd-icons-codicon "nf-cod-arrow_left"))))
+  (prettify-symbols-mode 1))
+#+end_src
+
+** Markdown Mode
+#+begin_src emacs-lisp
+;; Markdown mode
+(defun my/markdown-mode/load-prettify-symbols ()
+  "Load prettify symbols for Markdown mode."
+  (interactive)
+  (setq prettify-symbols-alist
+        `(;; Checkboxes
+          ("[ ]" . ,(nerd-icons-mdicon "nf-md-checkbox_blank_outline"))
+          ("[X]" . ,(nerd-icons-mdicon "nf-md-checkbox_marked"))
+          ("[x]" . ,(nerd-icons-mdicon "nf-md-checkbox_marked"))
+          ("[-]" . ,(nerd-icons-mdicon "nf-md-checkbox_intermediate"))
+          ;; Special symbols
+          ("..." . ?…)
+          ("->" . ?→)
+          ("<-" . ?←)
+          ("=>" . ?⇒)
+          ("<=" . ?⇐)
+          ;; Math-like
+          (">=" . ?≥)
+          ("<=" . ?≤)
+          ("!=" . ?≠)))
+  (prettify-symbols-mode 1))
+#+end_src
+
+** LaTeX
+#+begin_src emacs-lisp
+(defun my/latex-mode/load-prettify-symbols ()
+  "Load prettify symbols for LaTeX mode."
+  (interactive)
+  (setq prettify-symbols-alist
+        '(;; Greek letters
+          ("\\alpha" . ?α)
+          ("\\beta" . ?β)
+          ("\\gamma" . ?γ)
+          ("\\delta" . ?δ)
+          ("\\epsilon" . ?ε)
+          ("\\zeta" . ?ζ)
+          ("\\eta" . ?η)
+          ("\\theta" . ?θ)
+          ("\\iota" . ?ι)
+          ("\\kappa" . ?κ)
+          ("\\lambda" . ?λ)
+          ("\\mu" . ?μ)
+          ("\\nu" . ?ν)
+          ("\\xi" . ?ξ)
+          ("\\pi" . ?π)
+          ("\\rho" . ?ρ)
+          ("\\sigma" . ?σ)
+          ("\\tau" . ?τ)
+          ("\\phi" . ?φ)
+          ("\\chi" . ?χ)
+          ("\\psi" . ?ψ)
+          ("\\omega" . ?ω)
+          ;; Capital Greek
+          ("\\Gamma" . ?Γ)
+          ("\\Delta" . ?Δ)
+          ("\\Theta" . ?Θ)
+          ("\\Lambda" . ?Λ)
+          ("\\Xi" . ?Ξ)
+          ("\\Pi" . ?Π)
+          ("\\Sigma" . ?Σ)
+          ("\\Phi" . ?Φ)
+          ("\\Psi" . ?Ψ)
+          ("\\Omega" . ?Ω)
+          ;; Math operators
+          ("\\times" . ?×)
+          ("\\div" . ?÷)
+          ("\\pm" . ?±)
+          ("\\mp" . ?∓)
+          ("\\leq" . ?≤)
+          ("\\geq" . ?≥)
+          ("\\neq" . ?≠)
+          ("\\approx" . ?≈)
+          ("\\equiv" . ?≡)
+          ("\\subset" . ?⊂)
+          ("\\supset" . ?⊃)
+          ("\\subseteq" . ?⊆)
+          ("\\supseteq" . ?⊇)
+          ("\\in" . ?∈)
+          ("\\notin" . ?∉)
+          ("\\cup" . ?∪)
+          ("\\cap" . ?∩)
+          ("\\emptyset" . ?∅)
+          ("\\infty" . ?∞)
+          ("\\partial" . ?∂)
+          ("\\nabla" . ?∇)
+          ("\\int" . ?∫)
+          ("\\sum" . ?∑)
+          ("\\prod" . ?∏)
+          ("\\sqrt" . ?√)
+          ("\\forall" . ?∀)
+          ("\\exists" . ?∃)
+          ("\\wedge" . ?∧)
+          ("\\vee" . ?∨)
+          ("\\neg" . ?¬)
+          ("\\rightarrow" . ?→)
+          ("\\leftarrow" . ?←)
+          ("\\Rightarrow" . ?⇒)
+          ("\\Leftarrow" . ?⇐)
+          ("\\leftrightarrow" . ?↔)
+          ("\\Leftrightarrow" . ?⇔)
+          ("\\mapsto" . ?↦)
+          ;; Special symbols
+          ("\\dots" . ?…)
+          ("\\cdots" . ?⋯)
+          ("\\ldots" . ?…)
+          ("\\circ" . ?∘)
+          ("\\bullet" . ?•)
+          ("\\star" . ?⋆)))
+  (prettify-symbols-mode 1))
+#+end_src
+
+** YAML
+#+begin_src emacs-lisp
+(defun my/yaml-mode/load-prettify-symbols ()
+  "Load prettify symbols for YAML mode."
+  (interactive)
+  (setq prettify-symbols-alist
+        `(;; Boolean values
+          ("true" . ?⊤)
+          ("false" . ?⊥)
+          ("null" . ?∅)
+          ;; Special symbols
+          ("..." . ?…)))
+  (prettify-symbols-mode 1))
+#+end_src
+
+** JSON
+#+begin_src emacs-lisp
+(defun my/json-mode/load-prettify-symbols ()
+  "Load prettify symbols for JSON mode."
+  (interactive)
+  (setq prettify-symbols-alist
+        '(;; Boolean values
+          ("true" . ?⊤)
+          ("false" . ?⊥)
+          ("null" . ?∅)))
+  (prettify-symbols-mode 1))
+#+end_src
+
+** Hooks
+#+begin_src emacs-lisp
+(add-hook 'prog-mode-hook 'my/prog-mode/load-prettify-symbols)
+
+;; Python
+(add-hook 'python-mode-hook 'my/python-mode/load-prettify-symbols)
+(add-hook 'python-ts-mode-hook 'my/python-mode/load-prettify-symbols)
+
+;; JavaScript/TypeScript
+(add-hook 'js-mode-hook 'my/javascript-mode/load-prettify-symbols)
+(add-hook 'js-ts-mode-hook 'my/javascript-mode/load-prettify-symbols)
+(add-hook 'js2-mode-hook 'my/javascript-mode/load-prettify-symbols)
+(add-hook 'javascript-mode-hook 'my/javascript-mode/load-prettify-symbols)
+(add-hook 'typescript-mode-hook 'my/typescript-mode/load-prettify-symbols)
+(add-hook 'typescript-ts-mode-hook 'my/typescript-mode/load-prettify-symbols)
+(add-hook 'tsx-mode-hook 'my/typescript-mode/load-prettify-symbols)
+(add-hook 'tsx-ts-mode-hook 'my/typescript-mode/load-prettify-symbols)
+
+;; Lisp modes
+(add-hook 'emacs-lisp-mode-hook 'my/emacs-lisp-mode/load-prettify-symbols)
+(add-hook 'lisp-mode-hook 'my/lisp-mode/load-prettify-symbols)
+
+;; C/C++
+(add-hook 'c-mode-hook 'my/c-mode-common/load-prettify-symbols)
+(add-hook 'c-ts-mode-hook 'my/c-mode-common/load-prettify-symbols)
+(add-hook 'c++-mode-hook 'my/c-mode-common/load-prettify-symbols)
+(add-hook 'c++-ts-mode-hook 'my/c-mode-common/load-prettify-symbols)
+
+;; Shell scripts
+(add-hook 'sh-mode-hook 'my/shell-script-mode/load-prettify-symbols)
+(add-hook 'bash-ts-mode-hook 'my/shell-script-mode/load-prettify-symbols)
+
+;; Markdown
+(add-hook 'markdown-mode-hook 'my/markdown-mode/load-prettify-symbols)
+(add-hook 'gfm-mode-hook 'my/markdown-mode/load-prettify-symbols)
+
+;; LaTeX
+(add-hook 'latex-mode-hook 'my/latex-mode/load-prettify-symbols)
+(add-hook 'LaTeX-mode-hook 'my/latex-mode/load-prettify-symbols)
+
+;; YAML
+(add-hook 'yaml-mode-hook 'my/yaml-mode/load-prettify-symbols)
+(add-hook 'yaml-ts-mode-hook 'my/yaml-mode/load-prettify-symbols)
+
+;; JSON
+(add-hook 'json-mode-hook 'my/json-mode/load-prettify-symbols)
+(add-hook 'json-ts-mode-hook 'my/json-mode/load-prettify-symbols)
+
+;; Optional: Configure prettify-symbols behavior
+(setq prettify-symbols-unprettify-at-point 'right-edge)
+
+(defun my/org-babel-setup-prettify ()
+  "Enable prettify-symbols-mode in org-src edit buffers."
+  (when (derived-mode-p 'prog-mode)
+    (setq prettify-symbols-unprettify-at-point 'right-edge)
+    (prettify-symbols-mode 1)))
+
+(add-hook 'org-src-mode-hook #'my/org-babel-setup-prettify)
+#+end_src
+
 * Languages
 ** Nix
 #+begin_src emacs-lisp
