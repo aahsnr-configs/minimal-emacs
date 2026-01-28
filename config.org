@@ -2170,14 +2170,7 @@ If file doesn't exist, creates it with TEMPLATE content."
 ** Core Configuration
 #+begin_src emacs-lisp
 (use-package org
-  :straight (org :type git
-                 :host github
-                 :repo "emacs-straight/org-mode"
-                 :files (:defaults "etc")
-                 :depth 1
-                 :pre-build (("make" "autoloads"))
-                 :build (:not autoloads)
-                 :pin "b7bc0ede67f3e2a477f4d6ad0c46a6d80bca5aea")
+  :straight (:type built-in)
   :defer t
   :custom
   ;; Core settings
