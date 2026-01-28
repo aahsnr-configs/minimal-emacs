@@ -5373,7 +5373,6 @@ operators and other column-based navigation."
   (add-to-list 'completion-at-point-functions #'yasnippet-capf))
 #+end_src
 
-
 ** File Templates
 #+begin_src emacs-lisp
 ;; File Templates - Automatic template insertion for new files
@@ -5396,82 +5395,76 @@ operators and other column-based navigation."
     ("/Makefile$" :mode makefile-gmake-mode :trigger "__Makefile")
     ("/\\.env$" :mode conf-mode :trigger "__env")
 
-    ;; --- Dockerfile (Variety) ---
-    ;; Detects specific keywords in filename or directory if complex,
-    ;; otherwise defaults to standard.
-    (dockerfile-mode :trigger "__docker_standard")
+    ;; --- Dockerfile ---
+    (dockerfile-mode :trigger "__Dockerfile")
 
     ;; --- Emacs Lisp ---
-    ;; Specific files
     ("/\\.dir-locals\\.el$" :trigger "__dir_locals")
     ("-test\\.el$" :mode emacs-ert-mode :trigger "__ert")
-    ;; Generic
     (emacs-lisp-mode :trigger "__package")
     (snippet-mode :trigger "__snippet")
 
-    ;; --- Python (Standard & Tree-sitter) ---
-    ;; Specific file patterns
+    ;; --- Python ---
     ("/setup\\.py$" :mode python-mode :trigger "__setup")
     ("/__init__\\.py$" :mode python-mode :trigger "__init")
-    ("/conftest\\.py$" :mode python-mode :trigger "__conftest")
     ("/test_.*\\.py$" :mode python-mode :trigger "__pytest")
-    ;; Generic Scripts
+    ;; Handle both standard and tree-sitter modes
     (python-base-mode :mode python-mode :trigger "__main")
     (python-mode :trigger "__main")
     (python-ts-mode :mode python-mode :trigger "__main")
 
     ;; --- Shell ---
     (fish-mode :trigger "__fish")
-    ;; Differentiate between a library (sourced) and a script (executed) based on extension/name?
-    ;; For now, use regex for libs.
-    ("/lib.*\\.sh$" :mode sh-mode :trigger "__sh_lib")
     (sh-mode :trigger "__sh_script")
 
-    ;; --- Web / Config (YAML/JSON) ---
-    ("/\\.github/workflows/.*\\.yml$" :mode yaml-mode :trigger "__gh_action")
-    (yaml-mode :trigger "__yaml_base")
-    (yaml-ts-mode :mode yaml-mode :trigger "__yaml_base")
-    ("/package\\.json$" :mode json-mode :trigger "__package_json")
-    ("/tsconfig\\.json$" :mode json-mode :trigger "__tsconfig")
-    (json-mode :trigger "__json_base")
-    (json-ts-mode :mode json-mode :trigger "__json_base")
+    ;; --- Web / Data ---
+    (yaml-mode :trigger "__yaml")
+    (yaml-ts-mode :mode yaml-mode :trigger "__yaml")
+    (json-mode :trigger "__json")
+    (json-ts-mode :mode json-mode :trigger "__json")
+    (toml-ts-mode :trigger "__toml")
 
     ;; --- Nix ---
     ("/flake\\.nix$" :mode nix-mode :trigger "__nix_flake")
     ("/shell\\.nix$" :mode nix-mode :trigger "__nix_shell")
-    (nix-mode :trigger "__nix_pkg")
+    (nix-mode :trigger "__nix_default")
 
-    ;; --- Org Mode ---
-    ;; Project/Task based files vs Notes
+    ;; --- Org & Markdown ---
     ("/gtd/.*\\.org$" :mode org-mode :trigger "__org_gtd")
-    ("/roam/.*\\.org$" :mode org-mode :trigger "__org_roam")
     (org-mode :trigger "__org_basic")
-
-    ;; --- Markdown ---
     ("/README\\.md$" :mode markdown-mode :trigger "__md_readme")
     (markdown-mode :trigger "__md_frontmatter")
 
-    ;; --- Text ---
-    (text-mode :trigger "__text"))
+    ;; --- Text / Misc ---
+    ;; Specific file names match first
+    ("/LICENSE$" :mode text-mode :trigger "__license")
+    ("/COPYING$" :mode text-mode :trigger "__license")
+    ("/robots\\.txt$" :mode text-mode :trigger "__robots")
+    ("/humans\\.txt$" :mode text-mode :trigger "__humans")
+    ("/CHANGELOG$" :mode text-mode :trigger "__changelog")
+    ;; Generic fallback
+    (text-mode :trigger "__text_basic"))
   "Alist of file template rules.
-Order matters: Regex matches on filenames take precedence over Major Mode matches.
-
+Order matches: The first matching rule is applied.
 Structure: (PREDICATE . PLIST)
+
 PREDICATE:
-  - Regex string: Matches buffer file name.
-  - Symbol: Matches major mode (checked via `derived-mode-p`).
+  - Regex string: Matches buffer file name (High Priority).
+  - Symbol: Matches major mode (Low Priority).
 
 PLIST keys:
   :trigger - The yasnippet key to expand.
-  :mode    - The specific yasnippet table to search (useful for ts-modes).")
+  :mode    - The yasnippet table to search (useful for ts-modes).")
 
 (defun ar/file-template-p (rule)
   "Check if RULE applies to the current buffer.
 Returns the rule if it applies, nil otherwise."
   (let ((pred (car rule)))
     (cond
+     ;; 1. Check Regex against filename
      ((and (stringp pred) buffer-file-name)
       (string-match-p pred buffer-file-name))
+     ;; 2. Check Major Mode derivation
      ((symbolp pred)
       (derived-mode-p pred))
      (t nil))))
@@ -5491,10 +5484,9 @@ Returns the rule if it applies, nil otherwise."
 (defun ar/file-templates-apply ()
   "Find and expand a file template for the current buffer."
   (interactive)
-  ;; Find the FIRST matching rule (regex priority is handled by list order)
   (when-let* ((rule (cl-find-if #'ar/file-template-p ar/file-templates-alist))
               (plist (cdr rule))
-              ;; Determine the Yasnippet table mode
+              ;; If :mode is not specified, use the current major-mode
               (table-mode (or (plist-get plist :mode) major-mode))
               (trigger (or (plist-get plist :trigger) ar/file-templates-default-trigger)))
 
@@ -5504,11 +5496,8 @@ Returns the rule if it applies, nil otherwise."
 
     ;; Look up and expand
     (if-let ((template (yas-lookup-snippet trigger table-mode)))
-        (progn
-          (message "Expanding template: %s" trigger)
-          (yas-expand-snippet (yas--template-content template) (point-min) (point-max)))
-      ;; Fallback debug message
-      (message "File Template: Trigger '%s' not found in mode '%s'" trigger table-mode))))
+        (yas-expand-snippet (yas--template-content template) (point-min) (point-max))
+      (message "File Template: Snippet '%s' not found for table '%s'" trigger table-mode))))
 
 ;; Hook into file opening
 (add-hook 'find-file-hook #'ar/file-templates-check)

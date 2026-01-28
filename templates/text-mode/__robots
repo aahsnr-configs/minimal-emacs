@@ -1,0 +1,10 @@
+# -*- mode: snippet -*-
+# name: robots.txt
+# key: __robots
+# --
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Disallow: ${1:/admin/}
+Allow: /
+
+Sitemap: ${2:https://example.com/sitemap.xml}

@@ -1,0 +1,15 @@
+# -*- mode: snippet -*-
+# name: humans.txt
+# key: __humans
+# --
+# humanstxt.org/
+
+/* TEAM */
+Author: `user-full-name`
+Contact: `user-mail-address`
+Site: ${1:https://github.com/username}
+
+/* SITE */
+Last update: `(format-time-string "%Y/%m/%d")`
+Standards: HTML5, CSS3
+Components: ${2:Emacs, Org-mode}

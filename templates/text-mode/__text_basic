@@ -1,0 +1,11 @@
+# -*- mode: snippet -*-
+# name: Basic Note
+# key: __text_basic
+# --
+Title: ${1:`(capitalize (replace-regexp-in-string "[-_]" " " (file-name-base (buffer-file-name))))`}
+Date: `(format-time-string "%Y-%m-%d %H:%M")`
+Author: `user-full-name`
+
+--------------------------------------------------------------------------------
+
+$0
