@@ -5541,9 +5541,10 @@ Returns the rule if it applies, nil otherwise."
 
   ;; Indentation
   ;; Proper indentation for itemize/enumerate/description
-  (dolist (env '("itemize" "enumerate" "description"))
-    (add-to-list 'LaTeX-indent-environment-list
-                 `(,env ar/latex-indent-item-fn)))
+  (with-eval-after-load 'latex
+    (dolist (env '("itemize" "enumerate" "description"))
+      (add-to-list 'LaTeX-indent-environment-list
+                   `(,env ar/latex-indent-item-fn))))
 
   ;; TeX-MODE-HOOK (ispell & fill-nobreak setup)
   (add-hook 'TeX-mode-hook
