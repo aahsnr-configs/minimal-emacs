@@ -1,0 +1,20 @@
+# -*- mode: snippet -*-
+# name: Python Script
+# key: __main
+# --
+#!/usr/bin/env python3
+"""
+${1:Script description...}
+"""
+
+import sys
+import logging
+
+def main() -> int:
+    """Entry point."""
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    $0
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

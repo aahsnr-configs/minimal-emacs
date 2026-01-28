@@ -1,0 +1,10 @@
+# -*- mode: snippet -*-
+# name: Pytest
+# key: __pytest
+# --
+import pytest
+from ${1:module} import ${2:Class}
+
+def test_${3:functionality}():
+    """Test that $3 works correctly."""
+    assert $0

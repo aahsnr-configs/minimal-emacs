@@ -1,0 +1,12 @@
+# -*- mode: snippet -*-
+# name: Frontmatter
+# key: __md_frontmatter
+# --
+---
+title: "${1:`(capitalize (replace-regexp-in-string "[-_]" " " (file-name-base (buffer-file-name))))`}"
+date: `(format-time-string "%Y-%m-%d")`
+draft: true
+tags: [$2]
+---
+
+$0

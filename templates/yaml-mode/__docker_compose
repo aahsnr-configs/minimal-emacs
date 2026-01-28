@@ -1,0 +1,15 @@
+# -*- mode: snippet -*-
+# name: Docker Compose
+# key: __docker_compose
+# --
+version: "3.8"
+
+services:
+  ${1:app}:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - DEBUG=1

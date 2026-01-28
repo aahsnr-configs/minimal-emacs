@@ -38,11 +38,7 @@
 
   ;; Make Emacs Native-compile .elc files asynchronously by setting
   ;; `native-comp-jit-compilation' to t.
-  ; (setq native-comp-jit-compilation t)
-  ; (setq native-comp-deferred-compilation native-comp-jit-compilation)  ; Deprecated
-  ;
-
-
+  (setq native-comp-jit-compilation t)
   (setq byte-compile-warnings '(not free-vars unresolved noruntime lexical make-local))
 
   ;; ====================
@@ -66,6 +62,8 @@
         inhibit-splash-screen t
         initial-scratch-message nil)
 
+  ;; (setq inhibit-message t)
+
   ;; ====================
   ;; WARNINGS
   ;; ====================
@@ -82,7 +80,9 @@
   ;; ====================
   (add-hook 'emacs-startup-hook
             (lambda ()
-              (setq file-name-handler-alist file-name-handler-alist-original))
+              (setq file-name-handler-alist file-name-handler-alist-original)
+              (setq inhibit-message nil)
+              )
             101))  ; Run late
 
 ;;; early-init.el ends here

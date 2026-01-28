@@ -1,0 +1,14 @@
+# -*- mode: snippet -*-
+# name: README
+# key: __md_readme
+# --
+# ${1:Project Name}
+
+![CI Status](https://img.shields.io/badge/build-passing-brightgreen)
+
+## Overview
+$0
+
+## Installation
+
+## Usage

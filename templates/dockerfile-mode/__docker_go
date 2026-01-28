@@ -1,0 +1,16 @@
+# -*- mode: snippet -*-
+# name: Dockerfile Go (Multi-stage)
+# key: __docker_go
+# --
+# Build Stage
+FROM golang:${1:1.21-alpine} AS builder
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/binary .
+
+# Final Stage
+FROM gcr.io/distroless/static-debian12
+COPY --from=builder /app/binary /
+CMD ["/binary"]

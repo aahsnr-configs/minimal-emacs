@@ -1,0 +1,17 @@
+# -*- mode: snippet -*-
+# name: Bash Library
+# key: __sh_lib
+# --
+#!/usr/bin/env bash
+#
+# Library: ${1:lib_name}
+# Description: $2
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    echo "This script is a library and should be sourced, not executed."
+    exit 1
+fi
+
+function ${1:lib_name}::${3:func} {
+    $0
+}

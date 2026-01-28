@@ -1,0 +1,14 @@
+# -*- mode: snippet -*-
+# name: Org GTD Project
+# key: __org_gtd
+# --
+#+TITLE: Project: ${1:Name}
+#+CATEGORY: ${1:Name}
+#+FILETAGS: :project:
+#+STARTUP: content
+
+* Goal
+$2
+
+* Tasks
+** TODO $0

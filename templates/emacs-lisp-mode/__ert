@@ -1,0 +1,11 @@
+# -*- mode: snippet -*-
+# name: ERT Test
+# key: __ert
+# --
+;;; `(file-name-nondirectory (buffer-file-name))` --- Tests for `(replace-regexp-in-string "-test" "" (file-name-base (buffer-file-name)))` -*- lexical-binding: t; -*-
+
+(require 'ert)
+(require '`(replace-regexp-in-string "-test" "" (file-name-base (buffer-file-name)))`)
+
+(ert-deftest ${1:test-name} ()
+  (should (equal $0)))

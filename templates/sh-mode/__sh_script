@@ -1,0 +1,18 @@
+# -*- mode: snippet -*-
+# name: Bash Script (Strict)
+# key: __sh_script
+# --
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+
+# Constants
+readonly SCRIPT_NAME="$(basename "$0")"
+
+log() { echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')] $*" >&2; }
+
+main() {
+    $0
+}
+
+main "$@"

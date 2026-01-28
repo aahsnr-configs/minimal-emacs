@@ -1,0 +1,12 @@
+# -*- mode: snippet -*-
+# name: shell.nix
+# key: __nix_shell
+# --
+{ pkgs ? import <nixpkgs> {} }:
+
+pkgs.mkShell {
+  name = "${1:env}";
+  buildInputs = with pkgs; [
+    $0
+  ];
+}
