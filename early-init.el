@@ -9,7 +9,7 @@
   ;; MAXIMUM GC DEFERRAL (Doom Strategy)
   ;; ====================
   (setq gc-cons-threshold most-positive-fixnum
-        gc-cons-percentage 0.8)
+        gc-cons-percentage 1.0)
 
   ;; Disable file name handlers completely during startup
   (setq file-name-handler-alist nil)
@@ -36,10 +36,10 @@
   ;; NATIVE COMPILATION
   ;; ====================
 
-  ;; Make Emacs Native-compile .elc files asynchronously by setting
-  ;; `native-comp-jit-compilation' to t.
-  (setq native-comp-jit-compilation t)
-  (setq byte-compile-warnings '(not free-vars unresolved noruntime lexical make-local))
+  ;; ;; Make Emacs Native-compile .elc files asynchronously by setting
+  ;; ;; `native-comp-jit-compilation' to t.
+  ;; (setq native-comp-jit-compilation t)
+  ;; (setq byte-compile-warnings '(not free-vars unresolved noruntime lexical make-local))
 
   ;; ====================
   ;; UI INITIALIZATION

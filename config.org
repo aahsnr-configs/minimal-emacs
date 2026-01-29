@@ -3469,10 +3469,8 @@ Links back to the GTD task for execution tracking."
   (setq dired-clean-confirm-killing-deleted-buffers nil))
 
 (use-package diredfl
-  :defer t
   :hook
   ((dired-mode . diredfl-mode)
-   ;; highlight parent and directory preview as well
    (dirvish-directory-view-mode . diredfl-mode))
   :config
   (set-face-attribute 'diredfl-dir-name nil :bold t))
@@ -3480,7 +3478,6 @@ Links back to the GTD task for execution tracking."
 
 (use-package wdired
   :straight (:type built-in)
-  :defer t
   :after dired
   :custom
   (wdired-allow-to-change-permissions t)
@@ -3547,7 +3544,7 @@ Links back to the GTD task for execution tracking."
 
   ;; Previews
   (dirvish-preview-dispatchers
-   '(image gif video audio epub archive pdf))
+   '(image gif video audio epub archive pdf dired))
 
   :config
   (setq dirvish-mode-line-format
@@ -3556,7 +3553,6 @@ Links back to the GTD task for execution tracking."
   (setq dirvish-large-directory-threshold 20000)
   (require 'dirvish-fd)
   (require 'dirvish-emerge)
-
   (require 'dirvish-side)
 
   ;; Side window configuration (Restored to Left side)
@@ -3649,6 +3645,7 @@ Links back to the GTD task for execution tracking."
   :commands (tabspaces-switch-or-create-workspace
              tabspaces-open-or-create-project-and-workspace)
   :custom
+  (tab-bar-show nil)
   (tabspaces-use-filtered-buffers-as-default t)
   (tabspaces-default-tab "Home")
   (tabspaces-remove-to-default t)
@@ -5497,8 +5494,9 @@ Returns the rule if it applies, nil otherwise."
   :defer t
   :straight auctex
   :hook ((LaTeX-mode . visual-line-mode)
-         (LaTeX-mode . prettify-symbols-mode)
+         ;;(LaTeX-mode . prettify-symbols-mode) ;COMMENT Defined else where
          (LaTeX-mode . TeX-source-correlate-mode)
+         (LaTeX-mode . outline-minor-mode)
          (LaTeX-mode . eglot-ensure))
 
   :init
