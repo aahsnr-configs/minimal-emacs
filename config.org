@@ -310,10 +310,12 @@ byte-compiled files do not interfere with the reload."
 (add-to-list 'auto-mode-alist '("\\.bb\\'" . shell-script-mode))
 (add-to-list 'auto-mode-alist '("\\.bbclass\\'" . shell-script-mode))
 (add-to-list 'auto-mode-alist '("\\.Rmd\\'" . markdown-mode))
+#+end_src
 
-;; Autosave
-(auto-save-visited-mode +1)
-(setq auto-save-visited-interval 60)
+** Auto Save
+#+begin_src emacs-lisp
+(setq auto-save-visited-interval 5)
+(auto-save-visited-mode 1)
 #+end_src
 
 ** Garbage Collector Magic Hack
@@ -522,7 +524,7 @@ byte-compiled files do not interfere with the reload."
   (setq evil-want-integration t
         evil-want-keybinding nil
         evil-want-minibuffer t
-        ;; evil-mode-line-format nil ; COMMENT Don't turn this on
+        evil-mode-line-format nil ; COMMENT Don't turn this on
         evil-kbd-macro-suppress-motion-error t
         evil-symbol-word-search t
         evil-kill-on-visual-paste nil)
@@ -549,7 +551,7 @@ byte-compiled files do not interfere with the reload."
   (evil-want-C-u-delete t)
   (evil-want-fine-undo t)
   (evil-move-beyond-eol t)
-  (evil-search-wrap nil)
+  (evil-search-wrap t)
   (select-enable-clipboard t)
   (evil-visual-update-x-selection-p nil)
 
@@ -599,14 +601,17 @@ byte-compiled files do not interfere with the reload."
 
 ;; Better Initial States
 (evil-set-initial-state 'messages-buffer-mode 'normal)
-(evil-set-initial-state 'dashboard-mode 'normal)
-(evil-select-search-module 'evil-search-module 'evil-search))
+(evil-set-initial-state 'dashboard-mode 'normal))
 #+end_src
 
 ** Evil Collection
 #+begin_src emacs-lisp
 (use-package evil-collection
   :after evil
+  :ensure t
+  :init
+  ;; It has to be defined before evil-colllection
+  (setq evil-collection-setup-minibuffer t)
   :config
   (evil-collection-init))
 #+end_src
@@ -721,17 +726,14 @@ byte-compiled files do not interfere with the reload."
 
 ** Native Commenting Operator
 #+begin_src emacs-lisp
-(with-eval-after-load 'evil
-  (evil-define-operator ar/evil-comment-operator (beg end type)
-    "Toggle comment for the region defined by BEG and END."
-    :move-point nil
-    (interactive "<R>")
+;; The following code enables commenting and uncommenting by pressing gcc in
+;; normal mode and gc in visual mode.
+(with-eval-after-load "evil"
+  (evil-define-operator my-evil-comment-or-uncomment (beg end)
+    "Toggle comment for the region between BEG and END."
+    (interactive "<r>")
     (comment-or-uncomment-region beg end))
-
-  ;; Bind 'gc' to this operator
-  (define-key evil-normal-state-map (kbd "gc") #'ar/evil-comment-operator)
-  ;; Bind 'gc' in visual mode to ensure it works on selections
-  (define-key evil-visual-state-map (kbd "gc") #'ar/evil-comment-operator))
+  (evil-define-key 'normal 'global (kbd "gc") 'my-evil-comment-or-uncomment))
 #+end_src
 
 ** Smart Comment Continuation
@@ -3882,7 +3884,8 @@ Enrich existing commands with completion annotations
 #+begin_src emacs-lisp
 (use-package marginalia
   :init
-  (marginalia-mode)
+  :commands (marginalia-mode marginalia-cycle)
+  :hook (after-init . marginalia-mode)
   :config
   (setq marginalia-max-relative-age 0 ; Always show absolute time
         marginalia-align 'right))
@@ -4032,6 +4035,12 @@ Enrich existing commands with completion annotations
   :init
   (setq prefix-help-command #'embark-prefix-help-command)
   :config
+  ;; Hide the mode line of the Embark live/completions buffers
+  (add-to-list 'display-buffer-alist
+               '("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
+                 nil
+                 (window-parameters (mode-line-format . none))))
+
   ;; Manual preview for non-Consult commands using Embark
   (defun my-embark-preview ()
     "Previews candidate in vertico buffer, unless it's a consult command."
@@ -4100,23 +4109,25 @@ targets."
 ** Corfu
 #+begin_src emacs-lisp
 (use-package corfu
-  :autoload (corfu-quit consult-completion-in-region)
-  :functions (persistent-scratch-save corfu-move-to-minibuffer)
+  :init
+  (global-corfu-mode)
   :custom
   (corfu-cycle t)
   (corfu-auto t)
-  (corfu-auto-prefix 3)
+  (corfu-quit-at-boundary t)
+  (corfu-quit-no-match t)
   (corfu-count 12)
   (corfu-preselect 'prompt)
   (corfu-preview-current nil)
-  (corfu-on-exact-match nil)
-  (corfu-auto-delay 0.5)
+  (corfu-on-exact-match 'insert)
+  (corfu-auto-delay 0.1)
   (global-corfu-modes '((not erc-mode
                              circe-mode
                              help-mode
                              gud-mode
                              vterm-mode)
                         t))
+  (read-extended-command-predicate #'command-completion-default-include-p)
   :custom-face
   (corfu-border ((t (:inherit region :background unspecified))))
   :bind
@@ -4125,10 +4136,10 @@ targets."
         ([tab] . corfu-next)
         ("S-TAB" . corfu-previous)
         ([backtab] . corfu-previous)
+        ("RET" . corfu-insert)
         ("M-h" . corfu-info-documentation))
-  :hook ((after-init . global-corfu-mode)
-         (global-corfu-mode . corfu-history-mode))
   :config
+  (corfu-history-mode 1)
   ;;Quit completion before saving
   (add-hook 'before-save-hook #'corfu-quit)
   (advice-add #'persistent-scratch-save :before #'corfu-quit))
@@ -5156,14 +5167,21 @@ operators and other column-based navigation."
 (unless (file-directory-p my/snippets-directory)
   (make-directory my/snippets-directory t))
 
+(use-package yasnippet-snippets :after yasnippet)
+
 (use-package yasnippet
   :defer t
-  :hook ((prog-mode text-mode LaTeX-mode org-mode) . yas-minor-mode)
+  :hook ( after-init . yas-global-mode
+         ;;(prog-mode text-mode LaTeX-mode org-mode) . yas-minor-mode)
+         )
   :custom
-  (yas-prompt-functions '(yas-completing-prompt))
+  ;;(yas-prompt-functions '(yas-completing-prompt))
+  (yas-also-auto-indent-first-line t)  ; Indent first line of snippet
+  (yas-also-indent-empty-lines t)
+  (yas-snippet-revival nil)  ; Setting this to t causes issues with undo
+  (yas-wrap-around-region nil) ; Do not wrap region when expanding snippets
   :config
   (add-to-list 'yas-snippet-dirs my/snippets-directory)
-
   (defun ar/yas-reload-snippets-on-save ()
     "Reload all snippets if a snippet file is being saved."
     (when (string-prefix-p my/snippets-directory (buffer-file-name))
@@ -5172,10 +5190,10 @@ operators and other column-based navigation."
 
   (add-hook 'after-save-hook #'ar/yas-reload-snippets-on-save))
 
-(use-package yasnippet-snippets
-  :after yasnippet
-  :config
-  (yas-reload-all))
+;; (use-package yasnippet-snippets
+;;   :after yasnippet
+;;   :config
+;;   (yas-reload-all))
 
 (use-package consult-yasnippet
   :after (consult yasnippet)
@@ -5187,6 +5205,9 @@ operators and other column-based navigation."
   :config
   (add-to-list 'completion-at-point-functions #'yasnippet-capf))
 #+end_src
+
+#+RESULTS:
+: t
 
 ** File Templates
 #+begin_src emacs-lisp
@@ -6228,9 +6249,6 @@ It does NOT activate company-mode - completely safe with Corfu."
           ("==" . ?≡)
           ("<=" . ?≤)
           (">=" . ?≥)
-          ;; Special values
-          ("nil" . ?∅)
-          ("t" . ?⊤)
           ;; Common functions
           ("->" . ?→)
           ("->>" . ?↠)
@@ -6921,6 +6939,7 @@ It does NOT activate company-mode - completely safe with Corfu."
   ;; Search operations (SPC s)
   (ar/global-leader
     "s" '(:ignore t :wk "search")
+    "s c" '(evil-ex-nohighlight :wk "Clear highlights")
     "s s" '(consult-line :wk "Search buffer")
     "s S" '(consult-line-multi :wk "Search buffers")
     "s p" '(consult-ripgrep :wk "Search project")
