@@ -3645,7 +3645,6 @@ Links back to the GTD task for execution tracking."
 #+begin_src emacs-lisp
 (use-package tabspaces
   :straight (:type git :host github :repo "mclear-tools/tabspaces")
-  :defer t
   :hook (after-init . tabspaces-mode)
   :commands (tabspaces-switch-or-create-workspace
              tabspaces-open-or-create-project-and-workspace)
@@ -4615,44 +4614,77 @@ If completion fails in the future, check these:
                `(background-color . ,(face-background 'tooltip nil t))))
 #+end_src
 
-** Breadcrumbs
+** Imenu-Breadcrumbs
 *Disable breadcrumbs in org buffers*
 #+begin_src emacs-lisp
-(use-package breadcrumb
-  :straight (:host github :repo "joaotavora/breadcrumb")
-  :defer t
-  :custom
-  (breadcrumb-project-crumb-separator " > ")
-  (breadcrumb-imenu-crumb-separator " > ")
+(defun ar/imenu-breadcrumb-get-path (index-alist point)
+  "Recursively traverse INDEX-ALIST to find the path to POINT.
+Returns a list of strings (e.g., '(\"Class\" \"Method\"))."
+  (let ((path nil))
+    (dolist (item index-alist)
+      (when (and (consp item) (not path))
+        (let ((name (car item))
+              (val (cdr item)))
+          (cond
+           ;; Case 1: Nested list (Class/Module with children)
+           ((and (listp val) (consp (car val)))
+            ;; We need to determine the start/end of this section.
+            ;; In standard Imenu/Eglot, a section usually has a special entry
+            ;; or we approximate bounds by the range of its children.
+            ;; For safety, we check if the point is within the *range* of this node's children.
+            (let* ((positions (mapcar (lambda (x)
+                                        (if (markerp (cdr x))
+                                            (marker-position (cdr x))
+                                          (or (cdr x) 0)))
+                                      val))
+                   (valid-pos (cl-remove-if-not #'numberp positions))
+                   (min-pos (if valid-pos (apply #'min valid-pos) 0))
+                   (max-pos (if valid-pos (apply #'max valid-pos) (point-max))))
+              (when (and (>= point min-pos) (<= point max-pos))
+                (setq path (cons name (ar/imenu-breadcrumb-get-path val point))))))
 
-  ;; Max length settings (values are in characters, not percentages)
-  (breadcrumb-project-max-length 0.5)  ;; Proportion of available space
-  (breadcrumb-imenu-max-length 0.5)
+           ;; Case 2: Leaf node (Method/Function)
+           ;; Eglot usually provides markers. We check if point is near this marker.
+           ((or (markerp val) (integerp val))
+            (let ((pos (if (markerp val) (marker-position val) val)))
+              ;; Heuristic: If point is after definition start, it's a candidate.
+              ;; A stricter check would require end-positions, which Imenu lacks by default,
+              ;; but this works well for 'current function' detection.
+              (when (and (>= point pos)
+                         (< (- point pos) 5000)) ;; Sanity check: don't match if way far off
+                (setq path (list name)))))))))
+    path))
 
-  ;; Idle time before updating breadcrumbs (in seconds)
-  (breadcrumb-idle-time 0.5)
+(defun ar/eldoc-breadcrumbs (callback &rest _)
+  "ElDoc backend to show Imenu breadcrumbs (Parent > Child).
+Arguments are CALLBACK and ignored."
+  (when (and (derived-mode-p 'prog-mode)
+             (bound-and-true-p imenu--index-alist)) ; Only run if Imenu is ready
+    (let* ((path (ar/imenu-breadcrumb-get-path imenu--index-alist (point)))
+           (breadcrumb-string
+            (when path
+              (concat
+               (if (fboundp 'nerd-icons-codicon)
+                   (concat (nerd-icons-codicon "nf-cod-symbol_structure" :face 'shadow) " ")
+                 "")
+               (mapconcat (lambda (s) (propertize s 'face 'shadow))
+                          path
+                          (propertize " > " 'face 'shadow))))))
+      (when breadcrumb-string
+        ;; We pass :thing and :face to play nice with other backends
+        (funcall callback breadcrumb-string
+                 :thing "Breadcrumb"
+                 :face 'shadow)))))
 
-  :config
-  ;; Function to determine if breadcrumb should be enabled
-  (defun my/breadcrumb-mode-p ()
-    "Return nil if breadcrumb should be disabled in current buffer."
-    (or (derived-mode-p 'org-mode)
-        (derived-mode-p 'text-mode)))
+;; Register the backend
+(defun ar/setup-eldoc-breadcrumbs ()
+  "Add breadcrumbs to ElDoc with low priority."
+  ;; Priority 10 (positive) means it runs *after* the main docs (usually 0 or -10),
+  ;; effectively appending it to the end of the message in the echo area.
+  (add-hook 'eldoc-documentation-functions #'ar/eldoc-breadcrumbs 10 t))
 
-  ;; Hook to disable breadcrumb in specific modes
-  (defun my/breadcrumb-setup ()
-    "Conditionally enable breadcrumb-local-mode."
-    (unless (my/breadcrumb-mode-p)
-      (breadcrumb-local-mode 1)))
-
-  :hook
-  ((prog-mode
-    conf-mode-hook
-    yaml-mode
-    json-mode) . my/breadcrumb-setup)
-
-  ;; Explicitly disable for org and text modes
-  ((org-mode text-mode markdown-mode) . (lambda () (breadcrumb-local-mode -1))))
+;; Hook into Eglot/Prog-mode
+(add-hook 'eglot-managed-mode-hook #'ar/setup-eldoc-breadcrumbs)
 #+end_src
 
 ** Transient Menu
@@ -5171,9 +5203,8 @@ operators and other column-based navigation."
 
 (use-package yasnippet
   :defer t
-  :hook ( after-init . yas-global-mode
-         ;;(prog-mode text-mode LaTeX-mode org-mode) . yas-minor-mode)
-         )
+  :hook (after-init . yas-global-mode)
+  ;;:hook (prog-mode text-mode LaTeX-mode org-mode) . yas-minor-mode)
   :custom
   ;;(yas-prompt-functions '(yas-completing-prompt))
   (yas-also-auto-indent-first-line t)  ; Indent first line of snippet
@@ -5205,9 +5236,6 @@ operators and other column-based navigation."
   :config
   (add-to-list 'completion-at-point-functions #'yasnippet-capf))
 #+end_src
-
-#+RESULTS:
-: t
 
 ** File Templates
 #+begin_src emacs-lisp
