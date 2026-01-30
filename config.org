@@ -3708,42 +3708,51 @@ Links back to the GTD task for execution tracking."
 
 #+begin_src emacs-lisp
 (use-package beframe
-  :demand t
+  :hook (after-init . beframe-mode)
   :custom
   (beframe-global-buffers nil)
   (beframe-create-frame-scratch-buffer nil)
   (beframe-kill-frame-scratch-buffer nil)
   (beframe-functions-in-frames '(project-prompt-project-dir))
+ ;; Frames will be named after the project or directory
   (beframe-rename-function #'beframe-rename-frame)
+
+  ;; Customize the prompt prefix for beframed buffer operations
   (beframe-prompt-prefix "[Frame] ")
-
   :config
-  (beframe-mode 1)
+  (defvar consult-buffer-sources)
+  (declare-function consult--buffer-state "consult")
 
-  (when (daemonp)
-    (add-hook 'after-make-frame-functions
-              (lambda (frame)
-                (with-selected-frame frame
-                  (unless beframe-mode
-                    (beframe-mode 1))
-                  (set-frame-parameter frame 'buffer-predicate
-                                       #'beframe-buffer-list-p)))
-              :append))
-
+  ;; Consult Buffer Source
   (with-eval-after-load 'consult
-    (declare-function consult--buffer-state "consult")
+    (defface beframe-buffer
+      '((t :inherit font-lock-string-face))
+      "Face for `consult' framed buffers.")
 
-    (defun my-beframe-buffer-list-filtered (&optional frame)
-      "Return beframed buffer list for FRAME, excluding internal buffers.
-Filters out buffers whose names start with '*' (like *scratch*, *Messages*)
-and sorts by visibility (most recently used first, excluding current buffer).
-If FRAME is nil, use the current frame."
-      (let ((frame-buffers (beframe-buffer-list frame :sort #'beframe-buffer-sort-visibility)))
-        (seq-remove (lambda (buf)
-                      (string-prefix-p "*" (buffer-name buf)))
-                    frame-buffers)))
+    (defun my-beframe-buffer-names-sorted (&optional frame)
+      "Return the list of buffers from `beframe-buffer-names' sorted by visibility.
+With optional argument FRAME, return the list of buffers of FRAME."
+      (beframe-buffer-names frame :sort #'beframe-buffer-sort-visibility))
 
-    (setq consult-buffer-list-function #'my-beframe-buffer-list-filtered)))
+    (defvar beframe-consult-source
+      `( :name     "Frame-specific buffers (current frame)"
+         :narrow   ?F
+         :category buffer
+         :face     beframe-buffer
+         :history  beframe-history
+         :items    ,#'my-beframe-buffer-names-sorted
+         :action   ,#'switch-to-buffer
+         :state    ,#'consult--buffer-state))
+
+    (add-to-list 'consult-buffer-sources 'beframe-consult-source))
+
+  ;; Beframed buffers as the complete Consult buffer list
+  (defun consult-beframe-buffer-list (&optional frame)
+    "Return the list of buffers from `beframe-buffer-names' sorted by visibility.
+With optional argument FRAME, return the list of buffers of FRAME."
+    (beframe-buffer-list frame :sort #'beframe-buffer-sort-visibility))
+
+  (setq consult-buffer-list-function #'consult-beframe-buffer-list))
 #+end_src
 
 * Completion Framework
@@ -3798,99 +3807,83 @@ Enrich existing commands with completion annotations
 
 ** Consult
 #+begin_src emacs-lisp
+
 (use-package consult
-  :defines (xref-show-xrefs-function xref-show-definitions-function)
-  :defines shr-color-html-colors-alist
-  :autoload (consult-register-format consult-register-window consult-xref)
-  :autoload (consult--read consult--customize-put)
-  :commands (consult-narrow-help)
-  :functions (list-colors-duplicates consult-colors--web-list)
-  :bind (([remap switch-to-buffer] . consult-buffer)
+  :bind (;; Buffer switching
+         ([remap switch-to-buffer] . consult-buffer)
          ([remap switch-to-buffer-other-window] . consult-buffer-other-window)
          ([remap switch-to-buffer-other-frame] . consult-buffer-other-frame)
-         ([remap bookmark-jump] . consult-bookmark)
-         ([remap evil-show-marks] . consult-mark)
-         ([remap evil-show-jumps] . consult-jump-list)
+         ([remap project-switch-to-buffer] . consult-project-buffer)
+
+         ;; Navigation
          ([remap goto-line] . consult-goto-line)
          ([remap imenu] . consult-imenu)
-         ([remap load-theme] . consult-theme)
-         ([remap recentf-open-files] . consult-recent-file)
          ([remap yank-pop] . consult-yank-pop)
-         ([remap InfO-search]        . consult-info)
-         ([remap isearch-forward]    . consult-line))
+         ([remap bookmark-jump] . consult-bookmark))
+
   :hook (completion-list-mode . consult-preview-at-point-mode)
+
   :init
+  ;; Improve register preview with consult
   (setq register-preview-delay 0.5
         register-preview-function #'consult-register-format)
   (advice-add #'register-preview :override #'consult-register-window)
 
-  (with-eval-after-load 'xref
-    (setq xref-show-xrefs-function #'consult-xref
-          xref-show-definitions-function #'consult-xref))
+  ;; Use Consult for xref locations with preview
+  (setq xref-show-xrefs-function #'consult-xref
+        xref-show-definitions-function #'consult-xref)
 
-  (defvar consult-colors-history nil
-    "History for `consult-colors-emacs' and `consult-colors-web'.")
-
-  (autoload 'list-colors-duplicates "facemenu")
-  (autoload 'consult--read "consult")
-
-  (defun consult-colors-emacs (color)
-    "Show a list of all supported colors for a particular frame."
-    (interactive
-     (list (consult--read (list-colors-duplicates (defined-colors))
-                          :prompt "Emacs color: "
-                          :require-match t
-                          :category 'color
-                          :history '(:input consult-colors-history))))
-    (insert color))
-
-  (defun consult-colors--web-list nil
-    "Return list of CSS colors for `counsult-colors-web'."
-    (require 'shr-color)
-    (sort (mapcar #'downcase (mapcar #'car shr-color-html-colors-alist)) #'string-lessp))
-
-  (defun consult-colors-web (color)
-    "Show a list of all CSS colors."
-    (interactive
-     (list (consult--read (consult-colors--web-list)
-                          :prompt "Color: "
-                          :require-match t
-                          :category 'color
-                          :history '(:input consult-colors-history))))
-    (insert color))
   :config
-  (setq consult-preview-key nil)
+  ;; ;; Custom buffer source: file-visiting buffers only
+  ;; (defvar consult--source-file-visiting-buffer
+  ;;   `(:name "Main"
+  ;;     :narrow ?f
+  ;;     :category buffer
+  ;;     :face consult-buffer
+  ;;     :history buffer-name-history
+  ;;     :state ,#'consult--buffer-state
+  ;;     :default t
+  ;;     :items ,(lambda ()
+  ;;               (consult--buffer-query
+  ;;                :sort 'visibility
+  ;;                :predicate (lambda (buf)
+  ;;                             (buffer-file-name buf))
+  ;;                :as #'buffer-name)))
+  ;;   "Buffer source for file-visiting buffers only.")
 
-  (defvar consult--source-file-visiting-buffer
-    `(:name "Main"
-      :narrow ?f
-      :category buffer
-      :face consult-buffer
-      :history buffer-name-history
-      :state ,#'consult--buffer-state
-      :default t
-      :items ,(lambda ()
-                (consult--buffer-query
-                 :sort 'visibility
-                 :predicate (lambda (buf)
-                              (buffer-file-name buf))
-                 :as #'buffer-name)))
-    "Buffer source for file-visiting buffers only.")
+  ;; (setq consult-buffer-sources
+  ;;       '(consult--source-file-visiting-buffer))
 
-  (setq consult-buffer-sources
-        '(consult--source-file-visiting-buffer))
-
-  ;; Removed :initial. Use M-n to insert symbol-at-point dynamically.
+  ;; Configure preview behavior for optimal performance
+  ;; Immediate preview for navigation commands
+  ;; Delayed preview for potentially expensive operations
   (consult-customize
-   consult-line consult-line-multi :preview-key 'any
-   consult-buffer consult-recent-file consult-theme :preview-key '(:debounce 1.0 any)
-   consult-goto-line :preview-key '(:debounce 0.5 any)
-   consult-ripgrep consult-git-grep consult-grep
-   :preview-key '(:debounce 0.5 any))
+   ;; Instant preview for line/imenu navigation
+   consult-line consult-line-multi consult-imenu consult-imenu-multi
+   :preview-key 'any
 
+   ;; Slightly delayed preview for themes (smoother UI)
+   consult-theme
+   :preview-key '(:debounce 0.2 any)
+
+   ;; Debounced preview for buffer/file operations
+   consult-buffer consult-recent-file
+   :preview-key '(:debounce 0.4 any)
+
+   ;; Debounced preview for search operations
+   consult-ripgrep consult-git-grep consult-grep consult-find
+   :preview-key '(:debounce 0.4 any)
+
+   ;; Other commands with moderate delay
+   consult-goto-line consult-mark consult-global-mark
+   consult-outline consult-bookmark
+   :preview-key '(:debounce 0.4 any))
+
+  ;; Configure narrowing
   (setq consult-narrow-key "<")
-  (define-key consult-narrow-map (vconcat consult-narrow-key "?") #'consult-narrow-help))
 
+  ;; Make narrowing help available
+  (define-key consult-narrow-map (vconcat consult-narrow-key "?") #'consult-narrow-help))
 #+end_src
 
 ** Consult Dir
