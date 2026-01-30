@@ -55,6 +55,8 @@ Lower this if you experience freezing, raise if stuttering.")
 
 ** Package Management
 #+begin_src emacs-lisp
+(setq straight-check-at-startup nil)
+
 (defvar bootstrap-version)
 (let ((bootstrap-file
        (expand-file-name
@@ -72,6 +74,7 @@ Lower this if you experience freezing, raise if stuttering.")
   (load bootstrap-file nil 'nomessage))
 
 (straight-use-package 'use-package)
+(straight-use-package 'esup)
 
 (setq straight-use-package-by-default t)
 (setq use-package-verbose nil
@@ -3637,151 +3640,6 @@ Links back to the GTD task for execution tracking."
 ;;   (ibuffer-show-empty-filter-groups nil))
 #+end_src
 
-** Tabspaces
-#+begin_src emacs-lisp
-(use-package tabspaces
-  :straight (:type git :host github :repo "mclear-tools/tabspaces")
-  :hook (after-init . tabspaces-mode)
-  :commands (tabspaces-switch-or-create-workspace
-             tabspaces-open-or-create-project-and-workspace)
-  :custom
-  (tab-bar-show nil)
-  (tabspaces-use-filtered-buffers-as-default t)
-  (tabspaces-default-tab "Home")
-  (tabspaces-remove-to-default t)
-  (tabspaces-include-buffers '("*scratch*"))
-  (tabspaces-initialize-project-with-todo t)
-  (tabspaces-todo-file-name "project-todo.org")
-  (tabspaces-session t)
-  (tabspaces-session-auto-restore nil)
-  (tabspaces-fully-resolve-paths t)
-  (tabspaces-exclude-buffers '("*Messages*" "*Compile-Log*"))
-  (tab-bar-new-tab-choice "*scratch*")
-
-  :config
-  ;;; Frame-Local Project Tracking
-  (defun ar/frame-projects ()
-    "Get list of projects for the current frame."
-    (or (frame-parameter (selected-frame) 'ar/frame-projects) nil))
-
-  (defun ar/frame-add-project (project-root)
-    "Add PROJECT-ROOT to the current frame's project list."
-    (when (and project-root (file-directory-p project-root))
-      (let* ((frame (selected-frame))
-             (projects (ar/frame-projects))
-             (root (expand-file-name project-root)))
-        (unless (member root projects)
-          (set-frame-parameter frame 'ar/frame-projects (cons root projects))))))
-
-  (defun ar/track-project ()
-    "Track the current project in the frame's project list."
-    (when-let ((project (project-current)))
-      (ar/frame-add-project (project-root project))))
-
-  ;; Track projects when files are opened
-  (add-hook 'find-file-hook #'ar/track-project)
-  (add-hook 'dired-mode-hook #'ar/track-project)
-
-  ;;; Consult Integration - Frame-Local Buffer Filtering
-  (with-eval-after-load 'consult
-    ;; Frame-local workspace buffer source
-    (defvar consult--source-frame-workspace
-      (list :name     "Workspace Buffers"
-            :narrow   ?w
-            :history  'buffer-name-history
-            :category 'buffer
-            :state    #'consult--buffer-state
-            :default  t
-            :items    (lambda ()
-                       ;; Get frame's buffer-list (automatically maintained by Emacs)
-                       (let ((frame-buffers (buffer-list (selected-frame))))
-                         (consult--buffer-query
-                          :predicate (lambda (buf)
-                                      ;; Must be in frame's buffer list AND
-                                      ;; if tabspaces is active, must be in workspace
-                                      (and (memq buf frame-buffers)
-                                           (or (not tabspaces-mode)
-                                               (tabspaces--local-buffer-p buf))))
-                          :sort 'visibility
-                          :as #'buffer-name))))
-      "Frame-local workspace buffer list for consult-buffer.")
-
-    ;; All buffers source (hidden by default, access with 'o')
-    (defvar consult--source-all-buffers
-      (list :name     "All Buffers (Other Frames)"
-            :narrow   ?o
-            :hidden   t
-            :history  'buffer-name-history
-            :category 'buffer
-            :state    #'consult--buffer-state
-            :items    (lambda ()
-                       (consult--buffer-query
-                        :sort 'visibility
-                        :as #'buffer-name)))
-      "All buffers from all frames.")
-
-    ;; Update consult-buffer-sources
-    (setq consult-buffer-sources
-          '(consult--source-frame-workspace
-            consult--source-all-buffers))
-
-    ;; Hide default buffer source
-    (consult-customize consult-source-buffer :hidden t :default nil))
-
-  ;;; Project.el Integration - Frame-Local Project Switching
-  (with-eval-after-load 'project
-    ;; Track projects and create workspaces when switching projects
-    (defun ar/project-switch-track (&rest _)
-      "Track project in frame-local list and create workspace."
-      (when-let ((project (project-current)))
-        (let ((root (project-root project)))
-          ;; Add to frame's project list
-          (ar/frame-add-project root)
-          ;; Create or switch to workspace for this project
-          (when (and tabspaces-mode (fboundp 'tabspaces-switch-or-create-workspace))
-            (let ((project-name (file-name-nondirectory
-                                (directory-file-name root))))
-              (tabspaces-switch-or-create-workspace project-name))))))
-
-    ;; Advice project-switch-project
-    (advice-add 'project-switch-project :after #'ar/project-switch-track))
-
-  ;;; Frame Initialization
-  (defun ar/init-frame (frame)
-    "Initialize FRAME with frame-local parameters and workspace."
-    (with-selected-frame frame
-      ;; Initialize project tracking parameter if not present
-      (unless (frame-parameter frame 'ar/frame-projects)
-        (set-frame-parameter frame 'ar/frame-projects nil))
-
-      ;; Set up initial workspace if tabspaces is active and tabs don't exist
-      (when (and tabspaces-mode (boundp 'tab-bar-mode))
-        (let ((tabs (and (fboundp 'tab-bar-tabs) (tab-bar-tabs))))
-          ;; Only create initial tab if no tabs exist
-          (when (or (null tabs) (= (length tabs) 0))
-            (when (fboundp 'tab-bar-new-tab)
-              (tab-bar-new-tab))
-            (when (fboundp 'tab-bar-rename-tab)
-              (tab-bar-rename-tab "Home")))))))
-
-  ;; Initialize all existing frames
-  (dolist (frame (frame-list))
-    (ar/init-frame frame))
-
-  ;; Initialize new frames as they're created
-  (add-hook 'after-make-frame-functions #'ar/init-frame)
-
-  ;;; Startup Hooks
-  (defun ar/tabspaces-startup ()
-    "Initialize tabspaces at startup."
-    (when (fboundp 'tabspaces-mode)
-      (tabspaces-mode 1))
-    (ar/init-frame (selected-frame)))
-
-  ;; Hook into after-init
-  (add-hook 'after-init-hook #'ar/tabspaces-startup))
-#+end_src
-
 ** Treemacs
 #+begin_src emacs-lisp
 (use-package treemacs
@@ -3846,6 +3704,48 @@ Links back to the GTD task for execution tracking."
     [drag-mouse-1] #'treemacs-dragleftclick-action))
 #+end_src
 
+** Beframe
+
+#+begin_src emacs-lisp
+(use-package beframe
+  :demand t
+  :custom
+  (beframe-global-buffers nil)
+  (beframe-create-frame-scratch-buffer nil)
+  (beframe-kill-frame-scratch-buffer nil)
+  (beframe-functions-in-frames '(project-prompt-project-dir))
+  (beframe-rename-function #'beframe-rename-frame)
+  (beframe-prompt-prefix "[Frame] ")
+
+  :config
+  (beframe-mode 1)
+
+  (when (daemonp)
+    (add-hook 'after-make-frame-functions
+              (lambda (frame)
+                (with-selected-frame frame
+                  (unless beframe-mode
+                    (beframe-mode 1))
+                  (set-frame-parameter frame 'buffer-predicate
+                                       #'beframe-buffer-list-p)))
+              :append))
+
+  (with-eval-after-load 'consult
+    (declare-function consult--buffer-state "consult")
+
+    (defun my-beframe-buffer-list-filtered (&optional frame)
+      "Return beframed buffer list for FRAME, excluding internal buffers.
+Filters out buffers whose names start with '*' (like *scratch*, *Messages*)
+and sorts by visibility (most recently used first, excluding current buffer).
+If FRAME is nil, use the current frame."
+      (let ((frame-buffers (beframe-buffer-list frame :sort #'beframe-buffer-sort-visibility)))
+        (seq-remove (lambda (buf)
+                      (string-prefix-p "*" (buffer-name buf)))
+                    frame-buffers)))
+
+    (setq consult-buffer-list-function #'my-beframe-buffer-list-filtered)))
+#+end_src
+
 * Completion Framework
 ** Orderless
 #+begin_src emacs-lisp
@@ -3862,7 +3762,7 @@ VERTical Interactive COmpletion
 #+begin_src emacs-lisp
 (use-package vertico
   :custom
-  (vertico-count 13)
+  (vertico-count 10)
   (vertico-resize nil)
   (vertico-cycle t)
   :init
@@ -4118,6 +4018,7 @@ targets."
   (corfu-on-exact-match 'insert)
   (corfu-auto-delay 0.1)
   (global-corfu-modes '((not erc-mode
+                             eshell-mode
                              circe-mode
                              help-mode
                              gud-mode
@@ -4132,8 +4033,16 @@ targets."
         ([tab] . corfu-next)
         ("S-TAB" . corfu-previous)
         ([backtab] . corfu-previous)
-        ("RET" . corfu-insert)
         ("M-h" . corfu-info-documentation))
+
+  ;; :bind
+  ;; (:map corfu-map
+  ;;       ("TAB" . corfu-next)
+  ;;       ([tab] . corfu-next)
+  ;;       ("S-TAB" . corfu-previous)
+  ;;       ([backtab] . corfu-previous)
+  ;;       ("RET" . corfu-insert)
+  ;;       ("M-h" . corfu-info-documentation))
   :config
   (corfu-history-mode 1)
   ;;Quit completion before saving
@@ -4782,6 +4691,8 @@ Arguments are CALLBACK and ignored."
         '((python-mode . python-ts-mode)
           (json-mode . json-ts-mode)
           (js-mode . js-ts-mode)
+          (bash-mode . bash-ts-mode)
+          (sh-mode . bash-ts-mode)
           (typescript-mode . typescript-ts-mode)
           (conf-toml-mode . toml-ts-mode))))
 #+end_src
@@ -5235,6 +5146,7 @@ operators and other column-based navigation."
 #+end_src
 
 ** File Templates
+
 #+begin_src emacs-lisp
 ;; File Templates - Automatic template insertion for new files
 (defvar ar/file-templates-dir
@@ -5244,7 +5156,7 @@ operators and other column-based navigation."
 (defvar ar/file-templates-default-trigger "__"
   "Default yasnippet trigger key for file template rules.")
 
-;; Register templates directory and ensure they are loaded
+;; Ensure templates directory is registered and loaded
 (with-eval-after-load 'yasnippet
   (add-to-list 'yas-snippet-dirs ar/file-templates-dir t)
   (yas-reload-all))
@@ -5269,7 +5181,7 @@ operators and other column-based navigation."
     ("/setup\\.py$" :mode python-mode :trigger "__setup")
     ("/__init__\\.py$" :mode python-mode :trigger "__init")
     ("/test_.*\\.py$" :mode python-mode :trigger "__pytest")
-    ;; Handle both standard and tree-sitter modes
+    ;; Map all python modes to the 'python-mode' snippet table
     (python-base-mode :mode python-mode :trigger "__main")
     (python-mode :trigger "__main")
     (python-ts-mode :mode python-mode :trigger "__main")
@@ -5277,6 +5189,7 @@ operators and other column-based navigation."
     ;; --- Shell ---
     (fish-mode :trigger "__fish")
     (sh-mode :trigger "__sh_script")
+    (bash-ts-mode :trigger "__sh_script")
 
     ;; --- Web / Data ---
     (yaml-mode :trigger "__yaml")
@@ -5297,35 +5210,25 @@ operators and other column-based navigation."
     (markdown-mode :trigger "__md_frontmatter")
 
     ;; --- Text / Misc ---
-    ;; Specific file names match first
     ("/LICENSE$" :mode text-mode :trigger "__license")
     ("/COPYING$" :mode text-mode :trigger "__license")
     ("/robots\\.txt$" :mode text-mode :trigger "__robots")
     ("/humans\\.txt$" :mode text-mode :trigger "__humans")
     ("/CHANGELOG$" :mode text-mode :trigger "__changelog")
-    ;; Generic fallback
     (text-mode :trigger "__text_basic"))
   "Alist of file template rules.
-Order matches: The first matching rule is applied.
 Structure: (PREDICATE . PLIST)
-
-PREDICATE:
-  - Regex string: Matches buffer file name (High Priority).
-  - Symbol: Matches major mode (Low Priority).
-
+PREDICATE: Regex string (filename) or Major Mode symbol.
 PLIST keys:
-  :trigger - The yasnippet key to expand.
-  :mode    - The yasnippet table to search (useful for ts-modes).")
+  :trigger - Yasnippet trigger key.
+  :mode    - The yasnippet table (subfolder name) to load/search.")
 
 (defun ar/file-template-p (rule)
-  "Check if RULE applies to the current buffer.
-Returns the rule if it applies, nil otherwise."
+  "Check if RULE applies to the current buffer."
   (let ((pred (car rule)))
     (cond
-     ;; 1. Check Regex against filename
      ((and (stringp pred) buffer-file-name)
       (string-match-p pred buffer-file-name))
-     ;; 2. Check Major Mode derivation
      ((symbolp pred)
       (derived-mode-p pred))
      (t nil))))
@@ -5337,9 +5240,7 @@ Returns the rule if it applies, nil otherwise."
              (not (file-exists-p buffer-file-name))
              (= (buffer-size) 0)
              (not buffer-read-only)
-             ;; Ignore temp buffers/popups/archives
-             (not (string-match-p "^[*[:space:]]" (buffer-name)))
-             (not (string-match-p "\\.gpg$" (buffer-name))))
+             (not (string-match-p "^[*[:space:]]" (buffer-name))))
     (ar/file-templates-apply)))
 
 (defun ar/file-templates-apply ()
@@ -5347,27 +5248,44 @@ Returns the rule if it applies, nil otherwise."
   (interactive)
   (when-let* ((rule (cl-find-if #'ar/file-template-p ar/file-templates-alist))
               (plist (cdr rule))
-              ;; If :mode is not specified, use the current major-mode
-              (table-mode (or (plist-get plist :mode) major-mode))
-              (trigger (or (plist-get plist :trigger) ar/file-templates-default-trigger)))
+              (trigger (or (plist-get plist :trigger) ar/file-templates-default-trigger))
+              (target-mode (or (plist-get plist :mode) major-mode)))
 
-    ;; Ensure Yasnippet is active
+    ;; 1. Ensure Yasnippet is globally active
     (unless (bound-and-true-p yas-minor-mode)
       (yas-minor-mode 1))
 
-    ;; Look up and expand
-    (if-let ((template (yas-lookup-snippet trigger table-mode)))
-        (yas-expand-snippet (yas--template-content template) (point-min) (point-max))
-      (message "File Template: Snippet '%s' not found for table '%s'" trigger table-mode))))
+    ;; 2. Activate the target mode to ensure its table is eligible for loading
+    (yas-activate-extra-mode target-mode)
+
+    ;; 3. Force load any pending JITs (fixes argument error)
+    (when (fboundp 'yas--load-pending-jits)
+      (yas--load-pending-jits))
+
+    ;; 4. Try Lookup (with error suppression)
+    (let ((template (yas-lookup-snippet trigger target-mode t)))
+      ;; 5. Fallback: If not found, force a full reload and try one last time.
+      ;; This handles cases where you just created a snippet file but didn't restart Emacs.
+      (unless template
+        (message "Template '%s' not found in memory. Reloading snippets..." trigger)
+        (yas-reload-all)
+        (setq template (yas-lookup-snippet trigger target-mode t)))
+
+      ;; 6. Expand or Fail
+      (if template
+          (progn
+            (message "Expanding template '%s' for %s..." trigger target-mode)
+            (yas-expand-snippet (yas--template-content template) (point-min) (point-max)))
+        (message "File Template Error: Snippet '%s' not found for mode '%s' in %s."
+                 trigger target-mode ar/file-templates-dir)))))
 
 ;; Hook into file opening
 (add-hook 'find-file-hook #'ar/file-templates-check)
 #+end_src
 
 * LaTeX Writing Environment
-** Utility Autoload Functions
+** Utility Functions
 #+begin_src emacs-lisp
-;;;###autoload
 (defun ar/latex-indent-item-fn ()
   "Indent LaTeX itemize/enumerate/description environments."
   (save-match-data
@@ -5399,74 +5317,92 @@ Returns the rule if it applies, nil otherwise."
                  (current-column))))
             ((looking-at "\\\\item")
              (+ LaTeX-indent-level indent))
-            ((+ contin LaTeX-indent-level indent))))))
+            (t (+ contin LaTeX-indent-level indent))))))
 
-;;;###autoload
 (defun ar/latex-fold-last-macro (&rest _)
   "Auto-fold the last LaTeX macro before point."
   (when (and (derived-mode-p 'LaTeX-mode)
-             (bound-and-true-p TeX-fold-mode))
+             (bound-and-true-p TeX-fold-mode)
+             (fboundp 'TeX-fold-region))
     (save-excursion
       (let ((start (search-backward "\\" (line-beginning-position) t)))
         (when start
           (TeX-fold-region start (1+ (point))))))))
 
-;;;###autoload
 (defun ar/latex-compile ()
   "Compile current LaTeX buffer."
   (interactive)
-  (if (fboundp 'TeX-command-run-all)
-      (TeX-command-run-all nil)
-    (TeX-command-master)))
+  (cond
+   ((fboundp 'TeX-command-run-all)
+    (TeX-command-run-all nil))
+   ((fboundp 'TeX-command-master)
+    (TeX-command-master))
+   (t
+    (user-error "No LaTeX compilation command available"))))
 
-;;;###autoload
 (defun ar/latex-find-master-file ()
   "Find and visit master file."
   (interactive)
-  (if-let ((master (TeX-master-file)))
+  (if-let ((master (and (fboundp 'TeX-master-file)
+                        (TeX-master-file))))
       (find-file master)
     (user-error "No master file found")))
 
-;;;###autoload
 (defun ar/latex-view-output ()
   "View compiled output."
   (interactive)
-  (TeX-view))
+  (if (fboundp 'TeX-view)
+      (TeX-view)
+    (user-error "TeX-view function not available")))
 
-;;;###autoload
 (defun ar/latex-fold-toggle ()
   "Toggle folding of current element."
   (interactive)
-  (if (TeX-fold-item 'deep)
-      (message "Folded")
-    (TeX-fold-clearout-item)
-    (message "Unfolded")))
+  (if (not (bound-and-true-p TeX-fold-mode))
+      (user-error "TeX-fold-mode is not active")
+    (if (and (fboundp 'TeX-fold-item)
+             (fboundp 'TeX-fold-clearout-item))
+        (if (TeX-fold-item 'deep)
+            (message "Folded")
+          (TeX-fold-clearout-item)
+          (message "Unfolded"))
+      (user-error "TeX-fold functions not available"))))
 
-;;;###autoload
 (defun ar/latex-fold-all ()
   "Fold all elements in buffer."
   (interactive)
-  (TeX-fold-buffer)
-  (message "Folded all elements"))
+  (if (not (bound-and-true-p TeX-fold-mode))
+      (user-error "TeX-fold-mode is not active. Enable it with M-x TeX-fold-mode")
+    (if (fboundp 'TeX-fold-buffer)
+        (progn
+          (TeX-fold-buffer)
+          (message "Folded all elements"))
+      (user-error "TeX-fold-buffer function not available"))))
 
-;;;###autoload
 (defun ar/latex-fold-clear ()
   "Unfold all elements in buffer."
   (interactive)
-  (TeX-fold-clearout-buffer)
-  (message "Unfolded all elements"))
+  (if (not (bound-and-true-p TeX-fold-mode))
+      (user-error "TeX-fold-mode is not active")
+    (if (fboundp 'TeX-fold-clearout-buffer)
+        (progn
+          (TeX-fold-clearout-buffer)
+          (message "Unfolded all elements"))
+      (user-error "TeX-fold-clearout-buffer function not available"))))
 #+end_src
 
 ** Project Awareness
 #+begin_src emacs-lisp
 (defun ar/get-project-bibliographies ()
-  "Find .bib files in the current project root recursively."
+  "Find .bib files in the current project root recursively.
+Works for both LaTeX and Org documents within a project."
   (when-let* ((project (project-current nil))
               (root (project-root project)))
     (directory-files-recursively root "\\.bib$")))
 
 (defun ar/setup-project-bibliography ()
-  "Create a references.bib file in the project root if it doesn't exist."
+  "Create a references.bib file in the project root if it doesn't exist.
+This bibliography file can be used with both LaTeX and Org documents."
   (interactive)
   (if-let* ((project (project-current t))
             (root (project-root project))
@@ -5475,9 +5411,11 @@ Returns the rule if it applies, nil otherwise."
           (message "Bibliography already exists: %s" bib-file)
         (with-temp-file bib-file
           (insert "% Bibliography for " (file-name-nondirectory (directory-file-name root)) "\n")
-          (insert "% Created: " (format-time-string "%Y-%m-%d") "\n\n"))
+          (insert "% Created: " (format-time-string "%Y-%m-%d") "\n")
+          (insert "% This file can be used with both LaTeX and Org documents\n\n"))
         (message "Created project bibliography: %s" bib-file))
     (message "Not currently visiting a project.")))
+
 #+end_src
 
 ** Adaptive Wrap
@@ -5497,6 +5435,8 @@ Returns the rule if it applies, nil otherwise."
          ;;(LaTeX-mode . prettify-symbols-mode) ;COMMENT Defined else where
          (LaTeX-mode . TeX-source-correlate-mode)
          (LaTeX-mode . outline-minor-mode)
+         (LaTeX-mode . TeX-fold-mode)
+         (TeX-mode . TeX-tex-mode)
          (LaTeX-mode . eglot-ensure))
 
   :init
@@ -5525,7 +5465,7 @@ Returns the rule if it applies, nil otherwise."
         TeX-electric-sub-and-superscript t
 
         ;; Folding
-        TeX-fold-auto t
+        TeX-fold-auto nil
         TeX-fold-auto-reveal t
 
         ;; Font Lock
@@ -5746,27 +5686,50 @@ Returns the rule if it applies, nil otherwise."
 #+end_src
 
 ** Fast LaTeX Input
+
 #+begin_src emacs-lisp
 (use-package cdlatex
   :defer t
   :hook ((LaTeX-mode . cdlatex-mode)
          (org-mode . org-cdlatex-mode))
-  :custom
-  (cdlatex-math-modify-alist
-   '((?B "\\mathbb" nil t nil nil)
-     (?C "\\mathcal" nil t nil nil)
-     (?F "\\mathfrak" nil t nil nil)
-     (?S "\\mathscr" nil t nil nil)))
-
-  (cdlatex-env-alist
-   '(("equation*" "\\begin{equation*}\n?\n\\end{equation*}" nil)
-     ("align*" "\\begin{align*}\n?\n\\end{align*}" nil)))
-
-  (cdlatex-math-symbol-prefix ?@)
-  (cdlatex-use-dollar-to-ensure-math nil)
+  :init
+  ;; Change the internal prefix variable.
+  ;; IMPORTANT: This primarily updates CDLaTeX's internal help/prompts to show '~'.
+  ;; It does NOT automatically update Org-mode's keybindings.
+  (setq cdlatex-math-symbol-prefix ?~)
 
   :config
-  ;; Disable overlapping keys
+  ;; --- 1. Fix for standard LaTeX Mode ---
+  ;; Unbind backtick (restore normal insertion for code blocks/elisp)
+  (define-key cdlatex-mode-map (kbd "`") nil)
+  ;; Bind tilde to the math symbol menu
+  (define-key cdlatex-mode-map (kbd "~") #'cdlatex-math-symbol)
+
+  ;; --- 2. Fix for Org Mode ---
+  ;; Org defines its own map in 'org.el', so we must modify it after org loads.
+  (with-eval-after-load 'org
+    ;; Unbind the hardcoded backtick in Org's CDLaTeX map
+    (define-key org-cdlatex-mode-map (kbd "`") nil)
+
+    ;; Bind tilde to Org's wrapper for the math symbol function
+    ;; We use 'org-cdlatex-math-symbol', not the raw 'cdlatex-math-symbol'
+    (define-key org-cdlatex-mode-map (kbd "~") #'org-cdlatex-math-symbol))
+
+  ;; --- 3. Customizations ---
+  (setq cdlatex-math-modify-alist
+        '((?B "\\mathbb" nil t nil nil)
+          (?C "\\mathcal" nil t nil nil)
+          (?F "\\mathfrak" nil t nil nil)
+          (?S "\\mathscr" nil t nil nil)))
+
+  (setq cdlatex-env-alist
+        '(("equation*" "\\begin{equation*}\n?\n\\end{equation*}" nil)
+          ("align*" "\\begin{align*}\n?\n\\end{align*}" nil)))
+
+  ;; Prevent dollar sign from automatically entering math mode check
+  (setq cdlatex-use-dollar-to-ensure-math nil)
+
+  ;; --- 4. Disable other overlapping keys ---
   (define-key cdlatex-mode-map "$" nil)
   (define-key cdlatex-mode-map "(" nil)
   (define-key cdlatex-mode-map "{" nil)
@@ -5853,7 +5816,6 @@ It does NOT activate company-mode - completely safe with Corfu."
                ;; PRIMARY: Merge LSP + AUCTeX + Math
                (cape-capf-super
                 #'eglot-completion-at-point
-                #'LaTeX-completion-at-point
                 #'TeX--completion-at-point
                 (cape-company-to-capf #'company-math-symbols-latex)
                 (cape-company-to-capf #'company-auctex-macros))
@@ -5864,6 +5826,31 @@ It does NOT activate company-mode - completely safe with Corfu."
                #'cape-file)))
 
 (add-hook 'LaTeX-mode-hook #'ar/latex-setup-completion)
+#+end_src
+
+** LaTeX Keybindings
+#+begin_src emacs-lisp
+;; (with-eval-after-load 'tex
+;;   ;; Utility function keybindings
+;;   (define-key LaTeX-mode-map (kbd "C-c C-a") #'ar/latex-compile)
+;;   (define-key LaTeX-mode-map (kbd "C-c C-v") #'ar/latex-view-output)
+;;   (define-key LaTeX-mode-map (kbd "C-c C-^") #'ar/latex-find-master-file)
+
+;;   ;; Folding keybindings
+;;   (define-key LaTeX-mode-map (kbd "C-c C-o C-f") #'ar/latex-fold-toggle)
+;;   (define-key LaTeX-mode-map (kbd "C-c C-o C-b") #'ar/latex-fold-all)
+;;   (define-key LaTeX-mode-map (kbd "C-c C-o C-c") #'ar/latex-fold-clear))
+
+;; ;; Which-key integration
+;; (with-eval-after-load 'which-key
+;;   (which-key-add-major-mode-key-based-replacements 'LaTeX-mode
+;;     "C-c C-o" "folding"
+;;     "C-c C-o C-f" "toggle fold"
+;;     "C-c C-o C-b" "fold all"
+;;     "C-c C-o C-c" "clear folds"
+;;     "C-c C-a" "compile"
+;;     "C-c C-v" "view output"
+;;     "C-c C-^" "find master"))
 #+end_src
 
 * Utils
@@ -6262,24 +6249,24 @@ It does NOT activate company-mode - completely safe with Corfu."
   "Load prettify symbols for Emacs Lisp mode."
   (interactive)
   (setq prettify-symbols-alist
-        `(;; Keywords
-          ("lambda" . ?λ)
-          ("defun" . ,(nerd-icons-codicon "nf-cod-symbol_method"))
-          ("defvar" . ,(nerd-icons-codicon "nf-cod-symbol_variable"))
-          ("defconst" . ,(nerd-icons-codicon "nf-cod-symbol_constant"))
-          ("defmacro" . ,(nerd-icons-codicon "nf-cod-symbol_misc"))
-          ("defclass" . ,(nerd-icons-codicon "nf-cod-symbol_class"))
-          ;; Operators
-          ("!=" . ?≠)
-          ("/=" . ?≠)
-          ("==" . ?≡)
-          ("<=" . ?≤)
-          (">=" . ?≥)
-          ;; Common functions
-          ("->" . ?→)
-          ("->>" . ?↠)
-          ("<-" . ?←)
-          ("<<-" . ?↞)))
+      '(;; Keywords
+        ("lambda" . ?λ)
+        ("defun" . ?ƒ)      ; Function (Florin/Script f)
+        ("defvar" . ?𝑣)     ; Variable (Math Italic v)
+        ("defconst" . ?ᴄ)   ; Constant (Small Capital C)
+        ("defmacro" . ?ℳ)   ; Macro (Script Capital M)
+        ("defclass" . ?ℂ)   ; Class (Double-struck C)
+        ;; Operators
+        ("!=" . ?≠)
+        ("/=" . ?≠)
+        ("==" . ?≡)
+        ("<=" . ?≤)
+        (">=" . ?≥)
+        ;; Common functions
+        ("->" . ?→)
+        ("->>" . ?↠)
+        ("<-" . ?←)
+        ("<<-" . ?↞)))
   (prettify-symbols-mode 1))
 #+end_src
 
@@ -6629,6 +6616,22 @@ It does NOT activate company-mode - completely safe with Corfu."
   :commands nix-update-fetch)
 #+end_src
 
+** Bash
+#+begin_src emacs-lisp
+;; Bash/Shell Programming Configuration
+;; Sets up LSP (bash-language-server), formatter (shfmt), linter (shellcheck), and debugger (bash-debug)
+;; shfmt, shellcheck and bash-debug built-in
+;; LSP: bash-language-server with eglot
+;; Configures bash-language-server for sh-mode and bash-ts-mode
+;;(add-to-list 'major-mode-remap-alist '(sh-mode . bash-ts-mode))
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((bash-mode bash-ts-mode) . ("bash-language-server" "start"))))
+
+;; Enable eglot for bash-ts-mode (tree-sitter based bash mode)
+(add-hook 'bash-ts-mode-hook #'eglot-ensure)
+#+end_src
+
 * Window
 ** Winner
 #+begin_src emacs-lisp
@@ -6867,7 +6870,7 @@ It does NOT activate company-mode - completely safe with Corfu."
 * General Keybindings
 #+begin_src emacs-lisp
 (use-package general
-  :defer t
+  :demand t
   :after evil
   :config
   ;; Set up leader keys
@@ -7208,17 +7211,50 @@ It does NOT activate company-mode - completely safe with Corfu."
    "C-=" 'text-scale-increase
    "C--" 'text-scale-decrease)
 
-  ;; Workspace operations (SPC TAB)
+  ;; Frame operations (SPC TAB)
   (ar/global-leader
-    "TAB" '(:ignore t :wk "workspace")
-    "TAB TAB" '(tabspaces-switch-or-create-workspace :wk "Switch workspace")
-    "TAB n" '(tabspaces-switch-or-create-workspace :wk "New workspace")
-    "TAB d" '(tabspaces-close-workspace :wk "Delete workspace")
-    "TAB r" '(tab-bar-rename-tab :wk "Rename workspace")
-    "TAB [" '(tab-bar-switch-to-prev-tab :wk "Previous workspace")
-    "TAB ]" '(tab-bar-switch-to-next-tab :wk "Next workspace")
-    "TAB s" '(tabspaces-save-session :wk "Save session")
-    "TAB l" '(tabspaces-restore-session :wk "Load session"))
+    "TAB" '(:ignore t :wk "frame")
+
+    ;; Core Frame Management
+    "TAB TAB" '(select-frame-by-name :wk "Select frame")
+    "TAB n"   '(make-frame-command :wk "New frame")
+    "TAB c"   '(my-beframe-switch-or-create-frame :wk "Switch/Create frame")
+    "TAB d"   '(delete-frame :wk "Delete frame")
+    "TAB D"   '(delete-other-frames :wk "Delete other frames")
+    "TAB k"   '(my-beframe-kill-current-buffer-and-frame :wk "Kill buffer & frame")
+    "TAB o"   '(other-frame :wk "Other frame")
+    "TAB ["   '((lambda () (interactive) (other-frame -1)) :wk "Previous frame")
+    "TAB ]"   '((lambda () (interactive) (other-frame 1)) :wk "Next frame")
+    "TAB r"   '(beframe-rename-frame :wk "Rename frame")
+
+    ;; Buffer Operations (Frame-specific)
+    "TAB b"   '(beframe-switch-buffer :wk "Switch buffer")
+    "TAB m"   '(beframe-buffer-menu :wk "Buffer menu")
+
+    ;; Assume Buffers (Add buffers INTO this frame)
+    ;; NESTED SYNTAX: This constructs the full sub-menu atomically, preventing
+    ;; "starts with non-prefix key" errors on reload.
+    "TAB a"   '(:ignore t :wk "assume (add buffers)"
+                "f" '(beframe-assume-frame-buffers :wk "All from frame")
+                "s" '(beframe-assume-frame-buffers-selectively :wk "Select from frame")
+                "S" '(beframe-assume-buffers-selectively-all-frames :wk "Select from all frames")
+                "a" '(beframe-assume-all-buffers-no-prompts :wk "All from everywhere")
+                "r" '(beframe-assume-buffers-matching-regexp-all-frames :wk "By regexp"))
+
+    ;; Unassume Buffers (Remove buffers FROM this frame)
+    ;; NESTED SYNTAX
+    "TAB u"   '(:ignore t :wk "unassume (remove buffers)"
+                "f" '(beframe-unassume-frame-buffers :wk "All from frame")
+                "s" '(beframe-unassume-current-frame-buffers-selectively :wk "Select from current")
+                "a" '(beframe-unassume-all-buffers-no-prompts :wk "All (keep global)")
+                "r" '(beframe-unassume-buffers-matching-regexp-all-frames :wk "By regexp"))
+
+    ;; Advanced Operations
+    "TAB K"   '(beframe-kill-buffers-matching-regexp :wk "Kill by regexp")
+
+    ;; Transient Interface (Alternative to individual commands)
+    "TAB t"   '(beframe-transient :wk "Transient menu"))
+
 
   ;; Macro operations (SPC @)
   (ar/global-leader
@@ -7263,12 +7299,6 @@ It does NOT activate company-mode - completely safe with Corfu."
 
   (general-define-key
    :states '(normal visual)
-   ;; Better navigation
-   "j" 'evil-next-visual-line
-   "k" 'evil-previous-visual-line
-   "gj" 'evil-next-line
-   "gk" 'evil-previous-line
-
    ;; Avy zap
    "z" 'avy-zap-to-char-dwim
    "Z" 'avy-zap-up-to-char-dwim)
@@ -7342,15 +7372,6 @@ It does NOT activate company-mode - completely safe with Corfu."
    "M-e" 'dirvish-emerge-menu
    "M-j" 'dirvish-fd-jump
    "M-s" 'dirvish-setup-menu)
-
-  (general-define-key
-   :states 'normal
-   :keymaps 'helpful-mode-map
-   "q" 'quit-window
-   "g r" 'helpful-update
-   "TAB" 'forward-button
-   "S-TAB" 'backward-button
-   "RET" 'push-button)
 
   (general-define-key
    :states 'normal
