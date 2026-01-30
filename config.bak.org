@@ -5228,7 +5228,7 @@ Displays: Narrowed, Read-only, Macro recording, Evil state."
         ;; Tokyo Night theme colors
         pdf-view-midnight-colors '("#c0caf5" . "#1a1b26"))
   :config
-  ;;(pdf-tools-install t nil t nil)
+  (pdf-tools-install t nil t nil)
 
   ;; Tokyo Night theme custom faces
   (custom-set-faces
