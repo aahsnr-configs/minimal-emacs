@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.50
+#+VERSION: 0.51
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -3704,55 +3704,165 @@ Links back to the GTD task for execution tracking."
     [drag-mouse-1] #'treemacs-dragleftclick-action))
 #+end_src
 
-** Beframe
-
+** Perspective
+*** Core
 #+begin_src emacs-lisp
-(use-package beframe
-  :hook (after-init . beframe-mode)
+(use-package perspective
+  :hook (after-init . persp-mode)
+
   :custom
-  (beframe-global-buffers nil)
-  (beframe-create-frame-scratch-buffer nil)
-  (beframe-kill-frame-scratch-buffer nil)
-  (beframe-functions-in-frames '(project-prompt-project-dir))
- ;; Frames will be named after the project or directory
-  (beframe-rename-function #'beframe-rename-frame)
+  (persp-initial-frame-name "main")
+  (persp-sort 'access)
+  (persp-show-modestring t)
+  (persp-modestring-short t)
+  (persp-modestring-dividers '("[" "]" " | "))
+  (persp-state-default-file (expand-file-name "perspective-state" user-emacs-directory))
+  (persp-prevent-killing-last-buffer-in-perspective t)
+  (persp-suppress-no-prefix-key-warning t)
 
-  ;; Customize the prompt prefix for beframed buffer operations
-  (beframe-prompt-prefix "[Frame] ")
   :config
-  (defvar consult-buffer-sources)
-  (declare-function consult--buffer-state "consult")
+  ;; Auto-save perspective state on exit
+  (add-hook 'kill-emacs-hook #'persp-state-save))
+#+end_src
 
-  ;; Consult Buffer Source
-  (with-eval-after-load 'consult
-    (defface beframe-buffer
-      '((t :inherit font-lock-string-face))
-      "Face for `consult' framed buffers.")
+*** Project.el Integration
+#+begin_src emacs-lisp
+;; Custom functions for project.el integration with perspective
+;; These provide seamless project-perspective integration without external packages
 
-    (defun my-beframe-buffer-names-sorted (&optional frame)
-      "Return the list of buffers from `beframe-buffer-names' sorted by visibility.
-With optional argument FRAME, return the list of buffers of FRAME."
-      (beframe-buffer-names frame :sort #'beframe-buffer-sort-visibility))
+(with-eval-after-load 'perspective
+  (defun ar/persp-get-project-name ()
+    "Get the name of the current project."
+    (when-let ((project (project-current)))
+      (file-name-nondirectory
+       (directory-file-name
+        (project-root project)))))
 
-    (defvar beframe-consult-source
-      `( :name     "Frame-specific buffers (current frame)"
-         :narrow   ?F
-         :category buffer
-         :face     beframe-buffer
-         :history  beframe-history
-         :items    ,#'my-beframe-buffer-names-sorted
-         :action   ,#'switch-to-buffer
-         :state    ,#'consult--buffer-state))
+  (defun ar/persp-project-switch ()
+    "Switch to a project and create/switch to its perspective."
+    (interactive)
+    (let* ((projects (project-known-project-roots))
+           (choice (completing-read "Switch to project: " projects nil t))
+           (persp-name (file-name-nondirectory
+                       (directory-file-name choice))))
+      ;; Switch to or create perspective for this project
+      (persp-switch persp-name)
+      ;; Set default-directory and find file in the project
+      (let ((default-directory choice))
+        (call-interactively #'project-find-file))))
 
-    (add-to-list 'consult-buffer-sources 'beframe-consult-source))
+  (defun ar/persp-project-perspective ()
+    "Switch to the perspective for the current project, creating it if necessary."
+    (interactive)
+    (if-let ((persp-name (ar/persp-get-project-name)))
+        (progn
+          (persp-switch persp-name)
+          (message "Switched to perspective: %s" persp-name))
+      (message "Not in a project")))
 
-  ;; Beframed buffers as the complete Consult buffer list
-  (defun consult-beframe-buffer-list (&optional frame)
-    "Return the list of buffers from `beframe-buffer-names' sorted by visibility.
-With optional argument FRAME, return the list of buffers of FRAME."
-    (beframe-buffer-list frame :sort #'beframe-buffer-sort-visibility))
+  (defun ar/persp-project-kill ()
+    "Kill all buffers in the current project and its perspective."
+    (interactive)
+    (when-let* ((project (project-current))
+                (persp-name (ar/persp-get-project-name))
+                (buffers-to-kill (project-buffers project)))
+      (when (yes-or-no-p
+             (format "Kill %d buffer(s) in project %s and its perspective? "
+                     (length buffers-to-kill)
+                     persp-name))
+        ;; Kill all project buffers
+        (mapc #'kill-buffer buffers-to-kill)
+        ;; Kill the perspective if it exists
+        (when (member persp-name (persp-names))
+          (persp-kill persp-name))
+        (message "Killed project buffers and perspective: %s" persp-name)))))
+#+end_src
 
-  (setq consult-buffer-list-function #'consult-beframe-buffer-list))
+
+*** Treemacs Integration
+#+begin_src emacs-lisp
+(use-package treemacs-perspective
+  :after (treemacs perspective)
+  :config
+  ;; Set treemacs scope to work with perspectives
+  ;; This makes treemacs buffers unique per perspective
+  (treemacs-set-scope-type 'Perspectives))
+#+end_src
+
+*** iBuffer Integration
+#+begin_src emacs-lisp
+;; IBuffer integration is built into perspective.el via persp-ibuffer
+;; No separate package needed
+
+(with-eval-after-load 'perspective
+  (defun ar/persp-ibuffer (arg)
+    "Open ibuffer filtered by current perspective.
+With prefix argument ARG, show all buffers across all perspectives."
+    (interactive "P")
+    (persp-ibuffer arg))
+
+  (defun ar/persp-ibuffer-filter-by-perspective ()
+    "Set ibuffer filter groups by perspective name."
+    (interactive)
+    (when (fboundp 'persp-ibuffer-set-filter-groups)
+      (persp-ibuffer-set-filter-groups)
+      (unless (eq ibuffer-sorting-mode 'alphabetic)
+        (ibuffer-do-sort-by-alphabetic))))
+
+  ;; Optional: Auto-filter ibuffer by perspective
+  ;; Uncomment the following to enable automatic perspective filtering in ibuffer
+  ;; (add-hook 'ibuffer-hook #'ar/persp-ibuffer-filter-by-perspective)
+  )
+
+#+end_src
+
+*** Helper Functions
+#+begin_src emacs-lisp
+;; (with-eval-after-load 'perspective
+;;   ;; Helper function to kill all buffers in current perspective except current buffer
+;;   (defun ar/persp-kill-other-buffers ()
+;;     "Kill all buffers in current perspective except the current buffer.
+;; This is useful for cleaning up a perspective workspace."
+;;     (interactive)
+;;     (let ((current-buf (current-buffer))
+;;           (killed-count 0))
+;;       (dolist (buf (persp-current-buffers))
+;;         (unless (eq buf current-buf)
+;;           (when (kill-buffer buf)
+;;             (setq killed-count (1+ killed-count)))))
+;;       (message "Killed %d buffer(s) in current perspective" killed-count)))
+
+;;   ;; Helper function to list all buffers across all perspectives
+;;   (defun ar/persp-list-all-buffers ()
+;;     "Display all buffers with their associated perspectives in a temporary buffer.
+;; This provides an overview of which buffers belong to which perspectives."
+;;     (interactive)
+;;     (let ((buffer-persp-alist '()))
+;;       ;; Collect all buffers and their perspectives
+;;       (dolist (persp-name (persp-names))
+;;         ;; Use with-perspective to safely access each perspective's buffers
+;;         (with-perspective persp-name
+;;           (dolist (buf (persp-current-buffers))
+;;             (when (buffer-live-p buf)
+;;               (push (cons (buffer-name buf) persp-name) buffer-persp-alist)))))
+
+;;       ;; Display results in a temporary buffer
+;;       (with-output-to-temp-buffer "*Perspective Buffers*"
+;;         (princ (format "%-50s %s\n" "Buffer Name" "Perspective"))
+;;         (princ (format "%s %s\n" (make-string 50 ?-) (make-string 20 ?-)))
+;;         (dolist (item (sort buffer-persp-alist
+;;                            (lambda (a b) (string< (car a) (car b)))))
+;;           (princ (format "%-50s %s\n" (car item) (cdr item)))))))
+
+;;   ;; Helper function to switch to buffer from all perspectives
+;;   (defun ar/persp-switch-buffer-all ()
+;;     "Switch to a buffer from all perspectives (not just current).
+;; This allows accessing buffers outside the current perspective without
+;; having to switch perspectives first."
+;;     (interactive)
+;;     ;; persp-switch-to-buffer* with prefix arg shows all buffers
+;;     (let ((current-prefix-arg '(4)))
+;;       (call-interactively #'persp-switch-to-buffer*))))
 #+end_src
 
 * Completion Framework
@@ -3767,11 +3877,11 @@ With optional argument FRAME, return the list of buffers of FRAME."
 #+end_src
 
 ** Vertico
-VERTical Interactive COmpletion
+VERTical Interactively COmpletion
 #+begin_src emacs-lisp
 (use-package vertico
   :custom
-  (vertico-count 10)
+  (vertico-count 12)
   (vertico-resize nil)
   (vertico-cycle t)
   :init
@@ -3807,7 +3917,6 @@ Enrich existing commands with completion annotations
 
 ** Consult
 #+begin_src emacs-lisp
-
 (use-package consult
   :bind (;; Buffer switching
          ([remap switch-to-buffer] . consult-buffer)
@@ -3853,6 +3962,38 @@ Enrich existing commands with completion annotations
 
   ;; (setq consult-buffer-sources
   ;;       '(consult--source-file-visiting-buffer))
+
+
+  ;; Consult integration - Only show file-visiting buffers from current perspective
+  (with-eval-after-load 'perspective
+    ;; Hide the default consult buffer source
+    (consult-customize consult-source-buffer :hidden t :default nil)
+
+    ;; Define custom perspective buffer source for file-visiting buffers only
+    (defvar consult--source-perspective-file-visiting-buffer
+      `(:name     "Buffers"
+        :narrow   ?f
+        :category buffer
+        :face     consult-buffer
+        :history  buffer-name-history
+        :state    ,#'consult--buffer-state
+        :default  t
+        :items
+        ,(lambda ()
+           (let ((persp-buffers (persp-current-buffers)))
+             (consult--buffer-query
+              :sort 'visibility
+              :predicate (lambda (buf)
+                           (and (buffer-file-name buf)
+                                (memq buf persp-buffers)))
+              :as #'buffer-name))))
+      "Perspective buffer source showing only file-visiting buffers in current perspective.")
+
+    ;; Set consult-buffer-sources to use our custom source
+    (setq consult-buffer-sources
+          '(consult--source-perspective-file-visiting-buffer)))
+
+
 
   ;; Configure preview behavior for optimal performance
   ;; Immediate preview for navigation commands
@@ -4217,7 +4358,6 @@ If completion fails in the future, check these:
 
 ** LSP
 #+begin_src emacs-lisp
-;; TODO Modify some settings according to https://andreyor.st/posts/2023-09-09-migrating-from-lsp-mode-to-eglot/
 (use-package eglot
   :straight (:type built-in)
   :defer t
@@ -4230,10 +4370,18 @@ If completion fails in the future, check these:
                     (eglot-ensure))))
    ((markdown-mode yaml-mode yaml-ts-mode) . eglot-ensure))
 
-  :init
-  (setq eglot-events-buffer-size 0)
-  (setq eglot-send-changes-idle-time 0.5)
-  (setq eglot-autoshutdown nil))
+  :custom
+  (eglot-events-buffer-size 0)
+  (eglot-send-changes-idle-time 0.5)
+  (eglot-autoshutdown nil)
+  (eglot-sync-connect 0)
+  (eglot-extend-to-xref nil)
+  (eglot-ignored-server-capabilities
+   '(:documentFormattingProvider
+     :documentRangeFormattingProvider
+     :documentOnTypeFormattingProvider
+     :foldingRangeProvider
+     :documentHighlightProvider)))
 
 (use-package eglot-booster
   :straight (:host github :repo "jdtsmith/eglot-booster")
@@ -4272,6 +4420,7 @@ If completion fails in the future, check these:
          ("C-M-." . consult-eglot-symbols)))
 
 (use-package consult-eglot-embark :defer t)
+
 #+end_src
 
 ** Syntax Checking
@@ -4496,21 +4645,6 @@ If completion fails in the future, check these:
 
   (when (not (childframe-workable-p))
     (message "Warning: eldoc-box childframes may not work on this system")))
-#+end_src
-
-** Eldoc Mouse
-#+begin_src emacs-lisp
-(use-package eldoc-mouse
-  :defer t
-  :hook (eldoc-mode . (lambda ()
-                        (unless (derived-mode-p 'org-mode)
-                          (eldoc-mouse-mode 1))))
-  :init
-  (setq eldoc-mouse-posframe-border-color (face-background 'posframe-border nil t))
-  :config
-  (tooltip-mode -1)
-  (add-to-list 'eldoc-mouse-posframe-override-parameters
-               `(background-color . ,(face-background 'tooltip nil t))))
 #+end_src
 
 ** Imenu-Breadcrumbs
@@ -5009,16 +5143,17 @@ Falls back to `hl-todo-rgrep' if consult-ripgrep is not available."
   :defer t
   :hook ((LaTeX-mode . rainbow-delimiters-mode)
          (prog-mode . rainbow-delimiters-mode))
-  :custom-face
-  (rainbow-delimiters-depth-1-face ((t (:foreground "#7aa2f7"))))
-  (rainbow-delimiters-depth-2-face ((t (:foreground "#e0af68"))))
-  (rainbow-delimiters-depth-3-face ((t (:foreground "#9ece6a"))))
-  (rainbow-delimiters-depth-4-face ((t (:foreground "#1abc9c"))))
-  (rainbow-delimiters-depth-5-face ((t (:foreground "#bb9af7"))))
-  (rainbow-delimiters-depth-6-face ((t (:foreground "#9d7cd8"))))
-  (rainbow-delimiters-depth-7-face ((t (:foreground "#ff9e64"))))
-  (rainbow-delimiters-depth-8-face ((t (:foreground "#f7768e"))))
-  (rainbow-delimiters-depth-9-face ((t (:foreground "#7aa2f7")))))
+  :config
+  (custom-set-faces
+   '(rainbow-delimiters-depth-1-face ((t (:foreground "#7aa2f7"))))
+   '(rainbow-delimiters-depth-2-face ((t (:foreground "#e0af68"))))
+   '(rainbow-delimiters-depth-3-face ((t (:foreground "#9ece6a"))))
+   '(rainbow-delimiters-depth-4-face ((t (:foreground "#1abc9c"))))
+   '(rainbow-delimiters-depth-5-face ((t (:foreground "#bb9af7"))))
+   '(rainbow-delimiters-depth-6-face ((t (:foreground "#9d7cd8"))))
+   '(rainbow-delimiters-depth-7-face ((t (:foreground "#ff9e64"))))
+   '(rainbow-delimiters-depth-8-face ((t (:foreground "#f7768e"))))
+   '(rainbow-delimiters-depth-9-face ((t (:foreground "#7aa2f7"))))))
 #+end_src
 
 * Indentations
@@ -6622,6 +6757,262 @@ It does NOT activate company-mode - completely safe with Corfu."
 (add-hook 'bash-ts-mode-hook #'eglot-ensure)
 #+end_src
 
+** PlantUML
+#+begin_src emacs-lisp
+(use-package plantuml-mode
+  :defer t
+  :mode (("\\.\\(plantuml\\|puml\\|pum\\|plu\\)\\'" . plantuml-mode))
+
+  :init
+  ;; ────────────────────────────────────────────────────────────────────────
+  ;; Execution Mode Auto-Detection
+  ;; ────────────────────────────────────────────────────────────────────────
+  ;; Automatically detect the best available PlantUML execution method
+  (defvar ar/plantuml-jar-locations
+    '("~/.local/share/plantuml/plantuml.jar"
+      "~/plantuml.jar"
+      "/usr/share/plantuml/plantuml.jar"
+      "/usr/local/share/plantuml/plantuml.jar"
+      "/opt/plantuml/plantuml.jar")
+    "Common locations to search for PlantUML JAR file.")
+
+  (defun ar/find-plantuml-jar ()
+    "Find PlantUML JAR file in common locations."
+    (seq-find #'file-exists-p
+              (mapcar #'expand-file-name ar/plantuml-jar-locations)))
+
+  (let ((jar-path (ar/find-plantuml-jar))
+        (executable-path (executable-find "plantuml")))
+    (cond
+     ;; Prefer JAR mode (most reliable and feature-complete)
+     (jar-path
+      (setq plantuml-jar-path jar-path
+            plantuml-default-exec-mode 'jar))
+     ;; Fallback to executable if available
+     (executable-path
+      (setq plantuml-executable-path executable-path
+            plantuml-default-exec-mode 'executable))
+     ;; Last resort: server mode (warns about external data transmission)
+     (t
+      (setq plantuml-default-exec-mode 'server)
+      (message "PlantUML: No local installation found. Using server mode."))))
+
+  :custom
+  ;; Output format for previews
+  (plantuml-output-type "png" "Default output format: png, svg, txt, utxt")
+
+  ;; Indentation (align with your config's use of 2-space indents)
+  (plantuml-indent-level 2 "Number of spaces per indentation level")
+
+  ;; JAR arguments for better compatibility
+  (plantuml-jar-args '("-charset" "utf-8") "Arguments passed to PlantUML JAR")
+
+  ;; Completion keyword length
+  (plantuml-kwdList-max-length 24 "Maximum keyword length for completion")
+
+  :config
+  ;; ────────────────────────────────────────────────────────────────────────
+  ;; Org-Babel Integration
+  ;; ────────────────────────────────────────────────────────────────────────
+  ;; Ensure org-babel uses the same configuration as plantuml-mode
+  (with-eval-after-load 'ob-plantuml
+    ;; Sync paths between plantuml-mode and org-babel
+    (setq org-plantuml-jar-path plantuml-jar-path
+          org-plantuml-executable-path plantuml-executable-path
+          org-plantuml-exec-mode plantuml-default-exec-mode)
+
+    ;; Default header arguments for PlantUML code blocks
+    (setq org-babel-default-header-args:plantuml
+          '((:results . "file")
+            (:exports . "results")
+            (:cmdline . "-charset utf-8"))))
+
+  ;; Enable org-src-mode integration for editing PlantUML blocks
+  (with-eval-after-load 'org-src
+    (add-to-list 'org-src-lang-modes '("plantuml" . plantuml)))
+
+  ;; ────────────────────────────────────────────────────────────────────────
+  ;; Flymake Backend for Syntax Checking
+  ;; ────────────────────────────────────────────────────────────────────────
+  (defun ar/plantuml-flymake-backend (report-fn &rest _args)
+    "Flymake backend for PlantUML syntax checking using -syntax flag.
+Reports diagnostics to REPORT-FN."
+    (unless (eq plantuml-default-exec-mode 'server)
+      (let* ((source-buffer (current-buffer))
+             (source-text (buffer-substring-no-properties (point-min) (point-max))))
+
+        ;; Build command based on execution mode
+        (let ((command
+               (pcase plantuml-default-exec-mode
+                 ('jar
+                  `("java" "-Djava.awt.headless=true" "-jar" ,plantuml-jar-path "-syntax"))
+                 ('executable
+                  `(,plantuml-executable-path "-syntax"))
+                 (_ nil))))
+
+          (if (null command)
+              (funcall report-fn nil)
+            (let ((proc (make-process
+                         :name "plantuml-flymake"
+                         :buffer (generate-new-buffer " *plantuml-flymake*")
+                         :command command
+                         :connection-type 'pipe
+                         :sentinel
+                         (lambda (proc _event)
+                           (when (memq (process-status proc) '(exit signal))
+                             (unwind-protect
+                                 (when (buffer-live-p source-buffer)
+                                   (with-current-buffer source-buffer
+                                     (when (eq proc (flymake-is-running))
+                                       (with-current-buffer (process-buffer proc)
+                                         (goto-char (point-min))
+                                         (let ((diagnostics '()))
+                                           ;; Parse PlantUML syntax error output
+                                           ;; Format: "Error line X" or "Syntax Error line X"
+                                           (while (re-search-forward
+                                                   "\\(?:Syntax \\)?Error.*?line \\([0-9]+\\)"
+                                                   nil t)
+                                             (let* ((line-num (string-to-number (match-string 1)))
+                                                    (msg (buffer-substring-no-properties
+                                                          (line-beginning-position)
+                                                          (line-end-position)))
+                                                    (pos (with-current-buffer source-buffer
+                                                           (save-excursion
+                                                             (goto-char (point-min))
+                                                             (forward-line (1- line-num))
+                                                             (point))))
+                                                    (end-pos (with-current-buffer source-buffer
+                                                               (save-excursion
+                                                                 (goto-char pos)
+                                                                 (line-end-position)))))
+                                               (push (flymake-make-diagnostic
+                                                      source-buffer
+                                                      pos
+                                                      end-pos
+                                                      :error
+                                                      msg)
+                                                     diagnostics)))
+                                           (funcall report-fn (nreverse diagnostics)))))))
+                               (kill-buffer (process-buffer proc))))))))
+
+              ;; Send buffer content to stdin
+              (process-send-string proc source-text)
+              (process-send-eof proc)))))))
+
+  ;; Register flymake backend (only for jar and executable modes)
+  (defun ar/plantuml-setup-flymake ()
+    "Setup Flymake for PlantUML mode."
+    (when (and (not (eq plantuml-default-exec-mode 'server))
+               (bound-and-true-p flymake-mode))
+      (add-hook 'flymake-diagnostic-functions #'ar/plantuml-flymake-backend nil t)))
+
+  (add-hook 'plantuml-mode-hook #'ar/plantuml-setup-flymake)
+
+  ;; ────────────────────────────────────────────────────────────────────────
+  ;; Utility Functions
+  ;; ────────────────────────────────────────────────────────────────────────
+  (defun ar/plantuml-set-output-type ()
+    "Interactively change PlantUML output format."
+    (interactive)
+    (let ((type (completing-read "Output type: "
+                                 '("png" "svg" "txt" "utxt" "eps" "pdf" "vdx" "xmi" "latex")
+                                 nil t nil nil "png")))
+      (setq plantuml-output-type type)
+      (message "PlantUML output type set to: %s" type)))
+
+  (defun ar/plantuml-install-jar ()
+    "Download and install PlantUML JAR to ~/.local/share/plantuml/."
+    (interactive)
+    (if (fboundp 'plantuml-download-jar)
+        (call-interactively 'plantuml-download-jar)
+      (let* ((install-dir (expand-file-name "~/.local/share/plantuml"))
+             (jar-path (expand-file-name "plantuml.jar" install-dir)))
+        (unless (file-directory-p install-dir)
+          (make-directory install-dir t))
+        (if (yes-or-no-p (format "Download PlantUML JAR to %s? " jar-path))
+            (progn
+              (message "Downloading PlantUML JAR...")
+              (url-copy-file
+               "https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar"
+               jar-path t)
+              (setq plantuml-jar-path jar-path
+                    plantuml-default-exec-mode 'jar
+                    org-plantuml-jar-path jar-path
+                    org-plantuml-exec-mode 'jar)
+              (message "PlantUML JAR installed successfully at %s" jar-path))
+          (message "Installation cancelled")))))
+
+  (defun ar/plantuml-insert-org-block ()
+    "Insert a PlantUML source block template in org-mode."
+    (interactive)
+    (if (derived-mode-p 'org-mode)
+        (let* ((filename (read-string "Output filename (without extension): "
+                                      (format "%s-diagram"
+                                              (file-name-base (or (buffer-file-name) "diagram")))))
+               (extension (pcase plantuml-output-type
+                           ("png" "png")
+                           ("svg" "svg")
+                           (_ "png")))
+               (filepath (format "%s.%s" filename extension)))
+          (insert (format "#+begin_src plantuml :file %s\n" filepath))
+          (insert "@startuml\n")
+          (insert "!theme tokyo-night\n\n")
+          (save-excursion
+            (insert "\n@enduml\n")
+            (insert "#+end_src\n"))
+          (message "PlantUML block inserted. Use C-c C-c to generate diagram."))
+      (user-error "Not in org-mode buffer")))
+
+  (defun ar/plantuml-validate-installation ()
+    "Check PlantUML installation and display configuration."
+    (interactive)
+    (let ((mode-name (pcase plantuml-default-exec-mode
+                      ('jar "JAR")
+                      ('executable "Executable")
+                      ('server "Server")
+                      (_ "Unknown")))
+          (path (pcase plantuml-default-exec-mode
+                 ('jar plantuml-jar-path)
+                 ('executable plantuml-executable-path)
+                 ('server "https://www.plantuml.com/plantuml")
+                 (_ "Not configured"))))
+      (message "PlantUML mode: %s | Path: %s | Output: %s"
+               mode-name path plantuml-output-type)
+      (when (eq plantuml-default-exec-mode 'server)
+        (display-warning 'plantuml
+                        "Using server mode - diagrams sent to plantuml.com\nConsider installing locally for privacy."
+                        :warning))))
+
+  ;; ────────────────────────────────────────────────────────────────────────
+  ;; Post-Load Configuration
+  ;; ────────────────────────────────────────────────────────────────────────
+  (ar/plantuml-validate-installation))
+
+;; ════════════════════════════════════════════════════════════════════════════
+;; Org-Mode Image Display Configuration
+;; ════════════════════════════════════════════════════════════════════════════
+;; Enable inline image display for PlantUML diagrams in org-mode
+(with-eval-after-load 'org
+  ;; Auto-display images after executing PlantUML blocks
+  (add-hook 'org-babel-after-execute-hook
+            (lambda ()
+              (when (and (derived-mode-p 'org-mode)
+                        (save-excursion
+                          (goto-char (point-min))
+                          (re-search-forward "^#\\+begin_src plantuml" nil t)))
+                (org-display-inline-images))))
+
+  ;; Optional: Start with inline images displayed
+  ;; Uncomment if you want images shown automatically when opening org files
+  ;; (setq org-startup-with-inline-images t)
+  )
+
+;; ════════════════════════════════════════════════════════════════════════════
+;; Keybindings (using General.el, following your config pattern)
+;; ════════════════════════════════════════════════════════════════════════════
+
+#+end_src
+
 * Study
 ** PDF Tools
 #+begin_src emacs-lisp
@@ -6674,14 +7065,164 @@ It does NOT activate company-mode - completely safe with Corfu."
 
 ** Org Noter
 #+begin_src emacs-lisp
+(use-package org-noter
+  :defer t
+  :after (:any org pdf-view)
+  :commands (org-noter org-noter-kill-session)
+  :init
+  ;; Core property names
+  (setq org-noter-property-doc-file "NOTER_DOCUMENT"
+        org-noter-property-note-location "NOTER_PAGE")
 
+  ;; Search paths and file names
+  ;; Adjust these paths to match your note-taking structure
+  (setq org-noter-default-notes-file-names '("notes.org")
+        org-noter-notes-search-path '("~/Documents/notes"
+                                       "~/org/references/notes"))
+
+  ;; Session behavior
+  (setq org-noter-auto-save-last-location t      ; Remember last position
+        org-noter-doc-split-fraction '(0.6 . 0.6) ; Window split ratio (horizontal . vertical)
+        org-noter-always-create-frame nil         ; Use current frame
+        org-noter-hide-other nil                  ; Show all notes
+        org-noter-notes-window-location 'horizontal-split ; Notes position
+        org-noter-separate-notes-from-heading t   ; Separate note content from heading
+        org-noter-insert-note-no-questions nil    ; Prompt for note title
+        org-noter-kill-frame-at-session-end nil   ; Keep frame when killing session
+        org-noter-arrow-delay 0.2                 ; Delay for arrow tooltip (0 or negative to disable)
+        org-noter-doc-property-in-notes t         ; Include doc property in notes
+        org-noter-suggest-from-attachments t)     ; Suggest attached files
+
+  :config
+  ;; Optional: Customize default heading title
+  ;; Use $p$ as placeholder for page number
+  ;; (setq org-noter-default-heading-title "Notes for page $p$")
+
+  ;; Optional: Tokyo Night theme colors for org-noter
+  (custom-set-faces
+   '(org-noter-notes-exist-face ((t (:foreground "#7aa2f7" :weight bold))))
+   '(org-noter-no-notes-exist-face ((t (:foreground "#565f89"))))))
 #+end_src
 
 ** Org PDF Tools
 
+#+begin_src emacs-lisp
+(use-package org-pdftools
+  :defer t
+  :after (org pdf-tools)
+  :hook (org-mode . org-pdftools-setup-link)
+  :init
+  ;; Link configuration
+  (setq org-pdftools-link-prefix "pdf"              ; Link prefix for org-pdftools links
+        org-pdftools-search-string-separator "??")  ; Separator for search strings
+
+  ;; Path handling - these functions control how paths are stored and resolved
+  (setq org-pdftools-path-generator #'org-pdftools-abbreviate-file-name
+        org-pdftools-path-resolver #'expand-file-name)
+
+  ;; Link description
+  (setq org-pdftools-get-desc-function #'org-pdftools-get-desc-default)
+
+  ;; Pointer and annotation settings
+  (setq org-pdftools-markup-pointer-function #'pdf-annot-add-text-annotation
+        org-pdftools-free-pointer-icon "Note"
+        org-pdftools-free-pointer-color "#7aa2f7"   ; Tokyo Night blue
+        org-pdftools-use-isearch-link t
+        org-pdftools-use-freepointer-annot t)
+
+  ;; Export settings
+  (setq org-pdftools-export-style 'org-protocol     ; Export style for HTML
+        org-pdftools-link-prefix-to-export "pdf")
+
+  :config
+  ;; Setup the link type
+  (org-pdftools-setup-link)
+
+  ;; Optional: Set root directory for relative paths
+  ;; Uncomment and adjust if you want all PDF paths to be relative to a specific directory
+  ;; (setq org-pdftools-root-dir "~/Documents/pdfs")
+
+  ;; Optional: Configure path translation for cloud storage
+  ;; This allows you to store PDFs in cloud storage and have different paths
+  ;; on different machines while keeping links working
+  ;; Example configuration (uncomment and adjust as needed):
+  ;; (setq org-pdftools-path-transform-alist
+  ;;       '(("/mnt/gdrive/" . "~/Google Drive/")
+  ;;         ("/mnt/dropbox/" . "~/Dropbox/")
+  ;;         ("~/Library/Mobile Documents/com~apple~CloudDocs/" . "~/iCloud Drive/")))
+)
+#+end_src
+
 ** Org Noter PDF Tools
 #+begin_src emacs-lisp
+(use-package org-noter-pdftools
+  :defer t
+  :after (org-noter org-pdftools)
+  :init
+  ;; Org ID settings for linking notes to PDF annotations
+  (setq org-noter-pdftools-use-org-id t              ; Generate org-id for notes
+        org-noter-pdftools-use-unique-org-id nil     ; Use simple IDs
+        org-noter-pdftools-insert-content-heading t) ; Add "Content" heading
 
+  ;; Annotation appearance (using Tokyo Night colors)
+  (setq org-noter-pdftools-free-pointer-icon "Note"
+        org-noter-pdftools-free-pointer-color "#7aa2f7")
+
+  :config
+  ;; Integration with org-noter
+  ;; This ensures org-noter uses org-pdftools for precise note locations
+  (with-eval-after-load 'org-noter
+    (require 'org-noter-pdftools))
+
+  ;; Enhanced precise note insertion function
+  ;; This function ensures that precise notes are inserted with proper formatting
+  (defun org-noter-pdftools-insert-precise-note (&optional toggle-no-questions)
+    "Insert a precise note with enhanced PDF integration.
+With prefix argument TOGGLE-NO-QUESTIONS, toggle the value of
+`org-noter-insert-note-no-questions'."
+    (interactive "P")
+    (org-noter--with-valid-session
+     (let ((org-noter-insert-note-no-questions
+            (if toggle-no-questions
+                (not org-noter-insert-note-no-questions)
+              org-noter-insert-note-no-questions))
+           (org-pdftools-use-isearch-link t)
+           (org-pdftools-use-freepointer-annot t))
+       (org-noter-insert-note (org-noter--get-precise-info)))))
+
+  ;; Override org-noter-set-start-location to fix a known bug
+  ;; See: https://github.com/weirdNox/org-noter/pull/93
+  (defun org-noter-set-start-location (&optional arg)
+    "When opening a session with this document, go to the current location.
+With a prefix ARG, remove the start location."
+    (interactive "P")
+    (org-noter--with-valid-session
+     (let ((inhibit-read-only t)
+           (ast (org-noter--parse-root))
+           (location (org-noter--doc-approx-location (when (called-interactively-p 'any) 'interactive))))
+       (with-current-buffer (org-noter--session-notes-buffer session)
+         (org-with-wide-buffer
+          (goto-char (org-element-property :begin ast))
+          (if arg
+              (org-entry-delete nil org-noter-property-note-location)
+            (org-entry-put nil org-noter-property-note-location
+                           (org-noter--pretty-print-location location))))))))
+
+  ;; Setup PDF annotation handler to jump to notes
+  (with-eval-after-load 'pdf-annot
+    (add-hook 'pdf-annot-activate-handler-functions
+              #'org-noter-pdftools-jump-to-note))
+
+  ;; Optional: Functions to embed org notes into PDF annotations
+  ;; These are useful if you want to export your org notes back to the PDF
+
+  ;; Available commands (not bound to keys by default):
+  ;; - org-noter-pdftools-embed-org-note-to-pdf: Embed current note as PDF annotation
+  ;; - org-noter-pdftools-embed-all-org-note-to-pdf: Embed all notes as PDF annotations
+  ;; - org-noter-pdftools-embed-org-buffer-to-pdf: Embed entire org buffer as annotation
+
+  ;; Keybindings are defined separately in general.el configuration
+)
 #+end_src
 
 * Window
@@ -7263,50 +7804,42 @@ It does NOT activate company-mode - completely safe with Corfu."
    "C-=" 'text-scale-increase
    "C--" 'text-scale-decrease)
 
-  ;; Frame operations (SPC TAB)
   (ar/global-leader
-    "TAB" '(:ignore t :wk "frame")
+    ;; Core perspective management (SPC TAB)
+    "TAB"     '(:ignore t :wk "perspective")
+    "TAB TAB" '(persp-switch :wk "Switch/create perspective")
+    "TAB n"   '(persp-next :wk "Next perspective")
+    "TAB p"   '(persp-prev :wk "Previous perspective")
+    "TAB `"   '(persp-switch-last :wk "Last perspective")
+    "TAB r"   '(persp-rename :wk "Rename perspective")
+    "TAB k"   '(persp-kill :wk "Kill perspective")
+    "TAB K"   '(persp-kill-others :wk "Kill other perspectives")
 
-    ;; Core Frame Management
-    "TAB TAB" '(select-frame-by-name :wk "Select frame")
-    "TAB n"   '(make-frame-command :wk "New frame")
-    "TAB c"   '(my-beframe-switch-or-create-frame :wk "Switch/Create frame")
-    "TAB d"   '(delete-frame :wk "Delete frame")
-    "TAB D"   '(delete-other-frames :wk "Delete other frames")
-    "TAB k"   '(my-beframe-kill-current-buffer-and-frame :wk "Kill buffer & frame")
-    "TAB o"   '(other-frame :wk "Other frame")
-    "TAB ["   '((lambda () (interactive) (other-frame -1)) :wk "Previous frame")
-    "TAB ]"   '((lambda () (interactive) (other-frame 1)) :wk "Next frame")
-    "TAB r"   '(beframe-rename-frame :wk "Rename frame")
+    ;; Buffer management within perspectives
+    "TAB b"   '(persp-switch-to-buffer* :wk "Switch to buffer")
+    "TAB B"   '(ar/persp-switch-buffer-all :wk "Switch buffer (all persp)")
+    "TAB a"   '(persp-add-buffer :wk "Add buffer")
+    "TAB A"   '(persp-set-buffer :wk "Set buffer (remove from others)")
+    "TAB i"   '(persp-import :wk "Import buffer from perspective")
+    "TAB x"   '(persp-remove-buffer :wk "Remove buffer")
+    "TAB X"   '(ar/persp-kill-other-buffers :wk "Kill other buffers")
 
-    ;; Buffer Operations (Frame-specific)
-    "TAB b"   '(beframe-switch-buffer :wk "Switch buffer")
-    "TAB m"   '(beframe-buffer-menu :wk "Buffer menu")
+    ;; IBuffer integration
+    "TAB m"   '(ar/persp-ibuffer :wk "IBuffer (perspective-filtered)")
 
-    ;; Assume Buffers (Add buffers INTO this frame)
-    ;; NESTED SYNTAX: This constructs the full sub-menu atomically, preventing
-    ;; "starts with non-prefix key" errors on reload.
-    "TAB a"   '(:ignore t :wk "assume (add buffers)"
-                "f" '(beframe-assume-frame-buffers :wk "All from frame")
-                "s" '(beframe-assume-frame-buffers-selectively :wk "Select from frame")
-                "S" '(beframe-assume-buffers-selectively-all-frames :wk "Select from all frames")
-                "a" '(beframe-assume-all-buffers-no-prompts :wk "All from everywhere")
-                "r" '(beframe-assume-buffers-matching-regexp-all-frames :wk "By regexp"))
+    ;; State management
+    "TAB s"   '(:ignore t :wk "state")
+    "TAB s s" '(persp-state-save :wk "Save state")
+    "TAB s l" '(persp-state-load :wk "Load/restore state")
 
-    ;; Unassume Buffers (Remove buffers FROM this frame)
-    ;; NESTED SYNTAX
-    "TAB u"   '(:ignore t :wk "unassume (remove buffers)"
-                "f" '(beframe-unassume-frame-buffers :wk "All from frame")
-                "s" '(beframe-unassume-current-frame-buffers-selectively :wk "Select from current")
-                "a" '(beframe-unassume-all-buffers-no-prompts :wk "All (keep global)")
-                "r" '(beframe-unassume-buffers-matching-regexp-all-frames :wk "By regexp"))
+    ;; Project integration
+    "TAB P"   '(:ignore t :wk "project")
+    "TAB P s" '(ar/persp-project-switch :wk "Switch project + perspective")
+    "TAB P p" '(ar/persp-project-perspective :wk "Perspective for project")
+    "TAB P k" '(ar/persp-project-kill :wk "Kill project + perspective")
 
-    ;; Advanced Operations
-    "TAB K"   '(beframe-kill-buffers-matching-regexp :wk "Kill by regexp")
-
-    ;; Transient Interface (Alternative to individual commands)
-    "TAB t"   '(beframe-transient :wk "Transient menu"))
-
+    ;; Utilities
+    "TAB l"   '(ar/persp-list-all-buffers :wk "List all buffers/perspectives"))
 
   ;; Macro operations (SPC @)
   (ar/global-leader
@@ -7461,6 +7994,23 @@ It does NOT activate company-mode - completely safe with Corfu."
    :states '(normal visual insert)
    "M-j" 'move-text-down
    "M-k" 'move-text-up)
+
+  (ar/local-leader
+    :keymaps 'plantuml-mode-map
+    "c" '(:ignore t :wk "compile/preview")
+    "c c" '(plantuml-preview :wk "Preview (C-c C-c)")
+    "c b" '(plantuml-preview-buffer :wk "Preview buffer")
+    "c r" '(plantuml-preview :wk "Preview region/buffer")
+    "s" '(:ignore t :wk "settings")
+    "s m" '(plantuml-set-exec-mode :wk "Set execution mode")
+    "s o" '(ar/plantuml-set-output-type :wk "Set output type")
+    "s v" '(ar/plantuml-validate-installation :wk "Validate installation")
+    "i" '(:ignore t :wk "install")
+    "i j" '(ar/plantuml-install-jar :wk "Install/Download JAR")
+    "i b" '(ar/plantuml-insert-org-block :wk "Insert org block")
+    "=" '(plantuml-indent-buffer :wk "Indent buffer")
+    "TAB" '(plantuml-complete-symbol :wk "Complete symbol"))
+
 
   (ar/local-leader
     :keymaps 'org-mode-map

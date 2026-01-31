@@ -18,3 +18,4 @@ org-roam.db
 transient/
 .cache/
 straight/
+perspective-state
