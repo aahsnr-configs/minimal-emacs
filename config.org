@@ -5560,11 +5560,8 @@ This bibliography file can be used with both LaTeX and Org documents."
   :defer t
   :straight auctex
   :hook ((LaTeX-mode . visual-line-mode)
-         ;;(LaTeX-mode . prettify-symbols-mode) ;COMMENT Defined else where
          (LaTeX-mode . TeX-source-correlate-mode)
          (LaTeX-mode . outline-minor-mode)
-         (LaTeX-mode . TeX-fold-mode)
-         (TeX-mode . TeX-tex-mode)
          (LaTeX-mode . eglot-ensure))
 
   :init
@@ -5593,7 +5590,7 @@ This bibliography file can be used with both LaTeX and Org documents."
         TeX-electric-sub-and-superscript t
 
         ;; Folding
-        TeX-fold-auto nil
+
         TeX-fold-auto-reveal t
 
         ;; Font Lock
@@ -5700,18 +5697,18 @@ This bibliography file can be used with both LaTeX and Org documents."
 ** TeX Folding
 #+begin_src emacs-lisp
 (use-package tex-fold
-  :defer t
   :straight (:type built-in)
   :after tex
-  :commands (TeX-fold-mode TeX-fold-buffer)
+  :hook (TeX-mode . TeX-fold-mode)
   :config
-  (setq TeX-fold-auto-reveal t)
+  (setq TeX-fold-auto nil
+        TeX-fold-auto-reveal t)
 
   (defun ar/latex-fold-buffer-delayed ()
     "Fold buffer after idle delay."
     (run-with-idle-timer 0 nil 'TeX-fold-buffer))
 
-  (add-hook 'LaTeX-mode-hook #'ar/latex-fold-buffer-delayed)
+  (add-hook 'TeX-mode-hook #'ar/latex-fold-buffer-delayed)
 
   ;; Fold after AUCTeX macro insertions
   (add-hook 'TeX-fold-mode-hook
