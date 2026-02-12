@@ -1276,60 +1276,6 @@ byte-compiled files do not interfere with the reload."
     (add-hook 'ultra-scroll-hide-functions #'jit-lock-mode)))
 
 #+end_src
-** Dashboard
-#+begin_src emacs-lisp
-(use-package dashboard
-  :init
-  (setq dashboard-banner-logo-title "Welcome to Emacs!")
-  (setq dashboard-startup-banner 'logo)
-  (setq dashboard-items '((recents   . 10)
-                         (bookmarks . 3)
-                         (projects  . 6)
-                         (agenda    . 5)))
-
-  ;; CRITICAL: Close org files after reading them for agenda
-  (setq dashboard-agenda-release-buffers t)
-
-  (setq dashboard-center-content t)
-  (setq dashboard-set-heading-icons t)
-  (setq dashboard-set-file-icons t)
-  (setq dashboard-icon-type 'nerd-icons)
-
-  :config
-  ;; FORCE dashboard to recalculate startup time
-  (defun ar/dashboard-refresh-startup-time ()
-    "Force dashboard to show current session's startup time."
-    (setq dashboard-init-info
-          (format "%d packages loaded in %.3f seconds"
-                  (length package-activated-list)
-                  (float-time (time-subtract after-init-time before-init-time)))))
-
-  (add-hook 'emacs-startup-hook #'ar/dashboard-refresh-startup-time)
-
-  ;; CRITICAL FIX: Suppress "Followed link to" messages in daemon mode
-  (defun ar/dashboard-setup-startup-hook-quiet ()
-    "Setup dashboard but suppress messages during daemon startup."
-    (if (daemonp)
-        ;; In daemon mode: suppress all messages during dashboard init
-        (let ((inhibit-message t)
-              (message-log-max nil))  ; Don't even log to *Messages*
-          (dashboard-setup-startup-hook))
-      ;; Normal mode: show messages as usual
-      (dashboard-setup-startup-hook)))
-
-  (ar/dashboard-setup-startup-hook-quiet)
-
-  ;; FIX: Use get-buffer-create instead of get-buffer to avoid nil error
-  ;; This creates the buffer if it doesn't exist
-  ;; Also handle command-line files gracefully
-  (setq initial-buffer-choice
-        (lambda ()
-          ;; If files were passed on command line, don't force dashboard
-          (if (> (length command-line-args) 2)
-              nil
-            (get-buffer-create "*dashboard*")))))
-
-#+end_src
 
 ** Highlight the current line
 #+begin_src emacs-lisp
@@ -1659,6 +1605,13 @@ and sets up vim-style navigation."
     "Setup visual wrap and centering."
     (visual-line-mode 1)
     (visual-fill-column-mode 1)))
+#+end_src
+
+** Dashboard
+#+begin_src emacs-lisp
+(use-package dashboard
+  :config
+  (dashboard-setup-startup-hook))
 #+end_src
 
 * Markdown
