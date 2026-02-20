@@ -1610,8 +1610,45 @@ and sets up vim-style navigation."
 ** Dashboard
 #+begin_src emacs-lisp
 (use-package dashboard
+  :init
+  (setq dashboard-banner-logo-title "Welcome to Emacs!")
+  (setq dashboard-startup-banner 'logo)
+  (setq dashboard-items '((recents   . 10)
+                         (bookmarks . 3)
+                         (projects  . 6)
+                         (agenda    . 5)))
+
+  ;; CRITICAL: Close org files after reading them for agenda
+  (setq dashboard-agenda-release-buffers t)
+
+  (setq dashboard-center-content t)
+  (setq dashboard-set-heading-icons t)
+  (setq dashboard-set-file-icons t)
+  (setq dashboard-icon-type 'nerd-icons)
+
   :config
-  (dashboard-setup-startup-hook))
+  ;; CRITICAL FIX: Suppress "Followed link to" messages in daemon mode
+  (defun ar/dashboard-setup-startup-hook-quiet ()
+    "Setup dashboard but suppress messages during daemon startup."
+    (if (daemonp)
+        ;; In daemon mode: suppress all messages during dashboard init
+        (let ((inhibit-message t)
+              (message-log-max nil))  ; Don't even log to *Messages*
+          (dashboard-setup-startup-hook))
+      ;; Normal mode: show messages as usual
+      (dashboard-setup-startup-hook)))
+
+  (ar/dashboard-setup-startup-hook-quiet)
+
+  ;; FIX: Use get-buffer-create instead of get-buffer to avoid nil error
+  ;; This creates the buffer if it doesn't exist
+  ;; Also handle command-line files gracefully
+  (setq initial-buffer-choice
+        (lambda ()
+          ;; If files were passed on command line, don't force dashboard
+          (if (> (length command-line-args) 2)
+              nil
+            (get-buffer-create "*dashboard*")))))
 #+end_src
 
 * Markdown
@@ -5550,9 +5587,6 @@ This bibliography file can be used with both LaTeX and Org documents."
         font-latex-fontify-script 'invisible
         font-latex-fontify-sectioning 'color
 
-        ;; Indentation
-        LaTeX-indent-level 2
-        LaTeX-item-indent 0
         TeX-brace-indent-level 2)
 
   ;; TeX Command list
@@ -5570,50 +5604,12 @@ This bibliography file can be used with both LaTeX and Org documents."
 
   (setq-default TeX-command-default "LuaLaTeXmk")
 
-  ;; Eglot Integration
-  (with-eval-after-load 'eglot
-    (add-to-list 'eglot-server-programs
-                 '(LaTeX-mode . ("texlab")))
-
-    (defun ar/latex-eglot-setup ()
-      "Optimize eglot for LaTeX buffers."
-      (setq-local eglot-events-buffer-size 0)
-      (setq-local eglot-sync-connect nil))
-
-    (add-hook 'LaTeX-mode-hook #'ar/latex-eglot-setup))
-
   ;; Clean Intermediate Files
   (setq TeX-clean-confirm nil)
-
-  (setq LaTeX-clean-intermediate-suffixes
-        '("\\.aux" "\\.bbl" "\\.blg" "\\.brf" "\\.fot"
-          "\\.glo" "\\.gls" "\\.idx" "\\.ilg" "\\.ind"
-          "\\.lof" "\\.log" "\\.lot" "\\.nav" "\\.out"
-          "\\.snm" "\\.toc" "\\.url" "\\.synctex\\.gz"
-          "\\.fdb_latexmk" "\\.fls" "\\.xdv"
-          "-blx\\.bib" "\\.run\\.xml"))
 
   ;; Post-Compilation & Mode Associations
   (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer)
   (add-to-list 'auto-mode-alist '("\\.map\\'" . TeX-mode))
-  (setq LaTeX-command-style '(("" "%(latex)")))
-
-  ;; Sectioning
-  (setq LaTeX-section-hook
-        '(LaTeX-section-heading
-          LaTeX-section-title
-          LaTeX-section-toc
-          LaTeX-section-section
-          LaTeX-section-label))
-
-  (setq LaTeX-fill-break-at-separators nil)
-
-  ;; Indentation
-  ;; Proper indentation for itemize/enumerate/description
-  (with-eval-after-load 'latex
-    (dolist (env '("itemize" "enumerate" "description"))
-      (add-to-list 'LaTeX-indent-environment-list
-                   `(,env ar/latex-indent-item-fn))))
 
   ;; TeX-MODE-HOOK (ispell & fill-nobreak setup)
   (add-hook 'TeX-mode-hook
@@ -5647,11 +5643,58 @@ This bibliography file can be used with both LaTeX and Org documents."
                                        (flymake-mode 1)))))))
 #+end_src
 
+** TeX Site
+#+begin_src emacs-lisp
+(with-eval-after-load 'tex-site
+  (TeX-modes-set 'TeX-modes TeX-modes))
+#+end_src
+
+** Misc LaTeX
+#+begin_src emacs-lisp
+(with-eval-after-load 'latex
+  (setq LaTeX-clean-intermediate-suffixes
+        '("\\.aux" "\\.bbl" "\\.blg" "\\.brf" "\\.fot"
+          "\\.glo" "\\.gls" "\\.idx" "\\.ilg" "\\.ind"
+          "\\.lof" "\\.log" "\\.lot" "\\.nav" "\\.out"
+          "\\.snm" "\\.toc" "\\.url" "\\.synctex\\.gz"
+          "\\.fdb_latexmk" "\\.fls" "\\.xdv"
+          "-blx\\.bib" "\\.run\\.xml"))
+
+  (setq LaTeX-command-style '(("" "%(latex)")))
+
+  ;; Sectioning
+  (setq LaTeX-section-hook
+        '(LaTeX-section-heading
+          LaTeX-section-title
+          LaTeX-section-toc
+          LaTeX-section-section
+          LaTeX-section-label)
+        LaTeX-fill-break-at-separators nil
+        LaTeX-indent-level 2
+        LaTeX-item-indent 0)
+
+  (dolist (env '("itemize" "enumerate" "description"))
+    (add-to-list 'LaTeX-indent-environment-list
+                 `(,env ar/latex-indent-item-fn)))
+
+  (with-eval-after-load 'eglot
+    (add-to-list 'eglot-server-programs
+                 '(LaTeX-mode . ("texlab")))
+    (defun ar/latex-eglot-setup ()
+      "Optimize eglot for LaTeX buffers."
+      (setq-local eglot-events-buffer-size 0)
+      (setq-local eglot-sync-connect nil))
+
+    (add-hook 'LaTeX-mode-hook #'ar/latex-eglot-setup)))
+#+end_src
+
+
 ** TeX Folding
 #+begin_src emacs-lisp
 (use-package tex-fold
   :straight (:type built-in)
   :after tex
+  :hook (TeX-mode . ar/latex-fold-buffer-delayed)
   :hook (TeX-mode . TeX-fold-mode)
   :config
   (setq TeX-fold-auto nil
@@ -5661,7 +5704,7 @@ This bibliography file can be used with both LaTeX and Org documents."
     "Fold buffer after idle delay."
     (run-with-idle-timer 0 nil 'TeX-fold-buffer))
 
-  (add-hook 'TeX-mode-hook #'ar/latex-fold-buffer-delayed)
+  ;;(add-hook 'TeX-mode-hook #'ar/latex-fold-buffer-delayed)
 
   ;; Fold after AUCTeX macro insertions
   (add-hook 'TeX-fold-mode-hook
@@ -5821,9 +5864,7 @@ This bibliography file can be used with both LaTeX and Org documents."
 ** Preview LaTeX
 #+begin_src emacs-lisp
 (use-package preview
-  :defer t
   :straight (:type built-in)
-  :after tex
   :hook (LaTeX-mode . LaTeX-preview-setup)
   :custom
   (preview-auto-cache-preamble t)
