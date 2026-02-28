@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.51
+#+VERSION: 0.52
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -5688,7 +5688,6 @@ This bibliography file can be used with both LaTeX and Org documents."
     (add-hook 'LaTeX-mode-hook #'ar/latex-eglot-setup)))
 #+end_src
 
-
 ** TeX Folding
 #+begin_src emacs-lisp
 (use-package tex-fold
@@ -5758,20 +5757,18 @@ This bibliography file can be used with both LaTeX and Org documents."
 
 ** Bibliography Management
 #+begin_src emacs-lisp
+(use-package citeproc :defer t)
+
 (use-package citar
   :defer t
-  :custom
-  (citar-bibliography '("~/references.bib"))
-  (citar-library-paths '("~/Zotero/storage"))
-  (citar-notes-paths (list my/org-roam-directory))
-  (citar-symbols
-   `((file ,(nerd-icons-mdicon "nf-md-file_document") . " ")
-     (note ,(nerd-icons-mdicon "nf-md-note_text") . " ")
-     (link ,(nerd-icons-mdicon "nf-md-link") . " ")))
-  :config
-  (setq org-cite-insert-processor 'citar
-        org-cite-follow-processor 'citar
-        org-cite-activate-processor 'citar)
+  :init
+  (setq citar-bibliography '("~/references.bib")
+        citar-library-paths '("~/Zotero/storage")
+        citar-notes-paths (list my/org-roam-directory)
+        citar-symbols
+        `((file ,(nerd-icons-mdicon "nf-md-file_document") . " ")
+          (note ,(nerd-icons-mdicon "nf-md-note_text") . " ")
+          (link ,(nerd-icons-mdicon "nf-md-link") . " ")))
 
   (defun ar/citar-set-local-bibliography ()
     "Set buffer-local bibliography from project."
@@ -5780,9 +5777,16 @@ This bibliography file can be used with both LaTeX and Org documents."
       (setq-local org-cite-global-bibliography bibs)))
 
   (add-hook 'LaTeX-mode-hook #'ar/citar-set-local-bibliography)
-  (add-hook 'org-mode-hook #'ar/citar-set-local-bibliography))
+  (add-hook 'org-mode-hook #'ar/citar-set-local-bibliography)
+
+  :config
+  (with-eval-after-load 'oc
+    (setq org-cite-insert-processor 'citar
+          org-cite-follow-processor 'citar
+          org-cite-activate-processor 'citar)))
 
 (use-package citar-embark
+  :defer t
   :after (citar embark)
   :config
   (citar-embark-mode)
@@ -5794,6 +5798,18 @@ This bibliography file can be used with both LaTeX and Org documents."
   :config
   (citar-org-roam-mode 1)
   (setq citar-org-roam-subdir "literature"))
+
+(with-eval-after-load 'oc
+  (setq org-cite-global-bibliography
+        (ensure-list
+         (or (bound-and-true-p citar-bibliography)
+             (bound-and-true-p bibtex-completion-bibliography)))
+        org-cite-export-processors '((latex natbib) (t csl))
+        org-support-shift-select t)
+  (require 'oc-natbib))
+
+(with-eval-after-load 'org
+  (require 'oc-csl))
 
 (use-package reftex
   :straight (:type built-in)
@@ -5910,10 +5926,25 @@ This bibliography file can be used with both LaTeX and Org documents."
           ("" "unicode-math" t ("lualatex" "xelatex")))))
 
 (use-package org-fragtog
-  :defer t
   :hook (org-mode . org-fragtog-mode)
   :config
   (setq org-fragtog-preview-delay 0.2))
+#+end_src
+
+** Org LaTeX Classes
+#+begin_src emacs-lisp
+(with-eval-after-load 'ox-latex
+  (setq org-latex-pdf-process
+        '("latexmk -f -pdf -%latex -bibtex -interaction=nonstopmode -output-directory=%o %f"))
+  (add-to-list 'org-latex-classes
+               '("cas-dc"
+                 "\\documentclass{cas-dc}
+[NO-DEFAULT-PACKAGES]
+[PACKAGES]
+[EXTRA]"
+                 ("\\section{%s}" . "\\section*{%s}")
+                 ("\\subsection{%s}" . "\\subsection*{%s}")
+                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))))
 #+end_src
 
 ** Completions: LSP + AUCTeX + Company Integration
@@ -5970,6 +6001,24 @@ It does NOT activate company-mode - completely safe with Corfu."
 ;;     "C-c C-a" "compile"
 ;;     "C-c C-v" "view output"
 ;;     "C-c C-^" "find master"))
+#+end_src
+
+** Formatting
+#+begin_src emacs-lisp
+(with-eval-after-load 'apheleia
+  (push '(bibtex-tidy . ("bibtex-tidy"
+                         "--curly"        ; Enforce {} instead of ""
+                         "--numeric"      ; Standardize numbers/months
+                         "--align=14"     ; Align the '=' signs nicely
+                         "--blank-lines"  ; Ensure one blank line between entries
+                         "--sort=id"      ; Sort entries alphabetically by citation key
+                         "--duplicates"   ; Remove duplicate entries
+                         "--quiet"        ; Suppress CLI output
+                         "-"))
+        apheleia-formatters)
+
+  ;; 2. Map bibtex-mode to use bibtex-tidy instead of eglot
+  (setf (alist-get 'bibtex-mode apheleia-mode-alist) '(bibtex-tidy)))
 #+end_src
 
 * Utils
@@ -8014,6 +8063,7 @@ With a prefix ARG, remove the start location."
     "e" '(org-export-dispatch :wk "Export")
     "i" '(:ignore t :wk "insert")
     "i l" '(org-insert-link :wk "Link")
+    "@" '(org-cite-insert :wk "Insert citation")
     "i s" '(org-download-screenshot :wk "Screenshot")
     "i y" '(org-download-yank :wk "Yank image")
     "i t" '(org-table-create :wk "Table")
