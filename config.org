@@ -172,6 +172,29 @@ byte-compiled files do not interfere with the reload."
   (if (region-active-p)
       (buffer-substring-no-properties (region-beginning) (region-end))
     (thing-at-point 'symbol t)))
+
+
+(defun ar/eglot-status ()
+  "Show the running Eglot server name and command in the echo area."
+  (interactive)
+  ;; 1. Safely check if eglot is loaded AND an active server exists
+  (if (and (fboundp 'eglot-current-server)
+           (eglot-current-server))
+      (let* ((server (eglot-current-server))
+             (proc (jsonrpc--process server))
+             ;; 2. Ensure it's a real process before asking for its command
+             (cmd (and (processp proc) (process-command proc)))
+             ;; 3. Gracefully handle TCP/Network connections or missing commands
+             (cmd-str (cond
+                       ((listp cmd) (string-join cmd " "))
+                       ((stringp cmd) cmd)
+                       (t "Network/External Connection"))))
+
+        (message "LSP: %s | Command: %s"
+                 (propertize (jsonrpc-name server) 'face 'font-lock-keyword-face)
+                 (propertize cmd-str 'face 'font-lock-string-face)))
+
+    (message "No Eglot server managing this buffer.")))
 #+end_src
 
 ** Constants
@@ -1156,8 +1179,9 @@ byte-compiled files do not interfere with the reload."
                 (add-hook 'after-make-frame-functions
                           (lambda (frame)
                             (with-selected-frame frame (ar/set-fonts))))))
-  ;; For non-daemon mode, set fonts immediately
-  (ar/set-fonts))
+  ;; For non-daemon mode, set fonts immediately (but skip in background batch mode)
+  (unless noninteractive
+    (ar/set-fonts)))
 
 ;; Line spacing
 (setq-default line-spacing 0.02)
@@ -1640,15 +1664,17 @@ and sets up vim-style navigation."
 
   (ar/dashboard-setup-startup-hook-quiet)
 
-  ;; FIX: Use get-buffer-create instead of get-buffer to avoid nil error
+;; FIX: Use get-buffer-create instead of get-buffer to avoid nil error
   ;; This creates the buffer if it doesn't exist
   ;; Also handle command-line files gracefully
-  (setq initial-buffer-choice
-        (lambda ()
-          ;; If files were passed on command line, don't force dashboard
-          (if (> (length command-line-args) 2)
-              nil
-            (get-buffer-create "*dashboard*")))))
+  (unless noninteractive
+    (setq initial-buffer-choice
+          (lambda ()
+            ;; If files were passed on command line, don't force dashboard.
+            ;; Return (current-buffer) instead of nil to prevent "not a live buffer" errors.
+            (if (> (length command-line-args) 2)
+                (current-buffer)
+              (get-buffer-create "*dashboard*"))))))
 #+end_src
 
 * Markdown
@@ -4346,6 +4372,14 @@ If completion fails in the future, check these:
   :hook (after-init . envrc-global-mode))
 #+end_src
 
+** EditorConfig
+#+begin_src emacs-lisp
+(use-package editorconfig
+  :straight (:type built-in)
+  :config
+  (editorconfig-mode 1))
+#+end_src
+
 ** LSP
 #+begin_src emacs-lisp
 (use-package eglot
@@ -6770,15 +6804,27 @@ It does NOT activate company-mode - completely safe with Corfu."
 #+begin_src emacs-lisp
 (use-package nix-mode
   :defer t
-  :mode "\\.nix\\'")
+  :mode "\\.nix\\'"
+  :hook (nix-mode . eglot-ensure))
 
 (use-package nix-ts-mode
   :defer t
-  :mode "\\.nix\\'")
+  :mode "\\.nix\\'"
+  :hook (nix-ts-mode . eglot-ensure))
 
 (use-package nix-update
   :defer t
   :commands nix-update-fetch)
+
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((nix-mode nix-ts-mode) . ("nixd"))))
+
+
+(with-eval-after-load 'apheleia
+  (add-to-list 'apheleia-formatters '(alejandra . ("alejandra" "-q" "-")))
+  (setf (alist-get 'nix-mode apheleia-mode-alist) '(alejandra))
+  (setf (alist-get 'nix-ts-mode apheleia-mode-alist) '(alejandra)))
 #+end_src
 
 ** Bash
@@ -7051,6 +7097,41 @@ Reports diagnostics to REPORT-FN."
 ;; Keybindings (using General.el, following your config pattern)
 ;; ════════════════════════════════════════════════════════════════════════════
 
+#+end_src
+
+** Python
+#+begin_src emacs-lisp
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((python-ts-mode python-mode) "basedpyright-langserver" "--stdio")))
+
+(setq-default eglot-workspace-configuration
+              '(:basedpyright
+                ( :typeCheckingMode      "standard"
+                  :disableOrganizeImports t)
+                :basedpyright.analysis
+                ( :autoImportCompletions  t
+                  :autoSearchPaths        t
+                  :diagnosticMode         "workspace"
+                  :useLibraryCodeForTypes t)))
+
+(use-package flymake-ruff
+  :hook (eglot-managed-mode . flymake-ruff-load))
+
+(use-package python
+  :straight (:type built-in)
+  :defer t
+  :custom
+  (python-shell-completion-native-enable nil)
+  (python-shell-interpreter "python3")
+  (python-indent-offset 4))
+
+(with-eval-after-load 'apheleia
+  (setf (alist-get 'ruff apheleia-formatters)
+        '("ruff" "format" "--quiet" "--stdin-filename" filepath "-"))
+
+  (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(ruff-isort ruff))
+  (setf (alist-get 'python-mode    apheleia-mode-alist) '(ruff-isort ruff)))
 #+end_src
 
 * Study
