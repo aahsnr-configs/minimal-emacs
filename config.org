@@ -1227,6 +1227,8 @@ byte-compiled files do not interfere with the reload."
         doom-modeline-minor-modes nil
         doom-modeline-major-mode-icon t
         doom-modeline-icon t
+        doom-modeline-modal t              ; add this
+        doom-modeline-modal-icon t         ; add this
         doom-modeline-buffer-file-name-style 'relative-from-project)
   :config
   (setq doom-modeline-height 25
@@ -1639,8 +1641,7 @@ and sets up vim-style navigation."
   (setq dashboard-startup-banner 'logo)
   (setq dashboard-items '((recents   . 10)
                          (bookmarks . 3)
-                         (projects  . 6)
-                         (agenda    . 5)))
+                         (projects  . 6)))
 
   ;; CRITICAL: Close org files after reading them for agenda
   (setq dashboard-agenda-release-buffers t)
@@ -2395,7 +2396,7 @@ trigger a context switch. All other projects simply stay on global context."
 #+begin_src emacs-lisp
 (defun ar/org-font-setup ()
   ;; Replace list hyphen with dot
-  (font-lock-add-keywords 'org-mode
+  (font-lock-add-keywords nil
                           '(("^ *\\([-]\\) "
                              (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
 
@@ -3648,7 +3649,6 @@ rather than the newly created Zettel note. Fixed by creating the note with
                         (org-super-agenda-groups
                          '((:auto-priority t))))))))))
 #+end_src
-
 
 * Workflow Management
 ** Dired
