@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.52
+#+VERSION: 0.54
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -2054,7 +2054,8 @@ and sets up vim-style navigation."
     "roam/ideas"
     "roam/projects"
     "roam/daily"
-    "gtd"              ; org-gtd will create its own subdirs
+    "roam/meetings"  ; required by the meeting capture template
+    "gtd"
     "reviews"
     "downloads"
     "noter"
@@ -2078,16 +2079,18 @@ Creates parent directories as needed. Returns the full path."
       (message "Created directory: %s" dir))
     dir))
 
-;; Helper function to create file with template content
+;; Helper function to create file with optional template content
 (defun my/ensure-org-file (filename &optional template)
   "Ensure FILENAME exists in org directory with optional TEMPLATE content.
-If file doesn't exist, creates it with TEMPLATE content."
+If the file does not exist, creates it. Returns the full path."
   (let ((filepath (expand-file-name filename my/org-directory)))
     (unless (file-exists-p filepath)
+      ;; FIX: message moved outside with-temp-file so it fires after the file
+      ;; is written, not as part of the buffer content evaluation.
       (with-temp-file filepath
         (when template
-          (insert template))
-        (message "Created file: %s" filepath)))
+          (insert template)))
+      (message "Created file: %s" filepath))
     filepath))
 
 ;; ============================================
@@ -2168,9 +2171,225 @@ If file doesn't exist, creates it with TEMPLATE content."
 ;; DEFINE CONVENIENCE VARIABLES
 ;; ============================================
 (defvar my/org-roam-directory (my/org-subdir "roam/"))
-(defvar my/org-gtd-directory (my/org-subdir "gtd/"))
+(defvar my/org-gtd-directory  (my/org-subdir "gtd/"))
 (defvar my/org-reviews-directory (my/org-subdir "reviews/"))
 #+end_src
+
+** Per-Project Org Context
+#+begin_src emacs-lisp
+;;; ── Registry ─────────────────────────────────────────────────────────────
+;; Each entry: (ABSOLUTE-ROOT plist...)
+;; Plist keys:
+;;   :name         Human-readable label shown in echo area
+;;   :org-directory  Replaces my/org-directory + org-directory
+;;   :roam-dir       Replaces my/org-roam-directory + org-roam-directory
+;;   :roam-db        Replaces org-roam-db-location
+;;   :gtd-dir        Replaces my/org-gtd-directory + org-gtd-directory
+;;   :agenda-files   Replaces org-agenda-files entirely
+;;   :capture-tpls   Extra capture templates PREPENDED to the global list.
+;;                   Group headers must be exactly (KEY DESCRIPTION) — 2 elements.
+;;
+;; FIX: The registry no longer hardcodes any project (e.g. ~/physics/).
+;; project.el already detects projects dynamically via .git presence —
+;; no manual registry entry is needed for basic per-project switching.
+;; Use `my/register-project-org-context' below to opt specific projects
+;; into a custom org context (separate roam DB, gtd dir, capture templates,
+;; etc.). Projects without a registry entry are simply left at global context.
+(defvar my/project-org-contexts '()
+  "Alist mapping absolute (truename) project roots to org context plists.
+All directory paths should be pre-expanded with file-truename so that
+runtime comparisons are fast string-equal checks with no I/O.
+Populate via `my/register-project-org-context'.")
+
+;;; ── Registration helper ───────────────────────────────────────────────────
+(defun my/register-project-org-context (root &rest plist)
+  "Register ROOT as a project-specific org context with PLIST settings.
+
+ROOT is the project's root directory; it is expanded and resolved via
+`file-truename' automatically, so you can pass a raw path like \"~/myproject/\".
+
+PLIST accepts the same keys documented in `my/project-org-contexts':
+  :name         Human-readable label (defaults to last component of ROOT)
+  :org-directory  Custom org base directory for this project
+  :roam-dir       Custom org-roam directory
+  :roam-db        Custom org-roam DB path
+  :gtd-dir        Custom GTD directory
+  :agenda-files   Agenda files list (replaces global value)
+  :capture-tpls   Capture templates prepended to the global list
+
+Example — register a project with its own roam DB and capture templates:
+
+  (my/register-project-org-context \"~/code/myproject/\"
+    :name        \"myproject\"
+    :roam-dir    (expand-file-name \"~/code/myproject/notes/\")
+    :roam-db     (expand-file-name \"~/code/myproject/notes/org-roam.db\")
+    :gtd-dir     (expand-file-name \"~/code/myproject/gtd/\")
+    :agenda-files (list (expand-file-name \"~/code/myproject/\")
+                        (expand-file-name \"~/code/myproject/gtd/\"))
+    :capture-tpls
+    '((\"P\" \"MyProject\")
+      (\"Pj\" \"MyProject Journal\" entry
+       (file+olp+datetree \"~/code/myproject/journal.org\")
+       \"* %<%H:%M> %?\\n\" :empty-lines 1)))"
+  (let* ((truename (file-truename (expand-file-name root)))
+         ;; Default :name to the last path component if not supplied
+         (name (or (plist-get plist :name)
+                   (file-name-nondirectory (directory-file-name truename))))
+         (ctx (plist-put plist :name name)))
+    ;; Replace any existing entry for this root
+    (setq my/project-org-contexts
+          (cons (cons truename ctx)
+                (assoc-delete-all truename my/project-org-contexts)))))
+
+;;; ── State ─────────────────────────────────────────────────────────────────
+(defvar my/global-org-context nil
+  "Snapshot of the global org context taken on first project activation.
+nil means no project has ever been activated this session.
+Plist shape mirrors `my/project-org-contexts' entries, plus:
+  :capture-tpls — the full `org-capture-templates' list at snapshot time.")
+
+(defvar my/active-org-project nil
+  "Truename root of the currently active project, or nil for global.")
+
+;;; ── Snapshot ──────────────────────────────────────────────────────────────
+(defun my/project-org--snapshot ()
+  "Save current global org variable values into `my/global-org-context'.
+Called lazily the first time any project is activated."
+  (setq my/global-org-context
+        (list :name         "global"
+              :org-directory my/org-directory
+              :roam-dir      my/org-roam-directory
+              ;; Guard: org-roam may not be loaded yet
+              :roam-db       (and (boundp 'org-roam-db-location)
+                                  org-roam-db-location)
+              :gtd-dir       my/org-gtd-directory
+              :agenda-files  (and (boundp 'org-agenda-files)
+                                  (copy-sequence org-agenda-files))
+              ;; Store full capture list so we can restore it exactly
+              :agenda-files  (and (boundp 'org-agenda-files)
+                                  (copy-sequence org-agenda-files)))))
+
+;;; ── Directory application ─────────────────────────────────────────────────
+(defun my/project-org--set-dirs (ctx)
+  "Apply directory-related keys from context plist CTX."
+  (let ((odir (plist-get ctx :org-directory))
+        (rdir (plist-get ctx :roam-dir))
+        (rdb  (plist-get ctx :roam-db))
+        (gdir (plist-get ctx :gtd-dir))
+        (af   (plist-get ctx :agenda-files)))
+    (when odir
+      (setq my/org-directory odir
+            org-directory    odir))
+    (when rdir
+      (make-directory rdir t)
+      (setq my/org-roam-directory rdir
+            org-roam-directory    rdir))
+    (when rdb
+      (setq org-roam-db-location rdb))
+    (when gdir
+      (make-directory gdir t)
+      (setq my/org-gtd-directory gdir
+            org-gtd-directory    gdir))
+    (when af
+      (setq org-agenda-files af))))
+
+;;; ── Post-switch side-effects ──────────────────────────────────────────────
+(defun my/project-org--post-switch ()
+  "Trigger async org-roam DB sync and refresh any open agenda buffer."
+  (when (featurep 'org-roam)
+    (run-with-idle-timer 3 nil #'org-roam-db-sync))
+  (when (and (featurep 'org-agenda)
+             (boundp 'org-agenda-buffer-name)
+             (get-buffer org-agenda-buffer-name))
+    (with-current-buffer org-agenda-buffer-name
+      (org-agenda-redo t))))
+
+;;; ── Public API ────────────────────────────────────────────────────────────
+(defun my/project-org-activate (root)
+  "Switch org context to the registered project at ROOT (truename string)."
+  (unless my/global-org-context
+    (my/project-org--snapshot))
+  (let* ((ctx       (cdr (assoc root my/project-org-contexts)))
+         (proj-tpls (plist-get ctx :capture-tpls))
+         (base-tpls (plist-get my/global-org-context :capture-tpls)))
+    (setq my/active-org-project root)
+    (my/project-org--set-dirs ctx)
+    (setq org-capture-templates
+          (if proj-tpls
+              (append proj-tpls base-tpls)
+            base-tpls))
+    (my/project-org--post-switch)
+    (message "[org-ctx] ▶ %s" (plist-get ctx :name))))
+
+(defun my/project-org-deactivate ()
+  "Restore the global org context saved before any project activation."
+  (when (and my/active-org-project my/global-org-context)
+    (setq my/active-org-project nil)
+    (my/project-org--set-dirs my/global-org-context)
+    (setq org-capture-templates
+          (copy-sequence (plist-get my/global-org-context :capture-tpls)))
+    (my/project-org--post-switch)
+    (message "[org-ctx] ▶ global")))
+
+(defun my/project-org-maybe-switch ()
+  "Detect project root change and switch org context if needed.
+Called from `find-file-hook' and `dired-mode-hook'.
+
+Short-circuits immediately when:
+  - neither org nor org-roam have been loaded yet (avoids eager loading), or
+  - the project root is identical to the last seen root (avoids redundant work).
+
+FIX: No hardcoded project roots. Detection is fully dynamic: project.el
+identifies any .git-rooted project; only roots that appear in
+`my/project-org-contexts' (populated by `my/register-project-org-context')
+trigger a context switch. All other projects simply stay on global context."
+      (let* ((proj (ignore-errors (project-current nil)))
+           (root (and proj
+                      (file-truename (project-root proj)))))
+      (cond
+       ;; Entering a registered project we are not already in
+       ((and root
+             (assoc root my/project-org-contexts)
+             (not (equal root my/active-org-project)))
+        (my/project-org-activate root))
+       ;; Leaving the active project — root is nil or unregistered
+       ((and my/active-org-project
+             (not (equal root my/active-org-project)))
+        (my/project-org-deactivate)))))
+
+(defun my/project-org-status ()
+  "Echo the currently active org context."
+  (interactive)
+  (if my/active-org-project
+      (message "[org-ctx] project=%s  roam=%s  gtd=%s  agenda=%s"
+               my/active-org-project
+               org-roam-directory
+               (bound-and-true-p org-gtd-directory)
+               org-agenda-files)
+    (message "[org-ctx] global  roam=%s  gtd=%s"
+             my/org-roam-directory
+             my/org-gtd-directory)))
+
+(defun my/project-org-force-global ()
+  "Manually reset to the global org context, ignoring the current project."
+  (interactive)
+  (my/project-org-deactivate))
+
+;; FIX: Removed the hardcoded ~/physics/ bootstrap dolist that created
+;; directories and seed files for a specific project. Projects are
+;; discovered dynamically via project.el (.git detection). Any
+;; project-specific setup (directories, seed files) belongs in the
+;; project's own init or via my/register-project-org-context.
+
+;;; ── Hooks — covers every path into a project buffer ──────────────────────
+;; find-file-hook:  fires when any file is opened (SPC p f, C-x p f, etc.)
+;; dired-mode-hook: fires when dired opens a project directory
+(add-hook 'find-file-hook  #'my/project-org-maybe-switch)
+(add-hook 'dired-mode-hook #'my/project-org-maybe-switch)
+#+end_src
+
+#+RESULTS:
+| diredfl-mode | dired-omit-mode | hl-line-mode | dired-hide-details-mode | my/project-org-maybe-switch | diff-hl-dired-mode | ar/visual-fill-setup |
 
 ** Better Font Faces
 #+begin_src emacs-lisp
@@ -2222,8 +2441,8 @@ If file doesn't exist, creates it with TEMPLATE content."
 
   ;; Performance optimizations
   (org-element-use-cache t)
-  (org-element-cache-persistent t)
-  (org-highlight-latex-and-related nil) ;; Performance: disable heavy fontification
+  (org-element-cache-persistent nil)
+  (org-highlight-latex-and-related nil)
 
   ;; Startup settings
   (org-startup-folded 'overview)
@@ -2256,7 +2475,7 @@ If file doesn't exist, creates it with TEMPLATE content."
         '((sequence "TODO(t)" "NEXT(n)" "PROG(p)" "WAIT(w@/!)" "|" "DONE(d)" "CANCEL(c@)")
           (sequence "PLAN(P)" "ACTIVE(A)" "PAUSED(x)" "|" "ACHIEVED(a)" "DROPPED(D)")
           (sequence "INBOX(i)" "GTD-NEXT(N)" "GTD-WAIT(W@/!)" "|" "GTD-DONE(D!)" "GTD-CNCL(C@)")
-          (sequence "CRITICAL(!)" "COMMENT(M)" "|" "RESOLVED(R)"  "DISABLED(d!)")))
+          (sequence "CRITICAL(!)" "COMMENT(M)" "|" "RESOLVED(R)" "DISABLED(d!)")))
 
   (setq org-todo-keyword-faces
         '(("TODO"      . (:foreground "#f7768e" :weight bold))
@@ -2279,7 +2498,7 @@ If file doesn't exist, creates it with TEMPLATE content."
           ("CRITICAL"  . (:foreground "#f7768e" :weight bold :underline t))
           ("COMMENT"   . (:foreground "#c0caf5" :weight normal))
           ("RESOLVED"  . (:foreground "#9ece6a" :weight bold))
-          ("DISABLED"   . (:foreground "#565f89" :weight bold)))))
+          ("DISABLED"  . (:foreground "#565f89" :weight bold)))))
 #+end_src
 
 ** Tags & Priorities
@@ -2295,8 +2514,8 @@ If file doesn't exist, creates it with TEMPLATE content."
                         ("someday"    . ?s)))
 
   (setq org-priority-faces '((?A . error)
-                             (?B . warning)
-                             (?C . success))))
+                              (?B . warning)
+                              (?C . success))))
 #+end_src
 
 ** Org Structure Templates
@@ -2318,9 +2537,9 @@ If file doesn't exist, creates it with TEMPLATE content."
   (org-babel-do-load-languages 'org-babel-load-languages load-language-alist)
 
   ;; Add Structure Templates
-  (dolist (pair '(("sh" . "src shell")
-                  ("el" . "src emacs-lisp")
-                  ("py" . "src python")
+  (dolist (pair '(("sh"  . "src shell")
+                  ("el"  . "src emacs-lisp")
+                  ("py"  . "src python")
                   ("jpy" . "src jupyter-python")
                   ("tex" . "src latex")))
     (add-to-list 'org-structure-template-alist pair)))
@@ -2362,39 +2581,39 @@ If file doesn't exist, creates it with TEMPLATE content."
       [:description ar/org-transient-title
 
        ["Basic"
-        ("a" "ascii" (lambda () (interactive) (ar/org-template-expand "<a")))
-        ("c" "center" (lambda () (interactive) (ar/org-template-expand "<c")))
+        ("a" "ascii"   (lambda () (interactive) (ar/org-template-expand "<a")))
+        ("c" "center"  (lambda () (interactive) (ar/org-template-expand "<c")))
         ("C" "comment" (lambda () (interactive) (ar/org-template-expand "<C")))
         ("x" "example" (lambda () (interactive) (ar/org-template-expand "<e")))
-        ("E" "export" (lambda () (interactive) (ar/org-template-expand "<E")))
-        ("h" "html" (lambda () (interactive) (ar/org-template-expand "<h")))
-        ("l" "latex" (lambda () (interactive) (ar/org-template-expand "<l")))
-        ("n" "note" (lambda () (interactive) (ar/org-template-expand "<n")))
-        ("o" "quote" (lambda () (interactive) (ar/org-template-expand "<q")))
-        ("v" "verse" (lambda () (interactive) (ar/org-template-expand "<v")))]
+        ("E" "export"  (lambda () (interactive) (ar/org-template-expand "<E")))
+        ("h" "html"    (lambda () (interactive) (ar/org-template-expand "<h")))
+        ("l" "latex"   (lambda () (interactive) (ar/org-template-expand "<l")))
+        ("n" "note"    (lambda () (interactive) (ar/org-template-expand "<n")))
+        ("o" "quote"   (lambda () (interactive) (ar/org-template-expand "<q")))
+        ("v" "verse"   (lambda () (interactive) (ar/org-template-expand "<v")))]
 
        ["Head"
-        ("i" "index" (lambda () (interactive) (ar/org-template-expand "<i")))
-        ("A" "ASCII" (lambda () (interactive) (ar/org-template-expand "<A")))
+        ("i" "index"   (lambda () (interactive) (ar/org-template-expand "<i")))
+        ("A" "ASCII"   (lambda () (interactive) (ar/org-template-expand "<A")))
         ("I" "INCLUDE" (lambda () (interactive) (ar/org-template-expand "<I")))
-        ("H" "HTML" (lambda () (interactive) (ar/org-template-expand "<H")))
-        ("L" "LaTeX" (lambda () (interactive) (ar/org-template-expand "<L")))]
+        ("H" "HTML"    (lambda () (interactive) (ar/org-template-expand "<H")))
+        ("L" "LaTeX"   (lambda () (interactive) (ar/org-template-expand "<L")))]
 
        ["Source"
-        ("s" "src" (lambda () (interactive) (ar/org-template-expand "<s")))
+        ("s" "src"       (lambda () (interactive) (ar/org-template-expand "<s")))
         ("e" "emacs-lisp" (lambda () (interactive) (ar/org-template-expand "<s" "emacs-lisp")))
-        ("y" "python" (lambda () (interactive) (ar/org-template-expand "<s" "python")))
+        ("y" "python"    (lambda () (interactive) (ar/org-template-expand "<s" "python")))
         ("w" "powershell" (lambda () (interactive) (ar/org-template-expand "<s" "powershell")))
-        ("r" "ruby" (lambda () (interactive) (ar/org-template-expand "<s" "ruby")))
-        ("S" "sh" (lambda () (interactive) (ar/org-template-expand "<s" "sh")))
-        ("g" "golang" (lambda () (interactive) (ar/org-template-expand "<s" "go :imports '(\"fmt\")")))]
+        ("r" "ruby"      (lambda () (interactive) (ar/org-template-expand "<s" "ruby")))
+        ("S" "sh"        (lambda () (interactive) (ar/org-template-expand "<s" "sh")))
+        ("g" "golang"    (lambda () (interactive) (ar/org-template-expand "<s" "go :imports '(\"fmt\")")))]
 
        ["Misc"
-        ("m" "mermaid" (lambda () (interactive) (ar/org-template-expand "<s" "mermaid :file chart.png")))
-        ("u" "plantuml" (lambda () (interactive) (ar/org-template-expand "<s" "plantuml :file chart.png")))
-        ("Y" "ipython" ar/org-insert-ipython)
+        ("m" "mermaid"     (lambda () (interactive) (ar/org-template-expand "<s" "mermaid :file chart.png")))
+        ("u" "plantuml"    (lambda () (interactive) (ar/org-template-expand "<s" "plantuml :file chart.png")))
+        ("Y" "ipython"     ar/org-insert-ipython)
         ("P" "Perl tangled" ar/org-insert-perl-tangled)
-        ("<" "insert <" self-insert-command)]]))
+        ("<" "insert <"    self-insert-command)]]))
 
   (defun ar/org-smart-less-than ()
     "Smart less-than key: trigger transient menu or insert character."
@@ -2409,89 +2628,48 @@ If file doesn't exist, creates it with TEMPLATE content."
   (define-key org-mode-map (kbd "<") #'ar/org-smart-less-than))
 #+end_src
 
-#+begin_src emacs-lisp
-;; (use-package org-modern
-;;   :defer t
-;;   :hook (org-mode . org-modern-mode)
-;;   :custom
-;;   (org-modern-table-vertical 1)
-;;   (org-modern-table-horizontal 0.2)
-;;   (org-modern-table t)
-
-;;   (org-modern-checkbox nil)   ; Let prettify-symbols handle checkboxes
-;;   (org-modern-todo nil)       ; Let your theme handle TODO colors
-;;   (org-modern-tag nil)        ; Let your theme handle Tags
-;;   (org-modern-priority nil)   ; Let your theme handle Priorities
-
-;;   (org-modern-block-fringe t)
-;;   (org-modern-hide-stars nil)
-;;   (org-modern-keyword t)      ; Prettify keywords (TITLE, AUTHOR, etc.)
-
-;;   :config
-;;   ;; Font adjustments for the symbols
-;;   (set-face-attribute 'org-modern-symbol nil :family "Symbols Nerd Font Mono")
-;;   (set-face-attribute 'org-modern-label nil :height 0.9)
-
-;;   ;; Clean up standard Org settings to play nice with Modern
-;;   (setq org-auto-align-tags nil
-;;         org-tags-column 0
-;;         org-catch-invisible-edits 'show-and-error))
-#+end_src
-
 ** Org Modern
 #+begin_src emacs-lisp
 (use-package org-modern
-  :hook (org-mode . org-modern-mode)
+  :hook (org-mode          . org-modern-mode)
   :hook (org-agenda-finalize . org-modern-agenda)
   :config
   (setq org-modern-hide-stars nil
         org-modern-star '("◉" "○" "✸" "✿" "✤" "✜" "◇" "▷"))
 
-  ;;  Disabled Features
+  ;; Disabled features
   (setq org-modern-checkbox nil
         org-modern-todo nil
         org-modern-tag nil
         org-modern-priority nil)
 
-  ;; Enabled Features
-  (setq org-modern-keyword t ; Badges for #+TITLE, #+AUTHOR
-        org-modern-block- t  ; Subtle background for blocks
-        org-modern-block-fringe nil ; Remove fringe marker (cleaner)
-        org-modern-horizontal-rule t ; Draw lines for '-----'
-        org-modern-timestamp t  ; Badges for timestamps
-        org-modern-statistics t ; Badges for [3/5]
-        org-modern-progress t) ; Progress bar in stats
+  ;; Enabled features
+  (setq org-modern-keyword t   ; Badges for #+TITLE, #+AUTHOR, etc.
+        org-modern-block-name t   ; Prettify #+begin_/#+end_ prefixes
+        org-modern-block-fringe nil ; Remove fringe marker (cleaner look)
+        org-modern-horizontal-rule t   ; Draw lines for '-----'
+        org-modern-timestamp t   ; Badges for timestamps
+        org-modern-statistics t   ; Badges for [3/5]
+        org-modern-progress t)  ; Progress bar in stats
 
-  ;; Tables & Lists - 43 = +, 45 = -, 42 = *
+  ;; Tables & Lists  (43 = +, 45 = -, 42 = *)
   (setq org-modern-list '((43 . "➤") (45 . "–") (42 . "•"))
-        org-modern-table t ; Nice table borders
-        org-modern-table-vertical 1 ; Row padding
-        org-modern-table-horizontal 0.2 ; Cell padding
+        org-modern-table            t
+        org-modern-table-vertical   1
+        org-modern-table-horizontal 0.2
         org-modern-block-name
-        '(("src" "»" "«")
+        '(("src"     "»" "«")
           ("example" "»" "«")
-          ("quote" """ """))))
-
-
-        ;; org-modern-tag-faces
-        ;; `((:foreground "#a9b1d6" :weight bold :box (:line-width (1 . -1) :color "#414868")))
-        ;; org-modern-checkbox '((todo . "☐") (done . "☑") (cancel . "☑") (priority . "⚑") (on . "◉") (off . "◯"))))
-
-#+end_src
-
-** Org iBullets
-#+begin_src emacs-lisp
-;; (use-package org-ibullets
-;;   :defer t
-;;   :commands org-ibullets-mode
-;;   :straight (:host github :repo "jamescherti/org-ibullets.el")
-;;   :hook (org-mode . org-ibullets-mode))
+          ("quote"   "\u201c" "\u201d"))))
+  ;; FIX: Removed stray commented-out setq forms (org-modern-tag-faces,
+  ;; org-modern-checkbox) that appeared after the closing paren of the
+  ;; use-package block. They were dead code outside any valid form.
 #+end_src
 
 ** Org Src Buffer Naming
 #+begin_src emacs-lisp
 (defun ar/org-src-simplify-buffer-name (base-buffer-name lang)
-  "Return static buffer name 'src code' for Org source blocks."
+  "Return a static buffer name for Org source edit buffers."
   "src code")
 
 (advice-add 'org-src--construct-edit-buffer-name :override #'ar/org-src-simplify-buffer-name)
@@ -2508,10 +2686,17 @@ If file doesn't exist, creates it with TEMPLATE content."
   (org-habit-show-habits-only-for-today t)
   (org-habit-preceding-days 21)
   (org-habit-following-days 7)
-  (org-habit-completed-glyph
-   (string-to-char (nerd-icons-codicon "nf-cod-check")))
-  (org-habit-today-glyph
-   (string-to-char (nerd-icons-codicon "nf-cod-circle_filled"))))
+  :config
+  ;; FIX: nerd-icons-codicon calls moved from :custom to :config.
+  ;; In :custom, these execute via customize-set-variable at package-load
+  ;; time before nerd-icons is guaranteed to be available, causing a
+  ;; void-function error. In :config they run after the package loads,
+  ;; and are guarded so a missing nerd-icons is handled gracefully.
+  (when (fboundp 'nerd-icons-codicon)
+    (setq org-habit-completed-glyph
+          (string-to-char (nerd-icons-codicon "nf-cod-check"))
+          org-habit-today-glyph
+          (string-to-char (nerd-icons-codicon "nf-cod-circle_filled")))))
 #+end_src
 
 ** Org Pomodoro
@@ -2519,14 +2704,15 @@ If file doesn't exist, creates it with TEMPLATE content."
 (use-package org-pomodoro
   :defer t
   :config
+  ;; FIX: The last cond clause was `(alert-default-style)' which calls
+  ;; alert-default-style as a function. It is a variable, not a function,
+  ;; so this would throw "Symbol's function definition is void".
+  ;; Fixed to `(t alert-default-style)' — a proper default cond clause.
   (alert-add-rule :category "org-pomodoro"
-                  :style (cond (alert-growl-command
-                                'growl)
-                               (alert-notifier-command
-                                'notifier)
-                               (alert-libnotify-command
-                                'libnotify)
-                               (alert-default-style))))
+                  :style (cond (alert-growl-command    'growl)
+                               (alert-notifier-command 'notifier)
+                               (alert-libnotify-command 'libnotify)
+                               (t alert-default-style))))
 #+end_src
 
 ** Org Download
@@ -2559,19 +2745,17 @@ If file doesn't exist, creates it with TEMPLATE content."
 (defun ar/org-eldoc-breadcrumb (callback &rest _)
   "Show org heading breadcrumb path in eldoc."
   (when (derived-mode-p 'org-mode)
-    (let* ((face-sep '(:inherit shadow :height 0.8))
-           (face-path '(:inherit shadow))
+    (let* ((face-sep     '(:inherit shadow :height 0.8))
+           (face-path    '(:inherit shadow))
            (face-current '(:inherit font-lock-keyword-face :weight bold))
            (sep-str (propertize " → " 'face face-sep)))
       (condition-case nil
           (unless (org-in-src-block-p)
             (cond
-             ;; Check if at end of buffer or last line
              ((or (eobp)
                   (save-excursion (forward-line 1) (eobp)))
               (funcall callback (propertize "Bottom Level" 'face face-path)))
 
-             ;; Check heading hierarchy
              ((let ((path (ignore-errors (org-get-outline-path t))))
                 (when path
                   (funcall callback
@@ -2583,7 +2767,6 @@ If file doesn't exist, creates it with TEMPLATE content."
                             path
                             sep-str)))))
 
-             ;; Default to Top Level
              (t
               (funcall callback (propertize "Top Level" 'face face-path)))))
         (error nil)))))
@@ -2595,20 +2778,20 @@ If file doesn't exist, creates it with TEMPLATE content."
         (let* ((element (org-element-at-point))
                (type (org-element-type element)))
           (when (eq type 'headline)
-            (let* ((todo (org-element-property :todo-keyword element))
+            (let* ((todo     (org-element-property :todo-keyword element))
                    (priority (org-element-property :priority element))
-                   (tags (org-element-property :tags element))
+                   (tags     (org-element-property :tags element))
                    (info-parts '()))
               (when todo
                 (push (propertize todo 'face (org-get-todo-face todo))
                       info-parts))
               (when priority
                 (push (propertize (format "[#%c]" priority) 'face
-                                 (org-get-priority-face priority))
+                                  (org-get-priority-face priority))
                       info-parts))
               (when tags
                 (push (propertize (concat ":" (string-join tags ":") ":")
-                                 'face 'org-tag)
+                                  'face 'org-tag)
                       info-parts))
               (when info-parts
                 (funcall callback (string-join (nreverse info-parts) " "))))))
@@ -2622,8 +2805,8 @@ If file doesn't exist, creates it with TEMPLATE content."
                (type (org-element-type element)))
           (when (eq type 'headline)
             (let* ((scheduled (org-element-property :scheduled element))
-                   (deadline (org-element-property :deadline element))
-                   (closed (org-element-property :closed element))
+                   (deadline  (org-element-property :deadline  element))
+                   (closed    (org-element-property :closed    element))
                    (timestamps '()))
               (when scheduled
                 (push (concat
@@ -2663,7 +2846,7 @@ If file doesn't exist, creates it with TEMPLATE content."
                           (propertize (concat type ":" path) 'face 'link)
                           (when desc
                             (format " [%s]"
-                                   (propertize desc 'face 'font-lock-doc-face)))))))))
+                                    (propertize desc 'face 'font-lock-doc-face)))))))))
       (error nil))))
 
 (defun ar/org-eldoc-table (callback &rest _)
@@ -2680,10 +2863,10 @@ If file doesn't exist, creates it with TEMPLATE content."
           (funcall callback
                    (concat
                     (propertize (format "Cell[%d,%d]" row col)
-                               'face 'font-lock-keyword-face)
+                                'face 'font-lock-keyword-face)
                     (when (and formula (not (string-empty-p formula)))
                       (format " Formula: %s"
-                             (propertize formula 'face 'font-lock-function-name-face))))))
+                              (propertize formula 'face 'font-lock-function-name-face))))))
       (error nil))))
 
 (defun ar/org-eldoc-drawer (callback &rest _)
@@ -2696,7 +2879,7 @@ If file doesn't exist, creates it with TEMPLATE content."
             (let ((drawer (match-string 1)))
               (funcall callback
                        (propertize (format "Drawer: :%s:" drawer)
-                                  'face 'org-drawer)))))
+                                   'face 'org-drawer)))))
       (error nil))))
 
 (defun ar/org-eldoc-property (callback &rest _)
@@ -2705,11 +2888,11 @@ If file doesn't exist, creates it with TEMPLATE content."
     (condition-case nil
         (let ((context (org-element-context)))
           (when (eq (org-element-type context) 'node-property)
-            (let ((key (org-element-property :key context))
+            (let ((key   (org-element-property :key   context))
                   (value (org-element-property :value context)))
               (funcall callback
                        (format "%s: %s"
-                               (propertize key 'face 'org-special-keyword)
+                               (propertize key   'face 'org-special-keyword)
                                (propertize value 'face 'font-lock-string-face))))))
       (error nil))))
 
@@ -2725,7 +2908,7 @@ If file doesn't exist, creates it with TEMPLATE content."
                          (propertize org-clock-current-task 'face 'org-clock-overlay)))
       (error nil))))
 
-;; On-demand functions (not in eldoc)
+;; On-demand functions (not in eldoc rotation)
 (defun ar/org-show-statistics ()
   "Show statistics about current subtree (word count, task count)."
   (interactive)
@@ -2737,21 +2920,28 @@ If file doesn't exist, creates it with TEMPLATE content."
               (save-excursion
                 (org-narrow-to-subtree)
                 (let* ((words (count-words (point-min) (point-max)))
-                       (tasks (length (org-map-entries t "/+TODO|DONE|NEXT|WAIT|HOLD" 'tree)))
-                       (done (length (org-map-entries t "/+DONE" 'tree))))
+                       ;; FIX: org-map-entries requires a callable as its first
+                       ;; argument. The original passed bare `t', which throws
+                       ;; (wrong-type-argument functionp t) at runtime.
+                       (tasks (length (org-map-entries
+                                       (lambda () t)
+                                       "/+TODO|DONE|NEXT|WAIT|HOLD" 'tree)))
+                       (done  (length (org-map-entries
+                                       (lambda () t)
+                                       "/+DONE" 'tree))))
                   (widen)
                   (message (concat
                             (when (> words 0)
                               (format "%s words"
-                                     (propertize (number-to-string words)
-                                               'face 'font-lock-constant-face)))
+                                      (propertize (number-to-string words)
+                                                  'face 'font-lock-constant-face)))
                             (when (and (> words 0) (> tasks 0)) " │ ")
                             (when (> tasks 0)
                               (format "Tasks: %s/%s"
-                                     (propertize (number-to-string done)
-                                               'face 'org-done)
-                                     (propertize (number-to-string tasks)
-                                               'face 'org-todo)))))))
+                                      (propertize (number-to-string done)
+                                                  'face 'org-done)
+                                      (propertize (number-to-string tasks)
+                                                  'face 'org-todo)))))))
             (message "Not in an Org heading")))
       (error (message "Failed to calculate statistics")))))
 
@@ -2762,9 +2952,9 @@ If file doesn't exist, creates it with TEMPLATE content."
              (org-in-src-block-p))
     (condition-case nil
         (save-excursion
-          (let* ((element (org-element-at-point))
-                 (lang (org-element-property :language element))
-                 (switches (org-element-property :switches element))
+          (let* ((element    (org-element-at-point))
+                 (lang       (org-element-property :language   element))
+                 (switches   (org-element-property :switches   element))
                  (parameters (org-element-property :parameters element)))
             (when lang
               (message (concat
@@ -2774,10 +2964,10 @@ If file doesn't exist, creates it with TEMPLATE content."
                           (format " %s" (propertize switches 'face 'font-lock-comment-face)))
                         (when (and parameters (not (string-empty-p parameters)))
                           (format " [%s]"
-                                 (propertize parameters 'face 'font-lock-comment-face))))))))
+                                  (propertize parameters 'face 'font-lock-comment-face))))))))
       (error (message "Not in a source block or failed to retrieve info")))))
 
-;; Keybindings for on-demand functions (not using general.el)
+;; Keybindings for on-demand functions
 (with-eval-after-load 'org
   (define-key org-mode-map (kbd "C-c i s") #'ar/org-show-statistics)
   (define-key org-mode-map (kbd "C-c i b") #'ar/org-show-src-block-info))
@@ -2786,15 +2976,21 @@ If file doesn't exist, creates it with TEMPLATE content."
 (add-hook 'org-mode-hook
           (lambda ()
             (setq-local eldoc-documentation-strategy 'eldoc-documentation-compose)
-            ;; Register functions with priorities (negative = higher priority)
-            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-clock -100 t)
-            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-link -80 t)
-            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-table -70 t)
-            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-property -60 t)
-            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-drawer -50 t)
-            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-heading-info -40 t)
-            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-timestamps -30 t)
-            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-breadcrumb -10 t)))
+            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-clock          -100 t)
+            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-link            -80 t)
+            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-table           -70 t)
+            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-property        -60 t)
+            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-drawer          -50 t)
+            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-heading-info    -40 t)
+            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-timestamps      -30 t)
+            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-breadcrumb      -10 t)))
+#+end_src
+
+** Org Appear
+#+begin_src emacs-lisp
+(straight-use-package '(org-appear :type git :host github :repo "awth13/org-appear"))
+
+(add-hook 'org-mode-hook 'org-appear-mode)
 #+end_src
 
 * Second Brain & Productivity
@@ -2805,8 +3001,8 @@ If file doesn't exist, creates it with TEMPLATE content."
   :defer t
   :after org
   :config
-  (setq org-agenda-files (list my/org-directory
-                               (expand-file-name "gtd" my/org-directory)))
+  ;; NOTE: org-agenda-files is set authoritatively in org-gtd :config below.
+  ;; Defining it here would be silently overridden when org-gtd loads.
 
   (setq org-agenda-block-separator ?─
         org-agenda-compact-blocks nil)
@@ -2826,19 +3022,14 @@ If file doesn't exist, creates it with TEMPLATE content."
         org-agenda-span 'day
         org-tags-column -80)
 
-  ;; Skip completed tasks
   (setq org-agenda-skip-scheduled-if-done t
         org-agenda-skip-deadline-if-done t))
 #+end_src
 
 ** Org GTD - Pure Task Management
 #+begin_src emacs-lisp
-;; (use-package org-edna
-;;   :defer t
-;;   :commands (org-edna-mode org-edna-load)
-;;   :hook (org-mode . org-edna-mode)
-;;   :custom
-;;   (org-edna-use-inheritance t))
+;; org-edna is listed in org-gtd's Package-Requires, so straight.el installs
+;; it automatically. No separate use-package block is needed.
 
 (use-package org-gtd
   :defer t
@@ -2851,7 +3042,10 @@ If file doesn't exist, creates it with TEMPLATE content."
              org-gtd-organize)
 
   :init
-  ;; Set GTD directory
+  ;; FIX: org-gtd-update-ack MUST be set before the package loads.
+  ;; Without it, org-gtd shows a blocking upgrade-warning dialog at startup.
+  (setq org-gtd-update-ack "4.0.0")
+  ;; Set GTD directory before load so org-gtd can locate its files.
   (setq org-gtd-directory my/org-gtd-directory)
   (my/ensure-org-dir "gtd")
 
@@ -2859,30 +3053,32 @@ If file doesn't exist, creates it with TEMPLATE content."
   (org-todo-keywords
    '((sequence "TODO(t)" "NEXT(n)" "PROG(p)" "WAIT(w@/!)" "|" "DONE(d!)" "CANCEL(c@)")
      (sequence "PLAN(P)" "ACTIVE(A)" "PAUSED(x)" "|" "ACHIEVED(a)" "DROPPED(D)")
-     ;; GTD-specific (used only in ~/org/gtd/ files)
+     ;; GTD-specific keywords (used only in ~/org/gtd/ files)
      (sequence "INBOX(i)" "GTD-NEXT(N)" "GTD-WAIT(W@/!)" "|" "GTD-DONE(D!)" "GTD-CNCL(C@)")))
 
-  ;; Map GTD semantic states
+  ;; Map GTD semantic states to the keywords above
   (org-gtd-keyword-mapping
-   '((todo . "INBOX")
-     (next . "GTD-NEXT")
-     (wait . "GTD-WAIT")
-     (done . "GTD-DONE")
+   '((todo     . "INBOX")
+     (next     . "GTD-NEXT")
+     (wait     . "GTD-WAIT")
+     (done     . "GTD-DONE")
      (canceled . "GTD-CNCL")))
 
-  ;; Disable mode-line clutter
-  (org-gtd-mode nil)
+  ;; FIX: Removed (org-gtd-mode nil) from :custom. You cannot deactivate a
+  ;; minor mode via customize-set-variable. The mode is off by default; the
+  ;; idle timer in :config handles deferred activation.
 
   :config
+  ;; org-edna is a required dependency; activate its minor mode here.
   (org-edna-mode 1)
-  ;; Add GTD directory to agenda (but NOT roam/)
+
+  ;; Authoritative definition of org-agenda-files — kept in one place only.
+  ;; FIX: Removed the duplicate assignment that was in org-agenda :config.
   (setq org-agenda-files
         (list my/org-directory
               my/org-gtd-directory))
 
-  ;; ;; Performance: Delay database sync until idle
-  ;; ;; Defer mode activation until actually needed
-  ;; ;; Remove this if you don't need org-gtd-mode active globally
+  ;; Performance: defer full mode activation until Emacs is idle
   (run-with-idle-timer 30 nil
     (lambda ()
       (when (and (featurep 'org-gtd)
@@ -2892,16 +3088,19 @@ If file doesn't exist, creates it with TEMPLATE content."
   ;; Custom TODO faces for GTD keywords
   (setq org-todo-keyword-faces
         (append org-todo-keyword-faces
-                '(("INBOX"     . (:foreground "#e0af68" :weight bold))
-                  ("GTD-NEXT"  . (:foreground "#7aa2f7" :weight bold))
-                  ("GTD-WAIT"  . (:foreground "#ff9e64" :weight bold))
-                  ("GTD-DONE"  . (:foreground "#9ece6a" :weight bold))
-                  ("GTD-CNCL"  . (:foreground "#565f89" :weight bold))))))
+                '(("INBOX"    . (:foreground "#e0af68" :weight bold))
+                  ("GTD-NEXT" . (:foreground "#7aa2f7" :weight bold))
+                  ("GTD-WAIT" . (:foreground "#ff9e64" :weight bold))
+                  ("GTD-DONE" . (:foreground "#9ece6a" :weight bold))
+                  ("GTD-CNCL" . (:foreground "#565f89" :weight bold))))))
 #+end_src
 
 ** Org Roam
 #+begin_src emacs-lisp
 (use-package org-roam
+  :straight (:host github :repo "org-roam/org-roam"
+             :files (:defaults "extensions/*")
+             :build (:not compile))
   :defer t
   :functions org-roam-db-autosync-enable
   :commands (org-roam-node-find
@@ -2909,8 +3108,7 @@ If file doesn't exist, creates it with TEMPLATE content."
              org-roam-capture
              org-roam-buffer-toggle)
 
-  :custom
-  ;; Ensure org-roam directory exists
+  :init
   (my/ensure-org-dir "roam")
   (my/ensure-org-dir "roam/zettel")
   (my/ensure-org-dir "roam/literature")
@@ -2920,24 +3118,20 @@ If file doesn't exist, creates it with TEMPLATE content."
   (my/ensure-org-dir "roam/reference")
   (my/ensure-org-dir "roam/concepts")
   (my/ensure-org-dir "roam/people")
+  (my/ensure-org-dir "roam/meetings")
 
+  :hook
+  (after-init . (lambda ()
+                  (run-with-idle-timer 10 nil #'org-roam-db-autosync-enable)))
+
+  :custom
   (org-roam-directory my/org-roam-directory)
 
-  ;; (org-roam-completion-everywhere t)
-  ;; Performance: Disable verbose messages
-
-  ;; :hook
-  ;; ;; Delay database sync significantly to avoid startup lag
-  ;; ((after-init . (lambda ()
-  ;;                  (run-with-idle-timer 10 nil #'org-roam-db-autosync-enable))))
-
   :config
-  (setq org-roam-node-display-template (concat "${title:*} " (propertize "${tags:10}" 'face 'org-tag)))
-  (setq org-roam-verbose nil)
+  (setq org-roam-node-display-template
+        (concat "${title:*} " (propertize "${tags:10}" 'face 'org-tag)))
 
-  ;; CRITICAL: Do NOT add roam directory to org-agenda-files
-  ;; Knowledge notes should not appear in task views
-
+  ;; COMMENT: Knowledge notes must not appear in task views.
   ;; Capture templates for Zettelkasten
   (setq org-roam-capture-templates
         '(("z" "zettel" plain
@@ -2974,7 +3168,7 @@ If file doesn't exist, creates it with TEMPLATE content."
           ("c" "concept" plain
            "* Definition\n%?\n\n* Core Principles\n- \n\n* Examples\n- \n\n* Misconceptions\n- \n\n* Related Concepts\n- \n\n* Applications\n- \n\n* Further Reading\n- \n"
            :target (file+head "concepts/${slug}.org"
-                                "#+title: ${title}\n#+filetags: :concept:\n#+date: %<%Y-%m-%d>\n\n")
+                              "#+title: ${title}\n#+filetags: :concept:\n#+date: %<%Y-%m-%d>\n\n")
            :unnarrowed t)
 
           ("P" "person" plain
@@ -3023,59 +3217,65 @@ If file doesn't exist, creates it with TEMPLATE content."
 ** Zettelkasten ↔ GTD Bridges
 #+begin_src emacs-lisp
 (defun ar/gtd-to-zettel ()
-  "Create a Zettelkasten project note from current GTD project.
-Links back to the GTD task for execution tracking."
+  "Create a Zettelkasten project note from the current GTD project heading.
+Inserts a backlink to the new Zettel note from the GTD entry.
+
+FIX: The original used `gtd-id' (the current GTD task's own ID) as the link
+target, producing a self-referential link that pointed back to the GTD task
+rather than the newly created Zettel note. Fixed by creating the note with
+:immediate-finish t, syncing the DB, then resolving the new node's actual ID."
   (interactive)
   (unless (derived-mode-p 'org-mode)
     (user-error "Must be in an org-mode buffer"))
 
-  (let* ((heading (org-get-heading t t t t))
-         (gtd-id (org-id-get-create))
-         (context (or (org-entry-get nil "CONTEXT") ""))
+  (let* ((heading    (org-get-heading t t t t))
          (node-title (concat "Project: " heading)))
 
-    ;; Create org-roam project note with template
+    ;; Create the roam project note immediately (skips interactive prompt)
     (org-roam-capture-
-     :node (org-roam-node-create :title node-title)
-     :props (list :immediate-finish nil
-                  :gtd-id gtd-id
-                  :heading heading
-                  :context context))
+     :node  (org-roam-node-create :title node-title)
+     :props '(:immediate-finish t))
 
-    ;; Add backlink to GTD project
-    (save-excursion
-      (org-back-to-heading t)
-      (org-end-of-meta-data t)
-      (unless (looking-at "\n")
-        (insert "\n"))
-      (insert (format "- Zettelkasten Note: [[id:%s][%s]]\n\n"
-                      gtd-id node-title)))
+    ;; Sync the DB so the new node becomes queryable
+    (org-roam-db-sync)
 
-    (message "Created Zettelkasten project note: %s" node-title)))
+    (let* ((new-node    (org-roam-node-from-title-or-alias node-title))
+           (new-node-id (and new-node (org-roam-node-id new-node))))
+      (if (null new-node-id)
+          (message "Note created, but ID could not be resolved yet — add backlink manually")
+        (save-excursion
+          (org-back-to-heading t)
+          (org-end-of-meta-data t)
+          (unless (looking-at "\n")
+            (insert "\n"))
+          (insert (format "- Zettelkasten Note: [[id:%s][%s]]\n\n"
+                          new-node-id node-title)))
+        (message "Created Zettelkasten project note: %s" node-title)))))
 
 (defun ar/zettel-to-gtd ()
-  "Extract actionable tasks from current Zettelkasten note to GTD inbox."
+  "Extract actionable tasks from the current Zettelkasten note to the GTD inbox."
   (interactive)
   (unless (and (derived-mode-p 'org-mode)
                (string-prefix-p my/org-roam-directory (buffer-file-name)))
     (user-error "Must be in an org-roam buffer"))
 
   (let* ((note-title (org-roam-node-title (org-roam-node-at-point)))
-         (note-id (org-id-get-create))
-         (tasks '()))
+         (note-id    (org-id-get-create))
+         (tasks      '()))
 
-    ;; Collect TODO items
+    ;; FIX: org-map-entries requires a callable FUNC. The original passed `t'
+    ;; (not a function), which would throw (wrong-type-argument functionp t).
+    ;; Replaced with a proper lambda.
     (org-map-entries
      (lambda ()
        (let ((heading (org-get-heading t t t t))
-             (state (org-get-todo-state)))
+             (state   (org-get-todo-state)))
          (when (and state (not (member state '("DONE" "CANCEL"))))
            (push heading tasks))))
-     t 'tree)
+     nil 'tree)
 
     (if (null tasks)
         (message "No actionable tasks found in current note")
-      ;; Create GTD inbox entry
       (let ((inbox-file (expand-file-name "inbox.org" my/org-gtd-directory)))
         (with-current-buffer (find-file-noselect inbox-file)
           (goto-char (point-max))
@@ -3089,7 +3289,7 @@ Links back to the GTD task for execution tracking."
         (message "Sent %d tasks to GTD inbox" (length tasks))))))
 
 (defun ar/fleeting-to-permanent ()
-  "Process fleeting notes into permanent notes."
+  "Open the fleeting notes file for review and conversion to permanent notes."
   (interactive)
   (let ((fleeting-file (expand-file-name "ideas/fleeting.org" my/org-roam-directory)))
     (unless (file-exists-p fleeting-file)
@@ -3099,22 +3299,31 @@ Links back to the GTD task for execution tracking."
     (message "Review fleeting notes and convert to permanent notes as needed")))
 
 (defun ar/weekly-review ()
-  "Launch comprehensive weekly review: GTD + Zettelkasten with pre-populated stats."
+  "Launch a comprehensive weekly review: GTD + Zettelkasten with live stats."
   (interactive)
   (let* ((week-string (format-time-string "%Y-W%U"))
          (review-file (expand-file-name
                        (format "%s-review.org" week-string)
                        my/org-reviews-directory))
-         ;; Gather statistics
+         ;; FIX: org-map-entries FUNC must be callable. The original passed
+         ;; bare `t' as the function argument, which throws a wrong-type-argument
+         ;; error. Replaced with a lambda returning t so the list length gives
+         ;; the entry count.
          (inbox-count
-          (length (org-map-entries t "TODO=\"INBOX\""
-                                  (list (expand-file-name "inbox.org" my/org-gtd-directory)))))
+          (length (org-map-entries
+                   (lambda () t)
+                   "TODO=\"INBOX\""
+                   (list (expand-file-name "inbox.org" my/org-gtd-directory)))))
          (next-count
-          (length (org-map-entries t "TODO=\"GTD-NEXT\""
-                                  (list my/org-gtd-directory))))
+          (length (org-map-entries
+                   (lambda () t)
+                   "TODO=\"GTD-NEXT\""
+                   (list my/org-gtd-directory))))
          (wait-count
-          (length (org-map-entries t "TODO=\"GTD-WAIT\""
-                                  (list my/org-gtd-directory))))
+          (length (org-map-entries
+                   (lambda () t)
+                   "TODO=\"GTD-WAIT\""
+                   (list my/org-gtd-directory))))
          (fleeting-count
           (with-temp-buffer
             (let ((fleeting (expand-file-name "ideas/fleeting.org" my/org-roam-directory)))
@@ -3124,7 +3333,6 @@ Links back to the GTD task for execution tracking."
                     (count-matches "^\\* " (point-min) (point-max)))
                 0)))))
 
-    ;; Create review file with live data
     (unless (file-exists-p review-file)
       (with-temp-file review-file
         (insert "#+title: Weekly Review - " week-string "\n")
@@ -3133,13 +3341,13 @@ Links back to the GTD task for execution tracking."
 
         (insert "* GTD Health Check\n")
         (insert (format "- Inbox items: *%d* %s\n"
-                       inbox-count
-                       (if (> inbox-count 10) "⚠ PROCESS URGENTLY" "✓")))
+                        inbox-count
+                        (if (> inbox-count 10) "⚠ PROCESS URGENTLY" "✓")))
         (insert (format "- NEXT actions: *%d*\n" next-count))
         (insert (format "- WAIT items: *%d*\n" wait-count))
         (insert (format "- Fleeting notes: *%d* %s\n\n"
-                       fleeting-count
-                       (if (> fleeting-count 20) "⚠ PROCESS" "✓")))
+                        fleeting-count
+                        (if (> fleeting-count 20) "⚠ PROCESS" "✓")))
 
         (insert "* Review Checklist\n")
         (insert "** GTD Review\n")
@@ -3162,13 +3370,12 @@ Links back to the GTD task for execution tracking."
         (insert "** Key Insights This Week\n\n\n")
         (insert "** Next Week's Focus\n\n\n")))
 
-    ;; Open file
     (find-file review-file)
     (goto-char (point-min))
     (when (re-search-forward "^\\*\\* What Went Well" nil t)
       (org-end-of-line))))
 
-;; Add to org-roam-capture-templates for GTD bridge
+;; Add GTD bridge capture template after org-roam loads
 (with-eval-after-load 'org-roam
   (add-to-list 'org-roam-capture-templates
                '("g" "GTD Project Bridge" plain
@@ -3186,9 +3393,8 @@ Links back to the GTD task for execution tracking."
   :defer t
   :after org
   :init
-  ;; Smart capture dispatcher
   (defun ar/capture-dispatch ()
-    "Smart capture: GTD task, Zettelkasten note, or journal."
+    "Smart capture: GTD task, Zettelkasten note, fleeting thought, or journal."
     (interactive)
     (let ((choice (read-char-choice
                    "Capture: [t]ask [n]ote [f]leeting [j]ournal [q]uit? "
@@ -3212,7 +3418,7 @@ Links back to the GTD task for execution tracking."
       "* %<%H:%M> %?\n"
       :empty-lines 1)
 
-     ;; Meeting notes (extract tasks later)
+     ;; Meeting notes (extract tasks later via ar/zettel-to-gtd)
      ("m" "Meeting" entry
       (file+headline ,(expand-file-name "journal.org" my/org-directory) "Meetings")
       "* %<%Y-%m-%d> %? :meeting:\n:PROPERTIES:\n:CREATED: %U\n:ATTENDEES: \n:END:\n\n** Agenda\n\n** Notes\n\n** Action Items\n- [ ] \n"
@@ -3220,7 +3426,7 @@ Links back to the GTD task for execution tracking."
       :clock-in t
       :clock-resume t)
 
-     ;; Reading/book notes (becomes literature note)
+     ;; Reading/book notes (becomes a literature note via org-roam)
      ("b" "Book/Article" entry
       (file ,(expand-file-name "reading.org" my/org-directory))
       "* %? :read:\n:PROPERTIES:\n:CREATED: %U\n:AUTHOR: \n:TYPE: [Book/Article/Paper]\n:STATUS: [Reading/Finished]\n:END:\n\n** Summary\n\n** Key Ideas\n\n** Personal Thoughts\n"
@@ -3230,11 +3436,12 @@ Links back to the GTD task for execution tracking."
      ("h" "Habit" entry
       (file+headline ,(expand-file-name "habits.org" my/org-directory) "Habits")
       "* TODO %?\nSCHEDULED: %(format-time-string \"<%Y-%m-%d %a .+1d>\")\n:PROPERTIES:\n:STYLE: habit\n:END:\n"
-      :empty-lines 1)))
-
-  :config
-  ;; Performance: Don't save file on every capture
-  (remove-hook 'org-capture-prepare-finalize-hook 'org-capture-insert-template-here))
+      :empty-lines 1))))
+  ;; FIX: Removed the :config block containing
+  ;; (remove-hook 'org-capture-prepare-finalize-hook
+  ;;              'org-capture-insert-template-here)
+  ;; The function org-capture-insert-template-here does not exist in
+  ;; standard org-mode. The call was a no-op and has been removed.
 #+end_src
 
 ** Org Super Agenda
@@ -3246,7 +3453,11 @@ Links back to the GTD task for execution tracking."
   :custom
   (org-super-agenda-header-separator "─────────────────────────────────")
   :config
-  ;; Global groups for all agenda views (can be overridden per command)
+  ;; FIX: Removed the (:name "🚀 Active Projects (Zettelkasten)"
+  ;;                    :and (:tag "project" :file-path "roam/projects")) group.
+  ;; Since my/org-roam-directory is intentionally excluded from
+  ;; org-agenda-files, :file-path against "roam/projects" will never match —
+  ;; that group would be permanently empty and misleading.
   (setq org-super-agenda-groups
         '((:name "🔴 Overdue"
            :deadline past
@@ -3288,10 +3499,6 @@ Links back to the GTD task for execution tracking."
           (:name "📆 Due Soon (Next 7 Days)"
            :deadline future
            :order 9)
-
-          (:name "🚀 Active Projects (Zettelkasten)"
-           :and (:tag "project" :file-path "roam/projects")
-           :order 10)
 
           (:name "📋 Other Tasks"
            :anything t
@@ -3371,6 +3578,10 @@ Links back to the GTD task for execution tracking."
 
 
           ("p" "Projects Dashboard"
+           ;; FIX: Removed the second block that pulled from
+           ;; (expand-file-name "roam/projects" my/org-roam-directory).
+           ;; Roam knowledge files contain no TODO items by design, so that
+           ;; block always produced an empty agenda section. Removed.
            ((tags "LEVEL=1"
                   ((org-agenda-overriding-header "📋 GTD Projects (Execution Layer)")
                    (org-agenda-files (list (expand-file-name "gtd/projects.org" my/org-directory)))
@@ -3385,13 +3596,7 @@ Links back to the GTD task for execution tracking."
 
                       (:name "⸻ Paused"
                        :scheduled future
-                       :order 3)))))
-
-            (tags "+ACTIVE"
-                  ((org-agenda-overriding-header "💡 Knowledge Context (Zettelkasten)")
-                   (org-agenda-files (list (expand-file-name "roam/projects" my/org-roam-directory)))
-                   (org-super-agenda-groups
-                    '((:auto-tags t)))))))
+                       :order 3)))))))
 
 
           ("g" . "GTD Views")
@@ -3443,6 +3648,7 @@ Links back to the GTD task for execution tracking."
                         (org-super-agenda-groups
                          '((:auto-priority t))))))))))
 #+end_src
+
 
 * Workflow Management
 ** Dired
@@ -3793,7 +3999,6 @@ Links back to the GTD task for execution tracking."
           (persp-kill persp-name))
         (message "Killed project buffers and perspective: %s" persp-name)))))
 #+end_src
-
 
 *** Treemacs Integration
 #+begin_src emacs-lisp
@@ -4352,14 +4557,12 @@ If completion fails in the future, check these:
 (use-package consult-org-roam
   :defer t
   :after org-roam
-  :init
-  (require 'consult-org-roam)
-  (consult-org-roam-mode 1)
   :custom
   (consult-org-roam-grep-func #'consult-ripgrep)
   (consult-org-roam-buffer-narrow-key ?r)
   (consult-org-roam-buffer-after-buffers t)
   :config
+  (consult-org-roam-mode 1)
   (consult-customize
    consult-org-roam-forward-links
    :preview-key "M-."))
@@ -6744,8 +6947,8 @@ It does NOT activate company-mode - completely safe with Corfu."
 (add-hook 'prog-mode-hook 'my/prog-mode/load-prettify-symbols)
 
 ;; Python
-(add-hook 'python-mode-hook 'my/python-mode/load-prettify-symbols)
-(add-hook 'python-ts-mode-hook 'my/python-mode/load-prettify-symbols)
+;; (add-hook 'python-mode-hook 'my/python-mode/load-prettify-symbols)
+;; (add-hook 'python-ts-mode-hook 'my/python-mode/load-prettify-symbols)
 
 ;; JavaScript/TypeScript
 (add-hook 'js-mode-hook 'my/javascript-mode/load-prettify-symbols)
