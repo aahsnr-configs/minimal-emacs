@@ -1470,17 +1470,7 @@ byte-compiled files do not interfere with the reload."
 ;; (add-hook 'org-mode-hook #'my/org-prettify-setup)
 #+end_src
 
-** TODO Ediff
-#+begin_src emacs-lisp
-;; (use-package ediff
-;;   :straight (:type built-in)
-;;   :custom
-;;   (ediff-window-setup-function 'ediff-setup-windows-plain)
-;;   (ediff-split-window-function 'split-window-horizontally)
-;;   :hook (ediff-startup . (lambda ()
-;;                           (ediff-toggle-help))))
-#+end_src
-
+** Ediff
 #+begin_src emacs-lisp
 (use-package ediff
   :straight (:type built-in)
@@ -2476,30 +2466,7 @@ trigger a context switch. All other projects simply stay on global context."
         '((sequence "TODO(t)" "NEXT(n)" "PROG(p)" "WAIT(w@/!)" "|" "DONE(d)" "CANCEL(c@)")
           (sequence "PLAN(P)" "ACTIVE(A)" "PAUSED(x)" "|" "ACHIEVED(a)" "DROPPED(D)")
           (sequence "INBOX(i)" "GTD-NEXT(N)" "GTD-WAIT(W@/!)" "|" "GTD-DONE(D!)" "GTD-CNCL(C@)")
-          (sequence "CRITICAL(!)" "COMMENT(M)" "|" "RESOLVED(R)" "DISABLED(d!)")))
-
-  (setq org-todo-keyword-faces
-        '(("TODO"      . (:foreground "#f7768e" :weight bold))
-          ("NEXT"      . (:foreground "#ff9e64" :weight bold))
-          ("PROG"      . (:foreground "#7aa2f7" :weight bold))
-          ("WAIT"      . (:foreground "#e0af68" :weight bold))
-          ("NOTE"      . (:foreground "#7dcfff" :weight bold))
-          ("DONE"      . (:foreground "#9ece6a" :weight bold))
-          ("CANCEL"    . (:foreground "#565f89" :weight bold))
-          ("PLAN"      . (:foreground "#7dcfff" :weight bold))
-          ("ACTIVE"    . (:foreground "#bb9af7" :weight bold))
-          ("PAUSED"    . (:foreground "#a9b1d6" :weight bold))
-          ("ACHIEVED"  . (:foreground "#9ece6a" :weight bold))
-          ("DROPPED"   . (:foreground "#565f89" :weight bold))
-          ("INBOX"     . (:foreground "#e0af68" :weight bold))
-          ("GTD-NEXT"  . (:foreground "#7aa2f7" :weight bold))
-          ("GTD-WAIT"  . (:foreground "#ff9e64" :weight bold))
-          ("GTD-DONE"  . (:foreground "#9ece6a" :weight bold))
-          ("GTD-CNCL"  . (:foreground "#565f89" :weight bold))
-          ("CRITICAL"  . (:foreground "#f7768e" :weight bold :underline t))
-          ("COMMENT"   . (:foreground "#c0caf5" :weight normal))
-          ("RESOLVED"  . (:foreground "#9ece6a" :weight bold))
-          ("DISABLED"  . (:foreground "#565f89" :weight bold)))))
+          (sequence "CRITICAL(!)" "COMMENT(M)" "|" "RESOLVED(R)" "DISABLED(d!)"))))
 #+end_src
 
 ** Tags & Priorities
@@ -2515,8 +2482,8 @@ trigger a context switch. All other projects simply stay on global context."
                         ("someday"    . ?s)))
 
   (setq org-priority-faces '((?A . error)
-                              (?B . warning)
-                              (?C . success))))
+                             (?B . warning)
+                             (?C . success))))
 #+end_src
 
 ** Org Structure Templates
@@ -2635,14 +2602,15 @@ trigger a context switch. All other projects simply stay on global context."
   :hook (org-mode          . org-modern-mode)
   :hook (org-agenda-finalize . org-modern-agenda)
   :config
+
   (setq org-modern-hide-stars nil
         org-modern-star '("◉" "○" "✸" "✿" "✤" "✜" "◇" "▷"))
 
   ;; Disabled features
   (setq org-modern-checkbox nil
-        org-modern-todo nil
-        org-modern-tag nil
-        org-modern-priority nil)
+        org-modern-todo t
+        org-modern-tag t
+        org-modern-priority t)
 
   ;; Enabled features
   (setq org-modern-keyword t   ; Badges for #+TITLE, #+AUTHOR, etc.
@@ -3084,16 +3052,7 @@ trigger a context switch. All other projects simply stay on global context."
     (lambda ()
       (when (and (featurep 'org-gtd)
                  (not (bound-and-true-p org-gtd-mode)))
-        (org-gtd-mode 1))))
-
-  ;; Custom TODO faces for GTD keywords
-  (setq org-todo-keyword-faces
-        (append org-todo-keyword-faces
-                '(("INBOX"    . (:foreground "#e0af68" :weight bold))
-                  ("GTD-NEXT" . (:foreground "#7aa2f7" :weight bold))
-                  ("GTD-WAIT" . (:foreground "#ff9e64" :weight bold))
-                  ("GTD-DONE" . (:foreground "#9ece6a" :weight bold))
-                  ("GTD-CNCL" . (:foreground "#565f89" :weight bold))))))
+        (org-gtd-mode 1)))))
 #+end_src
 
 ** Org Roam
@@ -3388,61 +3347,409 @@ rather than the newly created Zettel note. Fixed by creating the note with
 #+end_src
 
 ** Org Capture
+*** Helper Functions
+#+begin_src emacs-lisp
+(defun ar/capture-goto-inbox ()
+  "Visit the GTD inbox file and position point at end for capture.
+Required by the `(function ...)' capture target for the quick inbox
+template — org-capture calls this to find the insertion location."
+  (find-file (expand-file-name "gtd/inbox.org" my/org-directory))
+  (goto-char (point-max)))
+
+(defun ar/capture-url-from-clipboard ()
+  "Return the URL currently in the clipboard/kill-ring.
+Falls back to `read-string' if no HTTP/HTTPS URL is found."
+  (let ((clip (or (when interprogram-paste-function
+                    (funcall interprogram-paste-function))
+                  (car kill-ring)
+                  "")))
+    (if (string-match-p "^https?://" clip)
+        clip
+      (read-string "URL: "))))
+
+(defun ar/capture-url-as-org-link ()
+  "Format the clipboard URL as an org link with a prompted description.
+Called from %(sexp) inside the web-clip capture templates."
+  (let* ((url  (ar/capture-url-from-clipboard))
+         (desc (read-string (format "Description [%s]: " url) nil nil url)))
+    (format "[[%s][%s]]" url desc)))
+
+(defun ar/capture-habit-range-schedule ()
+  "Interactively prompt for ideal and max repeat intervals.
+Returns a SCHEDULED timestamp string for an org-habit range repeater,
+e.g. \"<2026-03-14 Sat .+1d/2d>\".
+
+FIX: This function replaces the broken pattern of nesting %^{prompt}
+inside %(sexp). Per the org manual, %(sexp) is expanded BEFORE
+interactive %^{} prompts, so %^{} inside a sexp receives the literal
+string, not the user's input. Using read-string here is correct."
+  (let* ((ideal   (read-string "Ideal interval in days (e.g. 1): " "1"))
+         (ideal-n (string-to-number ideal))
+         (max-def (number-to-string (* 2 ideal-n)))
+         (max     (read-string
+                   (format "Max interval in days (default %s): " max-def)
+                   max-def)))
+    (format-time-string
+     (format "<%%Y-%%m-%%d %%a .+%sd/%sd>" ideal max))))
+
+(defun ar/capture-region-or-empty ()
+  "Return the active region as an org quote block, or empty string."
+  (if (region-active-p)
+      (format "#+begin_quote\n%s\n#+end_quote"
+              (buffer-substring-no-properties
+               (region-beginning) (region-end)))
+    ""))
+#+end_src
+
+*** Smart Dispatcher
+#+begin_src emacs-lisp
+(defun ar/capture-dispatch ()
+  "Hierarchical smart capture dispatcher.
+
+Top-level keys:
+  [t] GTD task → org-gtd inbox
+  [n] Zettelkasten note → org-roam
+  [f] Fleeting thought → roam/ideas/fleeting.org
+  [j] Journal (sub-menu)
+  [m] Meeting notes
+  [b] Book / article to reading list
+  [h] Habit (sub-menu)
+  [g] Goal (sub-menu)
+  [w] Web clip / bookmark (sub-menu)
+  [i] Quick inbox item with context link
+  [q] Quit"
+  (interactive)
+  (let ((choice (read-char-choice
+                 (concat "Capture: "
+                         "[t]ask [n]ote [f]leeting "
+                         "[j]ournal [m]eeting [b]ook "
+                         "[h]abit [g]oal [w]eb [i]nbox [q]uit: ")
+                 '(?t ?n ?f ?j ?m ?b ?h ?g ?w ?i ?q))))
+    (pcase choice
+      (?t (org-gtd-capture))
+
+      (?n (org-roam-capture))
+
+      (?f (find-file (expand-file-name "ideas/fleeting.org"
+                                       my/org-roam-directory))
+          (goto-char (point-max))
+          (unless (bolp) (insert "\n"))
+          (insert (format "\n* %s\n\n"
+                          (read-string "Fleeting thought: ")))
+          (backward-char 1))
+
+      (?j (let ((kind (read-char-choice
+                       "Journal: [d]aily  [l]ink+context  [q]uit: "
+                       '(?d ?l ?q))))
+            (pcase kind
+              (?d (org-capture nil "jd"))
+              (?l (org-capture nil "jl"))
+              (?q (keyboard-quit)))))
+
+      (?m (org-capture nil "m"))
+
+      (?b (org-capture nil "b"))
+
+      (?h (let ((kind (read-char-choice
+                       "Habit: [d]aily flexible  [s]trict daily  [r]ange  [q]uit: "
+                       '(?d ?s ?r ?q))))
+            (pcase kind
+              (?d (org-capture nil "hd"))
+              (?s (org-capture nil "hs"))
+              (?r (org-capture nil "hr"))
+              (?q (keyboard-quit)))))
+
+      (?g (let ((kind (read-char-choice
+                       "Goal: [l]ife  [Q]uarterly  [w]eekly  [q]uit: "
+                       '(?l ?Q ?w ?q))))
+            (pcase kind
+              (?l (org-capture nil "gl"))
+              (?Q (org-capture nil "gQ"))
+              (?w (org-capture nil "gw"))
+              (?q (keyboard-quit)))))
+
+      (?w (let ((kind (read-char-choice
+                       "Web: [c]lipboard URL  [l]ink+context  [q]uit: "
+                       '(?c ?l ?q))))
+            (pcase kind
+              (?c (org-capture nil "wc"))
+              (?l (org-capture nil "wl"))
+              (?q (keyboard-quit)))))
+
+      (?i (org-capture nil "i"))
+
+      (?q (keyboard-quit)))))
+#+end_src
+
+*** Journal Templates
+#+begin_src emacs-lisp
+(defvar ar/capture-templates-journal
+  `(("j" "Journal")
+
+    ("jd" "Daily entry" entry
+     (file+olp+datetree ,(expand-file-name "journal.org" my/org-directory))
+     ,(string-join
+       '("* %<%H:%M> %?"
+         ":PROPERTIES:"
+         ":CREATED: %U"
+         ":END:")
+       "\n")
+     :empty-lines 1
+     :tree-type week)
+
+    ("jl" "Daily entry + context link" entry
+     (file+olp+datetree ,(expand-file-name "journal.org" my/org-directory))
+     ,(string-join
+       '("* %<%H:%M> %?"
+         ":PROPERTIES:"
+         ":CREATED:  %U"
+         ":CONTEXT:  %a"
+         ":END:")
+       "\n")
+     :empty-lines 1
+     :tree-type week))
+  "Journal capture templates.")
+#+end_src
+
+*** Meeting Template
+#+begin_src emacs-lisp
+(defvar ar/capture-templates-meeting
+  `(("m" "Meeting" entry
+     (file+headline ,(expand-file-name "journal.org" my/org-directory)
+                    "Meetings")
+     ,(string-join
+       '("* %^{Meeting title} :meeting:"
+         ":PROPERTIES:"
+         ":CREATED:    %U"
+         ":ATTENDEES:  %^{Attendees}"
+         ":LOCATION:   %^{Location|Remote}"
+         ":END:"
+         ""
+         "** Agenda"
+         "- %?"
+         ""
+         "** Notes"
+         ""
+         "** Action Items"
+         "- [ ] "
+         ""
+         "** Follow-up")
+       "\n")
+     :empty-lines 1
+     :clock-in t
+     :clock-resume t))
+  "Meeting capture template.")
+#+end_src
+
+*** Book / Article Template
+#+begin_src emacs-lisp
+(defvar ar/capture-templates-book
+  `(("b" "Book / Article" entry
+     (file+headline ,(expand-file-name "reading.org" my/org-directory)
+                    "To Read")
+     ,(string-join
+       '("* TODO %^{Title} :read:"
+         ":PROPERTIES:"
+         ":CREATED:  %U"
+         ":AUTHOR:   %^{Author}"
+         ":TYPE:     %^{Type|Book|Article|Paper|Video|Podcast}"
+         ":URL:      %^{URL or DOI|}"
+         ":STATUS:   Unread"
+         ":END:"
+         ""
+         "** Why this matters"
+         "%?"
+         ""
+         "** Key ideas (fill after reading)")
+       "\n")
+     :empty-lines 1))
+  "Book and article capture template.")
+#+end_src
+
+*** Habit Templates
+#+begin_src emacs-lisp
+(defvar ar/capture-templates-habits
+  `(("h" "Habit")
+
+    ("hd" "Daily habit (flexible .+1d)" entry
+     (file+headline ,(expand-file-name "habits.org" my/org-directory)
+                    "Habits")
+     ,(string-join
+       '("* TODO %^{Habit name}"
+         "SCHEDULED: %(format-time-string \"<%Y-%m-%d %a .+1d>\")"
+         ":PROPERTIES:"
+         ":STYLE:    habit"
+         ":END:")
+       "\n")
+     :empty-lines 1)
+
+    ("hs" "Daily habit (strict ++1d)" entry
+     (file+headline ,(expand-file-name "habits.org" my/org-directory)
+                    "Habits")
+     ,(string-join
+       '("* TODO %^{Habit name}"
+         "SCHEDULED: %(format-time-string \"<%Y-%m-%d %a ++1d>\")"
+         ":PROPERTIES:"
+         ":STYLE:    habit"
+         ":END:")
+       "\n")
+     :empty-lines 1)
+
+    ("hr" "Range habit (.+Xd/Yd)" entry
+     (file+headline ,(expand-file-name "habits.org" my/org-directory)
+                    "Habits")
+     ,(string-join
+       '("* TODO %^{Habit name}"
+         "SCHEDULED: %(ar/capture-habit-range-schedule)"
+         ":PROPERTIES:"
+         ":STYLE:    habit"
+         ":END:")
+       "\n")
+     :empty-lines 1))
+  "Habit capture templates.")
+#+end_src
+
+*** Goal Templates
+#+begin_src emacs-lisp
+(defvar ar/capture-templates-goals
+  `(("g" "Goal")
+
+    ("gl" "Life goal" entry
+     (file+headline ,(expand-file-name "goals.org" my/org-directory)
+                    "Life Goals")
+     ,(string-join
+       '("* TODO %^{Goal}"
+         ":PROPERTIES:"
+         ":CREATED:  %U"
+         ":AREA:     %^{Area|Health|Career|Learning|Relationships|Finance|Creative}"
+         ":END:"
+         ""
+         "** Why this matters"
+         "%?"
+         ""
+         "** Success looks like"
+         ""
+         "** First next action"
+         "- [ ] ")
+       "\n")
+     :empty-lines 1)
+
+    ("gQ" "Quarterly goal" entry
+     (file+headline ,(expand-file-name "goals.org" my/org-directory)
+                    "This Quarter")
+     ,(string-join
+       '("* TODO %^{Goal}"
+         "DEADLINE: %^{Deadline}t"
+         ":PROPERTIES:"
+         ":CREATED:  %U"
+         ":AREA:     %^{Area|Health|Career|Learning|Relationships|Finance|Creative}"
+         ":END:"
+         ""
+         "** Outcome"
+         "%?"
+         ""
+         "** Key milestones"
+         "- [ ] "
+         ""
+         "** Weekly check-in notes")
+       "\n")
+     :empty-lines 1)
+
+    ("gw" "Weekly intention" entry
+     (file+headline ,(expand-file-name "goals.org" my/org-directory)
+                    "This Month")
+     ,(string-join
+       '("* TODO %^{Intention for the week}"
+         "SCHEDULED: %t"
+         ":PROPERTIES:"
+         ":CREATED:  %U"
+         ":END:"
+         ""
+         "%?")
+       "\n")
+     :empty-lines 1))
+  "Goal capture templates.")
+#+end_src
+
+*** Web / Bookmark Templates
+#+begin_src emacs-lisp
+(defvar ar/capture-templates-web
+  `(("w" "Web / Bookmark")
+
+    ("wc" "Clipboard URL bookmark" entry
+     (file+headline ,(expand-file-name "reading.org" my/org-directory)
+                    "Bookmarks")
+     ,(string-join
+       '("* %(ar/capture-url-as-org-link) :bookmark:"
+         ":PROPERTIES:"
+         ":CREATED:  %U"
+         ":TAGS:     %^{Tags (space-separated)}"
+         ":END:"
+         ""
+         "%?")
+       "\n")
+     :empty-lines 1
+     :prepend t)
+
+    ("wl" "Link to current Emacs location" entry
+     (file+headline ,(expand-file-name "reading.org" my/org-directory)
+                    "Bookmarks")
+     ,(string-join
+       '("* %^{Description} :bookmark:context:"
+         ":PROPERTIES:"
+         ":CREATED:  %U"
+         ":LINK:     %a"
+         ":END:"
+         ""
+         "%?")
+       "\n")
+     :empty-lines 1
+     :prepend t))
+  "Web clip and bookmark capture templates.")
+#+end_src
+
+*** Quick Inbox Template
+#+begin_src emacs-lisp
+(defvar ar/capture-templates-inbox
+  `(("i" "Quick inbox item (with context)" entry
+     (function ar/capture-goto-inbox)
+     ,(string-join
+       '("* INBOX %?"
+         ":PROPERTIES:"
+         ":CREATED:  %U"
+         ":CONTEXT:  %a"
+         ":END:")
+       "\n")
+     :empty-lines 1))
+  "Quick GTD inbox capture template.")
+#+end_src
+
+*** use-package
 #+begin_src emacs-lisp
 (use-package org-capture
   :straight (:type built-in)
   :defer t
   :after org
-  :init
-  (defun ar/capture-dispatch ()
-    "Smart capture: GTD task, Zettelkasten note, fleeting thought, or journal."
-    (interactive)
-    (let ((choice (read-char-choice
-                   "Capture: [t]ask [n]ote [f]leeting [j]ournal [q]uit? "
-                   '(?t ?n ?f ?j ?q))))
-      (pcase choice
-        (?t (org-gtd-capture))
-        (?n (org-roam-capture))
-        (?f (find-file (expand-file-name "ideas/fleeting.org" my/org-roam-directory))
-            (goto-char (point-max))
-            (unless (bolp) (insert "\n"))
-            (insert (format "\n* %s\n\n" (read-string "Fleeting thought: ")))
-            (backward-char 1))
-        (?j (org-capture nil "j"))
-        (?q (keyboard-quit)))))
 
   :custom
   (org-capture-templates
-   `(;; Quick journal entry (NOT a task)
-     ("j" "Journal" entry
-      (file+olp+datetree ,(expand-file-name "journal.org" my/org-directory))
-      "* %<%H:%M> %?\n"
-      :empty-lines 1)
+   (append ar/capture-templates-journal
+           ar/capture-templates-meeting
+           ar/capture-templates-book
+           ar/capture-templates-habits
+           ar/capture-templates-goals
+           ar/capture-templates-web
+           ar/capture-templates-inbox))
 
-     ;; Meeting notes (extract tasks later via ar/zettel-to-gtd)
-     ("m" "Meeting" entry
-      (file+headline ,(expand-file-name "journal.org" my/org-directory) "Meetings")
-      "* %<%Y-%m-%d> %? :meeting:\n:PROPERTIES:\n:CREATED: %U\n:ATTENDEES: \n:END:\n\n** Agenda\n\n** Notes\n\n** Action Items\n- [ ] \n"
-      :empty-lines 1
-      :clock-in t
-      :clock-resume t)
-
-     ;; Reading/book notes (becomes a literature note via org-roam)
-     ("b" "Book/Article" entry
-      (file ,(expand-file-name "reading.org" my/org-directory))
-      "* %? :read:\n:PROPERTIES:\n:CREATED: %U\n:AUTHOR: \n:TYPE: [Book/Article/Paper]\n:STATUS: [Reading/Finished]\n:END:\n\n** Summary\n\n** Key Ideas\n\n** Personal Thoughts\n"
-      :empty-lines 1)
-
-     ;; Habit (tracked in agenda, not GTD)
-     ("h" "Habit" entry
-      (file+headline ,(expand-file-name "habits.org" my/org-directory) "Habits")
-      "* TODO %?\nSCHEDULED: %(format-time-string \"<%Y-%m-%d %a .+1d>\")\n:PROPERTIES:\n:STYLE: habit\n:END:\n"
-      :empty-lines 1))))
-  ;; FIX: Removed the :config block containing
-  ;; (remove-hook 'org-capture-prepare-finalize-hook
-  ;;              'org-capture-insert-template-here)
-  ;; The function org-capture-insert-template-here does not exist in
-  ;; standard org-mode. The call was a no-op and has been removed.
+  :config
+  ;; Save all org buffers after a SUCCESSFUL capture only.
+  ;; org-capture-after-finalize-hook fires on both success and abort;
+  ;; org-note-abort is let-bound to t during org-capture-kill (abort),
+  ;; so the guard prevents unnecessary saves on cancelled captures.
+  (add-hook 'org-capture-after-finalize-hook
+            (lambda ()
+              (unless org-note-abort
+                (org-save-all-org-buffers)))))
 #+end_src
 
 ** Org Super Agenda
