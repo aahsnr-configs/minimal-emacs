@@ -2382,6 +2382,36 @@ trigger a context switch. All other projects simply stay on global context."
 #+RESULTS:
 | diredfl-mode | dired-omit-mode | hl-line-mode | dired-hide-details-mode | my/project-org-maybe-switch | diff-hl-dired-mode | ar/visual-fill-setup |
 
+** Register Projects
+#+begin_src emacs-lisp
+(my/register-project-org-context "~/physics/"
+  :name "physics"
+  :org-directory (file-truename (expand-file-name "~/physics/"))
+  :roam-dir      (file-truename (expand-file-name "~/physics/notes/"))
+  :roam-db       (expand-file-name "~/physics/notes/org-roam.db")
+  :gtd-dir       (file-truename (expand-file-name "~/physics/gtd/"))
+  :agenda-files  (list (file-truename (expand-file-name "~/physics/"))
+                       (file-truename (expand-file-name "~/physics/gtd/")))
+  :capture-tpls
+  '(("P"  "Physics")
+    ("Pj" "Physics Journal" entry
+     (file+olp+datetree "~/physics/journal.org")
+     "* %<%H:%M> %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n"
+     :empty-lines 1)
+    ("Pt" "Physics Task" entry
+     (file "~/physics/gtd/inbox.org")
+     "* INBOX %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n"
+     :empty-lines 1)
+    ("Pf" "Physics Fleeting" plain
+     (file "~/physics/notes/physics-00-index.org")
+     "\n* %<%Y-%m-%d %H:%M> %?\n"
+     :prepend t :empty-lines 1)
+    ("Pr" "Physics Reading" entry
+     (file "~/physics/reading.org")
+     "* %? :read:\n:PROPERTIES:\n:CREATED: %U\n:AUTHOR: \n:STATUS: Reading\n:END:\n"
+     :empty-lines 1)))
+#+end_src
+
 ** Better Font Faces
 #+begin_src emacs-lisp
 (defun ar/org-font-setup ()
@@ -2399,7 +2429,11 @@ trigger a context switch. All other projects simply stay on global context."
                   (org-level-6 . 1.03)
                   (org-level-7 . 1.02)
                   (org-level-8 . 1)))
-    (set-face-attribute (car face) nil :font "JetBrainsMono Nerd Font" :weight 'bold :height (cdr face))))
+    (set-face-attribute (car face) nil :font "JetBrainsMono Nerd Font" :weight 'bold :height (cdr face)))
+
+  (custom-set-faces
+   '(bold   ((t (:foreground "#e0af68" :weight bold))))
+   '(italic ((t (:foreground "#bb9af7" :slant italic))))))
 #+end_src
 
 ** Core Configuration
@@ -2475,6 +2509,7 @@ trigger a context switch. All other projects simply stay on global context."
   (setq org-tag-alist '(("@work"      . ?w)
                         ("@home"      . ?h)
                         ("@computer"  . ?c)
+                        ("@phone"     . ?p)
                         ("@errands"   . ?e)
                         ("read"       . ?r)
                         ("meeting"    . ?m)
@@ -3192,7 +3227,7 @@ rather than the newly created Zettel note. Fixed by creating the note with
          (node-title (concat "Project: " heading)))
 
     ;; Create the roam project note immediately (skips interactive prompt)
-    (org-roam-capture-
+    (org-roam-capture
      :node  (org-roam-node-create :title node-title)
      :props '(:immediate-finish t))
 
@@ -3760,12 +3795,7 @@ Top-level keys:
   :hook (org-agenda-mode . org-super-agenda-mode)
   :custom
   (org-super-agenda-header-separator "─────────────────────────────────")
-  :config
-  ;; FIX: Removed the (:name "🚀 Active Projects (Zettelkasten)"
-  ;;                    :and (:tag "project" :file-path "roam/projects")) group.
-  ;; Since my/org-roam-directory is intentionally excluded from
-  ;; org-agenda-files, :file-path against "roam/projects" will never match —
-  ;; that group would be permanently empty and misleading.
+  :init
   (setq org-super-agenda-groups
         '((:name "🔴 Overdue"
            :deadline past
@@ -3800,13 +3830,17 @@ Top-level keys:
            :and (:tag "@phone" :todo ("GTD-NEXT" "NEXT"))
            :order 7)
 
+          (:name "🚗 @Errands"                                  ;; FIX: Added @errands
+           :and (:tag "@errands" :todo ("GTD-NEXT" "NEXT"))
+           :order 8)
+
           (:name "⏳ Waiting For"
            :todo ("GTD-WAIT" "WAIT")
-           :order 8)
+           :order 9)
 
           (:name "📆 Due Soon (Next 7 Days)"
            :deadline future
-           :order 9)
+           :order 10)
 
           (:name "📋 Other Tasks"
            :anything t
@@ -3815,7 +3849,7 @@ Top-level keys:
 
 ** Org Agenda Custom Commands
 #+begin_src emacs-lisp
-(with-eval-after-load 'org-super-agenda
+(with-eval-after-load 'org-agenda
   (setq org-agenda-custom-commands
         '(("d" "Daily Dashboard"
            ((agenda ""
@@ -3854,6 +3888,10 @@ Top-level keys:
                          (:name "📞 @Phone"
                           :and (:tag "@phone" :todo ("GTD-NEXT" "NEXT"))
                           :order 4)
+
+                         (:name "🚗 @Errands"
+                          :and (:tag "@errands" :todo ("GTD-NEXT" "NEXT"))
+                          :order 5)
 
                          (:name "⏳ Waiting"
                           :todo ("GTD-WAIT" "WAIT")
@@ -5131,6 +5169,7 @@ If completion fails in the future, check these:
   :init
   (with-eval-after-load 'evil
     (evil-define-key '(normal visual) 'global (kbd "K") #'eldoc-box-help-at-point))
+  :hook (eglot-managed-mode . eldoc-box-hover-at-point-mode)
 
   :custom
   (eldoc-box-max-pixel-width 800)
@@ -5340,6 +5379,8 @@ Arguments are CALLBACK and ignored."
   (setq treesit-language-source-alist
         '((python "https://github.com/tree-sitter/tree-sitter-python")
           (bash "https://github.com/tree-sitter/tree-sitter-bash")
+          (c "https://github.com/tree-sitter/tree-sitter-c")
+          (cpp "https://github.com/tree-sitter/tree-sitter-cpp")
           (dockerfile "https://github.com/camdencheek/tree-sitter-dockerfile.git")
           (json "https://github.com/tree-sitter/tree-sitter-json")
           (latex "https://github.com/latex-lsp/tree-sitter-latex")
@@ -5355,7 +5396,9 @@ Arguments are CALLBACK and ignored."
           (bash-mode . bash-ts-mode)
           (sh-mode . bash-ts-mode)
           (typescript-mode . typescript-ts-mode)
-          (conf-toml-mode . toml-ts-mode))))
+          (conf-toml-mode . toml-ts-mode)
+          (c-mode . c-ts-mode)
+          (c++-mode . c++-ts-mode))))
 #+end_src
 
 ** Treesit-Fold
@@ -6457,9 +6500,9 @@ This bibliography file can be used with both LaTeX and Org documents."
   (setq org-format-latex-options
         (plist-put org-format-latex-options :scale 1.0))
   (setq org-format-latex-options
-        (plist-put org-format-latex-options :foreground 'default))
+        (plist-put org-format-latex-options :foreground "#c0caf5"))
   (setq org-format-latex-options
-        (plist-put org-format-latex-options :background 'default))
+        (plist-put org-format-latex-options :background "#1a1b26"))
 
   (setq org-preview-latex-image-directory "ltximg/")
 
@@ -7607,6 +7650,29 @@ Reports diagnostics to REPORT-FN."
 ;; Keybindings (using General.el, following your config pattern)
 ;; ════════════════════════════════════════════════════════════════════════════
 
+#+end_src
+
+** C/C++
+#+begin_src emacs-lisp
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((c-mode c-ts-mode c++-mode c++-ts-mode)
+                 . ("clangd"
+                    "--background-index"
+                    "--clang-tidy"
+                    "--header-insertion=never"
+                    "--completion-style=detailed"
+                    "--function-arg-placeholders=0"))))
+
+(with-eval-after-load 'apheleia
+  (setf (alist-get 'c-mode      apheleia-mode-alist) '(clang-format))
+  (setf (alist-get 'c-ts-mode   apheleia-mode-alist) '(clang-format))
+  (setf (alist-get 'c++-mode    apheleia-mode-alist) '(clang-format))
+  (setf (alist-get 'c++-ts-mode apheleia-mode-alist) '(clang-format)))
+
+(when (treesit-available-p)
+  (add-to-list 'auto-mode-alist '("CMakeLists\\.txt\\'" . cmake-ts-mode))
+  (add-to-list 'auto-mode-alist '("\\.cmake\\'"         . cmake-ts-mode)))
 #+end_src
 
 ** Python

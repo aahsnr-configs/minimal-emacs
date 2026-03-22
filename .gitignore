@@ -15,6 +15,7 @@ projects
 persp-auto-save
 projectile-bookmarks.eld
 org-roam.db
+.org-id-locations
 transient/
 .cache/
 straight/
