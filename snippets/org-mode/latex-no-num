@@ -1,5 +1,0 @@
-# -*- mode: snippet -*-
-# name: latex-no-num
-# key: nonum
-# --
-#+OPTIONS: num:nil

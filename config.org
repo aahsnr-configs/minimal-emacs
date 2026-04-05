@@ -374,7 +374,8 @@ byte-compiled files do not interfere with the reload."
    '("PATH" "MANPATH"
      "OPENAI_API_KEY" "ANTHROPIC_API_KEY"
      "XAI_API_KEY" "DEEPSEEK_API_KEY"
-     "OPENROUTER_API_KEY" "GEMINI_API_KEY"))
+     "OPENROUTER_API_KEY" "GEMINI_API_KEY"
+     "HF_TOKEN"))
   :config
   (when (daemonp)
     (exec-path-from-shell-initialize)))
@@ -2497,13 +2498,16 @@ trigger a context switch. All other projects simply stay on global context."
   (org-babel-do-load-languages 'org-babel-load-languages load-language-alist)
 
   ;; Add Structure Templates
-  (dolist (pair '(("sh"  . "src shell")
-                  ("el"  . "src emacs-lisp")
-                  ("py"  . "src python")
+  (dolist (pair '(("sh" . "src shell")
+                  ("el" . "src emacs-lisp")
+                  ("py" . "src python")
                   ("jpy" . "src jupyter-python")
-                  ("dot"      . "src dot")
+                  ("dot" . "src dot")
                   ("plantuml" . "src plantuml")
-                  ("tex" . "src latex")))
+                  ("tex" . "src latex")
+                  ("yml" . "src yaml")
+                  ("kbd" . "src kbd")
+                  ("kdl" . "src kdl")))
     (add-to-list 'org-structure-template-alist pair)))
 #+end_src
 
@@ -2572,7 +2576,10 @@ trigger a context switch. All other projects simply stay on global context."
 
        ["Misc"
         ("m" "mermaid"     (lambda () (interactive) (ar/org-template-expand "<s" "mermaid :file chart.png")))
+         ("k" "kdl"         (lambda () (interactive) (ar/org-template-expand "<s" "kdl")))
         ("u" "plantuml"    (lambda () (interactive) (ar/org-template-expand "<s" "plantuml :file chart.png")))
+         ("K" "kbd"         (lambda () (interactive) (ar/org-template-expand "<s" "kbd")))
+        ("Z" "yaml"        (lambda () (interactive) (ar/org-template-expand "<s" "yaml")))
         ("Y" "ipython"     ar/org-insert-ipython)
         ("P" "Perl tangled" ar/org-insert-perl-tangled)
         ("<" "insert <"    self-insert-command)]]))
@@ -2676,22 +2683,6 @@ trigger a context switch. All other projects simply stay on global context."
                                (alert-notifier-command 'notifier)
                                (alert-libnotify-command 'libnotify)
                                (t alert-default-style))))
-#+end_src
-
-** Org Download
-#+begin_src emacs-lisp
-(use-package org-download
-  :defer t
-  :after org
-  :custom
-  (org-download-screenshot-method "grim -g \"$(slurp)\" - | swappy -f - -o -")
-  (org-download-image-dir "assets")
-  (org-download-method 'attach)
-  (org-download-timestamp "%Y-%m-%d-%H%M%S_")
-  (org-download-display-inline t)
-  (org-image-actual-width 600)
-  :config
-  (advice-add 'org-download-dnd :after #'org-download-display-inline-images))
 #+end_src
 
 ** Org Remark
@@ -2976,14 +2967,17 @@ trigger a context switch. All other projects simply stay on global context."
   :custom
   (denote-directory my/denote-directory)
   (denote-known-keywords '("emacs" "philosophy" "reading"
-                           "project" "journal" "meeting" "idea"))
-  (denote-infer-keywords t)
-  (denote-sort-keywords t)
-  (denote-prompts '(title keywords))
-  (denote-date-prompt-use-org-read-date t)
-  (denote-rename-confirmations '(rewrite-front-matter modify-file-name))
+                           "project" "journal" "meeting" "idea" "physics"))
   (denote-org-capture-specifiers "%l\n%i\n%?")
   :config
+  (setq denote-save-buffers nil
+        denote-infer-keywords t
+        denote-sort-keywords t
+        denote-prompts '(title keywords)
+        denote-excluded-directories-regexp nil
+        denote-keywords-to-not-infer-regexp nil
+        denote-rename-confirmations '(rewrite-front-matter modify-file-name)
+        denote-date-prompt-use-org-read-date t)
   (denote-rename-buffer-mode 1))
 #+end_src
 
@@ -5162,6 +5156,7 @@ Arguments are CALLBACK and ignored."
           (latex "https://github.com/latex-lsp/tree-sitter-latex")
           (bibtex "https://github.com/latex-lsp/tree-sitter-bibtex")
           (nix "https://github.com/nix-community/tree-sitter-nix")
+          (yaml "https://github.com/tree-sitter-grammars/tree-sitter-yaml")
           (typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
           (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")))
 
@@ -6290,6 +6285,7 @@ This bibliography file can be used with both LaTeX and Org documents."
 ** Org LaTeX Classes
 #+begin_src emacs-lisp
 (with-eval-after-load 'ox-latex
+  (setq org-latex-compiler "lualatex")
   (setq org-latex-pdf-process
         '("latexmk -f -pdf -%latex -bibtex -interaction=nonstopmode -output-directory=%o %f"))
   (add-to-list 'org-latex-classes
@@ -7151,12 +7147,6 @@ It does NOT activate company-mode - completely safe with Corfu."
 
 ** Bash
 #+begin_src emacs-lisp
-;; Bash/Shell Programming Configuration
-;; Sets up LSP (bash-language-server), formatter (shfmt), linter (shellcheck), and debugger (bash-debug)
-;; shfmt, shellcheck and bash-debug built-in
-;; LSP: bash-language-server with eglot
-;; Configures bash-language-server for sh-mode and bash-ts-mode
-;;(add-to-list 'major-mode-remap-alist '(sh-mode . bash-ts-mode))
 (with-eval-after-load 'eglot
   (add-to-list 'eglot-server-programs
                '((bash-mode bash-ts-mode) . ("bash-language-server" "start"))))
@@ -7172,12 +7162,8 @@ It does NOT activate company-mode - completely safe with Corfu."
   :mode (("\\.\\(plantuml\\|puml\\|pum\\|plu\\)\\'" . plantuml-mode))
 
   :init
-  ;; ────────────────────────────────────────────────────────────────────────
-  ;; Execution Mode Auto-Detection
-  ;; ────────────────────────────────────────────────────────────────────────
-  ;; Automatically detect the best available PlantUML execution method
   (defvar ar/plantuml-jar-locations
-    '("~/.local/share/plantuml/plantuml.jar"
+    '("~/.config/plantuml/plantuml.jar"
       "~/plantuml.jar"
       "/usr/share/plantuml/plantuml.jar"
       "/usr/local/share/plantuml/plantuml.jar"
@@ -7478,6 +7464,43 @@ Reports diagnostics to REPORT-FN."
   (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(ruff-isort ruff))
   (setf (alist-get 'python-mode    apheleia-mode-alist) '(ruff-isort ruff)))
 #+end_src
+
+** kdl
+#+begin_src emacs-lisp
+(use-package kdl-mode
+  :straight (:host github :repo "taquangtrung/emacs-kdl-mode")
+  :mode "\\.kdl\\'")
+#+end_src
+
+** yaml
+#+begin_src emacs-lisp
+(use-package yaml-pro
+  :hook ((yaml-ts-mode . yaml-pro-ts-mode)))
+
+(with-eval-after-load 'org
+  (add-to-list 'org-src-lang-modes '("yaml" . yaml-ts)))
+
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((yaml-ts-mode) . ("yaml-language-server" "--stdio"))))
+
+(with-eval-after-load 'apheleia
+  (setf (alist-get 'yaml-ts-mode apheleia-mode-alist) '(prettier)))
+#+end_src
+
+** KBD
+#+begin_src emacs-lisp
+(use-package kbd-mode
+  :straight (:host github :repo "kmonad/kbd-mode")
+  :commands kbd-mode
+  :mode "\\.kbd\\'"
+  :config
+  ;; Register the src-block mapping while the package is loading,
+  ;; so it is available before any org buffer tries to fontify a kbd block.
+  (with-eval-after-load 'org
+    (add-to-list 'org-src-lang-modes '("kbd" . kbd))))
+#+end_src
+
 
 * Study
 ** PDF Tools
@@ -7925,6 +7948,8 @@ With a prefix ARG, remove the start location."
             (delete-window window)))))
     (advice-add #'keyboard-quit :before #'popper-close-window-hack)))
 #+end_src
+
+* AI/LLM
 
 * General Keybindings
 #+begin_src emacs-lisp

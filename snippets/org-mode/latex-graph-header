@@ -1,7 +1,0 @@
-# -*- mode: snippet -*-
-# name: latex-graph-header
-# key: lgheader
-# --
-#+LATEX_HEADER: \usepackage{tikz}
-#+LATEX_HEADER: \usetikzlibrary{trees}
-$0

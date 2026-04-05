@@ -1,5 +1,0 @@
-# -*- mode: snippet -*-
-# name: latex-no-toc
-# key: notoc
-# --
-#+OPTIONS: toc:nil
