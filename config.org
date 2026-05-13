@@ -1208,8 +1208,6 @@ byte-compiled files do not interfere with the reload."
 
 ** Solaire Mode
 #+begin_src emacs-lisp
-(use-package solaire-mode
-  :hook (after-init . solaire-global-mode))
 #+end_src
 
 ** Modeline
@@ -1667,149 +1665,6 @@ and sets up vim-style navigation."
             (if (> (length command-line-args) 2)
                 (current-buffer)
               (get-buffer-create "*dashboard*"))))))
-#+end_src
-
-* Markdown
-#+begin_src emacs-lisp
-(use-package markdown-mode
-  :defer t
-  :mode (("README\\.md\\'" . gfm-mode)
-         ("\\.md\\'" . markdown-mode)
-         ("\\.markdown\\'" . markdown-mode))
-  :init
-  ;; Basic settings
-  (setq markdown-italic-underscore t
-        markdown-asymmetric-header t
-        markdown-fontify-code-blocks-natively t
-        markdown-gfm-uppercase-checkbox t
-        markdown-enable-math nil
-        markdown-header-scaling t
-        markdown-header-scaling-values '(1.2 1.15 1.1 1.05 1.0 1.0)
-        markdown-display-message nil
-        markdown-hide-urls t
-        markdown-hide-markup t)
-
-  ;; List indentation
-  (setq markdown-list-indent-width 2)
-
-  ;; PERFORMANCE OPTIMIZATIONS - Reduce fontification overhead
-  (setq markdown-fontify-whole-heading-line nil
-        markdown-fontify-quote-and-verse-blocks nil)
-
-  ;; Defer expensive calculations
-  (setq jit-lock-defer-time 0.05  ;; Small delay before fontifying
-        jit-lock-stealth-time 1)   ;; Fontify invisible text after 1s idle
-
-  :hook ((markdown-mode . eglot-ensure)
-         (markdown-mode . visual-line-mode)
-         (markdown-mode . ar/markdown-setup-rendering)
-         (markdown-mode . ar/markdown-optimize-fontification))
-
-  :config
-  ;; EGLOT & MARKSMAN SETUP
-  (with-eval-after-load 'eglot
-    (add-to-list 'eglot-server-programs '(markdown-mode . ("marksman"))))
-
-  ;; FORMATTING INTEGRATION
-  (with-eval-after-load 'apheleia
-    (setf (alist-get 'markdown-mode apheleia-mode-alist) '(eglot)))
-
-  ;; FIX: Set imenu expression in :config after markdown-mode is loaded
-  (setq markdown-imenu-generic-expression
-        '(("^\\(.*\\)[ \t]*\n=+$" 1)
-          ("^\\(.*\\)[ \t]*\n-+$" 1)
-          ("^\\(#+ .*\\)" 1)))
-
-  ;; OPTIMIZATION: Reduce fontification frequency
-  (defun ar/markdown-optimize-fontification ()
-    "Optimize font-lock for markdown to reduce sluggishness."
-    (setq-local font-lock-multiline t)
-    (setq-local font-lock-maximum-decoration 2)
-    (setq-local jit-lock-chunk-size 1000)
-    (setq-local jit-lock-defer-time 0.1))
-
-  ;; DYNAMIC RENDERING: Detect when cursor is in markdown element
-  (defun ar/markdown-in-element-p ()
-    "Check if point is inside a markdown element that should show raw markup."
-    (let ((face (get-text-property (point) 'face)))
-      (or
-       (and face
-            (or (eq face 'markdown-code-face)
-                (eq face 'markdown-inline-code-face)
-                (eq face 'markdown-pre-face)
-                (eq face 'markdown-gfm-code-block-face)
-                (and (listp face)
-                     (or (memq 'markdown-code-face face)
-                         (memq 'markdown-inline-code-face face)
-                         (memq 'markdown-pre-face face)
-                         (memq 'markdown-gfm-code-block-face face)))))
-       (and face
-            (or (eq face 'markdown-bold-face)
-                (eq face 'markdown-italic-face)
-                (and (listp face)
-                     (or (memq 'markdown-bold-face face)
-                         (memq 'markdown-italic-face face)))))
-       (and face
-            (or (eq face 'markdown-link-face)
-                (eq face 'markdown-url-face)
-                (and (listp face)
-                     (or (memq 'markdown-link-face face)
-                         (memq 'markdown-url-face face)))))
-       (save-excursion
-         (and (looking-at-p "[*_`\\[\\]()]")
-              (or (looking-back "[*_`]" 1)
-                  (looking-at "[*_`]")))))))
-
-  ;; ANTI-FLICKER: Throttled markup toggling
-  (defvar ar/markdown-toggle-timer nil
-    "Timer to throttle markup visibility toggling.")
-
-  (defun ar/markdown-toggle-markup-at-point ()
-    "Toggle markup hiding based on cursor position."
-    (when (derived-mode-p 'markdown-mode)
-      (when ar/markdown-toggle-timer
-        (cancel-timer ar/markdown-toggle-timer))
-      (setq ar/markdown-toggle-timer
-            (run-with-idle-timer 0.05 nil
-              (lambda ()
-                (when (buffer-live-p (current-buffer))
-                  (with-current-buffer (current-buffer)
-                    (if (ar/markdown-in-element-p)
-                        (remove-text-properties (line-beginning-position) (line-end-position)
-                                              '(display nil composition nil invisible nil))
-                      (when markdown-hide-markup
-                        (font-lock-flush (line-beginning-position) (line-end-position)))))))))))
-
-  (defun ar/markdown-setup-rendering ()
-    (add-hook 'post-command-hook #'ar/markdown-toggle-markup-at-point nil t))
-
-  ;; CHECKBOX RENDERING
-  (defface ar/markdown-checkbox-face
-    '((t (:inherit markdown-list-face :box (:line-width 1 :style released-button))))
-    "Face for markdown checkboxes.")
-
-  (defun ar/markdown-fontify-checkboxes (last)
-    (when (markdown-match-generic-metadata "^[ \t]*- \\[[ X]\\]" last)
-      (let ((checkbox-begin (match-beginning 0))
-            (checkbox-end (match-end 0))
-            (checkbox-state (match-string 0)))
-        (if (string-match-p "\\[X\\]" checkbox-state)
-            (compose-region (+ checkbox-begin 2) (+ checkbox-begin 5) "☑")
-          (compose-region (+ checkbox-begin 2) (+ checkbox-begin 5) "☐"))
-        (add-text-properties checkbox-begin checkbox-end
-                           '(face ar/markdown-checkbox-face)))
-      t))
-
-  (font-lock-add-keywords 'markdown-mode
-                         '((ar/markdown-fontify-checkboxes)) 'append))
-
-(use-package markdown-toc
-  :defer t
-  :after markdown-mode
-  :hook (markdown-mode . markdown-toc-mode)
-  :config
-  (setq markdown-toc-header-toc-title "\n## Table of Contents"
-        markdown-toc-user-toc-structure-manipulation-fn 'cdr))
 #+end_src
 
 * Version Control
@@ -7090,8 +6945,8 @@ It does NOT activate company-mode - completely safe with Corfu."
 (add-hook 'bash-ts-mode-hook 'my/shell-script-mode/load-prettify-symbols)
 
 ;; Markdown
-(add-hook 'markdown-mode-hook 'my/markdown-mode/load-prettify-symbols)
-(add-hook 'gfm-mode-hook 'my/markdown-mode/load-prettify-symbols)
+;; (add-hook 'markdown-mode-hook 'my/markdown-mode/load-prettify-symbols)
+;; (add-hook 'gfm-mode-hook 'my/markdown-mode/load-prettify-symbols)
 
 ;; LaTeX
 (add-hook 'latex-mode-hook 'my/latex-mode/load-prettify-symbols)
