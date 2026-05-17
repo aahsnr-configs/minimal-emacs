@@ -1209,7 +1209,15 @@ byte-compiled files do not interfere with the reload."
 ** Solaire Mode
 #+begin_src emacs-lisp
 (use-package solaire-mode
-  :init (solaire-global-mode +1))
+  :init
+  (solaire-global-mode +1)
+  :custom
+  ;; Reduce unnecessary refreshes that cause flicker
+  (solaire-mode-refresh-on-buffer-list-change nil)
+  (solaire-mode-refresh-on-window-configuration-change nil)
+  :config
+  ;; Disable solaire-mode in temporary org-src edit buffers
+  (add-hook 'org-src-mode-hook (lambda () (solaire-mode -1))))
 #+end_src
 
 ** Modeline
@@ -5243,41 +5251,35 @@ Arguments are CALLBACK and ignored."
   (hl-todo-highlight-punctuation "")
 
   :config
-  ;; Define keywords with Tokyo Night colors
   (setq hl-todo-keyword-faces
-        '(("TODO"       . "#e0af68")  ; Yellow
-          ("COMMENT"    . "#e0af68")  ; Yellow
-          ("FIXME"      . "#f7768e")  ; Red
-          ("BUG"        . "#f7768e")  ; Red
-          ("ISSUE"      . "#f7768e")  ; Red
-          ("PROG"       . "#7aa2f7")  ; Blue
-          ("TRICK"      . "#ff9e64")  ; Orange
-          ("WORKAROUND" . "#ff9e64")  ; Orange
-          ("BENCHMARK"  . "#9ece6a")  ; Green
-          ("REVIEW"     . "#7dcfff")  ; Cyan
-          ("NOTE"       . "#bb9af7")  ; Purple
-          ("DEPRECATED" . "#73daca")  ; Teal
-          ("HACK"       . "#db4b4b")  ; Darker Red
-          ("DEBUG"      . "#e0af68")  ; Yellow
-          ("STUB"       . "#e0af68"))) ; Yellow
+        '(("TODO"       . "#e0af68")
+          ("COMMENT"    . "#e0af68")
+          ("FIXME"      . "#f7768e")
+          ("BUG"        . "#f7768e")
+          ("ISSUE"      . "#f7768e")
+          ("PROG"       . "#7aa2f7")
+          ("TRICK"      . "#ff9e64")
+          ("WORKAROUND" . "#ff9e64")
+          ("BENCHMARK"  . "#9ece6a")
+          ("REVIEW"     . "#7dcfff")
+          ("NOTE"       . "#bb9af7")
+          ("DEPRECATED" . "#73daca")
+          ("HACK"       . "#db4b4b")
+          ("DEBUG"      . "#e0af68")
+          ("STUB"       . "#e0af68")))
 
-  ;; Enhanced project search function with fallback
   (defun hl-todo-rg-project ()
-    "Use `consult-ripgrep' to find TODO keywords in the current project.
-Falls back to `hl-todo-rgrep' if consult-ripgrep is not available."
     (interactive)
     (let ((regexp (concat "\\b(" (string-join (mapcar #'car hl-todo-keyword-faces) "|") ")\\b")))
       (cond
-       ;; Prefer consult-ripgrep for better UI
        ((fboundp 'consult-ripgrep)
         (consult-ripgrep nil regexp))
-       ;; Fallback to built-in hl-todo-rgrep
        ((fboundp 'hl-todo-rgrep)
         (hl-todo-rgrep))
        (t
         (user-error "Neither consult-ripgrep nor hl-todo-rgrep is available")))))
 
-  ;; Add hl-todo-mode to consult preview hooks for better highlighting
+  ;; Safe registration of consult preview hooks
   (with-eval-after-load 'consult
     (when (boundp 'consult-preview-allowed-hooks)
       (add-to-list 'consult-preview-allowed-hooks 'hl-todo-mode)
@@ -7734,6 +7736,7 @@ With a prefix ARG, remove the start location."
 #+end_src
 
 ** Popper
+
 #+begin_src emacs-lisp
 (use-package popper
   :defer t
