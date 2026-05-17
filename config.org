@@ -3593,61 +3593,61 @@ Top-level keys:
 ** Org Super Agenda
 #+begin_src emacs-lisp
 (use-package org-super-agenda
+  :straight (:type built-in)
   :defer t
   :after org-agenda
   :hook (org-agenda-mode . org-super-agenda-mode)
   :custom
   (org-super-agenda-header-separator "─────────────────────────────────")
-  :init
-  (setq org-super-agenda-groups
-        '((:name "🔴 Overdue"
-           :deadline past
-           :scheduled past
-           :face (:foreground "#f7768e")
-           :order 1)
+  (org-super-agenda-groups
+   '((:name "🔴 Overdue"
+      :deadline past
+      :scheduled past
+      :face (:foreground "#f7768e")
+      :order 1)
 
-          (:name "🔥 GTD Inbox (Process Today)"
-           :todo "INBOX"
-           :file-path "gtd/inbox.org"
-           :order 2)
+     (:name "🔥 GTD Inbox (Process Today)"
+      :todo "INBOX"
+      :file-path "gtd/inbox.org"
+      :order 2)
 
-          (:name "⚡ Today's Schedule"
-           :time-grid t
-           :date today
-           :scheduled today
-           :order 3)
+     (:name "⚡ Today's Schedule"
+      :time-grid t
+      :date today
+      :scheduled today
+      :order 3)
 
-          (:name "🎯 High Priority"
-           :priority "A"
-           :order 4)
+     (:name "🎯 High Priority"
+      :priority "A"
+      :order 4)
 
-          (:name "💻 @Computer"
-           :and (:tag "@computer" :todo ("GTD-NEXT" "NEXT"))
-           :order 5)
+     (:name "💻 @Computer"
+      :and (:tag "@computer" :todo ("GTD-NEXT" "NEXT"))
+      :order 5)
 
-          (:name "🏠 @Home"
-           :and (:tag "@home" :todo ("GTD-NEXT" "NEXT"))
-           :order 6)
+     (:name "🏠 @Home"
+      :and (:tag "@home" :todo ("GTD-NEXT" "NEXT"))
+      :order 6)
 
-          (:name "📞 @Phone"
-           :and (:tag "@phone" :todo ("GTD-NEXT" "NEXT"))
-           :order 7)
+     (:name "📞 @Phone"
+      :and (:tag "@phone" :todo ("GTD-NEXT" "NEXT"))
+      :order 7)
 
-          (:name "🚗 @Errands"
-           :and (:tag "@errands" :todo ("GTD-NEXT" "NEXT"))
-           :order 8)
+     (:name "🚗 @Errands"
+      :and (:tag "@errands" :todo ("GTD-NEXT" "NEXT"))
+      :order 8)
 
-          (:name "⏳ Waiting For"
-           :todo ("GTD-WAIT" "WAIT")
-           :order 9)
+     (:name "⏳ Waiting For"
+      :todo ("GTD-WAIT" "WAIT")
+      :order 9)
 
-          (:name "📆 Due Soon (Next 7 Days)"
-           :deadline future
-           :order 10)
+     (:name "📆 Due Soon (Next 7 Days)"
+      :deadline future
+      :order 10)
 
-          (:name "📋 Other Tasks"
-           :anything t
-           :order 99))))
+     (:name "📋 Other Tasks"
+      :anything t
+      :order 99))))
 #+end_src
 
 ** Org Agenda Custom Commands
