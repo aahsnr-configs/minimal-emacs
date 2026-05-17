@@ -1209,7 +1209,7 @@ byte-compiled files do not interfere with the reload."
 ** Solaire Mode
 #+begin_src emacs-lisp
 (use-package solaire-mode
-  :hook (after-init . solaire-global-mode))
+  :init (solaire-global-mode +1))
 #+end_src
 
 ** Modeline
@@ -7500,7 +7500,6 @@ Reports diagnostics to REPORT-FN."
   (with-eval-after-load 'org
     (add-to-list 'org-src-lang-modes '("kbd" . kbd))))
 #+end_src
-
 
 * Study
 ** PDF Tools
