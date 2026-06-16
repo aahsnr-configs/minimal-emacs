@@ -4231,9 +4231,10 @@ With prefix argument ARG, show all buffers across all perspectives."
 (use-package orderless
   :custom
   (completion-styles '(orderless basic))
-  (completion-category-overrides '((file (styles partial-completion))))
-  (completion-category-defaults nil) ;; Disable defaults, use our settings
-  (completion-pcm-leading-wildcard t)) ;; Emacs 31: partial-completion behaves like substring
+  (completion-category-overrides '((file (styles partial-completion))
+                                   (eglot(styles orderless))))
+  (completion-category-defaults nil)
+  (completion-pcm-leading-wildcard t))
 #+end_src
 
 ** Vertico
@@ -4507,10 +4508,10 @@ targets."
   (corfu-quit-at-boundary t)
   (corfu-quit-no-match t)
   (corfu-count 12)
-  (corfu-preselect 'prompt)
+  (corfu-preselect 'first)
   (corfu-preview-current nil)
   (corfu-on-exact-match 'insert)
-  (corfu-auto-delay 0.1)
+  (corfu-auto-delay 0.0)
   (global-corfu-modes '((not erc-mode
                              eshell-mode
                              circe-mode
@@ -4521,25 +4522,16 @@ targets."
   (read-extended-command-predicate #'command-completion-default-include-p)
   :custom-face
   (corfu-border ((t (:inherit region :background unspecified))))
-  :bind
-  (:map corfu-map
-        ("TAB" . corfu-next)
-        ([tab] . corfu-next)
-        ("S-TAB" . corfu-previous)
-        ([backtab] . corfu-previous)
-        ("M-h" . corfu-info-documentation))
+  :bind (:map corfu-map
+              ("TAB"       . corfu-insert)
+              ("<tab>"     . corfu-insert)
+              ("S-TAB"     . corfu-previous)
+              ("<backtab>" . corfu-previous)
+              ("RET"       . corfu-insert)
+              ("<escape>"  . corfu-quit))
 
-  ;; :bind
-  ;; (:map corfu-map
-  ;;       ("TAB" . corfu-next)
-  ;;       ([tab] . corfu-next)
-  ;;       ("S-TAB" . corfu-previous)
-  ;;       ([backtab] . corfu-previous)
-  ;;       ("RET" . corfu-insert)
-  ;;       ("M-h" . corfu-info-documentation))
   :config
   (corfu-history-mode 1)
-  ;;Quit completion before saving
   (add-hook 'before-save-hook #'corfu-quit)
   (advice-add #'persistent-scratch-save :before #'corfu-quit))
 #+end_src
@@ -4563,49 +4555,6 @@ targets."
 #+end_src
 
 ** Cape
-
-#+begin_comment
-===========================================================================
-CAPE / CORFU CONFIGURATION & DEBUGGING GUIDE
-===========================================================================
-
-CONTEXT:
-Emacs completion in Org Mode source blocks is complex due to three conflicting factors:
-1. Org Mode's Native Completion: Org has its own CAPF (`org-block-capf`) that
-   often aggressively claims priority, preventing other backends from running.
-2. Large File Optimization (JIT Lock): In files >3000 lines, Emacs delays
-   fontification (syntax highlighting). `cape-elisp-block` natively relies on
-   detecting the `org-block` face to know it's inside code. In large files,
-   this face is often missing, causing Cape to fail (return nil).
-3. Syntax Corruption: Even if detection works, standard `elisp-completion-at-point`
-   uses the buffer's global syntax table (Org syntax). In large files, parsing
-   state (`syntax-ppss`) gets corrupted by previous Org headings/drawers, causing
-   the Lisp parser to think it's inside a string/comment and return no results.
-
-THE SOLUTION (`ar/org-elisp-capf`):
-We implement a custom Completion-At-Point Function (CAPF) that:
-1. STRUCTURAL DETECTION: Uses `org-element-at-point` instead of visual faces,
-   guaranteeing detection even in un-fontified large files.
-2. NARROWING: We `narrow-to-region` around the code block content. This is
-   critical because it resets the `syntax-ppss` parser cache, forcing it to
-   parse the Lisp code from a clean state (point-min) without pollution from
-   the preceding 50,000 lines of Org text.
-3. BOUNDARY SAFETY: We manually calculate start/end points to exclude
-   `#+begin_src` headers so the parser sees only pure Lisp code.
-4. SYNTAX SWAPPING: We temporarily enforce `emacs-lisp-mode-syntax-table`
-   so atoms/lists are read correctly.
-
-DEBUGGING / TESTING:
-If completion fails in the future, check these:
-1. Run `M-x describe-char` inside the block. If `face: org-block` is missing,
-   the structural fix is doing its job.
-2. Verify `completion-at-point-functions` variable (C-h v). `ar/org-elisp-capf`
-   must be at the START of the list (depth -100).
-3. If Corfu crashes with "Point outside narrowing", ensure the manual
-   boundary calculation logic handles the current cursor position.
-
-===========================================================================
-#+end_comment
 
 #+begin_src emacs-lisp
 (use-package cape
