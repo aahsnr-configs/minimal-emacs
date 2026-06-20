@@ -804,70 +804,6 @@ byte-compiled files do not interfere with the reload."
 #+end_src
 
 * Editor Behaviour
-** Eldoc Behaviour Documentation
-#+begin_src comment
-=============================================================================
-  ELDOC ARCHITECTURE & BREADCRUMB INTEGRATION GUIDE
-=============================================================================
-
-1. GLOBAL BEHAVIOR & PERFORMANCE
-   - eldoc-idle-delay (0.1s):
-     * What: The time Emacs waits after a cursor movement before showing docs.
-     * Set: via :custom in the eldoc use-package block.
-     * Debug: If docs feel "laggy," increase this. If they feel "slow," decrease.
-   - eldoc-echo-area-use-multiline-p (2):
-     * What: Allows ElDoc to expand the echo area up to 2 lines.
-     * Set: via :custom.
-     * Debug: Check variable value if docs are being cut off prematurely.
-   - eldoc-documentation-strategy (eldoc-documentation-compose):
-     * What: Tells ElDoc to combine results from ALL active backends (e.g., LSP
-       + Breadcrumbs) rather than just picking the first one.
-     * Debug: Check 'eldoc-documentation-functions' to see which backends are active.
-
-2. UI & MANUAL INTERACTION
-   - ar/show-eldoc-buffer (C-h .):
-     * What: A safe wrapper around 'eldoc-doc-buffer'. It forces a full buffer
-       to open with complete documentation.
-     * Debug: If C-h . shows nothing, the current backend lacks a "long-form"
-       doc string. Check the *Messages* buffer for error logs.
-
-3. ORG-MODE BREADCRUMBS (ar/get-org-breadcrumb-string)
-   - What: A structural context engine. It calculates the heading hierarchy
-     (Parent › Current) using 'org-get-outline-path'.
-   - Specific Logic:
-     a) EOB Check: Detects if you are at the bottom of the file.
-     b) Src-Block Check: Returns nil inside code blocks so that LSP/ElDoc can
-        show function signatures instead of headings.
-     c) Face Application: Uses 'shadow' for parents and 'bold-keyword' for
-        the current heading to provide visual depth.
-   - Debug: Run (ar/get-org-breadcrumb-string) in M-x ielm while in an Org
-     file to see the raw string generated.
-
-4. GENERIC CONTEXT FALLBACK (ar/generic-eldoc-backend)
-   - What: When not in Org-mode and not using LSP, this uses 'which-function'
-     to show which class/function your cursor is currently inside.
-   - Dependency: Requires 'which-function-mode' to be 1.
-   - Debug: If context doesn't appear in programming modes, verify
-     'which-function-mode' is active.
-
-5. HOVER SUPPORT (eldoc-mouse)
-   - What: Displays ElDoc documentation in a floating childframe when the
-     mouse hovers over a symbol.
-   - Set: Enabled via 'eldoc-mouse-mode' hook.
-   - Integration: Customizes 'posframe-border' to match your UI theme and
-     disables standard tooltips to prevent "double popups."
-   - Debug: Check if 'childframe-workable-p' returns T. Ensure 'posframe'
-     is installed.
-
-6. DEBUGGING BACKEND PRIORITY
-   - Backend priority is managed via 'add-hook' depth values:
-     * Org Breadcrumbs: -100 (Highest - always runs first).
-     * Generic Context: 0 (Default - runs if others aren't managing).
-   - Debug: Run 'C-h v eldoc-documentation-functions' in any buffer to see
-      the execution order.
-=============================================================================
-#+end_src
-
 ** Child Frame
 #+begin_src emacs-lisp
 (use-package posframe
@@ -892,12 +828,6 @@ byte-compiled files do not interfere with the reload."
             (/ (+ (plist-get info :parent-frame-height)
                   (* 2 (plist-get info :font-height)))
                2)))))
-#+end_src
-
-** Remap C-g to Escape
-#+begin_src emacs-lisp
-;; (keymap-set key-translation-map "C-g" "<escape>")
-;; (keymap-global-set "C-M-g" #'keyboard-quit)
 #+end_src
 
 ** Nerd Icons
@@ -1024,25 +954,6 @@ byte-compiled files do not interfere with the reload."
   :defer t
   :straight (:type built-in)
   :hook (after-init . global-auto-revert-mode))
-#+end_src
-
-** Avy/Ace
-#+begin_src emacs-lisp
-;; ;; Jump to things in Emacs tree-style
-;; (use-package avy
-;;   :hook (after-init . avy-setup-default)
-;;   :config (setq avy-all-windows nil
-;;                 avy-all-windows-alt t
-;;                 avy-background t
-;;                 avy-style 'pre))
-
-;; ;; Kill text between the point and the character CHAR
-;; (use-package avy-zap
-;;   :defer t)
-
-;; ;; Quickly follow links
-;; (use-package ace-link
-;;   :hook (after-init . ace-link-setup-default))
 #+end_src
 
 ** Anzu
@@ -1210,14 +1121,7 @@ byte-compiled files do not interfere with the reload."
 #+begin_src emacs-lisp
 (use-package solaire-mode
   :init
-  (solaire-global-mode +1)
-  :custom
-  ;; Reduce unnecessary refreshes that cause flicker
-  (solaire-mode-refresh-on-buffer-list-change nil)
-  (solaire-mode-refresh-on-window-configuration-change nil)
-  :config
-  ;; Disable solaire-mode in temporary org-src edit buffers
-  (add-hook 'org-src-mode-hook (lambda () (solaire-mode -1))))
+  (solaire-global-mode +1))
 #+end_src
 
 ** Modeline
@@ -1332,151 +1236,6 @@ byte-compiled files do not interfere with the reload."
 
   (add-hook 'evil-visual-state-entry-hook #'ar/disable-hl-line-in-visual)
   (add-hook 'evil-visual-state-exit-hook #'ar/enable-hl-line-after-visual))
-#+end_src
-
-** Prettify Symbols
-#+begin_src emacs-lisp
-;; (defun my/org-prettify-src-blocks ()
-;;   "Prettify org-mode src block delimiters using font-lock and nerd-icons."
-;;   (font-lock-add-keywords nil
-;;     '(;; #+begin_src (with language name)
-;;       ("^[ \t]*\\(#\\+begin_src\\)[ \t]*.*$"
-;;        (1 (prog1 nil
-;;             (let ((icon (nerd-icons-codicon "nf-cod-code")))
-;;               (compose-region (match-beginning 1) (match-end 1) icon)
-;;               (put-text-property (match-beginning 1) (match-end 1)
-;;                                 'face '(:foreground "#9ece6a"))))))
-;;       ;; #+end_src
-;;       ("^[ \t]*\\(#\\+end_src\\)[ \t]*$"
-;;        (1 (prog1 nil
-;;             (let ((icon (nerd-icons-codicon "nf-cod-code")))
-;;               (compose-region (match-beginning 1) (match-end 1) icon)
-;;               (put-text-property (match-beginning 1) (match-end 1)
-;;                                 'face '(:foreground "#9ece6a"))))))
-;;       ;; #+BEGIN_SRC (uppercase)
-;;       ("^[ \t]*\\(#\\+BEGIN_SRC\\)[ \t]*.*$"
-;;        (1 (prog1 nil
-;;             (let ((icon (nerd-icons-codicon "nf-cod-file_code")))
-;;               (compose-region (match-beginning 1) (match-end 1) icon)
-;;               (put-text-property (match-beginning 1) (match-end 1)
-;;                                 'face '(:foreground "#9ece6a"))))))
-;;       ;; #+END_SRC (uppercase)
-;;       ("^[ \t]*\\(#\\+END_SRC\\)[ \t]*$"
-;;        (1 (prog1 nil
-;;             (let ((icon (nerd-icons-codicon "nf-cod-file_code")))
-;;               (compose-region (match-beginning 1) (match-end 1) icon)
-;;               (put-text-property (match-beginning 1) (match-end 1)
-;;                                 'face '(:foreground "#7aa2f7"))))))
-;;       ;; #+begin_example
-;;       ("^[ \t]*\\(#\\+begin_example\\)[ \t]*$"
-;;        (1 (prog1 nil
-;;             (let ((icon (nerd-icons-faicon "nf-fa-quote_left")))
-;;               (compose-region (match-beginning 1) (match-end 1) icon)
-;;               (put-text-property (match-beginning 1) (match-end 1)
-;;                                 'face '(:foreground "#bb9af7"))))))
-;;       ;; #+end_example
-;;       ("^[ \t]*\\(#\\+end_example\\)[ \t]*$"
-;;        (1 (prog1 nil
-;;             (let ((icon (nerd-icons-faicon "nf-fa-quote_right")))
-;;               (compose-region (match-beginning 1) (match-end 1) icon)
-;;               (put-text-property (match-beginning 1) (match-end 1)
-;;                                 'face '(:foreground "#bb9af7"))))))
-;;       ;; #+BEGIN_EXAMPLE
-;;       ("^[ \t]*\\(#\\+BEGIN_EXAMPLE\\)[ \t]*$"
-;;        (1 (prog1 nil
-;;             (let ((icon (nerd-icons-faicon "nf-fa-quote_left")))
-;;               (compose-region (match-beginning 1) (match-end 1) icon)
-;;               (put-text-property (match-beginning 1) (match-end 1)
-;;                                 'face '(:foreground "#bb9af7"))))))
-;;       ;; #+END_EXAMPLE
-;;       ("^[ \t]*\\(#\\+END_EXAMPLE\\)[ \t]*$"
-;;        (1 (prog1 nil
-;;             (let ((icon (nerd-icons-faicon "nf-fa-quote_right")))
-;;               (compose-region (match-beginning 1) (match-end 1) icon)
-;;               (put-text-property (match-beginning 1) (match-end 1)
-;;                                 'face '(:foreground "#bb9af7"))))))
-;;       ;; #+header: or #+HEADER:
-;;       ("^[ \t]*\\(#\\+\\(?:header\\|HEADER\\):\\)[ \t]*"
-;;        (1 (prog1 nil
-;;             (let ((icon (nerd-icons-mdicon "nf-md-cog")))
-;;               (compose-region (match-beginning 1) (match-end 1) icon)
-;;               (put-text-property (match-beginning 1) (match-end 1)
-;;                                 'face '(:foreground "#e0af68"))))))
-;;       ;; #+results: or #+RESULTS:
-;;       ("^[ \t]*\\(#\\+\\(?:results\\|RESULTS\\):\\)[ \t]*"
-;;        (1 (prog1 nil
-;;             (let ((icon (nerd-icons-mdicon "nf-md-chart_line")))
-;;               (compose-region (match-beginning 1) (match-end 1) icon)
-;;               (put-text-property (match-beginning 1) (match-end 1)
-;;                                 'face '(:foreground "#7dcfff"))))))
-;;       ;; #+call: or #+CALL:
-;;       ("^[ \t]*\\(#\\+\\(?:call\\|CALL\\):\\)[ \t]*"
-;;        (1 (prog1 nil
-;;             (let ((icon (nerd-icons-mdicon "nf-md-phone")))
-;;               (compose-region (match-beginning 1) (match-end 1) icon)
-;;               (put-text-property (match-beginning 1) (match-end 1)
-;;                                 'face '(:foreground "#9aa5ce"))))))
-;;       ;; :PROPERTIES: or :properties:
-;;       ("^[ \t]*\\(:\\(?:PROPERTIES\\|properties\\):\\)[ \t]*$"
-;;        (1 (prog1 nil
-;;             (let ((icon (nerd-icons-mdicon "nf-md-folder_cog")))
-;;               (compose-region (match-beginning 1) (match-end 1) icon)
-;;               (put-text-property (match-beginning 1) (match-end 1)
-;;                                 'face '(:foreground "#ff9e64"))))))
-;;       ;; :LOGBOOK: or :logbook:
-;;       ("^[ \t]*\\(:\\(?:LOGBOOK\\|logbook\\):\\)[ \t]*$"
-;;        (1 (prog1 nil
-;;             (let ((icon (nerd-icons-mdicon "nf-md-notebook")))
-;;               (compose-region (match-beginning 1) (match-end 1) icon)
-;;               (put-text-property (match-beginning 1) (match-end 1)
-;;                                 'face '(:foreground "#9ece6a")))))))
-;;     'append))
-
-;; (defvar-local my/org-prettify-overlays-to-restore nil
-;;   "List of overlays to restore after cursor leaves.")
-
-;; (defun my/org-reveal-composition-at-point ()
-;;   "Remove composition from current line if on a prettified org element."
-;;   (when (and (eq major-mode 'org-mode)
-;;              (save-excursion
-;;                (beginning-of-line)
-;;                (looking-at "^[ \t]*\\(?:#\\+\\(?:begin_src\\|end_src\\|BEGIN_SRC\\|END_SRC\\|begin_example\\|end_example\\|BEGIN_EXAMPLE\\|END_EXAMPLE\\|\\(?:header\\|HEADER\\|results\\|RESULTS\\|call\\|CALL\\):\\)\\|:\\(?:PROPERTIES\\|properties\\|LOGBOOK\\|logbook\\):\\)")))
-;;     (let ((line-start (line-beginning-position))
-;;           (line-end (line-end-position)))
-;;       ;; Store the composition for restoration
-;;       (setq my/org-prettify-overlays-to-restore
-;;             (list line-start line-end
-;;                   (get-text-property line-start 'composition)))
-;;       ;; Remove composition
-;;       (with-silent-modifications
-;;         (remove-text-properties line-start line-end '(composition nil face nil))))))
-
-;; (defun my/org-restore-composition-at-point ()
-;;   "Restore composition after leaving the line."
-;;   (when my/org-prettify-overlays-to-restore
-;;     (let ((line-start (line-beginning-position))
-;;           (line-end (line-end-position))
-;;           (old-line-start (nth 0 my/org-prettify-overlays-to-restore))
-;;           (old-line-end (nth 1 my/org-prettify-overlays-to-restore)))
-;;       ;; Only restore if we've moved to a different line
-;;       (when (or (< line-end old-line-start)
-;;                 (> line-start old-line-end))
-;;         ;; Trigger font-lock to reapply
-;;         (font-lock-flush old-line-start old-line-end)
-;;         (setq my/org-prettify-overlays-to-restore nil)))))
-
-;; (defun my/org-setup-prettify-cursor-sensor ()
-;;   "Setup cursor sensor for revealing compositions."
-;;   (add-hook 'post-command-hook #'my/org-reveal-composition-at-point nil t)
-;;   (add-hook 'post-command-hook #'my/org-restore-composition-at-point nil t))
-
-;; (defun my/org-prettify-setup ()
-;;   "Complete setup for org-mode prettification."
-;;   (my/org-prettify-src-blocks)
-;;   (my/org-setup-prettify-cursor-sensor))
-
-;; ;; Add to org-mode hook
-;; (add-hook 'org-mode-hook #'my/org-prettify-setup)
 #+end_src
 
 ** Ediff
@@ -1607,7 +1366,6 @@ and sets up vim-style navigation."
               (select-window (get-buffer-window ediff-control-buffer)))))
 #+end_src
 
-** Scroll Mode
 ** Visual Fill Column
 #+begin_src emacs-lisp
 (use-package visual-fill-column
@@ -4441,12 +4199,6 @@ Enrich existing commands with completion annotations
         (let ((embark-quit-after-action nil))
           (embark-dwim)))))
 
-  ;; Hide the mode line of the Embark live/completions buffers
-  (add-to-list 'display-buffer-alist
-               '("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
-                 nil
-                 (window-parameters (mode-line-format . none))))
-
   (with-no-warnings
     (with-eval-after-load 'which-key
       (defun embark-which-key-indicator ()
@@ -4505,13 +4257,14 @@ targets."
   :custom
   (corfu-cycle t)
   (corfu-auto t)
-  (corfu-quit-at-boundary t)
+  (corfu-quit-at-boundary nil)
   (corfu-quit-no-match t)
   (corfu-count 12)
   (corfu-preselect 'first)
-  (corfu-preview-current nil)
+  (corfu-preview-current 'insert)
   (corfu-on-exact-match 'insert)
-  (corfu-auto-delay 0.0)
+  (corfu-auto-delay 0.15)
+  (corfu-auto-prefix 2)
   (global-corfu-modes '((not erc-mode
                              eshell-mode
                              circe-mode
@@ -4523,8 +4276,8 @@ targets."
   :custom-face
   (corfu-border ((t (:inherit region :background unspecified))))
   :bind (:map corfu-map
-              ("TAB"       . corfu-insert)
-              ("<tab>"     . corfu-insert)
+              ("TAB"       . corfu-next)
+              ("<tab>"     . corfu-next)
               ("S-TAB"     . corfu-previous)
               ("<backtab>" . corfu-previous)
               ("RET"       . corfu-insert)
@@ -4555,23 +4308,21 @@ targets."
 #+end_src
 
 ** Cape
-
 #+begin_src emacs-lisp
 (use-package cape
   :init
-  ;; 1. Global Setup
-  (add-hook 'completion-at-point-functions #'cape-tex)
-  (add-hook 'completion-at-point-functions #'cape-dict)
-  (add-hook 'completion-at-point-functions #'cape-dabbrev)
-  (add-hook 'completion-at-point-functions #'cape-file)
   (add-hook 'completion-at-point-functions #'cape-keyword)
+  (add-hook 'completion-at-point-functions #'cape-file)
+  (defun ar/cape-dabbrev-accept-all ()
+    "Like `cape-dabbrev' but accepts all inputs (cape README example 5).
+Required when `corfu-auto' is t for `corfu-preselect' to auto-insert
+the first candidate on popup open."
+    (cape-wrap-accept-all #'cape-dabbrev))
+  (add-hook 'completion-at-point-functions #'ar/cape-dabbrev-accept-all)
 
-  ;; NOTE: We do NOT add cape-elisp-block globally here.
-  ;; We use the custom function below for Org mode instead.
+  (add-hook 'completion-at-point-functions #'cape-dict)
+  (add-hook 'completion-at-point-functions #'cape-tex)
 
-  ;; -----------------------------------------------------------------------
-  ;; 2. Robust Elisp Completion for Large Org Files (Narrowing Strategy)
-  ;; -----------------------------------------------------------------------
   (defun ar/org-elisp-capf ()
     "A robust Capf for Elisp in Org mode.
     It identifies the block, narrows to the inner content (excluding headers),
@@ -4617,9 +4368,6 @@ targets."
 
   (add-hook 'org-mode-hook #'ar/setup-org-cape-completion)
 
-  ;; -----------------------------------------------------------------------
-  ;; 3. Advice Wrappers
-  ;; -----------------------------------------------------------------------
   (advice-add #'lsp-completion-at-point :around #'cape-wrap-noninterruptible)
   (advice-add #'lsp-completion-at-point :around #'cape-wrap-nonexclusive)
   (advice-add #'comint-completion-at-point :around #'cape-wrap-nonexclusive)
@@ -4782,9 +4530,6 @@ targets."
   :custom
   (apheleia-log-only-errors t)
   :config
-  ;; === THE CORRECTED LSP BRIDGE ===
-  ;; We use cl-defun because Apheleia v3+ passes arguments as keywords.
-  ;; Note: 'buffer' is the original buffer, 'scratch' is where formatting should happen.
   (cl-defun ar/apheleia-format-with-eglot (&key buffer scratch callback &allow-other-keys)
     "Format with Eglot if available; otherwise return nil to fallback."
     (with-current-buffer buffer
@@ -6591,8 +6336,8 @@ It does NOT activate company-mode - completely safe with Corfu."
       (kbd "M-r") #'ar/eshell-consult-history
       (kbd "C-d") #'eshell-life-is-too-much
       (kbd "C-l") #'ar/eshell-clear)))
-
 #+end_src
+
 * Prettify Symbols
 ** Common Prettify Symbols
 #+begin_src emacs-lisp

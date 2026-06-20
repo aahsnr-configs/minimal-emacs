@@ -117,7 +117,6 @@
 
   ;; Make narrowing help available
   (define-key consult-narrow-map (vconcat consult-narrow-key "?") #'consult-narrow-help))
-#+end_src
 
 (use-package consult-dir :defer t)
 
@@ -332,7 +331,6 @@ targets."
   (advice-add #'comint-completion-at-point :around #'cape-wrap-nonexclusive)
   (advice-add #'eglot-completion-at-point :around #'cape-wrap-nonexclusive)
   (advice-add #'pcomplete-completions-at-point :around #'cape-wrap-nonexclusive))
-#+end_src
 
 (use-package dabbrev
   :straight (:type built-in)
