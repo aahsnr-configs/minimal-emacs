@@ -7128,19 +7128,25 @@ Reports diagnostics to REPORT-FN."
 
 ** Python
 #+begin_src emacs-lisp
+;; (with-eval-after-load 'eglot
+;;   (add-to-list 'eglot-server-programs
+;;                '((python-ts-mode python-mode) "basedpyright-langserver" "--stdio")))
+
+;; (setq-default eglot-workspace-configuration
+;;               '(:basedpyright
+;;                 ( :typeCheckingMode      "standard"
+;;                   :disableOrganizeImports t)
+;;                 :basedpyright.analysis
+;;                 ( :autoImportCompletions  t
+;;                   :autoSearchPaths        t
+;;                   :diagnosticMode         "workspace"
+;;                   :useLibraryCodeForTypes t)))
+
+
 (with-eval-after-load 'eglot
   (add-to-list 'eglot-server-programs
-               '((python-ts-mode python-mode) "basedpyright-langserver" "--stdio")))
-
-(setq-default eglot-workspace-configuration
-              '(:basedpyright
-                ( :typeCheckingMode      "standard"
-                  :disableOrganizeImports t)
-                :basedpyright.analysis
-                ( :autoImportCompletions  t
-                  :autoSearchPaths        t
-                  :diagnosticMode         "workspace"
-                  :useLibraryCodeForTypes t)))
+               `((python-ts-mode python-mode)
+                 . ,(eglot-alternatives '(("pyrefly" "lsp"))))))
 
 (use-package flymake-ruff
   :hook (eglot-managed-mode . flymake-ruff-load))
