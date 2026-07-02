@@ -1,4 +1,5 @@
 - [ ] implement the email setup
 - [ ] move customs.el to var
 - [ ] add more padding to emacs buffer
-- [ ] move perspective-state to var/
+- [ ] move perspective-state to var/ or etc/
+- [ ] move tree-sitter grammars to var/ or etc/
