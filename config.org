@@ -14,99 +14,114 @@
 
 ** Garbage Collection
 #+begin_src emacs-lisp
-;; CRITICAL: Restore GC after startup with optimized values
-(defvar better-gc-cons-threshold (* 80 1024 1024)  ;; 128MB
-  "Optimal GC threshold for modern LSP-heavy workflows.
-Lower this if you experience freezing, raise if stuttering.")
+;; ;; CRITICAL: Restore GC after startup with optimized values
+;; (defvar better-gc-cons-threshold (* 80 1024 1024)  ;; 128MB
+;;   "Optimal GC threshold for modern LSP-heavy workflows.
+;; Lower this if you experience freezing, raise if stuttering.")
 
-(defvar better-gc-cons-percentage 0.1
-  "GC percentage of heap to trigger collection.")
+;; (defvar better-gc-cons-percentage 0.1
+;;   "GC percentage of heap to trigger collection.")
 
-;; Restore GC settings after startup
-(add-hook 'elpaca-after-init-hook
-          (lambda ()
-            (setq gc-cons-threshold better-gc-cons-threshold
-                  gc-cons-percentage better-gc-cons-percentage)
+;; ;; Restore GC settings after startup
+;; (add-hook 'emacs-startup-hook
+;;           (lambda ()
+;;             (setq gc-cons-threshold better-gc-cons-threshold
+;;                   gc-cons-percentage better-gc-cons-percentage)
 
-            ;; FIX: Only restore file handlers if the original variable actually exists
-            (when (boundp 'file-name-handler-alist-original)
-              (setq file-name-handler-alist file-name-handler-alist-original)
-              (makunbound 'file-name-handler-alist-original))
+;;             ;; FIX: Only restore file handlers if the original variable actually exists
+;;             (when (boundp 'file-name-handler-alist-original)
+;;               (setq file-name-handler-alist file-name-handler-alist-original)
+;;               (makunbound 'file-name-handler-alist-original))
 
-            ;; Report startup time
-            (message "Emacs loaded in %.2fs with %d GCs"
-                     (float-time (time-subtract after-init-time before-init-time))
-                     gcs-done))
-          101) ;; Run late to ensure accurate timing
+;;             ;; Report startup time
+;;             (message "Emacs loaded in %.2fs with %d GCs"
+;;                      (float-time (time-subtract after-init-time before-init-time))
+;;                      gcs-done))
+;;           101) ;; Run late to ensure accurate timing
 
-;; Increase GC threshold in minibuffer to prevent slowdowns during completion
-(add-hook 'elpaca-after-init-hook
-          (lambda ()
-            (defun gc-minibuffer-setup-hook ()
-              (setq gc-cons-threshold (* better-gc-cons-threshold 2)))
+;; ;; Increase GC threshold in minibuffer to prevent slowdowns during completion
+;; (add-hook 'emacs-startup-hook
+;;           (lambda ()
+;;             (defun gc-minibuffer-setup-hook ()
+;;               (setq gc-cons-threshold (* better-gc-cons-threshold 2)))
 
-            (defun gc-minibuffer-exit-hook ()
-              (garbage-collect)
-              (setq gc-cons-threshold better-gc-cons-threshold))
+;;             (defun gc-minibuffer-exit-hook ()
+;;               (garbage-collect)
+;;               (setq gc-cons-threshold better-gc-cons-threshold))
 
-            (add-hook 'minibuffer-setup-hook #'gc-minibuffer-setup-hook)
-            (add-hook 'minibuffer-exit-hook #'gc-minibuffer-exit-hook)))
+;;             (add-hook 'minibuffer-setup-hook #'gc-minibuffer-setup-hook)
+;;             (add-hook 'minibuffer-exit-hook #'gc-minibuffer-exit-hook)))
 #+end_src
 
 ** Package Management
 #+begin_src emacs-lisp
-(defvar elpaca-installer-version 0.12)
-(defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
-(defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
-(defvar elpaca-sources-directory (expand-file-name "sources/" elpaca-directory))
-(defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
-                              :ref nil :depth 1 :inherit ignore
-                              :files (:defaults "elpaca-test.el" (:exclude "extensions"))
-                              :build (:not elpaca-activate)))
-(let* ((repo  (expand-file-name "elpaca/" elpaca-sources-directory))
-       (build (expand-file-name "elpaca/" elpaca-builds-directory))
-       (order (cdr elpaca-order))
-       (default-directory repo))
-  (add-to-list 'load-path (if (file-exists-p build) build repo))
-  (unless (file-exists-p repo)
-    (make-directory repo t)
-    (when (<= emacs-major-version 28) (require 'subr-x))
-    (condition-case-unless-debug err
-        (if-let* ((buffer (pop-to-buffer-same-window "*elpaca-bootstrap*"))
-                  ((zerop (apply #'call-process `("git" nil ,buffer t "clone"
-                                                  ,@(when-let* ((depth (plist-get order :depth)))
-                                                      (list (format "--depth=%d" depth) "--no-single-branch"))
-                                                  ,(plist-get order :repo) ,repo))))
-                  ((zerop (call-process "git" nil buffer t "checkout"
-                                        (or (plist-get order :ref) "--"))))
-                  (emacs (concat invocation-directory invocation-name))
-                  ((zerop (call-process emacs nil buffer nil "-Q" "-L" "." "--batch"
-                                        "--eval" "(byte-recompile-directory \".\" 0 'force)")))
-                  ((require 'elpaca))
-                  ((elpaca-generate-autoloads "elpaca" repo)))
-            (progn (message "%s" (buffer-string)) (kill-buffer buffer))
-          (error "%s" (with-current-buffer buffer (buffer-string))))
-      ((error) (warn "%s" err) (delete-directory repo 'recursive))))
-  (unless (require 'elpaca-autoloads nil t)
-    (require 'elpaca)
-    (elpaca-generate-autoloads "elpaca" repo)
-    (let ((load-source-file-function nil)) (load "./elpaca-autoloads"))))
-(add-hook 'after-init-hook #'elpaca-process-queues)
-(elpaca `(,@elpaca-order))
+(setq load-prefer-newer t)
 
-(elpaca elpaca-use-package
-  ;; Enable use-package :ensure support for Elpaca.
-  (elpaca-use-package-mode))
+(setq package-user-dir (expand-file-name "var/elpa/" user-emacs-directory))
 
-(require 'use-package)
+(require 'package)
+
+(setq package-archives '(("gnu" . "https://elpa.gnu.org/packages/")
+                         ("nongnu" . "https://elpa.nongnu.org/nongnu/")
+                         ("melpa" . "https://melpa.org/packages/")))
+
+(package-initialize)
+(unless package-archive-contents
+  (package-refresh-contents))
+
+(unless (package-installed-p 'no-littering)
+  (package-install 'no-littering))
+
+(require 'no-littering)
+
+(setq custom-file (no-littering-expand-etc-file-name "custom.el"))
+(when (file-exists-p custom-file)
+  (load custom-file))
+
+(no-littering-theme-backups)
+
+;; Local personal libraries
+(add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
+
+(eval-when-compile (require 'use-package))
 (require 'bind-key)
 
-;; --- USE-PACKAGE CONFIGURATION ---
 (setq use-package-verbose nil
       use-package-expand-minimally t
       use-package-always-ensure t
       use-package-compute-statistics nil
       use-package-enable-imenu-support t)
+#+end_src
+
+** TODO Compile Angel
+#+begin_src emacs-lisp
+(use-package compile-angel
+  :demand t
+  :config
+  (setq compile-angel-verbose t)
+
+  ;; Uncomment the line below to compile automatically when an Elisp file is saved
+  ;; (add-hook 'emacs-lisp-mode-hook #'compile-angel-on-save-local-mode)
+
+  ;; The following directive prevents compile-angel from compiling your init
+  ;; files. If you choose to remove this push to `compile-angel-excluded-path-suffixes'
+  (push "/init.el" compile-angel-excluded-path-suffixes)
+  (push "/early-init.el" compile-angel-excluded-path-suffixes)
+
+  ;; A global mode that compiles .el files when they are loaded
+  ;; using `load' or `require'.
+  (compile-angel-on-load-mode 1))
+
+;; Explicit, not just relying on compile-angel's own defaults:
+(setq compile-angel-enable-byte-compile t)
+(setq compile-angel-enable-native-compile t)
+
+;; Don't leave half-finished .eln files in /tmp if you quit mid-compile
+(setq native-comp-async-query-on-exit t)
+(setq confirm-kill-processes t)
+
+;; Exclude anything you don't want silently compiled (adjust to taste)
+;; (setq compile-angel-excluded-files-regexps '("/\\.dir-config\\.el$"))
 #+end_src
 
 ** Custom Functions
@@ -236,18 +251,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   "Emacs is 31 or above.")
 #+end_src
 
-** Custom File
-#+begin_src emacs-lisp
-(setq custom-file (expand-file-name "customs.el" user-emacs-directory))
-(add-hook 'emacs-startup-hook (lambda () (load custom-file 'noerror)))
-#+end_src
-
-** Load File
-#+begin_src emacs-lisp
-;; Prioritize local lisp directory in load-path
-(add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
-#+end_src
-
 ** Performance Tuning
 #+begin_src emacs-lisp
 (setq-default bidi-display-reordering nil
@@ -304,9 +307,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 
 ** Small Configs
 #+begin_src emacs-lisp
-;; Move backup files to dedicated directory
-(setq backup-directory-alist `(("." . ,(expand-file-name ".backup" user-emacs-directory))))
-
 ;; Explicitly disable bzr, svn, hg to prevent TRAMP errors
 (setq vc-handled-backends '(Git))
 
@@ -358,11 +358,12 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Garbage Collector Magic Hack
 #+begin_src emacs-lisp
 (use-package gcmh
-  :hook (elpaca-after-init . gcmh-mode)
+  :unless (fboundp 'igc-info)
+  :hook (after-init . gcmh-mode)
   :init
-  ;; Match early-init.el restoration value
   (setq gcmh-idle-delay 'auto
-        gcmh-high-cons-threshold (* 80 1024 1024)))
+        gcmh-auto-idle-delay-factor 10
+        gcmh-high-cons-threshold (* 64 1024 1024)))
 #+end_src
 
 ** UTF-8 Coding System
@@ -376,33 +377,17 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 (setq locale-coding-system 'utf-8)
 #+end_src
 
-** Environment
-#+begin_src emacs-lisp
-(use-package exec-path-from-shell
-  :defer t
-  :custom
-  (exec-path-from-shell-variables
-   '("PATH" "MANPATH"
-     "OPENAI_API_KEY" "ANTHROPIC_API_KEY"
-     "XAI_API_KEY" "DEEPSEEK_API_KEY"
-     "OPENROUTER_API_KEY" "GEMINI_API_KEY"
-     "HF_TOKEN"))
-  :config
-  (when (daemonp)
-    (exec-path-from-shell-initialize)))
-#+end_src
-
 ** Session Management
 #+begin_src emacs-lisp
 ;; Save place
 (use-package saveplace
   :ensure nil
-  :hook (elpaca-after-init . save-place-mode))
+  :hook (after-init . save-place-mode))
 
 ;; History with symlink resolution
 (use-package recentf
   :ensure nil
-  :hook (elpaca-after-init . recentf-mode)
+  :hook (after-init . recentf-mode)
   :init
   (setq recentf-max-saved-items 300
         recentf-exclude
@@ -414,8 +399,14 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
   :config
   (push (expand-file-name recentf-save-file) recentf-exclude)
 
-  ;; CRITICAL: Resolve symlinks FIRST, then abbreviate
-  ;; This ensures ~/org/todo.org and ~/Git/.../org/todo.org become the same
+  ;; Keep recentf from listing no-littering's own housekeeping files.
+  ;; Must be `add-to-list', and must be here (post-:init), not in
+  ;; Package Management — the :init `setq' above would otherwise wipe it.
+  (add-to-list 'recentf-exclude
+               (recentf-expand-file-name no-littering-var-directory))
+  (add-to-list 'recentf-exclude
+               (recentf-expand-file-name no-littering-etc-directory))
+
   (setq recentf-filename-handlers
         '(file-truename        ; Resolve symlinks to real path
           abbreviate-file-name)) ; Then abbreviate for display
@@ -434,7 +425,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 
 (use-package savehist
   :ensure nil
-  :hook (elpaca-after-init . savehist-mode)
+  :hook (after-init . savehist-mode)
   :init
   (setq enable-recursive-minibuffers t
         history-length 1000
@@ -539,7 +530,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 
 (use-package undo-fu-session
   :commands undo-fu-session-global-mode
-  :hook (elpaca-after-init . undo-fu-session-global-mode))
+  :hook (after-init . undo-fu-session-global-mode))
 #+end_src
 
 ** Goto Chg
@@ -556,7 +547,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Evil
 #+begin_src emacs-lisp
 (use-package evil
-  :ensure (:wait t)
   :demand t
   :init
   ;; Core Settings
@@ -852,7 +842,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Transient
 #+begin_src emacs-lisp
 (use-package transient
-  :ensure (:wait t)
   :init
   (setq resize-mini-windows t)
 
@@ -944,20 +933,20 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 
 ** Cross Referencing Commands
 #+begin_src emacs-lisp
-(use-package xref
-  :ensure nil
-  :defer t
-  :autoload xref-show-definitions-completing-read
-  :bind (("M-g ." . xref-find-definitions)
-         ("M-g ," . xref-go-back))
-  :init
-  ;; Use faster search tool
-  (when (executable-find "rg")
-    (setq xref-search-program 'ripgrep))
+;; (use-package xref
+;;   :ensure nil
+;;   :defer t
+;;   :autoload xref-show-definitions-completing-read
+;;   :bind (("M-g ." . xref-find-definitions)
+;;          ("M-g ," . xref-go-back))
+;;   :init
+;;   ;; Use faster search tool
+;;   (when (executable-find "rg")
+;;     (setq xref-search-program 'ripgrep))
 
-  ;; Select from xref candidates in minibuffer
-  (setq xref-show-definitions-function #'xref-show-definitions-completing-read
-        xref-show-xrefs-function #'xref-show-definitions-completing-read))
+;;   ;; Select from xref candidates in minibuffer
+;;   (setq xref-show-definitions-function #'xref-show-definitions-completing-read
+;;         xref-show-xrefs-function #'xref-show-definitions-completing-read))
 #+end_src
 
 ** Autorevert
@@ -985,7 +974,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 #+begin_src emacs-lisp
 (use-package elec-pair
   :ensure nil
-  :hook (elpaca-after-init . electric-pair-mode)
+  :hook (after-init . electric-pair-mode)
   :init (setq electric-pair-inhibit-predicate 'electric-pair-conservative-inhibit))
 #+end_src
 
@@ -1011,7 +1000,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Buffer Terminator
 #+begin_src emacs-lisp
 (use-package buffer-terminator
-  :hook (elpaca-after-init . buffer-terminator-mode)
+  :hook (after-init . buffer-terminator-mode)
   :custom
   (buffer-terminator-verbose nil)
   (buffer-terminator-inactivity-timeout (* 30 60))
@@ -1041,7 +1030,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Jinx
 #+begin_src emacs-lisp
 (use-package jinx
-  :hook (elpaca-after-init . jinx-mode)
+  :hook (after-init . jinx-mode)
   :custom
   ;; Sensibly disable Jinx in modes where spell-checking is not desired.
   ;; This includes programming modes, UI-centric modes, and special buffers.
@@ -1142,7 +1131,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 (setq-default mode-line-percent-position nil)
 
 (use-package doom-modeline
-  :hook (elpaca-after-init . doom-modeline-mode)
+  :hook (after-init . doom-modeline-mode)
   :hook (doom-modeline-mode . column-number-mode)
   :init
   (setq doom-modeline-bar-width 3
@@ -1199,7 +1188,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ** Text Scaling
 #+begin_src emacs-lisp
 (use-package default-text-scale
-  :hook (elpaca-after-init . default-text-scale-mode))
+  :hook (after-init . default-text-scale-mode))
 #+end_src
 
 ** Scrolling
@@ -1219,7 +1208,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 ;; Smooth scrolling
 (use-package ultra-scroll
   :functions (hl-todo-mode diff-hl-flydiff-mode)
-  :hook (elpaca-after-init . ultra-scroll-mode)
+  :hook (after-init . ultra-scroll-mode)
   :config
   (add-hook 'ultra-scroll-hide-functions #'diff-hl-flydiff-mode)
   (add-hook 'ultra-scroll-hide-functions #'hl-todo-mode)
@@ -1231,7 +1220,7 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 #+begin_src emacs-lisp
 (use-package hl-line
   :ensure nil
-  :hook ((elpaca-after-init . global-hl-line-mode)
+  :hook ((after-init . global-hl-line-mode)
          ((dashboard-mode eshell-mode shell-mode term-mode vterm-mode) .
           (lambda () (setq-local global-hl-line-mode nil))))
   :config
@@ -1630,7 +1619,7 @@ and sets up vim-style navigation."
 ** Diff-hl
 #+begin_src emacs-lisp
 (use-package diff-hl
-  :hook ((elpaca-after-init . global-diff-hl-mode)
+  :hook ((after-init . global-diff-hl-mode)
          (dired-mode . diff-hl-dired-mode))
   :hook (magit-pre-refresh . diff-hl-magit-pre-refresh)
   :hook (magit-post-refresh . diff-hl-magit-post-refresh)
@@ -3788,7 +3777,7 @@ Top-level keys:
 *** Core
 #+begin_src emacs-lisp
 (use-package perspective
-  :hook (elpaca-after-init . persp-mode)
+  :hook (after-init . persp-mode)
 
   :custom
   (persp-initial-frame-name "main")
@@ -3980,7 +3969,7 @@ Enrich existing commands with completion annotations
 (use-package marginalia
   :init
   :commands (marginalia-mode marginalia-cycle)
-  :hook (elpaca-after-init . marginalia-mode)
+  :hook (after-init . marginalia-mode)
   :config
   (setq marginalia-max-relative-age 0 ; Always show absolute time
         marginalia-align 'right))
@@ -4353,117 +4342,131 @@ the first candidate on popup open."
 ** Direnv
 #+begin_src emacs-lisp
 (use-package envrc
-  :hook (elpaca-after-init . envrc-global-mode))
+  :hook (after-init . envrc-global-mode))
 #+end_src
 
-** LSP
+** TODO LSP
+*Replace eglot with lsp-mode*
 #+begin_src emacs-lisp
-(use-package eglot
-  :straight (:type built-in)
-  :defer t
-  :hook
-  ((prog-mode . (lambda ()
-                  (unless (derived-mode-p
-                           'emacs-lisp-mode 'lisp-mode
-                           'makefile-mode 'snippet-mode
-                           'ron-mode)
-                    (eglot-ensure))))
-   ((markdown-mode yaml-mode yaml-ts-mode) . eglot-ensure))
-
+(use-package lsp-mode
+  :hook ((lsp-mode . lsp-diagnostics-mode)
+         (lsp-mode . lsp-completion-mode-maybe))
   :custom
-  (eglot-events-buffer-size 0)
-  (eglot-send-changes-idle-time 0.5)
-  (eglot-autoshutdown nil)
-  (eglot-sync-connect 0)
-  (eglot-extend-to-xref nil)
-  (eglot-ignored-server-capabilities
-   '(:documentFormattingProvider
-     :documentRangeFormattingProvider
-     :documentOnTypeFormattingProvider
-     :foldingRangeProvider
-     :documentHighlightProvider)))
-
-(use-package eglot-booster
-  :straight (:host github :repo "jdtsmith/eglot-booster")
-  :after eglot
+  (lsp-keymap-prefix "C-c l")
+  (lsp-diagnostics-provider :flymake)
+  (lsp-completion-provider :none)
+  (lsp-session-file (expand-file-name ".lsp-session" user-emacs-directory))
+  (lsp-log-io nil)
+  (lsp-keep-workspace-alive nil)
+  (lsp-idle-delay 0.5)
+  ;; core
+  (lsp-enable-xref t)
+  (lsp-auto-configure nil)
+  (lsp-eldoc-enable-hover nil)
+  (lsp-enable-dap-auto-configure nil)
+  (lsp-enable-file-watchers nil)
+  (lsp-enable-folding nil)
+  (lsp-enable-imenu nil)
+  (lsp-enable-indentation nil)
+  (lsp-enable-links nil)
+  (lsp-enable-on-type-formatting nil)
+  (lsp-enable-suggest-server-download nil)
+  (lsp-enable-symbol-highlighting nil)
+  (lsp-enable-text-document-color nil)
+  ;; completion
+  (lsp-completion-enable t)
+  (lsp-completion-enable-additional-text-edit nil)
+  (lsp-enable-snippet nil)
+  (lsp-completion-show-kind nil)
+  ;; headerline
+  (lsp-headerline-breadcrumb-enable nil)
+  (lsp-headerline-breadcrumb-enable-diagnostics nil)
+  (lsp-headerline-breadcrumb-enable-symbol-numbers nil)
+  (lsp-headerline-breadcrumb-icons-enable nil)
+  ;; modeline
+  (lsp-modeline-code-actions-enable nil)
+  (lsp-modeline-diagnostics-enable nil)
+  (lsp-modeline-workspace-status-enable nil)
+  (lsp-signature-doc-lines 1)
+  ;; lens
+  (lsp-lens-enable nil)
+  ;; semantic
+  (lsp-semantic-tokens-enable nil)
   :init
-  (setq eglot-booster-io-only
-        (and (> emacs-major-version 29)
-             (not (functionp 'json-rpc-connection))))
-  :config
-  (eglot-booster-mode))
+  (setq lsp-use-plists t))
 
-(use-package org-src-context
-  :straight (:type built-in) ; Relies on lisp/org-src-context.el
-  :hook (after-init . org-src-context-mode)
-  :custom
-  ;; Visual: Set to 'nil' to see the grayed-out context surrounding your block.
-  ;; Set to 't' if you prefer a focused view (narrowed to just your code).
-  (org-src-context-narrow-p nil)
+;; (use-package org-src-context
+;;   :straight (:type built-in) ; Relies on lisp/org-src-context.el
+;;   :hook (after-init . org-src-context-mode)
+;;   :custom
+;;   ;; Visual: Set to 'nil' to see the grayed-out context surrounding your block.
+;;   ;; Set to 't' if you prefer a focused view (narrowed to just your code).
+;;   (org-src-context-narrow-p nil)
 
-  ;; Safety: Disable context injection for files larger than 500KB to prevent lag.
-  (org-src-context-max-filesize 500000)
+;;   ;; Safety: Disable context injection for files larger than 500KB to prevent lag.
+;;   (org-src-context-max-filesize 500000)
 
-  :config
-  ;; Enable Apheleia (auto-formatting) inside the edit buffer.
-  ;; The patched org-src-context ensures a valid file path exists for this to work.
-  (with-eval-after-load 'apheleia
-    (add-hook 'org-src-mode-hook
-              (lambda ()
-                (apheleia-mode 1)))))
+;;   :config
+;;   ;; Enable Apheleia (auto-formatting) inside the edit buffer.
+;;   ;; The patched org-src-context ensures a valid file path exists for this to work.
+;;   (with-eval-after-load 'apheleia
+;;     (add-hook 'org-src-mode-hook
+;;               (lambda ()
+;;                 (apheleia-mode 1)))))
 
-;; Integration with Consult for searching symbols
-(use-package consult-eglot
-  :defer t
-  :after consult
-  :bind (:map eglot-mode-map
-         ("C-M-." . consult-eglot-symbols)))
+;; ;; Integration with Consult for searching symbols
+;; (use-package consult-eglot
+;;   :defer t
+;;   :after consult
+;;   :bind (:map eglot-mode-map
+;;          ("C-M-." . consult-eglot-symbols)))
 
-(use-package consult-eglot-embark :defer t)
+;; (use-package consult-eglot-embark :defer t)
 
 #+end_src
 
-** Syntax Checking
+** TODO Syntax Checking
+*Replace flymake with flycheck*
 #+begin_src emacs-lisp
-(use-package flymake
-  :straight (:type built-in)
-  :defer t
-  :hook (prog-mode . flymake-mode)
-  :custom
-  ;; Doom-inspired behavior: better navigation and visual density
-  (flymake-fringe-indicator-position 'right-fringe)
-  (flymake-wrap-around t)
-  (flymake-suppress-zero-counters t)
-  (flymake-no-changes-timeout 0.5)
-  (flymake-start-on-save-buffer t)
-  :config
-  ;; UI: Doom Emacs Double-Arrow Fringe Bitmaps
-  (define-fringe-bitmap 'ar/flymake-double-arrow
-    [#b00000000 #b00010000 #b00011000 #b00011100 #b00011110
-     #b00011100 #b00011000 #b00010000 #b00000000])
+;; (use-package flymake
+;;   :straight (:type built-in)
+;;   :defer t
+;;   :hook (prog-mode . flymake-mode)
+;;   :custom
+;;   ;; Doom-inspired behavior: better navigation and visual density
+;;   (flymake-fringe-indicator-position 'right-fringe)
+;;   (flymake-wrap-around t)
+;;   (flymake-suppress-zero-counters t)
+;;   (flymake-no-changes-timeout 0.5)
+;;   (flymake-start-on-save-buffer t)
+;;   :config
+;;   ;; UI: Doom Emacs Double-Arrow Fringe Bitmaps
+;;   (define-fringe-bitmap 'ar/flymake-double-arrow
+;;     [#b00000000 #b00010000 #b00011000 #b00011100 #b00011110
+;;      #b00011100 #b00011000 #b00010000 #b00000000])
 
-  (setq flymake-error-bitmap   '(ar/flymake-double-arrow flymake-error)
-        flymake-warning-bitmap '(ar/flymake-double-arrow flymake-warning)
-        flymake-note-bitmap    '(ar/flymake-double-arrow flymake-note))
+;;   (setq flymake-error-bitmap   '(ar/flymake-double-arrow flymake-error)
+;;         flymake-warning-bitmap '(ar/flymake-double-arrow flymake-warning)
+;;         flymake-note-bitmap    '(ar/flymake-double-arrow flymake-note))
 
-  ;; UI: Nerd Icons in Diagnostics Buffer (SPC c B)
-  (defun ar/flymake-diagnostics-buffer-icons ()
-    "Apply nerd-icons to the Flymake diagnostics buffer."
-    (when (derived-mode-p 'flymake-diagnostics-mode)
-      (save-excursion
-        (goto-char (point-min))
-        (while (re-search-forward "^\\s-*\\(error\\|warning\\|note\\)" nil t)
-          (let* ((type (match-string 1))
-                 (icon (pcase type
-                         ("error"   (nerd-icons-faicon "nf-fa-times_circle" :face 'flymake-error))
-                         ("warning" (nerd-icons-faicon "nf-fa-exclamation_circle" :face 'flymake-warning))
-                         ("note"    (nerd-icons-faicon "nf-fa-info_circle" :face 'flymake-note)))))
-            (add-text-properties (match-beginning 1) (match-end 1) `(display ,icon)))))))
-  (add-hook 'flymake-diagnostics-mode-hook #'ar/flymake-diagnostics-buffer-icons)
+;;   ;; UI: Nerd Icons in Diagnostics Buffer (SPC c B)
+;;   (defun ar/flymake-diagnostics-buffer-icons ()
+;;     "Apply nerd-icons to the Flymake diagnostics buffer."
+;;     (when (derived-mode-p 'flymake-diagnostics-mode)
+;;       (save-excursion
+;;         (goto-char (point-min))
+;;         (while (re-search-forward "^\\s-*\\(error\\|warning\\|note\\)" nil t)
+;;           (let* ((type (match-string 1))
+;;                  (icon (pcase type
+;;                          ("error"   (nerd-icons-faicon "nf-fa-times_circle" :face 'flymake-error))
+;;                          ("warning" (nerd-icons-faicon "nf-fa-exclamation_circle" :face 'flymake-warning))
+;;                          ("note"    (nerd-icons-faicon "nf-fa-info_circle" :face 'flymake-note)))))
+;;             (add-text-properties (match-beginning 1) (match-end 1) `(display ,icon)))))))
+;;   (add-hook 'flymake-diagnostics-mode-hook #'ar/flymake-diagnostics-buffer-icons)
 
-  ;; Navigation Logic
-  (defun ar/flymake-next-error () (interactive) (flymake-goto-next-error 1 '(:error :warning) t))
-  (defun ar/flymake-prev-error () (interactive) (flymake-goto-prev-error 1 '(:error :warning) t)))
+;;   ;; Navigation Logic
+;;   (defun ar/flymake-next-error () (interactive) (flymake-goto-next-error 1 '(:error :warning) t))
+;;   (defun ar/flymake-prev-error () (interactive) (flymake-goto-prev-error 1 '(:error :warning) t)))
 
 ;; (use-package flymake-popon
 ;;   :hook (flymake-mode . flymake-popon-mode)
@@ -4479,7 +4482,7 @@ the first candidate on popup open."
 ** Formatting
 #+begin_src emacs-lisp
 (use-package apheleia
-  :hook (elpaca-after-init . apheleia-global-mode)
+  :hook (after-init . apheleia-global-mode)
   :custom
   (apheleia-log-only-errors t)
   :config
@@ -4841,22 +4844,15 @@ the first candidate on popup open."
       (add-to-list 'consult-preview-allowed-hooks 'global-hl-todo-mode))))
 #+end_src
 
-** TODO flymake-todo
+** TODO flycheck-todo
 *replace with flycheck*
 #+begin_src emacs-lisp
-;; (with-eval-after-load 'hl-todo
-;;   (with-eval-after-load 'flymake
-;;     ;; Helper function to register hl-todo-flymake
-;;     (defun ar/hl-todo-flymake-enable ()
-;;       "Enable hl-todo-flymake in the current buffer."
-;;       (when (and (bound-and-true-p hl-todo-mode)
-;;                  (fboundp 'hl-todo-flymake))
-;;         (add-hook 'flymake-diagnostic-functions #'hl-todo-flymake nil t)))
-
-;;     ;; Add to relevant modes
-;;     (add-hook 'prog-mode-hook #'ar/hl-todo-flymake-enable)
-;;     (add-hook 'text-mode-hook #'ar/hl-todo-flymake-enable)
-;;     (add-hook 'conf-mode-hook #'ar/hl-todo-flymake-enable)))
+(use-package flycheck-hl-todo
+  :ensure t
+  :defer 5 ; Need to be initialized after the rest of checkers
+  :vc (:fetcher github :repo "alvarogonzalezsotillo/flycheck-hl-todo")
+  :config
+  (flycheck-hl-todo-setup))
 #+end_src
 
 ** consult-todo
@@ -4964,7 +4960,7 @@ the first candidate on popup open."
 #+begin_src emacs-lisp
 (use-package paren
   :ensure nil
-  :hook (elpaca-after-init . show-paren-mode)
+  :hook (after-init . show-paren-mode)
   :custom
   (show-paren-delay 0.05)
   (show-paren-highlight-openparen t)
@@ -5947,264 +5943,8 @@ This bibliography file can be used with both LaTeX and Org documents."
   (which-key-popup-type 'minibuffer))
 #+end_src
 
-** TODO vi-fringe
-*no longer needed*
-#+begin_src emacs-lisp
-;; Display tildes beyond end-of-buffer like Vim/Neovim
-;; (defface ar/vi-tilde-face
-;;   '((t (:inherit font-lock-comment-face)))
-;;   "Face for tildes displayed beyond end of buffer."
-;;   :group 'ar)
-
-;; (defvar-local ar/vi-tilde-bitmap
-;;   [#b00000000
-;;    #b01100011
-;;    #b11010110
-;;    #b10001100
-;;    #b00000000]
-;;   "Tilde bitmap for fringe.")
-
-;; (when (display-graphic-p)
-;;   (define-fringe-bitmap 'ar/vi-tilde-bitmap
-;;     [#b00000000
-;;      #b01100011
-;;      #b11010110
-;;      #b10001100
-;;      #b00000000]
-;;     nil nil 'center))
-
-;; (defun ar/vi-tilde-display ()
-;;   "Add tilde indicators to lines beyond end of buffer."
-;;   (when (and (display-graphic-p) ar/vi-tilde-mode)
-;;     (save-excursion
-;;       ;; Remove old overlays
-;;       (remove-overlays (point-min) (point-max) 'ar/vi-tilde t)
-;;       ;; Find last actual line
-;;       (goto-char (point-max))
-;;       (unless (bolp) (forward-line 1))
-;;       ;; Add tildes to visible empty lines beyond EOF
-;;       (let ((eof-pos (point))
-;;             (window-end-pos (window-end nil t)))
-;;         (when (< eof-pos window-end-pos)
-;;           (goto-char eof-pos)
-;;           (while (and (not (eobp))
-;;                       (<= (point) window-end-pos))
-;;             (let ((ov (make-overlay (point) (point))))
-;;               (overlay-put ov 'ar/vi-tilde t)
-;;               (overlay-put ov 'before-string
-;;                           (propertize " " 'display
-;;                                      '(left-fringe ar/vi-tilde-bitmap
-;;                                                    ar/vi-tilde-face))))
-;;             (forward-line 1)))))))
-
-;; (define-minor-mode ar/vi-tilde-mode
-;;   "Display tildes in fringe for lines beyond end of buffer."
-;;   :lighter nil
-;;   :group 'ar
-;;   (if ar/vi-tilde-mode
-;;       (progn
-;;         (ar/vi-tilde-display)
-;;         (add-hook 'window-scroll-functions #'ar/vi-tilde--on-scroll nil t)
-;;         (add-hook 'window-configuration-change-hook #'ar/vi-tilde-display nil t))
-;;     (remove-overlays (point-min) (point-max) 'ar/vi-tilde t)
-;;     (remove-hook 'window-scroll-functions #'ar/vi-tilde--on-scroll t)
-;;     (remove-hook 'window-configuration-change-hook #'ar/vi-tilde-display t)))
-
-;; (defun ar/vi-tilde--on-scroll (_window _display-start)
-;;   "Update tildes when scrolling."
-;;   (ar/vi-tilde-display))
-
-;; ;; Enable for relevant modes
-;; (dolist (hook '(prog-mode-hook text-mode-hook conf-mode-hook))
-;;   (add-hook hook #'ar/vi-tilde-mode))
-#+end_src
-
 * TODO Terminal
 *Replace eshell with term from doom emacs modules*
-#+begin_src emacs-lisp
-;; (use-package eshell
-;;   :straight (:type built-in)
-;;   :defer t
-;;   :commands (eshell ar/eshell-toggle ar/eshell-new)
-;;   :hook ((eshell-mode . (lambda ()
-;;                           ;; Disable line numbers
-;;                           (when (bound-and-true-p display-line-numbers-mode)
-;;                             (display-line-numbers-mode -1))
-;;                           ;; Corfu manual completion only
-;;                           (setq-local corfu-auto nil))))
-;;   :custom
-;;   ;; Kill processes without confirmation
-;;   (eshell-kill-processes-on-exit t)
-;;   (eshell-destroy-buffer-when-process-dies nil)
-
-;;   ;; Remove banner
-;;   (eshell-banner-message "")
-
-;;   ;; Scrolling
-;;   (eshell-scroll-to-bottom-on-input 'this)
-;;   (eshell-scroll-show-maximum-output t)
-;;   (eshell-scroll-to-bottom-on-output nil)
-
-;;   ;; History
-;;   (eshell-history-size 10000)
-;;   (eshell-hist-ignoredups t)
-;;   (eshell-save-history-on-exit t)
-
-;;   ;; Buffer management
-;;   (eshell-buffer-maximum-lines 20000)
-
-;;   ;; Visual commands (programs requiring terminal emulation)
-;;   (eshell-visual-commands
-;;    '("top" "htop" "btop" "less" "more" "vim" "vi" "nano" "emacs"
-;;      "ssh" "tail" "watch" "ncdu" "ranger" "htop" "tmux" "screen"
-;;      "python" "ipython" "node" "ruby" "irb"))
-;;   (eshell-visual-subcommands
-;;    '(("git" "log" "diff" "show" "help")
-;;      ("docker" "run" "exec" "logs" "attach")
-;;      ("podman" "run" "exec" "logs" "attach")))
-;;   (eshell-visual-options
-;;    '(("git" "--help" "--paginate")))
-
-;;   ;; Prefer Lisp implementations
-;;   (eshell-prefer-lisp-functions t)
-;;   (eshell-prefer-lisp-variables t)
-
-;;   :config
-;;   ;; Suppress PAGER
-;;   (setenv "PAGER" "cat")
-
-;;   ;; === TOGGLE FUNCTION ===
-;;   (defun ar/eshell-toggle ()
-;;     "Toggle eshell popup window. Works from any Evil state."
-;;     (interactive)
-;;     (let* ((eshell-buffer-name "*eshell*")
-;;            (eshell-buffer (get-buffer eshell-buffer-name))
-;;            (eshell-window (and eshell-buffer (get-buffer-window eshell-buffer))))
-;;       (if eshell-window
-;;           ;; If visible, hide it
-;;           (progn
-;;             (delete-window eshell-window)
-;;             (message "Eshell hidden"))
-;;         ;; Otherwise, show it
-;;         (let ((display-buffer-alist
-;;                '(("\\*eshell\\*"
-;;                   (display-buffer-at-bottom)
-;;                   (window-height . 0.33)
-;;                   (dedicated . t)))))
-;;           (if eshell-buffer
-;;               (pop-to-buffer eshell-buffer)
-;;             (eshell))
-;;           (message "Eshell opened")))))
-
-;;   ;; === NEW ESHELL INSTANCE ===
-;;   (defun ar/eshell-new ()
-;;     "Create a new eshell buffer."
-;;     (interactive)
-;;     (let ((buf (generate-new-buffer "*eshell*")))
-;;       (with-current-buffer buf
-;;         (eshell-mode))
-;;       (pop-to-buffer buf)))
-
-;;   ;; === CLEAR BUFFER ===
-;;   (defun ar/eshell-clear ()
-;;     "Clear the eshell buffer."
-;;     (interactive)
-;;     (let ((inhibit-read-only t))
-;;       (erase-buffer)
-;;       (eshell-send-input)))
-
-;;   ;; === ALIASES ===
-;;   (defalias 'eshell/clear #'ar/eshell-clear)
-;;   (defalias 'eshell/ff #'find-file)
-;;   (defalias 'eshell/fo #'find-file-other-window)
-;;   (defalias 'eshell/d #'dired)
-;;   (defalias 'eshell/e #'find-file)
-;;   (defalias 'eshell/eh #'find-file-other-window)
-;;   (defalias 'eshell/v #'view-file)
-;;   (defalias 'eshell/l #'eshell/ls)
-;;   (defalias 'eshell/ll #'eshell/ls)
-
-;;   ;; === GIT BRANCH HELPER ===
-;;   (defun ar/eshell-git-branch ()
-;;     "Get current git branch if in repository."
-;;     (when (and (not (file-remote-p default-directory))
-;;                (executable-find "git")
-;;                (locate-dominating-file default-directory ".git"))
-;;       (let ((branch (string-trim
-;;                      (shell-command-to-string
-;;                       "git rev-parse --abbrev-ref HEAD 2>/dev/null"))))
-;;         (if (and branch (not (string-empty-p branch)))
-;;             (concat " " (propertize (concat "(" branch ")")
-;;                                    'face '(:foreground "#7aa2f7")))
-;;           ""))))
-
-;;   ;; === CUSTOM PROMPT ===
-;;   (setq eshell-prompt-function
-;;         (lambda ()
-;;           (concat
-;;            (propertize (abbreviate-file-name (eshell/pwd))
-;;                       'face '(:foreground "#bb9af7"))
-;;            (ar/eshell-git-branch)
-;;            (propertize (if (zerop (user-uid)) " # " " $ ")
-;;                       'face '(:foreground "#9ece6a" :weight bold)))))
-
-;;   (setq eshell-prompt-regexp "^[^#$\n]* [#$] "))
-
-;; ;; === GLOBAL TOGGLE KEYBINDING (works in ALL states) ===
-;; (global-set-key (kbd "C-c e") #'ar/eshell-toggle)
-
-;; ;; === COMPLETION WITH CAPE ===
-;; (with-eval-after-load 'eshell
-;;   (with-eval-after-load 'cape
-;;     (defun ar/eshell-setup-completion ()
-;;       "Setup completion for eshell."
-;;       (setq-local completion-at-point-functions
-;;                   (list (cape-capf-super
-;;                          #'pcomplete-completions-at-point
-;;                          #'cape-file))))
-;;     (add-hook 'eshell-mode-hook #'ar/eshell-setup-completion)))
-
-;; ;; === HISTORY WITH CONSULT ===
-;; (with-eval-after-load 'eshell
-;;   (with-eval-after-load 'consult
-;;     (defun ar/eshell-consult-history ()
-;;       "Browse eshell history with Consult."
-;;       (interactive)
-;;       (require 'em-hist)
-;;       (let* ((start-pos (save-excursion (eshell-bol) (point)))
-;;              (end-pos (point))
-;;              (input (buffer-substring-no-properties start-pos end-pos))
-;;              (history (delete-dups
-;;                       (mapcar (lambda (x) (substring-no-properties x))
-;;                               (ring-elements eshell-history-ring)))))
-;;         (let ((selected (consult--read history
-;;                                       :prompt "History: "
-;;                                       :initial input
-;;                                       :sort nil
-;;                                       :category 'eshell-history)))
-;;           (when selected
-;;             (delete-region start-pos end-pos)
-;;             (insert selected)))))))
-
-;; ;; === EVIL INTEGRATION ===
-;; (with-eval-after-load 'evil
-;;   (with-eval-after-load 'eshell
-;;     ;; Insert state bindings
-;;     (evil-define-key 'insert eshell-mode-map
-;;       (kbd "C-r") #'ar/eshell-consult-history
-;;       (kbd "M-r") #'ar/eshell-consult-history
-;;       (kbd "C-d") #'eshell-delchar-or-maybe-eof
-;;       (kbd "C-a") #'eshell-bol
-;;       (kbd "C-e") #'end-of-line
-;;       (kbd "C-u") #'eshell-kill-input)
-
-;;     ;; Normal state bindings
-;;     (evil-define-key 'normal eshell-mode-map
-;;       (kbd "C-r") #'ar/eshell-consult-history
-;;       (kbd "M-r") #'ar/eshell-consult-history
-;;       (kbd "C-d") #'eshell-life-is-too-much
-;;       (kbd "C-l") #'ar/eshell-clear)))
-#+end_src
 
 * Prettify Symbols
 ** Common Prettify Symbols
@@ -7024,7 +6764,7 @@ This bibliography file can be used with both LaTeX and Org documents."
 ;;   :hook (eglot-managed-mode . flymake-ruff-load))
 
 (use-package python
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :custom
   (python-shell-completion-native-enable nil)
@@ -7317,7 +7057,7 @@ This bibliography file can be used with both LaTeX and Org documents."
   :custom
   (popper-group-function #'popper-group-by-directory)
   (popper-echo-dispatch-actions t)
-  :hook (elpaca-after-init . popper-echo-mode)
+  :hook (after-init . popper-echo-mode)
   :init
   (setq popper-mode-line ""
         popper-reference-buffers

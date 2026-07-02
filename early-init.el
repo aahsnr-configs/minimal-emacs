@@ -1,4 +1,4 @@
-;;; early-init.el --- Doom-Style Early Initialization -*- no-byte-compile: t; lexical-binding: t; -*-
+;;; early-init.el --- Early Initialization -*- no-byte-compile: t; lexical-binding: t; -*-
 ;;; Commentary:
 ;;; Code:
 
@@ -6,7 +6,7 @@
 (let ((file-name-handler-alist-original file-name-handler-alist))
 
   ;; ====================
-  ;; MAXIMUM GC DEFERRAL (Doom Strategy)
+  ;; MAXIMUM GC DEFERRAL (startup-optimization trick, framework-agnostic)
   ;; ====================
   (setq gc-cons-threshold most-positive-fixnum
         gc-cons-percentage 1.0)
@@ -15,7 +15,7 @@
   (setq file-name-handler-alist nil)
 
   ;; ====================
-  ;; REDISPLAY OPTIMIZATIONS (Doom's Secret Sauce)
+  ;; REDISPLAY OPTIMIZATIONS
   ;; ====================
   (setq redisplay-skip-fontification-on-input t)  ; Skip font-lock during fast input
   (setq fast-but-imprecise-scrolling t)
@@ -30,14 +30,38 @@
   ;; ====================
   ;; PACKAGE SYSTEM
   ;; ====================
+  ;; package-enable-at-startup nil means Emacs will NOT auto-call
+  ;; `package-initialize' before loading init.el. Because of that, init.el
+  ;; MUST call `(package-initialize)' itself, after setting `package-archives'
+  ;; (which must include "melpa" -- no-littering is not on GNU/NonGNU ELPA)
+  ;; and BEFORE `(require 'no-littering)'. This is not optional bookkeeping;
+  ;; without it, `package-install' has nothing to install into/from.
   (setq package-enable-at-startup nil)
 
   ;; ====================
   ;; NATIVE COMPILATION
   ;; ====================
 
-  ;; ;; Make Emacs Native-compile .elc files asynchronously by setting
+  ;; Redirect the eln-cache into the no-littering var/ tree. This has to
+  ;; happen here, in early-init.el, before native compilation of anything
+  ;; (including no-littering itself) can occur -- no-littering can't theme
+  ;; this variable for us because it isn't installed/loaded yet at this
+  ;; point in startup. The path below is written out by hand to match what
+  ;; `no-littering-var-directory' will resolve to once init.el runs
+  ;; (default: "var/" under `user-emacs-directory'). If you override
+  ;; `no-littering-var-directory' in init.el, update this path to match.
+  (when (and (fboundp 'startup-redirect-eln-cache)
+             (fboundp 'native-comp-available-p)
+             (native-comp-available-p))
+    (startup-redirect-eln-cache
+     (convert-standard-filename
+      (expand-file-name "var/eln-cache/" user-emacs-directory))))
+
+  ;; ;; Make Emacs native-compile .elc files asynchronously by setting
   ;; ;; `native-comp-jit-compilation' to t.
+  ;; ;; Left commented out deliberately: this is Emacs's own default since
+  ;; ;; 29+, and compile-angel.el (configured separately in init.el) expects
+  ;; ;; it to stay at its default rather than being disabled.
   ;; (setq native-comp-jit-compilation t)
   ;; (setq byte-compile-warnings '(not free-vars unresolved noruntime lexical make-local))
 
