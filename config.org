@@ -15,7 +15,7 @@
 ** Garbage Collection
 #+begin_src emacs-lisp
 ;; CRITICAL: Restore GC after startup with optimized values
-(defvar better-gc-cons-threshold (* 128 1024 1024)  ;; 128MB
+(defvar better-gc-cons-threshold (* 80 1024 1024)  ;; 128MB
   "Optimal GC threshold for modern LSP-heavy workflows.
 Lower this if you experience freezing, raise if stuttering.")
 
@@ -23,7 +23,7 @@ Lower this if you experience freezing, raise if stuttering.")
   "GC percentage of heap to trigger collection.")
 
 ;; Restore GC settings after startup
-(add-hook 'emacs-startup-hook
+(add-hook 'elpaca-after-init-hook
           (lambda ()
             (setq gc-cons-threshold better-gc-cons-threshold
                   gc-cons-percentage better-gc-cons-percentage)
@@ -40,7 +40,7 @@ Lower this if you experience freezing, raise if stuttering.")
           101) ;; Run late to ensure accurate timing
 
 ;; Increase GC threshold in minibuffer to prevent slowdowns during completion
-(add-hook 'emacs-startup-hook
+(add-hook 'elpaca-after-init-hook
           (lambda ()
             (defun gc-minibuffer-setup-hook ()
               (setq gc-cons-threshold (* better-gc-cons-threshold 2)))
@@ -55,30 +55,56 @@ Lower this if you experience freezing, raise if stuttering.")
 
 ** Package Management
 #+begin_src emacs-lisp
-(setq straight-check-at-startup nil)
+(defvar elpaca-installer-version 0.12)
+(defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
+(defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
+(defvar elpaca-sources-directory (expand-file-name "sources/" elpaca-directory))
+(defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
+                              :ref nil :depth 1 :inherit ignore
+                              :files (:defaults "elpaca-test.el" (:exclude "extensions"))
+                              :build (:not elpaca-activate)))
+(let* ((repo  (expand-file-name "elpaca/" elpaca-sources-directory))
+       (build (expand-file-name "elpaca/" elpaca-builds-directory))
+       (order (cdr elpaca-order))
+       (default-directory repo))
+  (add-to-list 'load-path (if (file-exists-p build) build repo))
+  (unless (file-exists-p repo)
+    (make-directory repo t)
+    (when (<= emacs-major-version 28) (require 'subr-x))
+    (condition-case-unless-debug err
+        (if-let* ((buffer (pop-to-buffer-same-window "*elpaca-bootstrap*"))
+                  ((zerop (apply #'call-process `("git" nil ,buffer t "clone"
+                                                  ,@(when-let* ((depth (plist-get order :depth)))
+                                                      (list (format "--depth=%d" depth) "--no-single-branch"))
+                                                  ,(plist-get order :repo) ,repo))))
+                  ((zerop (call-process "git" nil buffer t "checkout"
+                                        (or (plist-get order :ref) "--"))))
+                  (emacs (concat invocation-directory invocation-name))
+                  ((zerop (call-process emacs nil buffer nil "-Q" "-L" "." "--batch"
+                                        "--eval" "(byte-recompile-directory \".\" 0 'force)")))
+                  ((require 'elpaca))
+                  ((elpaca-generate-autoloads "elpaca" repo)))
+            (progn (message "%s" (buffer-string)) (kill-buffer buffer))
+          (error "%s" (with-current-buffer buffer (buffer-string))))
+      ((error) (warn "%s" err) (delete-directory repo 'recursive))))
+  (unless (require 'elpaca-autoloads nil t)
+    (require 'elpaca)
+    (elpaca-generate-autoloads "elpaca" repo)
+    (let ((load-source-file-function nil)) (load "./elpaca-autoloads"))))
+(add-hook 'after-init-hook #'elpaca-process-queues)
+(elpaca `(,@elpaca-order))
 
-(defvar bootstrap-version)
-(let ((bootstrap-file
-       (expand-file-name
-        "straight/repos/straight.el/bootstrap.el"
-        (or (bound-and-true-p straight-base-dir)
-            user-emacs-directory)))
-      (bootstrap-version 7))
-  (unless (file-exists-p bootstrap-file)
-    (with-current-buffer
-        (url-retrieve-synchronously
-         "https://raw.githubusercontent.com/radian-software/straight.el/develop/install.el"
-         'silent 'inhibit-cookies)
-      (goto-char (point-max))
-      (eval-print-last-sexp)))
-  (load bootstrap-file nil 'nomessage))
+(elpaca elpaca-use-package
+  ;; Enable use-package :ensure support for Elpaca.
+  (elpaca-use-package-mode))
 
-(straight-use-package 'use-package)
-(straight-use-package 'esup)
+(require 'use-package)
+(require 'bind-key)
 
-(setq straight-use-package-by-default t)
+;; --- USE-PACKAGE CONFIGURATION ---
 (setq use-package-verbose nil
       use-package-expand-minimally t
+      use-package-always-ensure t
       use-package-compute-statistics nil
       use-package-enable-imenu-support t)
 #+end_src
@@ -110,49 +136,50 @@ Lower this if you experience freezing, raise if stuttering.")
 
 (defun reload-init-file ()
   "Tangle and reload the Emacs configuration from config.org.
-This function is optimized for use with straight.el by ensuring stale
-byte-compiled files do not interfere with the reload."
+This function is designed for use with package.el.
+
+IMPORTANT: This does NOT fully restart Emacs. Some changes (especially
+removed keybindings, hooks, or modes) will persist until you restart Emacs."
   (interactive)
   (let* ((config-org (expand-file-name "config.org" user-emacs-directory))
          (init-el (expand-file-name "init.el" user-emacs-directory))
-         (init-elc (expand-file-name "init.elc" user-emacs-directory))
          (start-time (current-time)))
 
+    ;; Check if config.org exists
     (unless (file-exists-p config-org)
       (user-error "Configuration file %s not found!" config-org))
 
-    (when (yes-or-no-p "Tangle and reload configuration? ")
+    ;; Confirm before reloading
+    (when (yes-or-no-p "Reload configuration? (This won't reset removed keybindings/hooks) ")
       (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
       (message "Tangling configuration from config.org...")
 
+      ;; Tangle the org file
       (condition-case err
-          (progn
-            ;; Ensure Org Babel is loaded for tangling
-            (require 'org)
-            (require 'ob-tangle)
-            (org-babel-tangle-file config-org init-el "emacs-lisp"))
+          (org-babel-tangle-file config-org init-el "emacs-lisp")
         (error
          (user-error "Failed to tangle config.org: %s" (error-message-string err))))
 
       (message "✓ Tangling complete")
-
-      (when (file-exists-p init-elc)
-        (delete-file init-elc)
-        (message "✓ Removed stale init.elc"))
-
       (message "Loading init.el...")
+
+      ;; Load the tangled init file
       (condition-case err
           (load-file init-el)
         (error
          (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
          (user-error "Failed to load init.el: %s" (error-message-string err))))
 
+      ;; Calculate load time
       (let ((elapsed-time (float-time (time-subtract (current-time) start-time))))
         (message "✓ Configuration loaded successfully")
         (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         (message "Reload completed in %.2f seconds" elapsed-time)
         (message "")
-        (message "NOTE: Some changes (removed hooks/packages) require a full restart.")
+        (message "NOTE: Some changes require a full Emacs restart:")
+        (message "  • Removed keybindings, hooks, or modes")
+        (message "  • Package installations/removals")
+        (message "  • Major structural changes")
         (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")))))
 
 (defun my/auto-tangle-config-org ()
@@ -173,28 +200,12 @@ byte-compiled files do not interfere with the reload."
       (buffer-substring-no-properties (region-beginning) (region-end))
     (thing-at-point 'symbol t)))
 
-
-(defun ar/eglot-status ()
-  "Show the running Eglot server name and command in the echo area."
+(defun ar/open-emacs-config-project ()
+  "Open Emacs config directory as a project."
   (interactive)
-  ;; 1. Safely check if eglot is loaded AND an active server exists
-  (if (and (fboundp 'eglot-current-server)
-           (eglot-current-server))
-      (let* ((server (eglot-current-server))
-             (proc (jsonrpc--process server))
-             ;; 2. Ensure it's a real process before asking for its command
-             (cmd (and (processp proc) (process-command proc)))
-             ;; 3. Gracefully handle TCP/Network connections or missing commands
-             (cmd-str (cond
-                       ((listp cmd) (string-join cmd " "))
-                       ((stringp cmd) cmd)
-                       (t "Network/External Connection"))))
+  (let ((default-directory user-emacs-directory))
+    (call-interactively #'project-find-file)))
 
-        (message "LSP: %s | Command: %s"
-                 (propertize (jsonrpc-name server) 'face 'font-lock-keyword-face)
-                 (propertize cmd-str 'face 'font-lock-string-face)))
-
-    (message "No Eglot server managing this buffer.")))
 #+end_src
 
 ** Constants
@@ -347,11 +358,11 @@ byte-compiled files do not interfere with the reload."
 ** Garbage Collector Magic Hack
 #+begin_src emacs-lisp
 (use-package gcmh
-  :hook (after-init . gcmh-mode)
+  :hook (elpaca-after-init . gcmh-mode)
   :init
   ;; Match early-init.el restoration value
   (setq gcmh-idle-delay 'auto
-        gcmh-high-cons-threshold (* 128 1024 1024)))
+        gcmh-high-cons-threshold (* 80 1024 1024)))
 #+end_src
 
 ** UTF-8 Coding System
@@ -385,13 +396,13 @@ byte-compiled files do not interfere with the reload."
 #+begin_src emacs-lisp
 ;; Save place
 (use-package saveplace
-  :straight (:type built-in)
-  :hook (after-init . save-place-mode))
+  :ensure nil
+  :hook (elpaca-after-init . save-place-mode))
 
 ;; History with symlink resolution
 (use-package recentf
-  :straight (:type built-in)
-  :hook (after-init . recentf-mode)
+  :ensure nil
+  :hook (elpaca-after-init . recentf-mode)
   :init
   (setq recentf-max-saved-items 300
         recentf-exclude
@@ -422,8 +433,8 @@ byte-compiled files do not interfere with the reload."
   (add-to-list 'recentf-exclude #'ar/exclude-org-agenda-files))
 
 (use-package savehist
-  :straight (:type built-in)
-  :hook (after-init . savehist-mode)
+  :ensure nil
+  :hook (elpaca-after-init . savehist-mode)
   :init
   (setq enable-recursive-minibuffers t
         history-length 1000
@@ -438,7 +449,7 @@ byte-compiled files do not interfere with the reload."
 ** Misc
 #+begin_src emacs-lisp
 (use-package simple
-  :straight (:type built-in)
+  :ensure nil
   :hook ((text-mode . visual-line-mode)
          ((prog-mode markdown-mode conf-mode) . enable-trailing-whitespace))
   :init
@@ -528,7 +539,7 @@ byte-compiled files do not interfere with the reload."
 
 (use-package undo-fu-session
   :commands undo-fu-session-global-mode
-  :hook (after-init . undo-fu-session-global-mode))
+  :hook (elpaca-after-init . undo-fu-session-global-mode))
 #+end_src
 
 ** Goto Chg
@@ -545,6 +556,7 @@ byte-compiled files do not interfere with the reload."
 ** Evil
 #+begin_src emacs-lisp
 (use-package evil
+  :ensure (:wait t)
   :demand t
   :init
   ;; Core Settings
@@ -635,7 +647,6 @@ byte-compiled files do not interfere with the reload."
 #+begin_src emacs-lisp
 (use-package evil-collection
   :after evil
-  :ensure t
   :init
   ;; It has to be defined before evil-colllection
   (setq evil-collection-setup-minibuffer t)
@@ -841,6 +852,7 @@ byte-compiled files do not interfere with the reload."
 ** Transient
 #+begin_src emacs-lisp
 (use-package transient
+  :ensure (:wait t)
   :init
   (setq resize-mini-windows t)
 
@@ -933,7 +945,7 @@ byte-compiled files do not interfere with the reload."
 ** Cross Referencing Commands
 #+begin_src emacs-lisp
 (use-package xref
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :autoload xref-show-definitions-completing-read
   :bind (("M-g ." . xref-find-definitions)
@@ -952,7 +964,7 @@ byte-compiled files do not interfere with the reload."
 #+begin_src emacs-lisp
 (use-package autorevert
   :defer t
-  :straight (:type built-in)
+  :ensure nil
   :hook (after-init . global-auto-revert-mode))
 #+end_src
 
@@ -972,8 +984,8 @@ byte-compiled files do not interfere with the reload."
 ** Automatic parenthesis pairing
 #+begin_src emacs-lisp
 (use-package elec-pair
-  :straight (:type built-in)
-  :hook (after-init . electric-pair-mode)
+  :ensure nil
+  :hook (elpaca-after-init . electric-pair-mode)
   :init (setq electric-pair-inhibit-predicate 'electric-pair-conservative-inhibit))
 #+end_src
 
@@ -991,7 +1003,7 @@ byte-compiled files do not interfere with the reload."
 #+begin_src emacs-lisp
 (use-package subword
   :defer t
-  :straight (:type built-in)
+  :ensure nil
   :hook ((prog-mode . subword-mode)
          (minibuffer-setup . subword-mode)))
 #+end_src
@@ -999,7 +1011,7 @@ byte-compiled files do not interfere with the reload."
 ** Buffer Terminator
 #+begin_src emacs-lisp
 (use-package buffer-terminator
-  :hook (after-init . buffer-terminator-mode)
+  :hook (elpaca-after-init . buffer-terminator-mode)
   :custom
   (buffer-terminator-verbose nil)
   (buffer-terminator-inactivity-timeout (* 30 60))
@@ -1029,7 +1041,7 @@ byte-compiled files do not interfere with the reload."
 ** Jinx
 #+begin_src emacs-lisp
 (use-package jinx
-  :hook (after-init . jinx-mode)
+  :hook (elpaca-after-init . jinx-mode)
   :custom
   ;; Sensibly disable Jinx in modes where spell-checking is not desired.
   ;; This includes programming modes, UI-centric modes, and special buffers.
@@ -1130,7 +1142,7 @@ byte-compiled files do not interfere with the reload."
 (setq-default mode-line-percent-position nil)
 
 (use-package doom-modeline
-  :hook (after-init . doom-modeline-mode)
+  :hook (elpaca-after-init . doom-modeline-mode)
   :hook (doom-modeline-mode . column-number-mode)
   :init
   (setq doom-modeline-bar-width 3
@@ -1168,7 +1180,7 @@ byte-compiled files do not interfere with the reload."
 ** Line Numbers
 #+begin_src emacs-lisp
 (use-package display-line-numbers
-  :straight (:type built-in)
+  :ensure nil
   :hook ((prog-mode
           conf-mode toml-ts-mode
           yaml-mode yaml-ts-mode)
@@ -1187,7 +1199,7 @@ byte-compiled files do not interfere with the reload."
 ** Text Scaling
 #+begin_src emacs-lisp
 (use-package default-text-scale
-  :hook (after-init . default-text-scale-mode))
+  :hook (elpaca-after-init . default-text-scale-mode))
 #+end_src
 
 ** Scrolling
@@ -1205,22 +1217,21 @@ byte-compiled files do not interfere with the reload."
       mouse-wheel-progressive-speed nil)
 
 ;; Smooth scrolling
-(when (fboundp 'pixel-scroll-precision-mode) ;; 29+
-  (use-package ultra-scroll
-    :functions (hl-todo-mode diff-hl-flydiff-mode)
-    :hook (after-init . ultra-scroll-mode)
-    :config
-    (add-hook 'ultra-scroll-hide-functions #'diff-hl-flydiff-mode)
-    (add-hook 'ultra-scroll-hide-functions #'hl-todo-mode)
-    (add-hook 'ultra-scroll-hide-functions #'jit-lock-mode)))
+(use-package ultra-scroll
+  :functions (hl-todo-mode diff-hl-flydiff-mode)
+  :hook (elpaca-after-init . ultra-scroll-mode)
+  :config
+  (add-hook 'ultra-scroll-hide-functions #'diff-hl-flydiff-mode)
+  (add-hook 'ultra-scroll-hide-functions #'hl-todo-mode)
+  (add-hook 'ultra-scroll-hide-functions #'jit-lock-mode))
 
 #+end_src
 
 ** Highlight the current line
 #+begin_src emacs-lisp
 (use-package hl-line
-  :straight (:type built-in)
-  :hook ((after-init . global-hl-line-mode)
+  :ensure nil
+  :hook ((elpaca-after-init . global-hl-line-mode)
          ((dashboard-mode eshell-mode shell-mode term-mode vterm-mode) .
           (lambda () (setq-local global-hl-line-mode nil))))
   :config
@@ -1241,7 +1252,7 @@ byte-compiled files do not interfere with the reload."
 ** Ediff
 #+begin_src emacs-lisp
 (use-package ediff
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :commands (ediff ediff-files ediff-buffers ediff-files3 ediff-buffers3
              ediff-revision ediff-current-file ediff-merge ediff-merge-with-ancestor
@@ -1366,30 +1377,6 @@ and sets up vim-style navigation."
               (select-window (get-buffer-window ediff-control-buffer)))))
 #+end_src
 
-** Visual Fill Column
-#+begin_src emacs-lisp
-(use-package visual-fill-column
-  :straight (:host codeberg :repo "joostkremers/visual-fill-column")
-  :hook ((org-mode . ar/visual-fill-setup)
-         (markdown-mode . ar/visual-fill-setup)
-         (text-mode . ar/visual-fill-setup)
-         (dired-mode . ar/visual-fill-setup)
-
-         ) ; Optional: Centers dired for a cleaner look
-  :custom
-  ;; width of the text area (default is fill-column, usually 80)
-  (visual-fill-column-width 110)
-  ;; Center the text within the window
-  (visual-fill-column-center-text t)
-  ;; Allow splitting windows without the text getting squashed
-  (visual-fill-column-enable-sensible-window-split t)
-  :config
-  (defun ar/visual-fill-setup ()
-    "Setup visual wrap and centering."
-    (visual-line-mode 1)
-    (visual-fill-column-mode 1)))
-#+end_src
-
 ** Dashboard
 #+begin_src emacs-lisp
 (use-package dashboard
@@ -1473,12 +1460,12 @@ and sets up vim-style navigation."
 
   :config
   ;; EGLOT & MARKSMAN SETUP
-  (with-eval-after-load 'eglot
-    (add-to-list 'eglot-server-programs '(markdown-mode . ("marksman"))))
+  ;;(with-eval-after-load 'eglot
+  ;;  (add-to-list 'eglot-server-programs '(markdown-mode . ("marksman"))))
 
   ;; FORMATTING INTEGRATION
-  (with-eval-after-load 'apheleia
-    (setf (alist-get 'markdown-mode apheleia-mode-alist) '(eglot)))
+  ;;(with-eval-after-load 'apheleia
+  ;;  (setf (alist-get 'markdown-mode apheleia-mode-alist) '(eglot)))
 
   ;; FIX: Set imenu expression in :config after markdown-mode is loaded
   (setq markdown-imenu-generic-expression
@@ -1643,7 +1630,7 @@ and sets up vim-style navigation."
 ** Diff-hl
 #+begin_src emacs-lisp
 (use-package diff-hl
-  :hook ((after-init . global-diff-hl-mode)
+  :hook ((elpaca-after-init . global-diff-hl-mode)
          (dired-mode . diff-hl-dired-mode))
   :hook (magit-pre-refresh . diff-hl-magit-pre-refresh)
   :hook (magit-post-refresh . diff-hl-magit-post-refresh)
@@ -2163,7 +2150,7 @@ trigger a context switch. All other projects simply stay on global context."
 ** Core Configuration
 #+begin_src emacs-lisp
 (use-package org
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :custom
   ;; Core settings
@@ -2414,7 +2401,7 @@ trigger a context switch. All other projects simply stay on global context."
 ** Org Habit
 #+begin_src emacs-lisp
 (use-package org-habit
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :after org
   :custom
@@ -2433,31 +2420,6 @@ trigger a context switch. All other projects simply stay on global context."
           (string-to-char (nerd-icons-codicon "nf-cod-check"))
           org-habit-today-glyph
           (string-to-char (nerd-icons-codicon "nf-cod-circle_filled")))))
-#+end_src
-
-** Org Pomodoro
-#+begin_src emacs-lisp
-(use-package org-pomodoro
-  :defer t
-  :config
-  ;; FIX: The last cond clause was `(alert-default-style)' which calls
-  ;; alert-default-style as a function. It is a variable, not a function,
-  ;; so this would throw "Symbol's function definition is void".
-  ;; Fixed to `(t alert-default-style)' — a proper default cond clause.
-  (alert-add-rule :category "org-pomodoro"
-                  :style (cond (alert-growl-command    'growl)
-                               (alert-notifier-command 'notifier)
-                               (alert-libnotify-command 'libnotify)
-                               (t alert-default-style))))
-#+end_src
-
-** Org Remark
-#+begin_src emacs-lisp
-(use-package org-remark
-  :defer t
-  :after org
-  :config
-  (org-remark-global-tracking-mode +1))
 #+end_src
 
 ** Eldoc for Org Mode
@@ -2708,9 +2670,9 @@ trigger a context switch. All other projects simply stay on global context."
 
 ** Org Appear
 #+begin_src emacs-lisp
-(straight-use-package '(org-appear :type git :host github :repo "awth13/org-appear"))
+;; (straight-use-package '(org-appear :type git :host github :repo "awth13/org-appear"))
 
-(add-hook 'org-mode-hook 'org-appear-mode)
+;; (add-hook 'org-mode-hook 'org-appear-mode)
 #+end_src
 
 * Second Brain & Productivity
@@ -2915,7 +2877,7 @@ trigger a context switch. All other projects simply stay on global context."
 ** Org Agenda
 #+begin_src emacs-lisp
 (use-package org-agenda
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :after org
   :config
@@ -3330,7 +3292,7 @@ Top-level keys:
 *** use-package
 #+begin_src emacs-lisp
 (use-package org-capture
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :after org
 
@@ -3359,7 +3321,6 @@ Top-level keys:
 ** Org Super Agenda
 #+begin_src emacs-lisp
 (use-package org-super-agenda
-  :straight (:type built-in)
   :defer t
   :after org-agenda
   :hook (org-agenda-mode . org-super-agenda-mode)
@@ -3551,7 +3512,7 @@ Top-level keys:
 ** Dired
 #+begin_src emacs-lisp
 (use-package dired
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :commands (dired dired-jump)
   :hook (dired-mode . dired-hide-details-mode)
@@ -3573,7 +3534,7 @@ Top-level keys:
 ** Dired Extensions
 #+begin_src emacs-lisp
 (use-package dired-x
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :hook (dired-mode . dired-omit-mode)
   :config
@@ -3599,7 +3560,7 @@ Top-level keys:
 
 
 (use-package wdired
-  :straight (:type built-in)
+  :ensure nil
   :after dired
   :custom
   (wdired-allow-to-change-permissions t)
@@ -3685,7 +3646,7 @@ Top-level keys:
 
 ** Project.el
 #+begin_src emacs-lisp
-(use-package project :straight (:type built-in) :defer t)
+(use-package project :ensure nil :defer t)
 
 (defun ar/open-emacs-config-project ()
   "Open Emacs config directory as a project."
@@ -3708,7 +3669,7 @@ Top-level keys:
 ** iBuffer
 #+begin_src emacs-lisp
 (use-package ibuffer
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :init (setq ibuffer-filter-group-name-face '(:inherit (font-lock-string-face bold))))
 
@@ -3827,7 +3788,7 @@ Top-level keys:
 *** Core
 #+begin_src emacs-lisp
 (use-package perspective
-  :hook (after-init . persp-mode)
+  :hook (elpaca-after-init . persp-mode)
 
   :custom
   (persp-initial-frame-name "main")
@@ -4019,7 +3980,7 @@ Enrich existing commands with completion annotations
 (use-package marginalia
   :init
   :commands (marginalia-mode marginalia-cycle)
-  :hook (after-init . marginalia-mode)
+  :hook (elpaca-after-init . marginalia-mode)
   :config
   (setq marginalia-max-relative-age 0 ; Always show absolute time
         marginalia-align 'right))
@@ -4292,7 +4253,7 @@ targets."
 ** Basic Completion
 #+begin_src emacs-lisp
 (use-package emacs
-  :straight (:type built-in)
+  :ensure nil
   :custom
   (tab-always-indent 'complete)
   (text-mode-ispell-word-completion nil)
@@ -4378,7 +4339,7 @@ the first candidate on popup open."
 ** Dabbrev
 #+begin_src emacs-lisp
 (use-package dabbrev
-  :straight (:type built-in)
+  :ensure nil
   :config
   (add-to-list 'dabbrev-ignored-buffer-regexps "\\` ")
   (add-to-list 'dabbrev-ignored-buffer-modes 'doc-view-mode)
@@ -4392,15 +4353,7 @@ the first candidate on popup open."
 ** Direnv
 #+begin_src emacs-lisp
 (use-package envrc
-  :hook (after-init . envrc-global-mode))
-#+end_src
-
-** EditorConfig
-#+begin_src emacs-lisp
-(use-package editorconfig
-  :straight (:type built-in)
-  :config
-  (editorconfig-mode 1))
+  :hook (elpaca-after-init . envrc-global-mode))
 #+end_src
 
 ** LSP
@@ -4526,7 +4479,7 @@ the first candidate on popup open."
 ** Formatting
 #+begin_src emacs-lisp
 (use-package apheleia
-  :hook (after-init . apheleia-global-mode)
+  :hook (elpaca-after-init . apheleia-global-mode)
   :custom
   (apheleia-log-only-errors t)
   :config
@@ -4555,19 +4508,6 @@ the first candidate on popup open."
   ;; Inhibit for prose where whitespace is sensitive
   (setq apheleia-inhibit-functions
         (list (lambda () (derived-mode-p 'org-mode)))))
-#+end_src
-
-** Symbols Outline
-#+begin_src emacs-lisp
-(use-package symbols-outline
-  :defer t
-  :init
-  (add-hook 'eglot-managed-mode-hook
-            (lambda ()
-              (setq-local symbols-outline-fetch-fn #'symbols-outline-lsp-fetch)))
-  :config
-  (setq symbols-outline-window-position 'left)
-  (symbols-outline-follow-mode))
 #+end_src
 
 ** Dape - Add transient menu
@@ -4633,136 +4573,77 @@ the first candidate on popup open."
   )
 #+end_src
 
-** Eldoc-box
-#+begin_src emacs-lisp
-(use-package eldoc-box
-  :defer t
-  :commands (eldoc-box-help-at-point eldoc-box-eglot-help-at-point)
-  :init
-  (with-eval-after-load 'evil
-    (evil-define-key '(normal visual) 'global (kbd "K") #'eldoc-box-help-at-point))
-  :hook (eglot-managed-mode . eldoc-box-hover-at-point-mode)
-
-  :custom
-  (eldoc-box-max-pixel-width 800)
-  (eldoc-box-max-pixel-height 600)
-  (eldoc-box-only-multi-line t)
-  (eldoc-box-cleanup-interval 0.5)
-  (eldoc-box-fringe-use-same-bg t)
-  (eldoc-box-lighter nil)
-  (eldoc-box-offset '(16 16 16))
-
-  :config
-  ;; Match doom-tokyo-night and posframe border styling
-  (defface eldoc-box-border
-    `((t (:background ,(face-attribute 'region :background nil t)
-          :inherit region)))
-    "Eldoc-box border face matching posframe styling."
-    :group 'eldoc-box)
-
-  (defface eldoc-box-body
-    `((t (:background ,(face-attribute 'default :background nil t)
-          :family "JetBrains Mono"
-          :height 125)))
-    "Eldoc-box body face with JetBrains Mono font."
-    :group 'eldoc-box)
-
-  ;; Better text wrapping and font rendering
-  (add-hook 'eldoc-box-buffer-hook
-            (lambda ()
-              (visual-line-mode 1)
-              (face-remap-add-relative 'default :family "JetBrains Mono" :height 125)))
-
-  ;; Match posframe aesthetics
-  (add-hook 'eldoc-box-frame-hook
-            (lambda (frame)
-              (set-face-background 'fringe nil frame)
-              (set-face-background 'internal-border
-                                   (face-attribute 'posframe-border :background nil t)
-                                   frame)))
-
-  ;; Configure eldoc strategy for LSP documentation
-  (with-eval-after-load 'eglot
-    (defun ar/eldoc-box-eglot-setup ()
-      "Configure eldoc display strategy for eglot buffers."
-      (setq-local eldoc-documentation-strategy #'eldoc-documentation-compose))
-    (add-hook 'eglot-managed-mode-hook #'ar/eldoc-box-eglot-setup))
-
-  (when (not (childframe-workable-p))
-    (message "Warning: eldoc-box childframes may not work on this system")))
-#+end_src
-
 ** Imenu-Breadcrumbs
 *Disable breadcrumbs in org buffers*
 #+begin_src emacs-lisp
-(defun ar/imenu-breadcrumb-get-path (index-alist point)
-  "Recursively traverse INDEX-ALIST to find the path to POINT.
-Returns a list of strings (e.g., '(\"Class\" \"Method\"))."
-  (let ((path nil))
-    (dolist (item index-alist)
-      (when (and (consp item) (not path))
-        (let ((name (car item))
-              (val (cdr item)))
-          (cond
-           ;; Case 1: Nested list (Class/Module with children)
-           ((and (listp val) (consp (car val)))
-            ;; We need to determine the start/end of this section.
-            ;; In standard Imenu/Eglot, a section usually has a special entry
-            ;; or we approximate bounds by the range of its children.
-            ;; For safety, we check if the point is within the *range* of this node's children.
-            (let* ((positions (mapcar (lambda (x)
-                                        (if (markerp (cdr x))
-                                            (marker-position (cdr x))
-                                          (or (cdr x) 0)))
-                                      val))
-                   (valid-pos (cl-remove-if-not #'numberp positions))
-                   (min-pos (if valid-pos (apply #'min valid-pos) 0))
-                   (max-pos (if valid-pos (apply #'max valid-pos) (point-max))))
-              (when (and (>= point min-pos) (<= point max-pos))
-                (setq path (cons name (ar/imenu-breadcrumb-get-path val point))))))
+;; (defun ar/imenu-breadcrumb-get-path (index-alist point)
+;;   "Recursively traverse INDEX-ALIST to find the path to POINT.
+;; Returns a list of strings (e.g., '(\"Class\" \"Method\"))."
+;;   (let ((path nil))
+;;     (dolist (item index-alist)
+;;       (when (and (consp item) (not path))
+;;         (let ((name (car item))
+;;               (val (cdr item)))
+;;           (cond
+;;            ;; Case 1: Nested list (Class/Module with children)
+;;            ((and (listp val) (consp (car val)))
+;;             ;; We need to determine the start/end of this section.
+;;             ;; In standard Imenu/Eglot, a section usually has a special entry
+;;             ;; or we approximate bounds by the range of its children.
+;;             ;; For safety, we check if the point is within the *range* of this node's children.
+;;             (let* ((positions (mapcar (lambda (x)
+;;                                         (if (markerp (cdr x))
+;;                                             (marker-position (cdr x))
+;;                                           (or (cdr x) 0)))
+;;                                       val))
+;;                    (valid-pos (cl-remove-if-not #'numberp positions))
+;;                    (min-pos (if valid-pos (apply #'min valid-pos) 0))
+;;                    (max-pos (if valid-pos (apply #'max valid-pos) (point-max))))
+;;               (when (and (>= point min-pos) (<= point max-pos))
+;;                 (setq path (cons name (ar/imenu-breadcrumb-get-path val point))))))
 
-           ;; Case 2: Leaf node (Method/Function)
-           ;; Eglot usually provides markers. We check if point is near this marker.
-           ((or (markerp val) (integerp val))
-            (let ((pos (if (markerp val) (marker-position val) val)))
-              ;; Heuristic: If point is after definition start, it's a candidate.
-              ;; A stricter check would require end-positions, which Imenu lacks by default,
-              ;; but this works well for 'current function' detection.
-              (when (and (>= point pos)
-                         (< (- point pos) 5000)) ;; Sanity check: don't match if way far off
-                (setq path (list name)))))))))
-    path))
+;;            ;; Case 2: Leaf node (Method/Function)
+;;            ;; Eglot usually provides markers. We check if point is near this marker.
+;;            ((or (markerp val) (integerp val))
+;;             (let ((pos (if (markerp val) (marker-position val) val)))
+;;               ;; Heuristic: If point is after definition start, it's a candidate.
+;;               ;; A stricter check would require end-positions, which Imenu lacks by default,
+;;               ;; but this works well for 'current function' detection.
+;;               (when (and (>= point pos)
+;;                          (< (- point pos) 5000)) ;; Sanity check: don't match if way far off
+;;                 (setq path (list name)))))))))
+;;     path))
 
-(defun ar/eldoc-breadcrumbs (callback &rest _)
-  "ElDoc backend to show Imenu breadcrumbs (Parent > Child).
-Arguments are CALLBACK and ignored."
-  (when (and (derived-mode-p 'prog-mode)
-             (bound-and-true-p imenu--index-alist)) ; Only run if Imenu is ready
-    (let* ((path (ar/imenu-breadcrumb-get-path imenu--index-alist (point)))
-           (breadcrumb-string
-            (when path
-              (concat
-               (if (fboundp 'nerd-icons-codicon)
-                   (concat (nerd-icons-codicon "nf-cod-symbol_structure" :face 'shadow) " ")
-                 "")
-               (mapconcat (lambda (s) (propertize s 'face 'shadow))
-                          path
-                          (propertize " > " 'face 'shadow))))))
-      (when breadcrumb-string
-        ;; We pass :thing and :face to play nice with other backends
-        (funcall callback breadcrumb-string
-                 :thing "Breadcrumb"
-                 :face 'shadow)))))
+;; (defun ar/eldoc-breadcrumbs (callback &rest _)
+;;   "ElDoc backend to show Imenu breadcrumbs (Parent > Child).
+;; Arguments are CALLBACK and ignored."
+;;   (when (and (derived-mode-p 'prog-mode)
+;;              (bound-and-true-p imenu--index-alist)) ; Only run if Imenu is ready
+;;     (let* ((path (ar/imenu-breadcrumb-get-path imenu--index-alist (point)))
+;;            (breadcrumb-string
+;;             (when path
+;;               (concat
+;;                (if (fboundp 'nerd-icons-codicon)
+;;                    (concat (nerd-icons-codicon "nf-cod-symbol_structure" :face 'shadow) " ")
+;;                  "")
+;;                (mapconcat (lambda (s) (propertize s 'face 'shadow))
+;;                           path
+;;                           (propertize " > " 'face 'shadow))))))
+;;       (when breadcrumb-string
+;;         ;; We pass :thing and :face to play nice with other backends
+;;         (funcall callback breadcrumb-string
+;;                  :thing "Breadcrumb"
+;;                  :face 'shadow)))))
 
-;; Register the backend
-(defun ar/setup-eldoc-breadcrumbs ()
-  "Add breadcrumbs to ElDoc with low priority."
-  ;; Priority 10 (positive) means it runs *after* the main docs (usually 0 or -10),
-  ;; effectively appending it to the end of the message in the echo area.
-  (add-hook 'eldoc-documentation-functions #'ar/eldoc-breadcrumbs 10 t))
+;; ;; Register the backend
+;; (defun ar/setup-eldoc-breadcrumbs ()
+;;   "Add breadcrumbs to ElDoc with low priority."
+;;   ;; Priority 10 (positive) means it runs *after* the main docs (usually 0 or -10),
+;;   ;; effectively appending it to the end of the message in the echo area.
+;;   (add-hook 'eldoc-documentation-functions #'ar/eldoc-breadcrumbs 10 t))
 
-;; Hook into Eglot/Prog-mode
-(add-hook 'eglot-managed-mode-hook #'ar/setup-eldoc-breadcrumbs)
+;; ;; Hook into Eglot/Prog-mode
+;; (add-hook 'eglot-managed-mode-hook #'ar/setup-eldoc-breadcrumbs)
 #+end_src
 
 ** Transient Menu
@@ -4833,7 +4714,7 @@ Arguments are CALLBACK and ignored."
 ** Treesit
 #+begin_src emacs-lisp
 (use-package treesit
-  :straight (:type built-in)
+  :ensure nil
   :mode (("\\.tsx\\'" . tsx-ts-mode))
   :init
   (defvar ar/treesit-grammar-dir
@@ -4874,44 +4755,24 @@ Arguments are CALLBACK and ignored."
           (c++-mode . c++-ts-mode))))
 #+end_src
 
-** Treesit-Fold
+#+RESULTS:
+: ((\.[pP][dD][fF]\' . pdf-view-mode) (\.kbd\' . kbd-mode) (\.kdl\' . kdl-mode) (\.cmake\' . cmake-ts-mode) (CMakeLists\.txt\' . cmake-ts-mode) (\.\(plantuml\|puml\|pum\|plu\)\' . plantuml-mode) (\.\(pu\|uml\|plantuml\|pum\|plu\)\' . plantuml-mode) (\.nix\' . nix-ts-mode) (\.nix\' . nix-mode) (\flake.lock\' . js-mode) (^/nix/store/.+\.drv\' . nix-drv-mode) (\.hva\' . LaTeX-mode) (\.tsx\' . tsx-ts-mode) (\.envrc\' . envrc-file-mode) (/git-rebase-todo\' . git-rebase-mode) (\.markdown\' . markdown-mode) (\.md\' . markdown-mode) (README\.md\' . gfm-mode) (\.\(?:md\|markdown\|mkd\|mdown\|mkdn\|mdwn\|mdx\)\' . markdown-mode) (\.Rmd\' . markdown-mode) (\.bbclass\' . shell-script-mode) (\.bb\' . shell-script-mode) (\.args\' . text-mode) (\.out\' . text-mode) (\.in\' . text-mode) (\.gpg\(~\|\.~[0-9]+~\)?\' nil epa-file) (\.elc\' . elisp-byte-code-mode) (\.zst\' nil jka-compr) (\.dz\' nil jka-compr) (\.xz\' nil jka-compr) (\.lzma\' nil jka-compr) (\.lz\' nil jka-compr) (\.g?z\' nil jka-compr) (\.bz2\' nil jka-compr) (\.Z\' nil jka-compr) (\.vr[hi]?\' . vera-mode) (\(?:\.\(?:rbw?\|ru\|rake\|thor\|axlsx\|jbuilder\|rabl\|gemspec\|podspec\)\|/\(?:Gem\|Rake\|Cap\|Thor\|Puppet\|Berks\|Brew\|Fast\|Vagrant\|Guard\|Pod\)file\)\' . ruby-mode) (\.re?st\' . rst-mode) (/\(?:Pipfile\|\.?flake8\)\' . conf-mode) (\.py[iw]?\' . python-mode) (\.m\' . octave-maybe-mode) (\.less\' . less-css-mode) (\.editorconfig\' . editorconfig-conf-mode) (\.scss\' . scss-mode) (\.cs\' . csharp-mode) (\.awk\' . awk-mode) (\.\(u?lpc\|pike\|pmod\(\.in\)?\)\' . pike-mode) (\.idl\' . idl-mode) (\.java\' . java-mode) (\.m\' . objc-mode) (\.ii\' . c++-mode) (\.i\' . c-mode) (\.lex\' . c-mode) (\.y\(acc\)?\' . c-mode) (\.h\' . c-or-c++-mode) (\.c\' . c-mode) (\.\(CC?\|HH?\)\' . c++-mode) (\.[ch]\(pp\|xx\|\+\+\)\' . c++-mode) (\.\(cc\|hh\)\' . c++-mode) (\.\(bat\|cmd\)\' . bat-mode) (\.[sx]?html?\(\.[a-zA-Z_]+\)?\' . mhtml-mode) (\.svgz?\' . image-mode) (\.svgz?\' . xml-mode) (\.x[bp]m\' . image-mode) (\.x[bp]m\' . c-mode) (\.p[bpgn]m\' . image-mode) (\.tiff?\' . image-mode) (\.gif\' . image-mode) (\.png\' . image-mode) (\.jpe?g\' . image-mode) (\.webp\' . image-mode) (\.te?xt\' . text-mode) (\.[tT]e[xX]\' . tex-mode) (\.ins\' . tex-mode) (\.ltx\' . latex-mode) (\.dtx\' . doctex-mode) (\.org\' . org-mode) (\.dir-locals\(?:-2\)?\.el\' . lisp-data-mode) (\.eld\' . lisp-data-mode) (eww-bookmarks\' . lisp-data-mode) (tramp\' . lisp-data-mode) (/archive-contents\' . lisp-data-mode) (places\' . lisp-data-mode) (\.emacs-places\' . lisp-data-mode) (\.el\' . emacs-lisp-mode) (Project\.ede\' . emacs-lisp-mode) (\(?:\.\(?:scm\|sls\|sld\|stk\|ss\|sch\)\|/\.guile\)\' . scheme-mode) (\.l\' . lisp-mode) (\.li?sp\' . lisp-mode) (\.[fF]\' . fortran-mode) (\.for\' . fortran-mode) (\.p\' . pascal-mode) (\.pas\' . pascal-mode) (\.\(dpr\|DPR\)\' . delphi-mode) (\.\([pP]\([Llm]\|erl\|od\)\|al\)\' . perl-mode) (Imakefile\' . makefile-imake-mode) (Makeppfile\(?:\.mk\)?\' . makefile-makepp-mode) (\.makepp\' . makefile-makepp-mode) (\.mk\' . makefile-gmake-mode) (\.make\' . makefile-gmake-mode) ([Mm]akefile\' . makefile-gmake-mode) (\.am\' . makefile-automake-mode) (\.texinfo\' . texinfo-mode) (\.te?xi\' . texinfo-mode) (\.[sS]\' . asm-mode) (\.asm\' . asm-mode) (\.css\' . css-mode) (\.mixal\' . mixal-mode) (\.gcov\' . compilation-mode) (/\.[a-z0-9-]*gdbinit . gdb-script-mode) (-gdb\.gdb . gdb-script-mode) ([cC]hange\.?[lL]og?\' . change-log-mode) ([cC]hange[lL]og[-.][0-9]+\' . change-log-mode) (\$CHANGE_LOG\$\.TXT . change-log-mode) (\.scm\.[0-9]*\' . scheme-mode) (\.[ckz]?sh\'\|\.shar\'\|/\.z?profile\' . sh-mode) (\.bash\' . sh-mode) (/PKGBUILD\' . sh-mode) (\(/\|\`\)\.\(bash_\(profile\|history\|log\(in\|out\)\)\|z?log\(in\|out\)\)\' . sh-mode) (\(/\|\`\)\.\(shrc\|zshrc\|m?kshrc\|bashrc\|t?cshrc\|esrc\)\' . sh-mode) (\(/\|\`\)\.\([kz]shenv\|xinitrc\|startxrc\|xsession\)\' . sh-mode) (\.m?spec\' . sh-mode) (\.m[mes]\' . nroff-mode) (\.man\' . nroff-mode) (\.sty\' . latex-mode) (\.cl[so]\' . latex-mode) (\.bbl\' . latex-mode) (\.bib\' . bibtex-mode) (\.bst\' . bibtex-style-mode) (\.sql\' . sql-mode) (\(acinclude\|aclocal\|acsite\)\.m4\' . autoconf-mode) (\.m[4c]\' . m4-mode) (\.mf\' . metafont-mode) (\.mp\' . metapost-mode) (\.vhdl?\' . vhdl-mode) (\.article\' . text-mode) (\.letter\' . text-mode) (\.i?tcl\' . tcl-mode) (\.exp\' . tcl-mode) (\.itk\' . tcl-mode) (\.icn\' . icon-mode) (\.sim\' . simula-mode) (\.mss\' . scribe-mode) (\.f9[05]\' . f90-mode) (\.f0[38]\' . f90-mode) (\.indent\.pro\' . fundamental-mode) (\.\(pro\|PRO\)\' . idlwave-mode) (\.srt\' . srecode-template-mode) (\.prolog\' . prolog-mode) (\.tar\' . tar-mode) (\.\(arc\|zip\|lzh\|lha\|zoo\|[jew]ar\|xpi\|rar\|cbr\|7z\|squashfs\|ARC\|ZIP\|LZH\|LHA\|ZOO\|[JEW]AR\|XPI\|RAR\|CBR\|7Z\|SQUASHFS\)\' . archive-mode) (\.oxt\' . archive-mode) (\.\(deb\|[oi]pk\)\' . archive-mode) (\`/tmp/Re . text-mode) (/Message[0-9]*\' . text-mode) (\`/tmp/fol/ . text-mode) (\.oak\' . scheme-mode) (\.sgml?\' . sgml-mode) (\.x[ms]l\' . xml-mode) (\.dbk\' . xml-mode) (\.dtd\' . sgml-mode) (\.ds\(ss\)?l\' . dsssl-mode) (\.js[mx]?\' . javascript-mode) (\.har\' . javascript-mode) (\.json\' . js-json-mode) (\.[ds]?va?h?\' . verilog-mode) (\.by\' . bovine-grammar-mode) (\.wy\' . wisent-grammar-mode) (\.erts\' . erts-mode) ([:/\]\..*\(emacs\|gnus\|viper\)\' . emacs-lisp-mode) (\`\..*emacs\' . emacs-lisp-mode) ([:/]_emacs\' . emacs-lisp-mode) (/crontab\.X*[0-9]+\' . shell-script-mode) (\.ml\' . lisp-mode) (\.ld[si]?\' . ld-script-mode) (ld\.?script\' . ld-script-mode) (\.xs\' . c-mode) (\.x[abdsru]?[cnw]?\' . ld-script-mode) (\.zone\' . dns-mode) (\.soa\' . dns-mode) (\.asd\' . lisp-mode) (\.\(asn\|mib\|smi\)\' . snmp-mode) (\.\(as\|mi\|sm\)2\' . snmpv2-mode) (\.\(diffs?\|patch\|rej\)\' . diff-mode) (\.\(dif\|pat\)\' . diff-mode) (\.[eE]?[pP][sS]\' . ps-mode) (\.\(?:PDF\|EPUB\|CBZ\|FB2\|O?XPS\|DVI\|OD[FGPST]\|DOCX\|XLSX?\|PPTX?\|pdf\|epub\|cbz\|fb2\|o?xps\|djvu\|dvi\|od[fgpst]\|docx\|xlsx?\|pptx?\)\' . doc-view-mode-maybe) (configure\.\(ac\|in\)\' . autoconf-mode) (\.s\(v\|iv\|ieve\)\' . sieve-mode) (BROWSE\' . ebrowse-tree-mode) (\.ebrowse\' . ebrowse-tree-mode) (#\*mail\* . mail-mode) (\.g\' . antlr-mode) (\.mod\' . m2-mode) (\.ses\' . ses-mode) (\.docbook\' . sgml-mode) (\.com\' . dcl-mode) (/config\.\(?:bat\|log\)\' . fundamental-mode) (/\.?\(authinfo\|netrc\)\' . authinfo-mode) (\.\(?:[iI][nN][iI]\|[lL][sS][tT]\|[rR][eE][gG]\|[sS][yY][sS]\)\' . conf-mode) (\.la\' . conf-unix-mode) (\.ppd\' . conf-ppd-mode) (java.+\.conf\' . conf-javaprop-mode) (\.properties\(?:\.[a-zA-Z0-9._-]+\)?\' . conf-javaprop-mode) (\.toml\' . conf-toml-mode) (\.desktop\' . conf-desktop-mode) (/\.redshift\.conf\' . conf-windows-mode) (\`/etc/\(?:DIR_COLORS\|ethers\|.?fstab\|.*hosts\|lesskey\|login\.?de\(?:fs\|vperm\)\|magic\|mtab\|pam\.d/.*\|permissions\(?:\.d/.+\)?\|protocols\|rpc\|services\)\' . conf-space-mode) (\`/etc/\(?:acpid?/.+\|aliases\(?:\.d/.+\)?\|default/.+\|group-?\|hosts\..+\|inittab\|ksysguarddrc\|opera6rc\|passwd-?\|shadow-?\|sysconfig/.+\)\' . conf-mode) ([cC]hange[lL]og[-.][-0-9a-z]+\' . change-log-mode) (/\.?\(?:gitconfig\|gnokiirc\|hgrc\|kde.*rc\|mime\.types\|wgetrc\)\' . conf-mode) (/\.mailmap\' . conf-unix-mode) (/\.\(?:asound\|enigma\|fetchmail\|gltron\|gtk\|hxplayer\|mairix\|mbsync\|msmtp\|net\|neverball\|nvidia-settings-\|offlineimap\|qt/.+\|realplayer\|reportbug\|rtorrent\.\|screen\|scummvm\|sversion\|sylpheed/.+\|xmp\)rc\' . conf-mode) (/\.\(?:gdbtkinit\|grip\|mpdconf\|notmuch-config\|orbital/.+txt\|rhosts\|tuxracer/options\)\' . conf-mode) (/\.?X\(?:default\|resource\|re\)s\> . conf-xdefaults-mode) (/X11.+app-defaults/\|\.ad\' . conf-xdefaults-mode) (/X11.+locale/.+/Compose\' . conf-colon-mode) (/X11.+locale/compose\.dir\' . conf-javaprop-mode) (\.~?[0-9]+\.[0-9][-.0-9]*~?\' nil t) (\.\(?:orig\|in\|[bB][aA][kK]\)\' nil t) ([/.]c\(?:on\)?f\(?:i?g\)?\(?:\.[a-zA-Z0-9._-]+\)?\' . conf-mode-maybe) (\.[1-9]\' . nroff-mode) (\.art\' . image-mode) (\.avs\' . image-mode) (\.bmp\' . image-mode) (\.cmyk\' . image-mode) (\.cmyka\' . image-mode) (\.crw\' . image-mode) (\.dcr\' . image-mode) (\.dcx\' . image-mode) (\.dng\' . image-mode) (\.dpx\' . image-mode) (\.fax\' . image-mode) (\.heic\' . image-mode) (\.hrz\' . image-mode) (\.icb\' . image-mode) (\.icc\' . image-mode) (\.icm\' . image-mode) (\.ico\' . image-mode) (\.icon\' . image-mode) (\.jbg\' . image-mode) (\.jbig\' . image-mode) (\.jng\' . image-mode) (\.jnx\' . image-mode) (\.miff\' . image-mode) (\.mng\' . image-mode) (\.mvg\' . image-mode) (\.otb\' . image-mode) (\.p7\' . image-mode) (\.pcx\' . image-mode) (\.pdb\' . image-mode) (\.pfa\' . image-mode) (\.pfb\' . image-mode) (\.picon\' . image-mode) (\.pict\' . image-mode) (\.rgb\' . image-mode) (\.rgba\' . image-mode) (\.tga\' . image-mode) (\.wbmp\' . image-mode) (\.webp\' . image-mode) (\.wmf\' . image-mode) (\.wpg\' . image-mode) (\.xcf\' . image-mode) (\.xmp\' . image-mode) (\.xwd\' . image-mode) (\.yuv\' . image-mode) (\.tgz\' . tar-mode) (\.tbz2?\' . tar-mode) (\.txz\' . tar-mode) (\.tzst\' . tar-mode) (\.drv\' . LaTeX-mode))
+
+** TODO Treesit-Fold
+*check with doom-emacs modules*
 #+begin_src emacs-lisp
-(use-package treesit-fold
-  :defer t
-  :straight (:host github :repo "emacs-tree-sitter/treesit-fold")
-  ;; :custom
-  ;; (treesit-fold-indicators-priority -1)
-  :config
-  (global-treesit-fold-mode 1)
-  (global-treesit-fold-indicators-mode 1))
+;; (use-package treesit-fold
+;;   :defer t
+;;   :straight (:host github :repo "emacs-tree-sitter/treesit-fold")
+;;   ;; :custom
+;;   ;; (treesit-fold-indicators-priority -1)
+;;   :config
+;;   (global-treesit-fold-mode 1)
+;;   (global-treesit-fold-indicators-mode 1))
 #+end_src
 
-** Evil Text Objects
-#+begin_src emacs-lisp
-(use-package evil-textobj-tree-sitter
-  :defer t
-  :after evil
-  :config
-  ;; Bindings for function objects (next/prev)
-  (define-key evil-normal-state-map (kbd "]f")
-              (lambda () (interactive) (evil-textobj-tree-sitter-goto-textobj "function.outer")))
-  (define-key evil-normal-state-map (kbd "[f")
-              (lambda () (interactive) (evil-textobj-tree-sitter-goto-textobj "function.outer" t)))
-  (define-key evil-normal-state-map (kbd "]F")
-              (lambda () (interactive) (evil-textobj-tree-sitter-goto-textobj "function.outer" nil t)))
-  (define-key evil-normal-state-map (kbd "[F")
-              (lambda () (interactive) (evil-textobj-tree-sitter-goto-textobj "function.outer" t t)))
-
-  (define-key evil-inner-text-objects-map "f" (evil-textobj-tree-sitter-get-textobj "function.inner"))
-  (define-key evil-outer-text-objects-map "f" (evil-textobj-tree-sitter-get-textobj "function.outer"))
-  (define-key evil-inner-text-objects-map "c" (evil-textobj-tree-sitter-get-textobj "class.inner"))
-  (define-key evil-outer-text-objects-map "c" (evil-textobj-tree-sitter-get-textobj "class.outer"))
-
-  (define-key evil-inner-text-objects-map "a" (evil-textobj-tree-sitter-get-textobj "parameter.inner"))
-  (define-key evil-outer-text-objects-map "a" (evil-textobj-tree-sitter-get-textobj "parameter.outer")))
-#+end_src
-
-** Vimish Fold
+** TODO Vimish Fold
+*check with doom emacs modules*
 #+begin_src emacs-lisp
 (use-package vimish-fold
   :defer t
@@ -4980,21 +4841,22 @@ Arguments are CALLBACK and ignored."
       (add-to-list 'consult-preview-allowed-hooks 'global-hl-todo-mode))))
 #+end_src
 
-** flymake-todo
+** TODO flymake-todo
+*replace with flycheck*
 #+begin_src emacs-lisp
-(with-eval-after-load 'hl-todo
-  (with-eval-after-load 'flymake
-    ;; Helper function to register hl-todo-flymake
-    (defun ar/hl-todo-flymake-enable ()
-      "Enable hl-todo-flymake in the current buffer."
-      (when (and (bound-and-true-p hl-todo-mode)
-                 (fboundp 'hl-todo-flymake))
-        (add-hook 'flymake-diagnostic-functions #'hl-todo-flymake nil t)))
+;; (with-eval-after-load 'hl-todo
+;;   (with-eval-after-load 'flymake
+;;     ;; Helper function to register hl-todo-flymake
+;;     (defun ar/hl-todo-flymake-enable ()
+;;       "Enable hl-todo-flymake in the current buffer."
+;;       (when (and (bound-and-true-p hl-todo-mode)
+;;                  (fboundp 'hl-todo-flymake))
+;;         (add-hook 'flymake-diagnostic-functions #'hl-todo-flymake nil t)))
 
-    ;; Add to relevant modes
-    (add-hook 'prog-mode-hook #'ar/hl-todo-flymake-enable)
-    (add-hook 'text-mode-hook #'ar/hl-todo-flymake-enable)
-    (add-hook 'conf-mode-hook #'ar/hl-todo-flymake-enable)))
+;;     ;; Add to relevant modes
+;;     (add-hook 'prog-mode-hook #'ar/hl-todo-flymake-enable)
+;;     (add-hook 'text-mode-hook #'ar/hl-todo-flymake-enable)
+;;     (add-hook 'conf-mode-hook #'ar/hl-todo-flymake-enable)))
 #+end_src
 
 ** consult-todo
@@ -5101,8 +4963,8 @@ Arguments are CALLBACK and ignored."
 ** show-paren-mode
 #+begin_src emacs-lisp
 (use-package paren
-  :straight (:type built-in)
-  :hook (after-init . show-paren-mode)
+  :ensure nil
+  :hook (elpaca-after-init . show-paren-mode)
   :custom
   (show-paren-delay 0.05)
   (show-paren-highlight-openparen t)
@@ -5598,7 +5460,8 @@ This bibliography file can be used with both LaTeX and Org documents."
   :init (setq-default adaptive-wrap-extra-indent 0))
 #+end_src
 
-** Core AUCTeX
+** TODO Core AUCTeX
+*add preview-auto.el from https://github.com/ultronozm/preview-auto.el*
 #+begin_src emacs-lisp
 (use-package tex
   :defer t
@@ -5675,26 +5538,27 @@ This bibliography file can be used with both LaTeX and Org documents."
                             (cons #'texmathp fill-nobreak-predicate))))))
 #+end_src
 
-** Flymake Integration
+** TODO Flymake Integration
+*Replace with flycheck*
 #+begin_src emacs-lisp
-(with-eval-after-load 'tex
-  (with-eval-after-load 'flymake
-    (when (boundp 'LaTeX-flymake-chktex-options)
-      (setq LaTeX-flymake-chktex-options
-            '("-n2"   ; Disable "non-breaking space (~) should be used"
-              "-n8"   ; Disable "wrong length of dash"
-              "-n13"  ; Disable "Intersentence spacing"
-              "-n21"  ; Disable "This command might not be intended"
-              ))))
+;; (with-eval-after-load 'tex
+;;   (with-eval-after-load 'flymake
+;;     (when (boundp 'LaTeX-flymake-chktex-options)
+;;       (setq LaTeX-flymake-chktex-options
+;;             '("-n2"   ; Disable "non-breaking space (~) should be used"
+;;               "-n8"   ; Disable "wrong length of dash"
+;;               "-n13"  ; Disable "Intersentence spacing"
+;;               "-n21"  ; Disable "This command might not be intended"
+;;               ))))
 
-  ;; Delayed flymake activation to prevent sentinel errors
-  (add-hook 'LaTeX-mode-hook
-            (lambda ()
-              (run-with-idle-timer 0.5 nil
-                                   (lambda ()
-                                     (when (and (derived-mode-p 'LaTeX-mode)
-                                                (not (bound-and-true-p flymake-mode)))
-                                       (flymake-mode 1)))))))
+;;   ;; Delayed flymake activation to prevent sentinel errors
+;;   (add-hook 'LaTeX-mode-hook
+;;             (lambda ()
+;;               (run-with-idle-timer 0.5 nil
+;;                                    (lambda ()
+;;                                      (when (and (derived-mode-p 'LaTeX-mode)
+;;                                                 (not (bound-and-true-p flymake-mode)))
+;;                                        (flymake-mode 1)))))))
 #+end_src
 
 ** TeX Site
@@ -5745,7 +5609,7 @@ This bibliography file can be used with both LaTeX and Org documents."
 ** TeX Folding
 #+begin_src emacs-lisp
 (use-package tex-fold
-  :straight (:type built-in)
+  :ensure nil
   :after tex
   :hook (TeX-mode . ar/latex-fold-buffer-delayed)
   :hook (TeX-mode . TeX-fold-mode)
@@ -5859,7 +5723,7 @@ This bibliography file can be used with both LaTeX and Org documents."
   (require 'oc-csl))
 
 (use-package reftex
-  :straight (:type built-in)
+  :ensure nil
   :after tex
   :hook (LaTeX-mode . reftex-mode)
   :custom
@@ -5869,62 +5733,63 @@ This bibliography file can be used with both LaTeX and Org documents."
   (reftex-toc-split-windows-fraction 0.2))
 #+end_src
 
-** Fast LaTeX Input
-
+** TODO Fast LaTeX Input
+*Use doom emacs configuration*
 #+begin_src emacs-lisp
-(use-package cdlatex
-  :defer t
-  :hook ((LaTeX-mode . cdlatex-mode)
-         (org-mode . org-cdlatex-mode))
-  :init
-  ;; Change the internal prefix variable.
-  ;; IMPORTANT: This primarily updates CDLaTeX's internal help/prompts to show '~'.
-  ;; It does NOT automatically update Org-mode's keybindings.
-  (setq cdlatex-math-symbol-prefix ?~)
+;; (use-package cdlatex
+;;   :defer t
+;;   :hook ((LaTeX-mode . cdlatex-mode)
+;;          (org-mode . org-cdlatex-mode))
+;;   :init
+;;   ;; Change the internal prefix variable.
+;;   ;; IMPORTANT: This primarily updates CDLaTeX's internal help/prompts to show '~'.
+;;   ;; It does NOT automatically update Org-mode's keybindings.
+;;   (setq cdlatex-math-symbol-prefix ?~)
 
-  :config
-  ;; --- 1. Fix for standard LaTeX Mode ---
-  ;; Unbind backtick (restore normal insertion for code blocks/elisp)
-  (define-key cdlatex-mode-map (kbd "`") nil)
-  ;; Bind tilde to the math symbol menu
-  (define-key cdlatex-mode-map (kbd "~") #'cdlatex-math-symbol)
+;;   :config
+;;   ;; --- 1. Fix for standard LaTeX Mode ---
+;;   ;; Unbind backtick (restore normal insertion for code blocks/elisp)
+;;   (define-key cdlatex-mode-map (kbd "`") nil)
+;;   ;; Bind tilde to the math symbol menu
+;;   (define-key cdlatex-mode-map (kbd "~") #'cdlatex-math-symbol)
 
-  ;; --- 2. Fix for Org Mode ---
-  ;; Org defines its own map in 'org.el', so we must modify it after org loads.
-  (with-eval-after-load 'org
-    ;; Unbind the hardcoded backtick in Org's CDLaTeX map
-    (define-key org-cdlatex-mode-map (kbd "`") nil)
+;;   ;; --- 2. Fix for Org Mode ---
+;;   ;; Org defines its own map in 'org.el', so we must modify it after org loads.
+;;   (with-eval-after-load 'org
+;;     ;; Unbind the hardcoded backtick in Org's CDLaTeX map
+;;     (define-key org-cdlatex-mode-map (kbd "`") nil)
 
-    ;; Bind tilde to Org's wrapper for the math symbol function
-    ;; We use 'org-cdlatex-math-symbol', not the raw 'cdlatex-math-symbol'
-    (define-key org-cdlatex-mode-map (kbd "~") #'org-cdlatex-math-symbol))
+;;     ;; Bind tilde to Org's wrapper for the math symbol function
+;;     ;; We use 'org-cdlatex-math-symbol', not the raw 'cdlatex-math-symbol'
+;;     (define-key org-cdlatex-mode-map (kbd "~") #'org-cdlatex-math-symbol))
 
-  ;; --- 3. Customizations ---
-  (setq cdlatex-math-modify-alist
-        '((?B "\\mathbb" nil t nil nil)
-          (?C "\\mathcal" nil t nil nil)
-          (?F "\\mathfrak" nil t nil nil)
-          (?S "\\mathscr" nil t nil nil)))
+;;   ;; --- 3. Customizations ---
+;;   (setq cdlatex-math-modify-alist
+;;         '((?B "\\mathbb" nil t nil nil)
+;;           (?C "\\mathcal" nil t nil nil)
+;;           (?F "\\mathfrak" nil t nil nil)
+;;           (?S "\\mathscr" nil t nil nil)))
 
-  (setq cdlatex-env-alist
-        '(("equation*" "\\begin{equation*}\n?\n\\end{equation*}" nil)
-          ("align*" "\\begin{align*}\n?\n\\end{align*}" nil)))
+;;   (setq cdlatex-env-alist
+;;         '(("equation*" "\\begin{equation*}\n?\n\\end{equation*}" nil)
+;;           ("align*" "\\begin{align*}\n?\n\\end{align*}" nil)))
 
-  ;; Prevent dollar sign from automatically entering math mode check
-  (setq cdlatex-use-dollar-to-ensure-math nil)
+;;   ;; Prevent dollar sign from automatically entering math mode check
+;;   (setq cdlatex-use-dollar-to-ensure-math nil)
 
-  ;; --- 4. Disable other overlapping keys ---
-  (define-key cdlatex-mode-map "$" nil)
-  (define-key cdlatex-mode-map "(" nil)
-  (define-key cdlatex-mode-map "{" nil)
-  (define-key cdlatex-mode-map "[" nil)
-  (define-key cdlatex-mode-map "^" nil)
-  (define-key cdlatex-mode-map "_" nil)
-  (define-key cdlatex-mode-map (kbd "TAB") nil)
-  (define-key cdlatex-mode-map [(control return)] nil))
+;;   ;; --- 4. Disable other overlapping keys ---
+;;   (define-key cdlatex-mode-map "$" nil)
+;;   (define-key cdlatex-mode-map "(" nil)
+;;   (define-key cdlatex-mode-map "{" nil)
+;;   (define-key cdlatex-mode-map "[" nil)
+;;   (define-key cdlatex-mode-map "^" nil)
+;;   (define-key cdlatex-mode-map "_" nil)
+;;   (define-key cdlatex-mode-map (kbd "TAB") nil)
+;;   (define-key cdlatex-mode-map [(control return)] nil))
 #+end_src
 
-** Preview LaTeX
+** TODO Preview LaTeX
+*Determine the difference between this preview package and preview-auto from https://github.com/ultronozm/preview-auto.el*
 #+begin_src emacs-lisp
 (use-package preview
   :straight (:type built-in)
@@ -5995,35 +5860,36 @@ This bibliography file can be used with both LaTeX and Org documents."
                  ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))))
 #+end_src
 
-** Completions: LSP + AUCTeX + Company Integration
+** TODO Completions: LSP + AUCTeX + Company Integration
+*Determine if still needed*
 #+begin_src emacs-lisp
-(use-package company :defer t)
-(use-package company-math :defer t)
-(use-package company-auctex :defer t)
+;; (use-package company :defer t)
+;; (use-package company-math :defer t)
+;; (use-package company-auctex :defer t)
 
-(defun ar/latex-setup-completion ()
-  "Configure LaTeX completion: Eglot + AUCTeX + company-math via Cape.
+;; (defun ar/latex-setup-completion ()
+;;   "Configure LaTeX completion: Eglot + AUCTeX + company-math via Cape.
 
-VERIFIED: cape-company-to-capf only converts backend functions.
-It does NOT activate company-mode - completely safe with Corfu."
-  (require 'cape)
+;; VERIFIED: cape-company-to-capf only converts backend functions.
+;; It does NOT activate company-mode - completely safe with Corfu."
+;;   (require 'cape)
 
-  ;; Convert company backends to CAPFs (does NOT enable company-mode)
-  (setq-local completion-at-point-functions
-              (list
-               ;; PRIMARY: Merge LSP + AUCTeX + Math
-               (cape-capf-super
-                #'eglot-completion-at-point
-                #'TeX--completion-at-point
-                (cape-company-to-capf #'company-math-symbols-latex)
-                (cape-company-to-capf #'company-auctex-macros))
+;;   ;; Convert company backends to CAPFs (does NOT enable company-mode)
+;;   (setq-local completion-at-point-functions
+;;               (list
+;;                ;; PRIMARY: Merge LSP + AUCTeX + Math
+;;                (cape-capf-super
+;;                 #'eglot-completion-at-point
+;;                 #'TeX--completion-at-point
+;;                 (cape-company-to-capf #'company-math-symbols-latex)
+;;                 (cape-company-to-capf #'company-auctex-macros))
 
-               ;; SECONDARY: Additional backends
-               (cape-company-to-capf #'company-auctex-environments)
-               #'cape-dabbrev
-               #'cape-file)))
+;;                ;; SECONDARY: Additional backends
+;;                (cape-company-to-capf #'company-auctex-environments)
+;;                #'cape-dabbrev
+;;                #'cape-file)))
 
-(add-hook 'LaTeX-mode-hook #'ar/latex-setup-completion)
+;; (add-hook 'LaTeX-mode-hook #'ar/latex-setup-completion)
 #+end_src
 
 ** LaTeX Keybindings
@@ -6082,260 +5948,262 @@ It does NOT activate company-mode - completely safe with Corfu."
 #+end_src
 
 ** TODO vi-fringe
+*no longer needed*
 #+begin_src emacs-lisp
 ;; Display tildes beyond end-of-buffer like Vim/Neovim
-(defface ar/vi-tilde-face
-  '((t (:inherit font-lock-comment-face)))
-  "Face for tildes displayed beyond end of buffer."
-  :group 'ar)
+;; (defface ar/vi-tilde-face
+;;   '((t (:inherit font-lock-comment-face)))
+;;   "Face for tildes displayed beyond end of buffer."
+;;   :group 'ar)
 
-(defvar-local ar/vi-tilde-bitmap
-  [#b00000000
-   #b01100011
-   #b11010110
-   #b10001100
-   #b00000000]
-  "Tilde bitmap for fringe.")
+;; (defvar-local ar/vi-tilde-bitmap
+;;   [#b00000000
+;;    #b01100011
+;;    #b11010110
+;;    #b10001100
+;;    #b00000000]
+;;   "Tilde bitmap for fringe.")
 
-(when (display-graphic-p)
-  (define-fringe-bitmap 'ar/vi-tilde-bitmap
-    [#b00000000
-     #b01100011
-     #b11010110
-     #b10001100
-     #b00000000]
-    nil nil 'center))
+;; (when (display-graphic-p)
+;;   (define-fringe-bitmap 'ar/vi-tilde-bitmap
+;;     [#b00000000
+;;      #b01100011
+;;      #b11010110
+;;      #b10001100
+;;      #b00000000]
+;;     nil nil 'center))
 
-(defun ar/vi-tilde-display ()
-  "Add tilde indicators to lines beyond end of buffer."
-  (when (and (display-graphic-p) ar/vi-tilde-mode)
-    (save-excursion
-      ;; Remove old overlays
-      (remove-overlays (point-min) (point-max) 'ar/vi-tilde t)
-      ;; Find last actual line
-      (goto-char (point-max))
-      (unless (bolp) (forward-line 1))
-      ;; Add tildes to visible empty lines beyond EOF
-      (let ((eof-pos (point))
-            (window-end-pos (window-end nil t)))
-        (when (< eof-pos window-end-pos)
-          (goto-char eof-pos)
-          (while (and (not (eobp))
-                      (<= (point) window-end-pos))
-            (let ((ov (make-overlay (point) (point))))
-              (overlay-put ov 'ar/vi-tilde t)
-              (overlay-put ov 'before-string
-                          (propertize " " 'display
-                                     '(left-fringe ar/vi-tilde-bitmap
-                                                   ar/vi-tilde-face))))
-            (forward-line 1)))))))
+;; (defun ar/vi-tilde-display ()
+;;   "Add tilde indicators to lines beyond end of buffer."
+;;   (when (and (display-graphic-p) ar/vi-tilde-mode)
+;;     (save-excursion
+;;       ;; Remove old overlays
+;;       (remove-overlays (point-min) (point-max) 'ar/vi-tilde t)
+;;       ;; Find last actual line
+;;       (goto-char (point-max))
+;;       (unless (bolp) (forward-line 1))
+;;       ;; Add tildes to visible empty lines beyond EOF
+;;       (let ((eof-pos (point))
+;;             (window-end-pos (window-end nil t)))
+;;         (when (< eof-pos window-end-pos)
+;;           (goto-char eof-pos)
+;;           (while (and (not (eobp))
+;;                       (<= (point) window-end-pos))
+;;             (let ((ov (make-overlay (point) (point))))
+;;               (overlay-put ov 'ar/vi-tilde t)
+;;               (overlay-put ov 'before-string
+;;                           (propertize " " 'display
+;;                                      '(left-fringe ar/vi-tilde-bitmap
+;;                                                    ar/vi-tilde-face))))
+;;             (forward-line 1)))))))
 
-(define-minor-mode ar/vi-tilde-mode
-  "Display tildes in fringe for lines beyond end of buffer."
-  :lighter nil
-  :group 'ar
-  (if ar/vi-tilde-mode
-      (progn
-        (ar/vi-tilde-display)
-        (add-hook 'window-scroll-functions #'ar/vi-tilde--on-scroll nil t)
-        (add-hook 'window-configuration-change-hook #'ar/vi-tilde-display nil t))
-    (remove-overlays (point-min) (point-max) 'ar/vi-tilde t)
-    (remove-hook 'window-scroll-functions #'ar/vi-tilde--on-scroll t)
-    (remove-hook 'window-configuration-change-hook #'ar/vi-tilde-display t)))
+;; (define-minor-mode ar/vi-tilde-mode
+;;   "Display tildes in fringe for lines beyond end of buffer."
+;;   :lighter nil
+;;   :group 'ar
+;;   (if ar/vi-tilde-mode
+;;       (progn
+;;         (ar/vi-tilde-display)
+;;         (add-hook 'window-scroll-functions #'ar/vi-tilde--on-scroll nil t)
+;;         (add-hook 'window-configuration-change-hook #'ar/vi-tilde-display nil t))
+;;     (remove-overlays (point-min) (point-max) 'ar/vi-tilde t)
+;;     (remove-hook 'window-scroll-functions #'ar/vi-tilde--on-scroll t)
+;;     (remove-hook 'window-configuration-change-hook #'ar/vi-tilde-display t)))
 
-(defun ar/vi-tilde--on-scroll (_window _display-start)
-  "Update tildes when scrolling."
-  (ar/vi-tilde-display))
+;; (defun ar/vi-tilde--on-scroll (_window _display-start)
+;;   "Update tildes when scrolling."
+;;   (ar/vi-tilde-display))
 
-;; Enable for relevant modes
-(dolist (hook '(prog-mode-hook text-mode-hook conf-mode-hook))
-  (add-hook hook #'ar/vi-tilde-mode))
+;; ;; Enable for relevant modes
+;; (dolist (hook '(prog-mode-hook text-mode-hook conf-mode-hook))
+;;   (add-hook hook #'ar/vi-tilde-mode))
 #+end_src
 
-* Terminal
+* TODO Terminal
+*Replace eshell with term from doom emacs modules*
 #+begin_src emacs-lisp
-(use-package eshell
-  :straight (:type built-in)
-  :defer t
-  :commands (eshell ar/eshell-toggle ar/eshell-new)
-  :hook ((eshell-mode . (lambda ()
-                          ;; Disable line numbers
-                          (when (bound-and-true-p display-line-numbers-mode)
-                            (display-line-numbers-mode -1))
-                          ;; Corfu manual completion only
-                          (setq-local corfu-auto nil))))
-  :custom
-  ;; Kill processes without confirmation
-  (eshell-kill-processes-on-exit t)
-  (eshell-destroy-buffer-when-process-dies nil)
+;; (use-package eshell
+;;   :straight (:type built-in)
+;;   :defer t
+;;   :commands (eshell ar/eshell-toggle ar/eshell-new)
+;;   :hook ((eshell-mode . (lambda ()
+;;                           ;; Disable line numbers
+;;                           (when (bound-and-true-p display-line-numbers-mode)
+;;                             (display-line-numbers-mode -1))
+;;                           ;; Corfu manual completion only
+;;                           (setq-local corfu-auto nil))))
+;;   :custom
+;;   ;; Kill processes without confirmation
+;;   (eshell-kill-processes-on-exit t)
+;;   (eshell-destroy-buffer-when-process-dies nil)
 
-  ;; Remove banner
-  (eshell-banner-message "")
+;;   ;; Remove banner
+;;   (eshell-banner-message "")
 
-  ;; Scrolling
-  (eshell-scroll-to-bottom-on-input 'this)
-  (eshell-scroll-show-maximum-output t)
-  (eshell-scroll-to-bottom-on-output nil)
+;;   ;; Scrolling
+;;   (eshell-scroll-to-bottom-on-input 'this)
+;;   (eshell-scroll-show-maximum-output t)
+;;   (eshell-scroll-to-bottom-on-output nil)
 
-  ;; History
-  (eshell-history-size 10000)
-  (eshell-hist-ignoredups t)
-  (eshell-save-history-on-exit t)
+;;   ;; History
+;;   (eshell-history-size 10000)
+;;   (eshell-hist-ignoredups t)
+;;   (eshell-save-history-on-exit t)
 
-  ;; Buffer management
-  (eshell-buffer-maximum-lines 20000)
+;;   ;; Buffer management
+;;   (eshell-buffer-maximum-lines 20000)
 
-  ;; Visual commands (programs requiring terminal emulation)
-  (eshell-visual-commands
-   '("top" "htop" "btop" "less" "more" "vim" "vi" "nano" "emacs"
-     "ssh" "tail" "watch" "ncdu" "ranger" "htop" "tmux" "screen"
-     "python" "ipython" "node" "ruby" "irb"))
-  (eshell-visual-subcommands
-   '(("git" "log" "diff" "show" "help")
-     ("docker" "run" "exec" "logs" "attach")
-     ("podman" "run" "exec" "logs" "attach")))
-  (eshell-visual-options
-   '(("git" "--help" "--paginate")))
+;;   ;; Visual commands (programs requiring terminal emulation)
+;;   (eshell-visual-commands
+;;    '("top" "htop" "btop" "less" "more" "vim" "vi" "nano" "emacs"
+;;      "ssh" "tail" "watch" "ncdu" "ranger" "htop" "tmux" "screen"
+;;      "python" "ipython" "node" "ruby" "irb"))
+;;   (eshell-visual-subcommands
+;;    '(("git" "log" "diff" "show" "help")
+;;      ("docker" "run" "exec" "logs" "attach")
+;;      ("podman" "run" "exec" "logs" "attach")))
+;;   (eshell-visual-options
+;;    '(("git" "--help" "--paginate")))
 
-  ;; Prefer Lisp implementations
-  (eshell-prefer-lisp-functions t)
-  (eshell-prefer-lisp-variables t)
+;;   ;; Prefer Lisp implementations
+;;   (eshell-prefer-lisp-functions t)
+;;   (eshell-prefer-lisp-variables t)
 
-  :config
-  ;; Suppress PAGER
-  (setenv "PAGER" "cat")
+;;   :config
+;;   ;; Suppress PAGER
+;;   (setenv "PAGER" "cat")
 
-  ;; === TOGGLE FUNCTION ===
-  (defun ar/eshell-toggle ()
-    "Toggle eshell popup window. Works from any Evil state."
-    (interactive)
-    (let* ((eshell-buffer-name "*eshell*")
-           (eshell-buffer (get-buffer eshell-buffer-name))
-           (eshell-window (and eshell-buffer (get-buffer-window eshell-buffer))))
-      (if eshell-window
-          ;; If visible, hide it
-          (progn
-            (delete-window eshell-window)
-            (message "Eshell hidden"))
-        ;; Otherwise, show it
-        (let ((display-buffer-alist
-               '(("\\*eshell\\*"
-                  (display-buffer-at-bottom)
-                  (window-height . 0.33)
-                  (dedicated . t)))))
-          (if eshell-buffer
-              (pop-to-buffer eshell-buffer)
-            (eshell))
-          (message "Eshell opened")))))
+;;   ;; === TOGGLE FUNCTION ===
+;;   (defun ar/eshell-toggle ()
+;;     "Toggle eshell popup window. Works from any Evil state."
+;;     (interactive)
+;;     (let* ((eshell-buffer-name "*eshell*")
+;;            (eshell-buffer (get-buffer eshell-buffer-name))
+;;            (eshell-window (and eshell-buffer (get-buffer-window eshell-buffer))))
+;;       (if eshell-window
+;;           ;; If visible, hide it
+;;           (progn
+;;             (delete-window eshell-window)
+;;             (message "Eshell hidden"))
+;;         ;; Otherwise, show it
+;;         (let ((display-buffer-alist
+;;                '(("\\*eshell\\*"
+;;                   (display-buffer-at-bottom)
+;;                   (window-height . 0.33)
+;;                   (dedicated . t)))))
+;;           (if eshell-buffer
+;;               (pop-to-buffer eshell-buffer)
+;;             (eshell))
+;;           (message "Eshell opened")))))
 
-  ;; === NEW ESHELL INSTANCE ===
-  (defun ar/eshell-new ()
-    "Create a new eshell buffer."
-    (interactive)
-    (let ((buf (generate-new-buffer "*eshell*")))
-      (with-current-buffer buf
-        (eshell-mode))
-      (pop-to-buffer buf)))
+;;   ;; === NEW ESHELL INSTANCE ===
+;;   (defun ar/eshell-new ()
+;;     "Create a new eshell buffer."
+;;     (interactive)
+;;     (let ((buf (generate-new-buffer "*eshell*")))
+;;       (with-current-buffer buf
+;;         (eshell-mode))
+;;       (pop-to-buffer buf)))
 
-  ;; === CLEAR BUFFER ===
-  (defun ar/eshell-clear ()
-    "Clear the eshell buffer."
-    (interactive)
-    (let ((inhibit-read-only t))
-      (erase-buffer)
-      (eshell-send-input)))
+;;   ;; === CLEAR BUFFER ===
+;;   (defun ar/eshell-clear ()
+;;     "Clear the eshell buffer."
+;;     (interactive)
+;;     (let ((inhibit-read-only t))
+;;       (erase-buffer)
+;;       (eshell-send-input)))
 
-  ;; === ALIASES ===
-  (defalias 'eshell/clear #'ar/eshell-clear)
-  (defalias 'eshell/ff #'find-file)
-  (defalias 'eshell/fo #'find-file-other-window)
-  (defalias 'eshell/d #'dired)
-  (defalias 'eshell/e #'find-file)
-  (defalias 'eshell/eh #'find-file-other-window)
-  (defalias 'eshell/v #'view-file)
-  (defalias 'eshell/l #'eshell/ls)
-  (defalias 'eshell/ll #'eshell/ls)
+;;   ;; === ALIASES ===
+;;   (defalias 'eshell/clear #'ar/eshell-clear)
+;;   (defalias 'eshell/ff #'find-file)
+;;   (defalias 'eshell/fo #'find-file-other-window)
+;;   (defalias 'eshell/d #'dired)
+;;   (defalias 'eshell/e #'find-file)
+;;   (defalias 'eshell/eh #'find-file-other-window)
+;;   (defalias 'eshell/v #'view-file)
+;;   (defalias 'eshell/l #'eshell/ls)
+;;   (defalias 'eshell/ll #'eshell/ls)
 
-  ;; === GIT BRANCH HELPER ===
-  (defun ar/eshell-git-branch ()
-    "Get current git branch if in repository."
-    (when (and (not (file-remote-p default-directory))
-               (executable-find "git")
-               (locate-dominating-file default-directory ".git"))
-      (let ((branch (string-trim
-                     (shell-command-to-string
-                      "git rev-parse --abbrev-ref HEAD 2>/dev/null"))))
-        (if (and branch (not (string-empty-p branch)))
-            (concat " " (propertize (concat "(" branch ")")
-                                   'face '(:foreground "#7aa2f7")))
-          ""))))
+;;   ;; === GIT BRANCH HELPER ===
+;;   (defun ar/eshell-git-branch ()
+;;     "Get current git branch if in repository."
+;;     (when (and (not (file-remote-p default-directory))
+;;                (executable-find "git")
+;;                (locate-dominating-file default-directory ".git"))
+;;       (let ((branch (string-trim
+;;                      (shell-command-to-string
+;;                       "git rev-parse --abbrev-ref HEAD 2>/dev/null"))))
+;;         (if (and branch (not (string-empty-p branch)))
+;;             (concat " " (propertize (concat "(" branch ")")
+;;                                    'face '(:foreground "#7aa2f7")))
+;;           ""))))
 
-  ;; === CUSTOM PROMPT ===
-  (setq eshell-prompt-function
-        (lambda ()
-          (concat
-           (propertize (abbreviate-file-name (eshell/pwd))
-                      'face '(:foreground "#bb9af7"))
-           (ar/eshell-git-branch)
-           (propertize (if (zerop (user-uid)) " # " " $ ")
-                      'face '(:foreground "#9ece6a" :weight bold)))))
+;;   ;; === CUSTOM PROMPT ===
+;;   (setq eshell-prompt-function
+;;         (lambda ()
+;;           (concat
+;;            (propertize (abbreviate-file-name (eshell/pwd))
+;;                       'face '(:foreground "#bb9af7"))
+;;            (ar/eshell-git-branch)
+;;            (propertize (if (zerop (user-uid)) " # " " $ ")
+;;                       'face '(:foreground "#9ece6a" :weight bold)))))
 
-  (setq eshell-prompt-regexp "^[^#$\n]* [#$] "))
+;;   (setq eshell-prompt-regexp "^[^#$\n]* [#$] "))
 
-;; === GLOBAL TOGGLE KEYBINDING (works in ALL states) ===
-(global-set-key (kbd "C-c e") #'ar/eshell-toggle)
+;; ;; === GLOBAL TOGGLE KEYBINDING (works in ALL states) ===
+;; (global-set-key (kbd "C-c e") #'ar/eshell-toggle)
 
-;; === COMPLETION WITH CAPE ===
-(with-eval-after-load 'eshell
-  (with-eval-after-load 'cape
-    (defun ar/eshell-setup-completion ()
-      "Setup completion for eshell."
-      (setq-local completion-at-point-functions
-                  (list (cape-capf-super
-                         #'pcomplete-completions-at-point
-                         #'cape-file))))
-    (add-hook 'eshell-mode-hook #'ar/eshell-setup-completion)))
+;; ;; === COMPLETION WITH CAPE ===
+;; (with-eval-after-load 'eshell
+;;   (with-eval-after-load 'cape
+;;     (defun ar/eshell-setup-completion ()
+;;       "Setup completion for eshell."
+;;       (setq-local completion-at-point-functions
+;;                   (list (cape-capf-super
+;;                          #'pcomplete-completions-at-point
+;;                          #'cape-file))))
+;;     (add-hook 'eshell-mode-hook #'ar/eshell-setup-completion)))
 
-;; === HISTORY WITH CONSULT ===
-(with-eval-after-load 'eshell
-  (with-eval-after-load 'consult
-    (defun ar/eshell-consult-history ()
-      "Browse eshell history with Consult."
-      (interactive)
-      (require 'em-hist)
-      (let* ((start-pos (save-excursion (eshell-bol) (point)))
-             (end-pos (point))
-             (input (buffer-substring-no-properties start-pos end-pos))
-             (history (delete-dups
-                      (mapcar (lambda (x) (substring-no-properties x))
-                              (ring-elements eshell-history-ring)))))
-        (let ((selected (consult--read history
-                                      :prompt "History: "
-                                      :initial input
-                                      :sort nil
-                                      :category 'eshell-history)))
-          (when selected
-            (delete-region start-pos end-pos)
-            (insert selected)))))))
+;; ;; === HISTORY WITH CONSULT ===
+;; (with-eval-after-load 'eshell
+;;   (with-eval-after-load 'consult
+;;     (defun ar/eshell-consult-history ()
+;;       "Browse eshell history with Consult."
+;;       (interactive)
+;;       (require 'em-hist)
+;;       (let* ((start-pos (save-excursion (eshell-bol) (point)))
+;;              (end-pos (point))
+;;              (input (buffer-substring-no-properties start-pos end-pos))
+;;              (history (delete-dups
+;;                       (mapcar (lambda (x) (substring-no-properties x))
+;;                               (ring-elements eshell-history-ring)))))
+;;         (let ((selected (consult--read history
+;;                                       :prompt "History: "
+;;                                       :initial input
+;;                                       :sort nil
+;;                                       :category 'eshell-history)))
+;;           (when selected
+;;             (delete-region start-pos end-pos)
+;;             (insert selected)))))))
 
-;; === EVIL INTEGRATION ===
-(with-eval-after-load 'evil
-  (with-eval-after-load 'eshell
-    ;; Insert state bindings
-    (evil-define-key 'insert eshell-mode-map
-      (kbd "C-r") #'ar/eshell-consult-history
-      (kbd "M-r") #'ar/eshell-consult-history
-      (kbd "C-d") #'eshell-delchar-or-maybe-eof
-      (kbd "C-a") #'eshell-bol
-      (kbd "C-e") #'end-of-line
-      (kbd "C-u") #'eshell-kill-input)
+;; ;; === EVIL INTEGRATION ===
+;; (with-eval-after-load 'evil
+;;   (with-eval-after-load 'eshell
+;;     ;; Insert state bindings
+;;     (evil-define-key 'insert eshell-mode-map
+;;       (kbd "C-r") #'ar/eshell-consult-history
+;;       (kbd "M-r") #'ar/eshell-consult-history
+;;       (kbd "C-d") #'eshell-delchar-or-maybe-eof
+;;       (kbd "C-a") #'eshell-bol
+;;       (kbd "C-e") #'end-of-line
+;;       (kbd "C-u") #'eshell-kill-input)
 
-    ;; Normal state bindings
-    (evil-define-key 'normal eshell-mode-map
-      (kbd "C-r") #'ar/eshell-consult-history
-      (kbd "M-r") #'ar/eshell-consult-history
-      (kbd "C-d") #'eshell-life-is-too-much
-      (kbd "C-l") #'ar/eshell-clear)))
+;;     ;; Normal state bindings
+;;     (evil-define-key 'normal eshell-mode-map
+;;       (kbd "C-r") #'ar/eshell-consult-history
+;;       (kbd "M-r") #'ar/eshell-consult-history
+;;       (kbd "C-d") #'eshell-life-is-too-much
+;;       (kbd "C-l") #'ar/eshell-clear)))
 #+end_src
 
 * Prettify Symbols
@@ -6841,292 +6709,296 @@ It does NOT activate company-mode - completely safe with Corfu."
   (setf (alist-get 'nix-ts-mode apheleia-mode-alist) '(alejandra)))
 #+end_src
 
-** Bash
+** TODO Bash
+*Replace with lsp-mode*
 #+begin_src emacs-lisp
-(with-eval-after-load 'eglot
-  (add-to-list 'eglot-server-programs
-               '((bash-mode bash-ts-mode) . ("bash-language-server" "start"))))
+;; (with-eval-after-load 'eglot
+;;   (add-to-list 'eglot-server-programs
+;;                '((bash-mode bash-ts-mode) . ("bash-language-server" "start"))))
 
-;; Enable eglot for bash-ts-mode (tree-sitter based bash mode)
-(add-hook 'bash-ts-mode-hook #'eglot-ensure)
+;; ;; Enable eglot for bash-ts-mode (tree-sitter based bash mode)
+;; (add-hook 'bash-ts-mode-hook #'eglot-ensure)
 #+end_src
 
-** PlantUML
+** TODO PlantUML
+*Deal with later*
 #+begin_src emacs-lisp
-(use-package plantuml-mode
-  :defer t
-  :mode (("\\.\\(plantuml\\|puml\\|pum\\|plu\\)\\'" . plantuml-mode))
+;; (use-package plantuml-mode
+;;   :defer t
+;;   :mode (("\\.\\(plantuml\\|puml\\|pum\\|plu\\)\\'" . plantuml-mode))
 
-  :init
-  (defvar ar/plantuml-jar-locations
-    '("~/.config/plantuml/plantuml.jar"
-      "~/plantuml.jar"
-      "/usr/share/plantuml/plantuml.jar"
-      "/usr/local/share/plantuml/plantuml.jar"
-      "/opt/plantuml/plantuml.jar")
-    "Common locations to search for PlantUML JAR file.")
+;;   :init
+;;   (defvar ar/plantuml-jar-locations
+;;     '("~/.config/plantuml/plantuml.jar"
+;;       "~/plantuml.jar"
+;;       "/usr/share/plantuml/plantuml.jar"
+;;       "/usr/local/share/plantuml/plantuml.jar"
+;;       "/opt/plantuml/plantuml.jar")
+;;     "Common locations to search for PlantUML JAR file.")
 
-  (defun ar/find-plantuml-jar ()
-    "Find PlantUML JAR file in common locations."
-    (seq-find #'file-exists-p
-              (mapcar #'expand-file-name ar/plantuml-jar-locations)))
+;;   (defun ar/find-plantuml-jar ()
+;;     "Find PlantUML JAR file in common locations."
+;;     (seq-find #'file-exists-p
+;;               (mapcar #'expand-file-name ar/plantuml-jar-locations)))
 
-  (let ((jar-path (ar/find-plantuml-jar))
-        (executable-path (executable-find "plantuml")))
-    (cond
-     ;; Prefer JAR mode (most reliable and feature-complete)
-     (jar-path
-      (setq plantuml-jar-path jar-path
-            plantuml-default-exec-mode 'jar))
-     ;; Fallback to executable if available
-     (executable-path
-      (setq plantuml-executable-path executable-path
-            plantuml-default-exec-mode 'executable))
-     ;; Last resort: server mode (warns about external data transmission)
-     (t
-      (setq plantuml-default-exec-mode 'server)
-      (message "PlantUML: No local installation found. Using server mode."))))
+;;   (let ((jar-path (ar/find-plantuml-jar))
+;;         (executable-path (executable-find "plantuml")))
+;;     (cond
+;;      ;; Prefer JAR mode (most reliable and feature-complete)
+;;      (jar-path
+;;       (setq plantuml-jar-path jar-path
+;;             plantuml-default-exec-mode 'jar))
+;;      ;; Fallback to executable if available
+;;      (executable-path
+;;       (setq plantuml-executable-path executable-path
+;;             plantuml-default-exec-mode 'executable))
+;;      ;; Last resort: server mode (warns about external data transmission)
+;;      (t
+;;       (setq plantuml-default-exec-mode 'server)
+;;       (message "PlantUML: No local installation found. Using server mode."))))
 
-  :custom
-  ;; Output format for previews
-  (plantuml-output-type "png" "Default output format: png, svg, txt, utxt")
+;;   :custom
+;;   ;; Output format for previews
+;;   (plantuml-output-type "png" "Default output format: png, svg, txt, utxt")
 
-  ;; Indentation (align with your config's use of 2-space indents)
-  (plantuml-indent-level 2 "Number of spaces per indentation level")
+;;   ;; Indentation (align with your config's use of 2-space indents)
+;;   (plantuml-indent-level 2 "Number of spaces per indentation level")
 
-  ;; JAR arguments for better compatibility
-  (plantuml-jar-args '("-charset" "utf-8") "Arguments passed to PlantUML JAR")
+;;   ;; JAR arguments for better compatibility
+;;   (plantuml-jar-args '("-charset" "utf-8") "Arguments passed to PlantUML JAR")
 
-  ;; Completion keyword length
-  (plantuml-kwdList-max-length 24 "Maximum keyword length for completion")
+;;   ;; Completion keyword length
+;;   (plantuml-kwdList-max-length 24 "Maximum keyword length for completion")
 
-  :config
-  ;; ────────────────────────────────────────────────────────────────────────
-  ;; Org-Babel Integration
-  ;; ────────────────────────────────────────────────────────────────────────
-  ;; Ensure org-babel uses the same configuration as plantuml-mode
-  (with-eval-after-load 'ob-plantuml
-    ;; Sync paths between plantuml-mode and org-babel
-    (setq org-plantuml-jar-path plantuml-jar-path
-          org-plantuml-executable-path plantuml-executable-path
-          org-plantuml-exec-mode plantuml-default-exec-mode)
+;;   :config
+;;   ;; ────────────────────────────────────────────────────────────────────────
+;;   ;; Org-Babel Integration
+;;   ;; ────────────────────────────────────────────────────────────────────────
+;;   ;; Ensure org-babel uses the same configuration as plantuml-mode
+;;   (with-eval-after-load 'ob-plantuml
+;;     ;; Sync paths between plantuml-mode and org-babel
+;;     (setq org-plantuml-jar-path plantuml-jar-path
+;;           org-plantuml-executable-path plantuml-executable-path
+;;           org-plantuml-exec-mode plantuml-default-exec-mode)
 
-    ;; Default header arguments for PlantUML code blocks
-    (setq org-babel-default-header-args:plantuml
-          '((:results . "file")
-            (:exports . "results")
-            (:cmdline . "-charset utf-8"))))
+;;     ;; Default header arguments for PlantUML code blocks
+;;     (setq org-babel-default-header-args:plantuml
+;;           '((:results . "file")
+;;             (:exports . "results")
+;;             (:cmdline . "-charset utf-8"))))
 
-  ;; Enable org-src-mode integration for editing PlantUML blocks
-  (with-eval-after-load 'org-src
-    (add-to-list 'org-src-lang-modes '("plantuml" . plantuml)))
+;;   ;; Enable org-src-mode integration for editing PlantUML blocks
+;;   (with-eval-after-load 'org-src
+;;     (add-to-list 'org-src-lang-modes '("plantuml" . plantuml)))
 
-  ;; ────────────────────────────────────────────────────────────────────────
-  ;; Flymake Backend for Syntax Checking
-  ;; ────────────────────────────────────────────────────────────────────────
-  (defun ar/plantuml-flymake-backend (report-fn &rest _args)
-    "Flymake backend for PlantUML syntax checking using -syntax flag.
-Reports diagnostics to REPORT-FN."
-    (unless (eq plantuml-default-exec-mode 'server)
-      (let* ((source-buffer (current-buffer))
-             (source-text (buffer-substring-no-properties (point-min) (point-max))))
+;;   ;; ────────────────────────────────────────────────────────────────────────
+;;   ;; Flymake Backend for Syntax Checking
+;;   ;; ────────────────────────────────────────────────────────────────────────
+;;   (defun ar/plantuml-flymake-backend (report-fn &rest _args)
+;;     "Flymake backend for PlantUML syntax checking using -syntax flag.
+;; Reports diagnostics to REPORT-FN."
+;;     (unless (eq plantuml-default-exec-mode 'server)
+;;       (let* ((source-buffer (current-buffer))
+;;              (source-text (buffer-substring-no-properties (point-min) (point-max))))
 
-        ;; Build command based on execution mode
-        (let ((command
-               (pcase plantuml-default-exec-mode
-                 ('jar
-                  `("java" "-Djava.awt.headless=true" "-jar" ,plantuml-jar-path "-syntax"))
-                 ('executable
-                  `(,plantuml-executable-path "-syntax"))
-                 (_ nil))))
+;;         ;; Build command based on execution mode
+;;         (let ((command
+;;                (pcase plantuml-default-exec-mode
+;;                  ('jar
+;;                   `("java" "-Djava.awt.headless=true" "-jar" ,plantuml-jar-path "-syntax"))
+;;                  ('executable
+;;                   `(,plantuml-executable-path "-syntax"))
+;;                  (_ nil))))
 
-          (if (null command)
-              (funcall report-fn nil)
-            (let ((proc (make-process
-                         :name "plantuml-flymake"
-                         :buffer (generate-new-buffer " *plantuml-flymake*")
-                         :command command
-                         :connection-type 'pipe
-                         :sentinel
-                         (lambda (proc _event)
-                           (when (memq (process-status proc) '(exit signal))
-                             (unwind-protect
-                                 (when (buffer-live-p source-buffer)
-                                   (with-current-buffer source-buffer
-                                     (when (eq proc (flymake-is-running))
-                                       (with-current-buffer (process-buffer proc)
-                                         (goto-char (point-min))
-                                         (let ((diagnostics '()))
-                                           ;; Parse PlantUML syntax error output
-                                           ;; Format: "Error line X" or "Syntax Error line X"
-                                           (while (re-search-forward
-                                                   "\\(?:Syntax \\)?Error.*?line \\([0-9]+\\)"
-                                                   nil t)
-                                             (let* ((line-num (string-to-number (match-string 1)))
-                                                    (msg (buffer-substring-no-properties
-                                                          (line-beginning-position)
-                                                          (line-end-position)))
-                                                    (pos (with-current-buffer source-buffer
-                                                           (save-excursion
-                                                             (goto-char (point-min))
-                                                             (forward-line (1- line-num))
-                                                             (point))))
-                                                    (end-pos (with-current-buffer source-buffer
-                                                               (save-excursion
-                                                                 (goto-char pos)
-                                                                 (line-end-position)))))
-                                               (push (flymake-make-diagnostic
-                                                      source-buffer
-                                                      pos
-                                                      end-pos
-                                                      :error
-                                                      msg)
-                                                     diagnostics)))
-                                           (funcall report-fn (nreverse diagnostics)))))))
-                               (kill-buffer (process-buffer proc))))))))
+;;           (if (null command)
+;;               (funcall report-fn nil)
+;;             (let ((proc (make-process
+;;                          :name "plantuml-flymake"
+;;                          :buffer (generate-new-buffer " *plantuml-flymake*")
+;;                          :command command
+;;                          :connection-type 'pipe
+;;                          :sentinel
+;;                          (lambda (proc _event)
+;;                            (when (memq (process-status proc) '(exit signal))
+;;                              (unwind-protect
+;;                                  (when (buffer-live-p source-buffer)
+;;                                    (with-current-buffer source-buffer
+;;                                      (when (eq proc (flymake-is-running))
+;;                                        (with-current-buffer (process-buffer proc)
+;;                                          (goto-char (point-min))
+;;                                          (let ((diagnostics '()))
+;;                                            ;; Parse PlantUML syntax error output
+;;                                            ;; Format: "Error line X" or "Syntax Error line X"
+;;                                            (while (re-search-forward
+;;                                                    "\\(?:Syntax \\)?Error.*?line \\([0-9]+\\)"
+;;                                                    nil t)
+;;                                              (let* ((line-num (string-to-number (match-string 1)))
+;;                                                     (msg (buffer-substring-no-properties
+;;                                                           (line-beginning-position)
+;;                                                           (line-end-position)))
+;;                                                     (pos (with-current-buffer source-buffer
+;;                                                            (save-excursion
+;;                                                              (goto-char (point-min))
+;;                                                              (forward-line (1- line-num))
+;;                                                              (point))))
+;;                                                     (end-pos (with-current-buffer source-buffer
+;;                                                                (save-excursion
+;;                                                                  (goto-char pos)
+;;                                                                  (line-end-position)))))
+;;                                                (push (flymake-make-diagnostic
+;;                                                       source-buffer
+;;                                                       pos
+;;                                                       end-pos
+;;                                                       :error
+;;                                                       msg)
+;;                                                      diagnostics)))
+;;                                            (funcall report-fn (nreverse diagnostics)))))))
+;;                                (kill-buffer (process-buffer proc))))))))
 
-              ;; Send buffer content to stdin
-              (process-send-string proc source-text)
-              (process-send-eof proc)))))))
+;;               ;; Send buffer content to stdin
+;;               (process-send-string proc source-text)
+;;               (process-send-eof proc)))))))
 
-  ;; Register flymake backend (only for jar and executable modes)
-  (defun ar/plantuml-setup-flymake ()
-    "Setup Flymake for PlantUML mode."
-    (when (and (not (eq plantuml-default-exec-mode 'server))
-               (bound-and-true-p flymake-mode))
-      (add-hook 'flymake-diagnostic-functions #'ar/plantuml-flymake-backend nil t)))
+;;   ;; Register flymake backend (only for jar and executable modes)
+;;   (defun ar/plantuml-setup-flymake ()
+;;     "Setup Flymake for PlantUML mode."
+;;     (when (and (not (eq plantuml-default-exec-mode 'server))
+;;                (bound-and-true-p flymake-mode))
+;;       (add-hook 'flymake-diagnostic-functions #'ar/plantuml-flymake-backend nil t)))
 
-  (add-hook 'plantuml-mode-hook #'ar/plantuml-setup-flymake)
+;;   (add-hook 'plantuml-mode-hook #'ar/plantuml-setup-flymake)
 
-  ;; ────────────────────────────────────────────────────────────────────────
-  ;; Utility Functions
-  ;; ────────────────────────────────────────────────────────────────────────
-  (defun ar/plantuml-set-output-type ()
-    "Interactively change PlantUML output format."
-    (interactive)
-    (let ((type (completing-read "Output type: "
-                                 '("png" "svg" "txt" "utxt" "eps" "pdf" "vdx" "xmi" "latex")
-                                 nil t nil nil "png")))
-      (setq plantuml-output-type type)
-      (message "PlantUML output type set to: %s" type)))
+;;   ;; ────────────────────────────────────────────────────────────────────────
+;;   ;; Utility Functions
+;;   ;; ────────────────────────────────────────────────────────────────────────
+;;   (defun ar/plantuml-set-output-type ()
+;;     "Interactively change PlantUML output format."
+;;     (interactive)
+;;     (let ((type (completing-read "Output type: "
+;;                                  '("png" "svg" "txt" "utxt" "eps" "pdf" "vdx" "xmi" "latex")
+;;                                  nil t nil nil "png")))
+;;       (setq plantuml-output-type type)
+;;       (message "PlantUML output type set to: %s" type)))
 
-  (defun ar/plantuml-install-jar ()
-    "Download and install PlantUML JAR to ~/.local/share/plantuml/."
-    (interactive)
-    (if (fboundp 'plantuml-download-jar)
-        (call-interactively 'plantuml-download-jar)
-      (let* ((install-dir (expand-file-name "~/.local/share/plantuml"))
-             (jar-path (expand-file-name "plantuml.jar" install-dir)))
-        (unless (file-directory-p install-dir)
-          (make-directory install-dir t))
-        (if (yes-or-no-p (format "Download PlantUML JAR to %s? " jar-path))
-            (progn
-              (message "Downloading PlantUML JAR...")
-              (url-copy-file
-               "https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar"
-               jar-path t)
-              (setq plantuml-jar-path jar-path
-                    plantuml-default-exec-mode 'jar
-                    org-plantuml-jar-path jar-path
-                    org-plantuml-exec-mode 'jar)
-              (message "PlantUML JAR installed successfully at %s" jar-path))
-          (message "Installation cancelled")))))
+;;   (defun ar/plantuml-install-jar ()
+;;     "Download and install PlantUML JAR to ~/.local/share/plantuml/."
+;;     (interactive)
+;;     (if (fboundp 'plantuml-download-jar)
+;;         (call-interactively 'plantuml-download-jar)
+;;       (let* ((install-dir (expand-file-name "~/.local/share/plantuml"))
+;;              (jar-path (expand-file-name "plantuml.jar" install-dir)))
+;;         (unless (file-directory-p install-dir)
+;;           (make-directory install-dir t))
+;;         (if (yes-or-no-p (format "Download PlantUML JAR to %s? " jar-path))
+;;             (progn
+;;               (message "Downloading PlantUML JAR...")
+;;               (url-copy-file
+;;                "https://github.com/plantuml/plantuml/releases/latest/download/plantuml.jar"
+;;                jar-path t)
+;;               (setq plantuml-jar-path jar-path
+;;                     plantuml-default-exec-mode 'jar
+;;                     org-plantuml-jar-path jar-path
+;;                     org-plantuml-exec-mode 'jar)
+;;               (message "PlantUML JAR installed successfully at %s" jar-path))
+;;           (message "Installation cancelled")))))
 
-  (defun ar/plantuml-insert-org-block ()
-    "Insert a PlantUML source block template in org-mode."
-    (interactive)
-    (if (derived-mode-p 'org-mode)
-        (let* ((filename (read-string "Output filename (without extension): "
-                                      (format "%s-diagram"
-                                              (file-name-base (or (buffer-file-name) "diagram")))))
-               (extension (pcase plantuml-output-type
-                           ("png" "png")
-                           ("svg" "svg")
-                           (_ "png")))
-               (filepath (format "%s.%s" filename extension)))
-          (insert (format "#+begin_src plantuml :file %s\n" filepath))
-          (insert "@startuml\n")
-          (insert "!theme tokyo-night\n\n")
-          (save-excursion
-            (insert "\n@enduml\n")
-            (insert "#+end_src\n"))
-          (message "PlantUML block inserted. Use C-c C-c to generate diagram."))
-      (user-error "Not in org-mode buffer")))
+;;   (defun ar/plantuml-insert-org-block ()
+;;     "Insert a PlantUML source block template in org-mode."
+;;     (interactive)
+;;     (if (derived-mode-p 'org-mode)
+;;         (let* ((filename (read-string "Output filename (without extension): "
+;;                                       (format "%s-diagram"
+;;                                               (file-name-base (or (buffer-file-name) "diagram")))))
+;;                (extension (pcase plantuml-output-type
+;;                            ("png" "png")
+;;                            ("svg" "svg")
+;;                            (_ "png")))
+;;                (filepath (format "%s.%s" filename extension)))
+;;           (insert (format "#+begin_src plantuml :file %s\n" filepath))
+;;           (insert "@startuml\n")
+;;           (insert "!theme tokyo-night\n\n")
+;;           (save-excursion
+;;             (insert "\n@enduml\n")
+;;             (insert "#+end_src\n"))
+;;           (message "PlantUML block inserted. Use C-c C-c to generate diagram."))
+;;       (user-error "Not in org-mode buffer")))
 
-  (defun ar/plantuml-validate-installation ()
-    "Check PlantUML installation and display configuration."
-    (interactive)
-    (let ((mode-name (pcase plantuml-default-exec-mode
-                      ('jar "JAR")
-                      ('executable "Executable")
-                      ('server "Server")
-                      (_ "Unknown")))
-          (path (pcase plantuml-default-exec-mode
-                 ('jar plantuml-jar-path)
-                 ('executable plantuml-executable-path)
-                 ('server "https://www.plantuml.com/plantuml")
-                 (_ "Not configured"))))
-      (message "PlantUML mode: %s | Path: %s | Output: %s"
-               mode-name path plantuml-output-type)
-      (when (eq plantuml-default-exec-mode 'server)
-        (display-warning 'plantuml
-                        "Using server mode - diagrams sent to plantuml.com\nConsider installing locally for privacy."
-                        :warning))))
+;;   (defun ar/plantuml-validate-installation ()
+;;     "Check PlantUML installation and display configuration."
+;;     (interactive)
+;;     (let ((mode-name (pcase plantuml-default-exec-mode
+;;                       ('jar "JAR")
+;;                       ('executable "Executable")
+;;                       ('server "Server")
+;;                       (_ "Unknown")))
+;;           (path (pcase plantuml-default-exec-mode
+;;                  ('jar plantuml-jar-path)
+;;                  ('executable plantuml-executable-path)
+;;                  ('server "https://www.plantuml.com/plantuml")
+;;                  (_ "Not configured"))))
+;;       (message "PlantUML mode: %s | Path: %s | Output: %s"
+;;                mode-name path plantuml-output-type)
+;;       (when (eq plantuml-default-exec-mode 'server)
+;;         (display-warning 'plantuml
+;;                         "Using server mode - diagrams sent to plantuml.com\nConsider installing locally for privacy."
+;;                         :warning))))
 
-  ;; ────────────────────────────────────────────────────────────────────────
-  ;; Post-Load Configuration
-  ;; ────────────────────────────────────────────────────────────────────────
-  (ar/plantuml-validate-installation))
+;;   ;; ────────────────────────────────────────────────────────────────────────
+;;   ;; Post-Load Configuration
+;;   ;; ────────────────────────────────────────────────────────────────────────
+;;   (ar/plantuml-validate-installation))
 
-;; ════════════════════════════════════════════════════════════════════════════
-;; Org-Mode Image Display Configuration
-;; ════════════════════════════════════════════════════════════════════════════
-;; Enable inline image display for PlantUML diagrams in org-mode
-(with-eval-after-load 'org
-  ;; Auto-display images after executing PlantUML blocks
-  (add-hook 'org-babel-after-execute-hook
-            (lambda ()
-              (when (and (derived-mode-p 'org-mode)
-                        (save-excursion
-                          (goto-char (point-min))
-                          (re-search-forward "^#\\+begin_src plantuml" nil t)))
-                (org-display-inline-images))))
+;; ;; ════════════════════════════════════════════════════════════════════════════
+;; ;; Org-Mode Image Display Configuration
+;; ;; ════════════════════════════════════════════════════════════════════════════
+;; ;; Enable inline image display for PlantUML diagrams in org-mode
+;; (with-eval-after-load 'org
+;;   ;; Auto-display images after executing PlantUML blocks
+;;   (add-hook 'org-babel-after-execute-hook
+;;             (lambda ()
+;;               (when (and (derived-mode-p 'org-mode)
+;;                         (save-excursion
+;;                           (goto-char (point-min))
+;;                           (re-search-forward "^#\\+begin_src plantuml" nil t)))
+;;                 (org-display-inline-images))))
 
-  ;; Optional: Start with inline images displayed
-  ;; Uncomment if you want images shown automatically when opening org files
-  ;; (setq org-startup-with-inline-images t)
-  )
+;;   ;; Optional: Start with inline images displayed
+;;   ;; Uncomment if you want images shown automatically when opening org files
+;;   ;; (setq org-startup-with-inline-images t)
+;;   )
 
-;; ════════════════════════════════════════════════════════════════════════════
-;; Keybindings (using General.el, following your config pattern)
-;; ════════════════════════════════════════════════════════════════════════════
+;; ;; ════════════════════════════════════════════════════════════════════════════
+;; ;; Keybindings (using General.el, following your config pattern)
+;; ;; ════════════════════════════════════════════════════════════════════════════
 
 #+end_src
 
-** C/C++
+** TODO C/C++
+*Deal with later*
 #+begin_src emacs-lisp
-(with-eval-after-load 'eglot
-  (add-to-list 'eglot-server-programs
-               '((c-mode c-ts-mode c++-mode c++-ts-mode)
-                 . ("clangd"
-                    "--background-index"
-                    "--clang-tidy"
-                    "--header-insertion=never"
-                    "--completion-style=detailed"
-                    "--function-arg-placeholders=0"))))
+;; (with-eval-after-load 'eglot
+;;   (add-to-list 'eglot-server-programs
+;;                '((c-mode c-ts-mode c++-mode c++-ts-mode)
+;;                  . ("clangd"
+;;                     "--background-index"
+;;                     "--clang-tidy"
+;;                     "--header-insertion=never"
+;;                     "--completion-style=detailed"
+;;                     "--function-arg-placeholders=0"))))
 
-(with-eval-after-load 'apheleia
-  (setf (alist-get 'c-mode      apheleia-mode-alist) '(clang-format))
-  (setf (alist-get 'c-ts-mode   apheleia-mode-alist) '(clang-format))
-  (setf (alist-get 'c++-mode    apheleia-mode-alist) '(clang-format))
-  (setf (alist-get 'c++-ts-mode apheleia-mode-alist) '(clang-format)))
+;; (with-eval-after-load 'apheleia
+;;   (setf (alist-get 'c-mode      apheleia-mode-alist) '(clang-format))
+;;   (setf (alist-get 'c-ts-mode   apheleia-mode-alist) '(clang-format))
+;;   (setf (alist-get 'c++-mode    apheleia-mode-alist) '(clang-format))
+;;   (setf (alist-get 'c++-ts-mode apheleia-mode-alist) '(clang-format)))
 
-(when (treesit-available-p)
-  (add-to-list 'auto-mode-alist '("CMakeLists\\.txt\\'" . cmake-ts-mode))
-  (add-to-list 'auto-mode-alist '("\\.cmake\\'"         . cmake-ts-mode)))
+;; (when (treesit-available-p)
+;;   (add-to-list 'auto-mode-alist '("CMakeLists\\.txt\\'" . cmake-ts-mode))
+;;   (add-to-list 'auto-mode-alist '("\\.cmake\\'"         . cmake-ts-mode)))
 #+end_src
 
-** Python
+** TODO Python
+*Replace with lsp-mode and flycheck*
 #+begin_src emacs-lisp
 ;; (with-eval-after-load 'eglot
 ;;   (add-to-list 'eglot-server-programs
@@ -7143,13 +7015,13 @@ Reports diagnostics to REPORT-FN."
 ;;                   :useLibraryCodeForTypes t)))
 
 
-(with-eval-after-load 'eglot
-  (add-to-list 'eglot-server-programs
-               `((python-ts-mode python-mode)
-                 . ,(eglot-alternatives '(("pyrefly" "lsp"))))))
+;; (with-eval-after-load 'eglot
+;;   (add-to-list 'eglot-server-programs
+;;                `((python-ts-mode python-mode)
+;;                  . ,(eglot-alternatives '(("pyrefly" "lsp"))))))
 
-(use-package flymake-ruff
-  :hook (eglot-managed-mode . flymake-ruff-load))
+;; (use-package flymake-ruff
+;;   :hook (eglot-managed-mode . flymake-ruff-load))
 
 (use-package python
   :straight (:type built-in)
@@ -7157,7 +7029,7 @@ Reports diagnostics to REPORT-FN."
   :custom
   (python-shell-completion-native-enable nil)
   (python-shell-interpreter "python3")
-  (python-indent-offset 4))
+  (python-indent-offset 3))
 
 (with-eval-after-load 'apheleia
   (setf (alist-get 'ruff apheleia-formatters)
@@ -7169,38 +7041,40 @@ Reports diagnostics to REPORT-FN."
 
 ** kdl
 #+begin_src emacs-lisp
-(use-package kdl-mode
-  :straight (:host github :repo "taquangtrung/emacs-kdl-mode")
-  :mode "\\.kdl\\'")
+;; (use-package kdl-mode
+;;   :straight (:host github :repo "taquangtrung/emacs-kdl-mode")
+;;   :mode "\\.kdl\\'")
 #+end_src
 
-** yaml
+** TODO yaml
+*Deal with later*
 #+begin_src emacs-lisp
-(use-package yaml-pro
-  :hook ((yaml-ts-mode . yaml-pro-ts-mode)))
+;; (use-package yaml-pro
+;;   :hook ((yaml-ts-mode . yaml-pro-ts-mode)))
 
-(with-eval-after-load 'org
-  (add-to-list 'org-src-lang-modes '("yaml" . yaml-ts)))
+;; (with-eval-after-load 'org
+;;   (add-to-list 'org-src-lang-modes '("yaml" . yaml-ts)))
 
-(with-eval-after-load 'eglot
-  (add-to-list 'eglot-server-programs
-               '((yaml-ts-mode) . ("yaml-language-server" "--stdio"))))
+;; (with-eval-after-load 'eglot
+;;   (add-to-list 'eglot-server-programs
+;;                '((yaml-ts-mode) . ("yaml-language-server" "--stdio"))))
 
-(with-eval-after-load 'apheleia
-  (setf (alist-get 'yaml-ts-mode apheleia-mode-alist) '(prettier)))
+;; (with-eval-after-load 'apheleia
+;;   (setf (alist-get 'yaml-ts-mode apheleia-mode-alist) '(prettier)))
 #+end_src
 
-** KBD
+** TODO KBD
+*Deal with later*
 #+begin_src emacs-lisp
-(use-package kbd-mode
-  :straight (:host github :repo "kmonad/kbd-mode")
-  :commands kbd-mode
-  :mode "\\.kbd\\'"
-  :config
-  ;; Register the src-block mapping while the package is loading,
-  ;; so it is available before any org buffer tries to fontify a kbd block.
-  (with-eval-after-load 'org
-    (add-to-list 'org-src-lang-modes '("kbd" . kbd))))
+;; (use-package kbd-mode
+;;   :straight (:host github :repo "kmonad/kbd-mode")
+;;   :commands kbd-mode
+;;   :mode "\\.kbd\\'"
+;;   :config
+;;   ;; Register the src-block mapping while the package is loading,
+;;   ;; so it is available before any org buffer tries to fontify a kbd block.
+;;   (with-eval-after-load 'org
+;;     (add-to-list 'org-src-lang-modes '("kbd" . kbd))))
 #+end_src
 
 * Study
@@ -7208,7 +7082,7 @@ Reports diagnostics to REPORT-FN."
 #+begin_src emacs-lisp
 (use-package pdf-view
   :defer t
-  :straight pdf-tools
+  :ensure pdf-tools
   :defines pdf-annot-activate-created-annotations
   :functions pdf-tools-install
   :hook ((pdf-tools-enabled . pdf-view-auto-slice-minor-mode)
@@ -7255,164 +7129,164 @@ Reports diagnostics to REPORT-FN."
 
 ** Org Noter
 #+begin_src emacs-lisp
-(use-package org-noter
-  :defer t
-  :after (:any org pdf-view)
-  :commands (org-noter org-noter-kill-session)
-  :init
-  ;; Core property names
-  (setq org-noter-property-doc-file "NOTER_DOCUMENT"
-        org-noter-property-note-location "NOTER_PAGE")
+;; (use-package org-noter
+;;   :defer t
+;;   :after (:any org pdf-view)
+;;   :commands (org-noter org-noter-kill-session)
+;;   :init
+;;   ;; Core property names
+;;   (setq org-noter-property-doc-file "NOTER_DOCUMENT"
+;;         org-noter-property-note-location "NOTER_PAGE")
 
-  ;; Search paths and file names
-  ;; Adjust these paths to match your note-taking structure
-  (setq org-noter-default-notes-file-names '("notes.org")
-        org-noter-notes-search-path '("~/Documents/notes"
-                                       "~/org/references/notes"))
+;;   ;; Search paths and file names
+;;   ;; Adjust these paths to match your note-taking structure
+;;   (setq org-noter-default-notes-file-names '("notes.org")
+;;         org-noter-notes-search-path '("~/Documents/notes"
+;;                                        "~/org/references/notes"))
 
-  ;; Session behavior
-  (setq org-noter-auto-save-last-location t      ; Remember last position
-        org-noter-doc-split-fraction '(0.6 . 0.6) ; Window split ratio (horizontal . vertical)
-        org-noter-always-create-frame nil         ; Use current frame
-        org-noter-hide-other nil                  ; Show all notes
-        org-noter-notes-window-location 'horizontal-split ; Notes position
-        org-noter-separate-notes-from-heading t   ; Separate note content from heading
-        org-noter-insert-note-no-questions nil    ; Prompt for note title
-        org-noter-kill-frame-at-session-end nil   ; Keep frame when killing session
-        org-noter-arrow-delay 0.2                 ; Delay for arrow tooltip (0 or negative to disable)
-        org-noter-doc-property-in-notes t         ; Include doc property in notes
-        org-noter-suggest-from-attachments t)     ; Suggest attached files
+;;   ;; Session behavior
+;;   (setq org-noter-auto-save-last-location t      ; Remember last position
+;;         org-noter-doc-split-fraction '(0.6 . 0.6) ; Window split ratio (horizontal . vertical)
+;;         org-noter-always-create-frame nil         ; Use current frame
+;;         org-noter-hide-other nil                  ; Show all notes
+;;         org-noter-notes-window-location 'horizontal-split ; Notes position
+;;         org-noter-separate-notes-from-heading t   ; Separate note content from heading
+;;         org-noter-insert-note-no-questions nil    ; Prompt for note title
+;;         org-noter-kill-frame-at-session-end nil   ; Keep frame when killing session
+;;         org-noter-arrow-delay 0.2                 ; Delay for arrow tooltip (0 or negative to disable)
+;;         org-noter-doc-property-in-notes t         ; Include doc property in notes
+;;         org-noter-suggest-from-attachments t)     ; Suggest attached files
 
-  :config
-  ;; Optional: Customize default heading title
-  ;; Use $p$ as placeholder for page number
-  ;; (setq org-noter-default-heading-title "Notes for page $p$")
+;;   :config
+;;   ;; Optional: Customize default heading title
+;;   ;; Use $p$ as placeholder for page number
+;;   ;; (setq org-noter-default-heading-title "Notes for page $p$")
 
-  ;; Optional: Tokyo Night theme colors for org-noter
-  (custom-set-faces
-   '(org-noter-notes-exist-face ((t (:foreground "#7aa2f7" :weight bold))))
-   '(org-noter-no-notes-exist-face ((t (:foreground "#565f89"))))))
+;;   ;; Optional: Tokyo Night theme colors for org-noter
+;;   (custom-set-faces
+;;    '(org-noter-notes-exist-face ((t (:foreground "#7aa2f7" :weight bold))))
+;;    '(org-noter-no-notes-exist-face ((t (:foreground "#565f89"))))))
 #+end_src
 
 ** Org PDF Tools
 
 #+begin_src emacs-lisp
-(use-package org-pdftools
-  :defer t
-  :after (org pdf-tools)
-  :hook (org-mode . org-pdftools-setup-link)
-  :init
-  ;; Link configuration
-  (setq org-pdftools-link-prefix "pdf"              ; Link prefix for org-pdftools links
-        org-pdftools-search-string-separator "??")  ; Separator for search strings
+;; (use-package org-pdftools
+;;   :defer t
+;;   :after (org pdf-tools)
+;;   :hook (org-mode . org-pdftools-setup-link)
+;;   :init
+;;   ;; Link configuration
+;;   (setq org-pdftools-link-prefix "pdf"              ; Link prefix for org-pdftools links
+;;         org-pdftools-search-string-separator "??")  ; Separator for search strings
 
-  ;; Path handling - these functions control how paths are stored and resolved
-  (setq org-pdftools-path-generator #'org-pdftools-abbreviate-file-name
-        org-pdftools-path-resolver #'expand-file-name)
+;;   ;; Path handling - these functions control how paths are stored and resolved
+;;   (setq org-pdftools-path-generator #'org-pdftools-abbreviate-file-name
+;;         org-pdftools-path-resolver #'expand-file-name)
 
-  ;; Link description
-  (setq org-pdftools-get-desc-function #'org-pdftools-get-desc-default)
+;;   ;; Link description
+;;   (setq org-pdftools-get-desc-function #'org-pdftools-get-desc-default)
 
-  ;; Pointer and annotation settings
-  (setq org-pdftools-markup-pointer-function #'pdf-annot-add-text-annotation
-        org-pdftools-free-pointer-icon "Note"
-        org-pdftools-free-pointer-color "#7aa2f7"   ; Tokyo Night blue
-        org-pdftools-use-isearch-link t
-        org-pdftools-use-freepointer-annot t)
+;;   ;; Pointer and annotation settings
+;;   (setq org-pdftools-markup-pointer-function #'pdf-annot-add-text-annotation
+;;         org-pdftools-free-pointer-icon "Note"
+;;         org-pdftools-free-pointer-color "#7aa2f7"   ; Tokyo Night blue
+;;         org-pdftools-use-isearch-link t
+;;         org-pdftools-use-freepointer-annot t)
 
-  ;; Export settings
-  (setq org-pdftools-export-style 'org-protocol     ; Export style for HTML
-        org-pdftools-link-prefix-to-export "pdf")
+;;   ;; Export settings
+;;   (setq org-pdftools-export-style 'org-protocol     ; Export style for HTML
+;;         org-pdftools-link-prefix-to-export "pdf")
 
-  :config
-  ;; Setup the link type
-  (org-pdftools-setup-link)
+;;   :config
+;;   ;; Setup the link type
+;;   (org-pdftools-setup-link)
 
-  ;; Optional: Set root directory for relative paths
-  ;; Uncomment and adjust if you want all PDF paths to be relative to a specific directory
-  ;; (setq org-pdftools-root-dir "~/Documents/pdfs")
+;;   ;; Optional: Set root directory for relative paths
+;;   ;; Uncomment and adjust if you want all PDF paths to be relative to a specific directory
+;;   ;; (setq org-pdftools-root-dir "~/Documents/pdfs")
 
-  ;; Optional: Configure path translation for cloud storage
-  ;; This allows you to store PDFs in cloud storage and have different paths
-  ;; on different machines while keeping links working
-  ;; Example configuration (uncomment and adjust as needed):
-  ;; (setq org-pdftools-path-transform-alist
-  ;;       '(("/mnt/gdrive/" . "~/Google Drive/")
-  ;;         ("/mnt/dropbox/" . "~/Dropbox/")
-  ;;         ("~/Library/Mobile Documents/com~apple~CloudDocs/" . "~/iCloud Drive/")))
-)
+;;   ;; Optional: Configure path translation for cloud storage
+;;   ;; This allows you to store PDFs in cloud storage and have different paths
+;;   ;; on different machines while keeping links working
+;;   ;; Example configuration (uncomment and adjust as needed):
+;;   ;; (setq org-pdftools-path-transform-alist
+;;   ;;       '(("/mnt/gdrive/" . "~/Google Drive/")
+;;   ;;         ("/mnt/dropbox/" . "~/Dropbox/")
+;;   ;;         ("~/Library/Mobile Documents/com~apple~CloudDocs/" . "~/iCloud Drive/")))
+;; )
 #+end_src
 
 ** Org Noter PDF Tools
 #+begin_src emacs-lisp
-(use-package org-noter-pdftools
-  :defer t
-  :after (org-noter org-pdftools)
-  :init
-  ;; Org ID settings for linking notes to PDF annotations
-  (setq org-noter-pdftools-use-org-id t              ; Generate org-id for notes
-        org-noter-pdftools-use-unique-org-id nil     ; Use simple IDs
-        org-noter-pdftools-insert-content-heading t) ; Add "Content" heading
+;; (use-package org-noter-pdftools
+;;   :defer t
+;;   :after (org-noter org-pdftools)
+;;   :init
+;;   ;; Org ID settings for linking notes to PDF annotations
+;;   (setq org-noter-pdftools-use-org-id t              ; Generate org-id for notes
+;;         org-noter-pdftools-use-unique-org-id nil     ; Use simple IDs
+;;         org-noter-pdftools-insert-content-heading t) ; Add "Content" heading
 
-  ;; Annotation appearance (using Tokyo Night colors)
-  (setq org-noter-pdftools-free-pointer-icon "Note"
-        org-noter-pdftools-free-pointer-color "#7aa2f7")
+;;   ;; Annotation appearance (using Tokyo Night colors)
+;;   (setq org-noter-pdftools-free-pointer-icon "Note"
+;;         org-noter-pdftools-free-pointer-color "#7aa2f7")
 
-  :config
-  ;; Integration with org-noter
-  ;; This ensures org-noter uses org-pdftools for precise note locations
-  (with-eval-after-load 'org-noter
-    (require 'org-noter-pdftools))
+;;   :config
+;;   ;; Integration with org-noter
+;;   ;; This ensures org-noter uses org-pdftools for precise note locations
+;;   (with-eval-after-load 'org-noter
+;;     (require 'org-noter-pdftools))
 
-  ;; Enhanced precise note insertion function
-  ;; This function ensures that precise notes are inserted with proper formatting
-  (defun org-noter-pdftools-insert-precise-note (&optional toggle-no-questions)
-    "Insert a precise note with enhanced PDF integration.
-With prefix argument TOGGLE-NO-QUESTIONS, toggle the value of
-`org-noter-insert-note-no-questions'."
-    (interactive "P")
-    (org-noter--with-valid-session
-     (let ((org-noter-insert-note-no-questions
-            (if toggle-no-questions
-                (not org-noter-insert-note-no-questions)
-              org-noter-insert-note-no-questions))
-           (org-pdftools-use-isearch-link t)
-           (org-pdftools-use-freepointer-annot t))
-       (org-noter-insert-note (org-noter--get-precise-info)))))
+;;   ;; Enhanced precise note insertion function
+;;   ;; This function ensures that precise notes are inserted with proper formatting
+;;   (defun org-noter-pdftools-insert-precise-note (&optional toggle-no-questions)
+;;     "Insert a precise note with enhanced PDF integration.
+;; With prefix argument TOGGLE-NO-QUESTIONS, toggle the value of
+;; `org-noter-insert-note-no-questions'."
+;;     (interactive "P")
+;;     (org-noter--with-valid-session
+;;      (let ((org-noter-insert-note-no-questions
+;;             (if toggle-no-questions
+;;                 (not org-noter-insert-note-no-questions)
+;;               org-noter-insert-note-no-questions))
+;;            (org-pdftools-use-isearch-link t)
+;;            (org-pdftools-use-freepointer-annot t))
+;;        (org-noter-insert-note (org-noter--get-precise-info)))))
 
-  ;; Override org-noter-set-start-location to fix a known bug
-  ;; See: https://github.com/weirdNox/org-noter/pull/93
-  (defun org-noter-set-start-location (&optional arg)
-    "When opening a session with this document, go to the current location.
-With a prefix ARG, remove the start location."
-    (interactive "P")
-    (org-noter--with-valid-session
-     (let ((inhibit-read-only t)
-           (ast (org-noter--parse-root))
-           (location (org-noter--doc-approx-location (when (called-interactively-p 'any) 'interactive))))
-       (with-current-buffer (org-noter--session-notes-buffer session)
-         (org-with-wide-buffer
-          (goto-char (org-element-property :begin ast))
-          (if arg
-              (org-entry-delete nil org-noter-property-note-location)
-            (org-entry-put nil org-noter-property-note-location
-                           (org-noter--pretty-print-location location))))))))
+;;   ;; Override org-noter-set-start-location to fix a known bug
+;;   ;; See: https://github.com/weirdNox/org-noter/pull/93
+;;   (defun org-noter-set-start-location (&optional arg)
+;;     "When opening a session with this document, go to the current location.
+;; With a prefix ARG, remove the start location."
+;;     (interactive "P")
+;;     (org-noter--with-valid-session
+;;      (let ((inhibit-read-only t)
+;;            (ast (org-noter--parse-root))
+;;            (location (org-noter--doc-approx-location (when (called-interactively-p 'any) 'interactive))))
+;;        (with-current-buffer (org-noter--session-notes-buffer session)
+;;          (org-with-wide-buffer
+;;           (goto-char (org-element-property :begin ast))
+;;           (if arg
+;;               (org-entry-delete nil org-noter-property-note-location)
+;;             (org-entry-put nil org-noter-property-note-location
+;;                            (org-noter--pretty-print-location location))))))))
 
-  ;; Setup PDF annotation handler to jump to notes
-  (with-eval-after-load 'pdf-annot
-    (add-hook 'pdf-annot-activate-handler-functions
-              #'org-noter-pdftools-jump-to-note))
+;;   ;; Setup PDF annotation handler to jump to notes
+;;   (with-eval-after-load 'pdf-annot
+;;     (add-hook 'pdf-annot-activate-handler-functions
+;;               #'org-noter-pdftools-jump-to-note))
 
-  ;; Optional: Functions to embed org notes into PDF annotations
-  ;; These are useful if you want to export your org notes back to the PDF
+;;   ;; Optional: Functions to embed org notes into PDF annotations
+;;   ;; These are useful if you want to export your org notes back to the PDF
 
-  ;; Available commands (not bound to keys by default):
-  ;; - org-noter-pdftools-embed-org-note-to-pdf: Embed current note as PDF annotation
-  ;; - org-noter-pdftools-embed-all-org-note-to-pdf: Embed all notes as PDF annotations
-  ;; - org-noter-pdftools-embed-org-buffer-to-pdf: Embed entire org buffer as annotation
+;;   ;; Available commands (not bound to keys by default):
+;;   ;; - org-noter-pdftools-embed-org-note-to-pdf: Embed current note as PDF annotation
+;;   ;; - org-noter-pdftools-embed-all-org-note-to-pdf: Embed all notes as PDF annotations
+;;   ;; - org-noter-pdftools-embed-org-buffer-to-pdf: Embed entire org buffer as annotation
 
-  ;; Keybindings are defined separately in general.el configuration
-)
+;;   ;; Keybindings are defined separately in general.el configuration
+;; )
 #+end_src
 
 * Window
@@ -7443,7 +7317,7 @@ With a prefix ARG, remove the start location."
   :custom
   (popper-group-function #'popper-group-by-directory)
   (popper-echo-dispatch-actions t)
-  :hook (after-init . popper-echo-mode)
+  :hook (elpaca-after-init . popper-echo-mode)
   :init
   (setq popper-mode-line ""
         popper-reference-buffers
@@ -7656,6 +7530,7 @@ With a prefix ARG, remove the start location."
 * General Keybindings
 #+begin_src emacs-lisp
 (use-package general
+  :ensure (:wait t)
   :demand t
   :after evil
   :config
