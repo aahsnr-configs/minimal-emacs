@@ -1,7 +1,0 @@
-# -*- mode: snippet -*-
-# name: child
-# key: child
-# --
-child { ${1:node?}
-  ${2:child?}
-}

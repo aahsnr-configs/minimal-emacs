@@ -833,10 +833,10 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
 
 ** Nerd Icons
 #+begin_src emacs-lisp
-(use-package nerd-icons
-  :custom
-  (nerd-icons-font-family "Symbols Nerd Font Mono")
-  (nerd-icons-color-icons t))
+(use-package nerd-icons)
+  ;; :custom
+  ;; (nerd-icons-font-family "Symbols Nerd Font Mono")
+  ;; (nerd-icons-color-icons t)
 #+end_src
 
 ** Transient
@@ -3950,7 +3950,7 @@ VERTical Interactively COmpletion
 #+begin_src emacs-lisp
 (use-package vertico
   :custom
-  (vertico-count 12)
+  (vertico-count 8)
   (vertico-resize nil)
   (vertico-cycle t)
   :init
@@ -4477,6 +4477,11 @@ the first candidate on popup open."
 ;;   ;; Border logic to match your custom posframe configuration
 ;;   (set-face-attribute 'flymake-popon-posframe-border nil
 ;;                       :background (face-attribute 'posframe-border :background nil t)))
+
+(use-package flycheck
+  :config
+  (add-hook 'after-init-hook #'global-flycheck-mode))
+
 #+end_src
 
 ** Formatting
@@ -4848,9 +4853,8 @@ the first candidate on popup open."
 *replace with flycheck*
 #+begin_src emacs-lisp
 (use-package flycheck-hl-todo
-  :ensure t
   :defer 5 ; Need to be initialized after the rest of checkers
-  :vc (:fetcher github :repo "alvarogonzalezsotillo/flycheck-hl-todo")
+  :vc (:url "https://github.com/alvarogonzalezsotillo/flycheck-hl-todo")
   :config
   (flycheck-hl-todo-setup))
 #+end_src
@@ -5461,7 +5465,7 @@ This bibliography file can be used with both LaTeX and Org documents."
 #+begin_src emacs-lisp
 (use-package tex
   :defer t
-  :straight auctex
+  :ensure auctex
   :hook ((LaTeX-mode . visual-line-mode)
          (LaTeX-mode . TeX-source-correlate-mode)
          (LaTeX-mode . outline-minor-mode)
@@ -5788,7 +5792,7 @@ This bibliography file can be used with both LaTeX and Org documents."
 *Determine the difference between this preview package and preview-auto from https://github.com/ultronozm/preview-auto.el*
 #+begin_src emacs-lisp
 (use-package preview
-  :straight (:type built-in)
+  :ensure nil
   :hook (LaTeX-mode . LaTeX-preview-setup)
   :custom
   (preview-auto-cache-preamble t)
@@ -7034,7 +7038,7 @@ This bibliography file can be used with both LaTeX and Org documents."
 #+begin_src emacs-lisp
 (use-package winner
   :defer t
-  :straight (:type built-in)
+  :ensure nil
   :commands (winner-undo winner-redo)
   :hook (after-init . winner-mode)
   :init (setq winner-boring-buffers '("*Completions*"
@@ -7270,7 +7274,6 @@ This bibliography file can be used with both LaTeX and Org documents."
 * General Keybindings
 #+begin_src emacs-lisp
 (use-package general
-  :ensure (:wait t)
   :demand t
   :after evil
   :config

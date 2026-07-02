@@ -1,5 +1,0 @@
-# -*- mode: snippet -*-
-# name: loga
-# key: loga
-# --
-\log_{${1:a}}(${2:x})$0

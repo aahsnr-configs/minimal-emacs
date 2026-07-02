@@ -1,7 +1,0 @@
-# -*- mode: snippet -*-
-# name: insertquote
-# key: <s
-# --
-\`\`\`$1
-$0
-\`\`\`

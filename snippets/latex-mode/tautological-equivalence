@@ -1,5 +1,0 @@
-# -*- mode: snippet -*-
-# name: tautological-equivalence
-# key: teq
-# --
-\vDash\mkern-10mu\Dashv

@@ -1,5 +1,0 @@
-# -*- mode: snippet -*-
-# name: phantom
-# key: null
-# --
-\phantom{${1:A}}

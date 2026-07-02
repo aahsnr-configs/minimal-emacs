@@ -1,5 +1,0 @@
-# -*- mode: snippet -*-
-# name: italics
-# key: itl
-# --
-\textit{$1}

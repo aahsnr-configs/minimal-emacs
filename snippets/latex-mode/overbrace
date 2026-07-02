@@ -1,5 +1,0 @@
-# -*- mode: snippet -*-
-# name: overbrace
-# key: o{
-# --
-\\overbrace{$1}^{$2}

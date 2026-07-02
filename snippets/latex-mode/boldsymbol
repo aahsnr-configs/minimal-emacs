@@ -1,5 +1,0 @@
-# -*- mode: snippet -*-
-# name: boldsymbol
-# key: sv
-# --
-\boldsymbol{$0}
