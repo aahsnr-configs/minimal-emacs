@@ -3,3 +3,4 @@
 - [ ] add more padding to emacs buffer
 - [ ] move perspective-state to var/ or etc/
 - [ ] move tree-sitter grammars to var/ or etc/
+- [ ] don't add ~/.config/emacs or ~/.config/emacs/var/elpa/flycheck-hl-todo/ to projects

@@ -4,6 +4,9 @@ dirvis/
 eln-cache/
 elpaca/
 recentf
+var/
+etc/
+perspective-state
 places
 init.el
 history

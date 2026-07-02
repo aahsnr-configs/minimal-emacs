@@ -215,12 +215,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
       (buffer-substring-no-properties (region-beginning) (region-end))
     (thing-at-point 'symbol t)))
 
-(defun ar/open-emacs-config-project ()
-  "Open Emacs config directory as a project."
-  (interactive)
-  (let ((default-directory user-emacs-directory))
-    (call-interactively #'project-find-file)))
-
 #+end_src
 
 ** Constants
@@ -2044,23 +2038,22 @@ Short-circuits immediately when:
   - neither org nor org-roam have been loaded yet (avoids eager loading), or
   - the project root is identical to the last seen root (avoids redundant work).
 
-FIX: No hardcoded project roots. Detection is fully dynamic: project.el
-identifies any .git-rooted project; only roots that appear in
+FIX: No hardcoded project roots. Detection is fully dynamic: Projectile
+identifies any recognized project root; only roots that appear in
 `my/project-org-contexts' (populated by `my/register-project-org-context')
 trigger a context switch. All other projects simply stay on global context."
-      (let* ((proj (ignore-errors (project-current nil)))
-           (root (and proj
-                      (file-truename (project-root proj)))))
-      (cond
-       ;; Entering a registered project we are not already in
-       ((and root
-             (assoc root my/project-org-contexts)
-             (not (equal root my/active-org-project)))
-        (my/project-org-activate root))
-       ;; Leaving the active project — root is nil or unregistered
-       ((and my/active-org-project
-             (not (equal root my/active-org-project)))
-        (my/project-org-deactivate)))))
+  (let* ((root (ignore-errors (projectile-project-root)))
+         (root (and root (file-truename root))))
+    (cond
+     ;; Entering a registered project we are not already in
+     ((and root
+           (assoc root my/project-org-contexts)
+           (not (equal root my/active-org-project)))
+      (my/project-org-activate root))
+     ;; Leaving the active project — root is nil or unregistered
+     ((and my/active-org-project
+           (not (equal root my/active-org-project)))
+      (my/project-org-deactivate)))))
 
 (defun my/project-org-status ()
   "Echo the currently active org context."
@@ -2349,7 +2342,6 @@ trigger a context switch. All other projects simply stay on global context."
   (setq org-modern-hide-stars nil
         org-modern-star '("◉" "○" "✸" "✿" "✤" "✜" "◇" "▷"))
 
-  ;; Disabled features
   (setq org-modern-checkbox nil
         org-modern-todo t
         org-modern-tag t
@@ -2360,7 +2352,7 @@ trigger a context switch. All other projects simply stay on global context."
         org-modern-block-name t   ; Prettify #+begin_/#+end_ prefixes
         org-modern-block-fringe nil ; Remove fringe marker (cleaner look)
         org-modern-horizontal-rule t   ; Draw lines for '-----'
-        org-modern-timestamp t   ; Badges for timestamps
+        org-modern-timestamp nil   ; Badges for timestamps
         org-modern-statistics t   ; Badges for [3/5]
         org-modern-progress t)  ; Progress bar in stats
 
@@ -2734,7 +2726,6 @@ trigger a context switch. All other projects simply stay on global context."
   :defer t
   :after (citar denote)
   :custom
-  ;; Store literature notes in notes/literature/ inside denote-directory.
   (citar-denote-subdir "literature")
   :config
   (citar-denote-mode 1))
@@ -2742,9 +2733,6 @@ trigger a context switch. All other projects simply stay on global context."
 
 ** Org GTD - Pure Task Management
 #+begin_src emacs-lisp
-;; org-edna is listed in org-gtd's Package-Requires, so straight.el installs
-;; it automatically. No separate use-package block is needed.
-
 (use-package org-gtd
   :defer t
   :after org
@@ -2754,7 +2742,6 @@ trigger a context switch. All other projects simply stay on global context."
              org-gtd-show-all-next
              org-gtd-show-stuck-projects
              org-gtd-organize)
-
   :init
   ;; FIX: org-gtd-update-ack MUST be set before the package loads.
   ;; Without it, org-gtd shows a blocking upgrade-warning dialog at startup.
@@ -3633,26 +3620,86 @@ Top-level keys:
         dirvish-side-display-alist '((side . bottom) (slot . -1)))
 #+end_src
 
-** Project.el
+** Projectile
 #+begin_src emacs-lisp
-(use-package project :ensure nil :defer t)
+(defun ar/projectile-ignore-emacs-config-p (project-root)
+  "Return non-nil if PROJECT-ROOT is `user-emacs-directory' or a descendant of it.
+Prevents Projectile from tracking, listing, or switching to the Emacs
+configuration directory (~/.config/emacs) or any of its subfolders as
+a project."
+  (file-in-directory-p (file-truename project-root)
+                        (file-truename user-emacs-directory)))
+
+(use-package projectile
+  :defer t
+  :hook (after-init . projectile-mode)
+  :custom
+  (projectile-enable-caching (if noninteractive t 'persistent))
+  (projectile-globally-ignored-files '(".DS_Store" "TAGS"))
+  (projectile-globally-ignored-file-suffixes '(".elc" ".pyc" ".o"))
+  (projectile-kill-buffers-filter 'kill-only-files)
+  (projectile-indexing-method 'hybrid)
+  (projectile-known-projects-file
+   (no-littering-expand-var-file-name "projectile/projects.eld"))
+  (projectile-cache-file
+   (no-littering-expand-var-file-name "projectile/projectile.cache"))
+  ;; Never track/list/switch to the Emacs config directory (or subfolders).
+  (projectile-ignored-projects (list (file-truename user-emacs-directory)))
+  (projectile-ignored-project-function #'ar/projectile-ignore-emacs-config-p)
+
+  :init
+  (defvar ar/fd-executable (cl-find-if #'executable-find '("fdfind" "fd"))
+    "Filename of the fd executable (Debian/Ubuntu ship it as `fdfind').")
+
+  :config
+  ;; Reduce the number of root marker files/dirs Projectile checks when
+  ;; resolving a project's root, for performance (per Doom's +projectile.el).
+  (setq projectile-project-root-files '()
+        projectile-project-root-files-top-down-recurring '("Makefile"))
+  (add-to-list 'projectile-project-root-files-bottom-up ".project")
+
+  ;; Prefer fd/ripgrep over the VCS-specific commands (faster, respects
+  ;; .gitignore) instead of git ls-files/find.
+  (when ar/fd-executable
+    (setq projectile-fd-executable ar/fd-executable))
+  (setq projectile-git-submodule-command nil
+        projectile-git-fd-args (concat "-tl " projectile-git-fd-args)
+        projectile-generic-command
+        (lambda (_)
+          (cond
+           ((and ar/fd-executable projectile-git-use-fd)
+            (format "%s . --type f --hidden --follow --color=never -0 -E .git"
+                    ar/fd-executable))
+           ((executable-find "rg")
+            "rg -0 --files --follow --color=never --hidden -g!.git")
+           (t "find . -type f -print0"))))
+
+  ;; Doom-inspired: rely on the ripgrep-backed `consult-ripgrep' instead of
+  ;; Projectile's built-in (slower/less consistent) search commands.
+  (put 'projectile-ag 'disabled "Use consult-ripgrep instead")
+  (put 'projectile-ripgrep 'disabled "Use consult-ripgrep instead")
+  (put 'projectile-grep 'disabled "Use consult-ripgrep instead")
+
+  ;; Per-project compilation buffers.
+  (setq compilation-buffer-name-function #'projectile-compilation-buffer-name
+        compilation-save-buffers-predicate #'projectile-current-project-buffer-p))
 
 (defun ar/open-emacs-config-project ()
   "Open Emacs config directory as a project."
   (interactive)
   (let ((default-directory user-emacs-directory))
-    (call-interactively #'project-find-file)))
+    (call-interactively #'projectile-find-file)))
 
 (defun ar/project-switch-to-file ()
   "Switch to a project and immediately find a file in it."
   (interactive)
-  (let ((project-switch-commands #'project-find-file))
-    (call-interactively #'project-switch-project)))
+  (let ((projectile-switch-project-action #'projectile-find-file))
+    (call-interactively #'projectile-switch-project)))
 
 (defun ar/project-switch-with-menu ()
   "Switch to a project and show the dispatch menu."
   (interactive)
-  (call-interactively #'project-switch-project))
+  (call-interactively #'projectile-switch-project))
 #+end_src
 
 ** iBuffer
@@ -3667,36 +3714,26 @@ Top-level keys:
   :defer t
   :hook (ibuffer-mode . nerd-icons-ibuffer-mode))
 
-;; Group ibuffer's list by project
-(use-package ibuffer-project
+;; Group ibuffer's list by project (Projectile-backed)
+(use-package ibuffer-projectile
   :defer t
-  :autoload (ibuffer-project-generate-filter-groups ibuffer-do-sort-by-project-file-relative)
+  :commands (ibuffer-projectile-generate-filter-groups)
   :functions icons-displayable-p
   :hook (ibuffer . (lambda ()
                      "Group ibuffer's list by project."
-                     (setq ibuffer-filter-groups (ibuffer-project-generate-filter-groups))
-                     (unless (eq ibuffer-sorting-mode 'project-file-relative)
-                       (ibuffer-do-sort-by-project-file-relative))))
-  :init (setq ibuffer-project-use-cache t)
+                     (setq ibuffer-filter-groups (ibuffer-projectile-generate-filter-groups))
+                     (unless (eq ibuffer-sorting-mode 'alphabetic)
+                       (ibuffer-do-sort-by-alphabetic))))
   :config
-  (with-no-warnings
-    (defun my-ibuffer-project-group-name (root type)
-      "Return group name for project ROOT and TYPE."
-      (if (and (stringp type) (> (length type) 0))
-          (format "%s %s" type root)
-        (format "%s" root)))
+  (defun ar/ibuffer-projectile-group-name (project-name _root-dir)
+    "Return group name for PROJECT-NAME, prefixed with a repo icon if available."
     (if (icons-displayable-p)
-        (progn
-          (advice-add #'ibuffer-project-group-name :override #'my-ibuffer-project-group-name)
-          (setq ibuffer-project-root-functions
-                `((ibuffer-project-project-root . ,(nerd-icons-octicon "nf-oct-repo" :height 1.2 :face ibuffer-filter-group-name-face))
-                  (file-remote-p . ,(nerd-icons-codicon "nf-cod-radio_tower" :height 1.2 :face ibuffer-filter-group-name-face)))))
-      (progn
-        (advice-remove #'ibuffer-project-group-name #'my-ibuffer-project-group-name)
-        (setq ibuffer-project-root-functions
-              '((ibuffer-project-project-root . "Project")
-                (file-remote-p . "Remote")))))))
+        (format "%s %s"
+                (nerd-icons-octicon "nf-oct-repo" :height 1.2 :face ibuffer-filter-group-name-face)
+                project-name)
+      (format "Project: %s" project-name)))
 
+  (setq ibuffer-projectile-group-name-function #'ar/ibuffer-projectile-group-name))
 
 ;; Group ibuffer's list by version control repository (backup option)
 ;; (use-package ibuffer-vc
@@ -3741,10 +3778,9 @@ Top-level keys:
     (setq treemacs-collapse-dirs 0)))
 
 ;; treemacs-nerd-icons with hidden directory arrows
-(use-package treemacs-nerd-icons
-  :defer t
-  :after treemacs
-  :config (treemacs-load-theme "nerd-icons"))
+(use-package treemacs-icons-dired
+  :hook (dired-mode . treemacs-icons-dired-enable-once)
+  :ensure t)
 
 ;; Magit integration (refresh sidebar on git changes)
 (use-package treemacs-magit
@@ -3776,49 +3812,55 @@ Top-level keys:
 ** Perspective
 *** Core
 #+begin_src emacs-lisp
-(use-package perspective
+(use-package persp-mode
   :hook (after-init . persp-mode)
+  :init
+
+  (setq persp-nil-name "main")
 
   :custom
-  (persp-initial-frame-name "main")
-  (persp-sort 'access)
-  (persp-show-modestring t)
-  (persp-modestring-short t)
-  (persp-modestring-dividers '("[" "]" " | "))
-  (persp-state-default-file (expand-file-name "perspective-state" user-emacs-directory))
-  (persp-prevent-killing-last-buffer-in-perspective t)
-  (persp-suppress-no-prefix-key-warning t)
+  (persp-set-last-persp-for-new-frames t)
+  (persp-add-buffer-on-find-file t)
+  (persp-autokill-buffer-on-remove 'kill-weak)
+  (persp-save-dir (no-littering-expand-var-file-name "persp-confs/"))
+  (persp-auto-save-opt 2)       ; save on persp-mode deactivation or Emacs exit
+  (persp-auto-save-num-of-backups 3)
+  (persp-auto-resume-time 1.0)  ; auto-restore last session shortly after startup
+  (persp-modestring-short t))
 
-  :config
-  ;; Auto-save perspective state on exit
-  (add-hook 'kill-emacs-hook #'persp-state-save))
+;; NOTE: No manual `kill-emacs-hook' save is needed — persp-mode handles
+;; autosave/autoresume internally via `persp-auto-save-opt'/`persp-auto-resume-time'.
 #+end_src
 
-*** Project.el Integration
+*** Projectile Integration
 #+begin_src emacs-lisp
-;; Custom functions for project.el integration with perspective
-;; These provide seamless project-perspective integration without external packages
+(use-package persp-mode-projectile-bridge
+  :after (persp-mode projectile)
+  :commands (persp-mode-projectile-bridge-mode
+             persp-mode-projectile-bridge-find-perspectives-for-all-buffers
+             persp-mode-projectile-bridge-kill-perspectives)
+  :hook (persp-mode-projectile-bridge-mode
+         . (lambda ()
+             (if persp-mode-projectile-bridge-mode
+                 (persp-mode-projectile-bridge-find-perspectives-for-all-buffers)
+               (persp-mode-projectile-bridge-kill-perspectives))))
+  :init
+  (add-hook 'after-init-hook
+            (lambda () (persp-mode-projectile-bridge-mode 1))
+            t))
 
-(with-eval-after-load 'perspective
+;; Custom helpers on top of the bridge (which auto-creates/kills a
+;; perspective per project the moment a project file is visited).
+(with-eval-after-load 'persp-mode
   (defun ar/persp-get-project-name ()
     "Get the name of the current project."
-    (when-let ((project (project-current)))
-      (file-name-nondirectory
-       (directory-file-name
-        (project-root project)))))
+    (ignore-errors (projectile-project-name)))
 
   (defun ar/persp-project-switch ()
-    "Switch to a project and create/switch to its perspective."
+    "Switch to a project; `persp-mode-projectile-bridge' automatically
+creates/switches to the matching perspective once a project file is opened."
     (interactive)
-    (let* ((projects (project-known-project-roots))
-           (choice (completing-read "Switch to project: " projects nil t))
-           (persp-name (file-name-nondirectory
-                       (directory-file-name choice))))
-      ;; Switch to or create perspective for this project
-      (persp-switch persp-name)
-      ;; Set default-directory and find file in the project
-      (let ((default-directory choice))
-        (call-interactively #'project-find-file))))
+    (call-interactively #'projectile-switch-project))
 
   (defun ar/persp-project-perspective ()
     "Switch to the perspective for the current project, creating it if necessary."
@@ -3832,16 +3874,14 @@ Top-level keys:
   (defun ar/persp-project-kill ()
     "Kill all buffers in the current project and its perspective."
     (interactive)
-    (when-let* ((project (project-current))
-                (persp-name (ar/persp-get-project-name))
-                (buffers-to-kill (project-buffers project)))
+    (when-let* ((persp-name (ar/persp-get-project-name))
+                (persp (persp-get-by-name persp-name))
+                (buffers-to-kill (and persp (persp-buffers persp))))
       (when (yes-or-no-p
              (format "Kill %d buffer(s) in project %s and its perspective? "
                      (length buffers-to-kill)
                      persp-name))
-        ;; Kill all project buffers
         (mapc #'kill-buffer buffers-to-kill)
-        ;; Kill the perspective if it exists
         (when (member persp-name (persp-names))
           (persp-kill persp-name))
         (message "Killed project buffers and perspective: %s" persp-name)))))
@@ -3849,88 +3889,66 @@ Top-level keys:
 
 *** Treemacs Integration
 #+begin_src emacs-lisp
-(use-package treemacs-perspective
-  :after (treemacs perspective)
+(use-package treemacs-persp
+  :after (treemacs persp-mode)
   :config
-  ;; Set treemacs scope to work with perspectives
+  ;; Set treemacs scope to work with perspectives (persp-mode backend)
   ;; This makes treemacs buffers unique per perspective
   (treemacs-set-scope-type 'Perspectives))
 #+end_src
 
-*** iBuffer Integration
+*** Compatibility Helpers
 #+begin_src emacs-lisp
-;; IBuffer integration is built into perspective.el via persp-ibuffer
-;; No separate package needed
-
-(with-eval-after-load 'perspective
-  (defun ar/persp-ibuffer (arg)
-    "Open ibuffer filtered by current perspective.
-With prefix argument ARG, show all buffers across all perspectives."
-    (interactive "P")
-    (persp-ibuffer arg))
-
-  (defun ar/persp-ibuffer-filter-by-perspective ()
-    "Set ibuffer filter groups by perspective name."
+(with-eval-after-load 'persp-mode
+  (defun ar/persp-switch-last ()
+    "Switch to the last active perspective."
     (interactive)
-    (when (fboundp 'persp-ibuffer-set-filter-groups)
-      (persp-ibuffer-set-filter-groups)
-      (unless (eq ibuffer-sorting-mode 'alphabetic)
-        (ibuffer-do-sort-by-alphabetic))))
+    (persp-switch persp-last-persp-name))
 
-  ;; Optional: Auto-filter ibuffer by perspective
-  ;; Uncomment the following to enable automatic perspective filtering in ibuffer
-  ;; (add-hook 'ibuffer-hook #'ar/persp-ibuffer-filter-by-perspective)
-  )
+  (defun ar/persp-kill-others ()
+    "Kill all perspectives except the current one."
+    (interactive)
+    (let ((current (safe-persp-name (get-current-persp))))
+      (dolist (name (persp-names))
+        (unless (or (equal name current) (equal name persp-nil-name))
+          (persp-kill name)))))
 
-#+end_src
+  (defun ar/persp-set-buffer (buffer-or-name)
+    "Associate BUFFER-OR-NAME with the current perspective only,
+removing it from all other perspectives."
+    (interactive (list (read-buffer "Set buffer: ")))
+    (dolist (name (persp-names))
+      (let ((persp (persp-get-by-name name)))
+        (when (and persp (not (eq persp (get-current-persp))))
+          (persp-remove-buffer buffer-or-name persp))))
+    (persp-add-buffer buffer-or-name (get-current-persp) nil))
 
-*** Helper Functions
-#+begin_src emacs-lisp
-;; (with-eval-after-load 'perspective
-;;   ;; Helper function to kill all buffers in current perspective except current buffer
-;;   (defun ar/persp-kill-other-buffers ()
-;;     "Kill all buffers in current perspective except the current buffer.
-;; This is useful for cleaning up a perspective workspace."
-;;     (interactive)
-;;     (let ((current-buf (current-buffer))
-;;           (killed-count 0))
-;;       (dolist (buf (persp-current-buffers))
-;;         (unless (eq buf current-buf)
-;;           (when (kill-buffer buf)
-;;             (setq killed-count (1+ killed-count)))))
-;;       (message "Killed %d buffer(s) in current perspective" killed-count)))
+  (defun ar/persp-kill-other-buffers ()
+    "Kill all buffers in current perspective except the current buffer."
+    (interactive)
+    (let ((current-buf (current-buffer))
+          (killed-count 0))
+      (dolist (buf (persp-buffers (get-current-persp)))
+        (unless (eq buf current-buf)
+          (when (kill-buffer buf)
+            (setq killed-count (1+ killed-count)))))
+      (message "Killed %d buffer(s) in current perspective" killed-count)))
 
-;;   ;; Helper function to list all buffers across all perspectives
-;;   (defun ar/persp-list-all-buffers ()
-;;     "Display all buffers with their associated perspectives in a temporary buffer.
-;; This provides an overview of which buffers belong to which perspectives."
-;;     (interactive)
-;;     (let ((buffer-persp-alist '()))
-;;       ;; Collect all buffers and their perspectives
-;;       (dolist (persp-name (persp-names))
-;;         ;; Use with-perspective to safely access each perspective's buffers
-;;         (with-perspective persp-name
-;;           (dolist (buf (persp-current-buffers))
-;;             (when (buffer-live-p buf)
-;;               (push (cons (buffer-name buf) persp-name) buffer-persp-alist)))))
-
-;;       ;; Display results in a temporary buffer
-;;       (with-output-to-temp-buffer "*Perspective Buffers*"
-;;         (princ (format "%-50s %s\n" "Buffer Name" "Perspective"))
-;;         (princ (format "%s %s\n" (make-string 50 ?-) (make-string 20 ?-)))
-;;         (dolist (item (sort buffer-persp-alist
-;;                            (lambda (a b) (string< (car a) (car b)))))
-;;           (princ (format "%-50s %s\n" (car item) (cdr item)))))))
-
-;;   ;; Helper function to switch to buffer from all perspectives
-;;   (defun ar/persp-switch-buffer-all ()
-;;     "Switch to a buffer from all perspectives (not just current).
-;; This allows accessing buffers outside the current perspective without
-;; having to switch perspectives first."
-;;     (interactive)
-;;     ;; persp-switch-to-buffer* with prefix arg shows all buffers
-;;     (let ((current-prefix-arg '(4)))
-;;       (call-interactively #'persp-switch-to-buffer*))))
+  (defun ar/persp-list-all-buffers ()
+    "Display all buffers with their associated perspectives in a temporary buffer."
+    (interactive)
+    (let (buffer-persp-alist)
+      (dolist (name (persp-names))
+        (let ((persp (persp-get-by-name name)))
+          (dolist (buf (and persp (persp-buffers persp)))
+            (when (buffer-live-p buf)
+              (push (cons (buffer-name buf) name) buffer-persp-alist)))))
+      (with-output-to-temp-buffer "*Perspective Buffers*"
+        (princ (format "%-50s %s\n" "Buffer Name" "Perspective"))
+        (princ (format "%s %s\n" (make-string 50 ?-) (make-string 20 ?-)))
+        (dolist (item (sort buffer-persp-alist
+                            (lambda (a b) (string< (car a) (car b)))))
+          (princ (format "%-50s %s\n" (car item) (cdr item))))))))
 #+end_src
 
 * Completion Framework
@@ -3950,7 +3968,7 @@ VERTical Interactively COmpletion
 #+begin_src emacs-lisp
 (use-package vertico
   :custom
-  (vertico-count 8)
+  (vertico-count 10)
   (vertico-resize nil)
   (vertico-cycle t)
   :init
@@ -4101,11 +4119,16 @@ Enrich existing commands with completion annotations
 (use-package consult-dir :defer t)
 #+end_src
 
-** Consult-Project-Extra
+** Consult-Projectile
 #+begin_src emacs-lisp
-(use-package consult-project-extra
+(defun ar/consult-projectile-project-function (_may-prompt)
+  "Return the current Projectile project root for `consult-project-function'."
+  (ignore-errors (projectile-project-root)))
+
+(use-package consult-projectile
   :defer t
-  :custom (consult-project-function #'consult-project-extra-project-fn)
+  :after (consult projectile)
+  :custom (consult-project-function #'ar/consult-projectile-project-function)
   :config
   ;; Frame-local project filtering (requires tabspaces)
   (with-eval-after-load 'tabspaces
@@ -4118,13 +4141,13 @@ Enrich existing commands with completion annotations
                        (member (expand-file-name proj) frame-projects))
                      projects))))
 
-    (advice-add 'consult-project-extra--known-projects
+    (advice-add 'projectile-relevant-known-projects
                 :filter-return
                 #'ar/consult-project-filter))
 
   :bind
-  (("C-c p f" . consult-project-extra-find)
-   ("C-c p o" . consult-project-extra-find-other-window)))
+  (("C-c p f" . consult-projectile-find-file)
+   ("C-c p o" . consult-projectile-find-file-other-window)))
 #+end_src
 
 ** Embark
@@ -4207,13 +4230,20 @@ targets."
   :custom
   (corfu-cycle t)
   (corfu-auto t)
-  (corfu-quit-at-boundary nil)
-  (corfu-quit-no-match t)
-  (corfu-count 12)
-  (corfu-preselect 'first)
-  (corfu-preview-current 'insert)
-  (corfu-on-exact-match 'insert)
-  (corfu-auto-delay 0.15)
+  ;; Both Vertico and Orderless are enabled — only quit at a component
+  ;; separator (M-SPC), not at every plain word boundary.
+  (corfu-quit-at-boundary 'separator)
+  (corfu-quit-no-match 'separator)
+  (corfu-count 16)
+  (corfu-max-width 120) ; caps popup width so the frame doesn't resize/jump every keystroke
+  ;; KEY FIX: `prompt' preselects the literal typed text instead of the
+  ;; first candidate. Combined with `corfu-on-exact-match' below, Corfu no
+  ;; longer silently inserts/removes a "ghost" candidate into the buffer on
+  ;; every keystroke (the actual cause of the stutter) — you now opt in to
+  ;; a candidate explicitly by navigating to it with TAB/S-TAB.
+  (corfu-preselect 'prompt)
+  (corfu-on-exact-match nil)
+  (corfu-auto-delay 0.2)
   (corfu-auto-prefix 2)
   (global-corfu-modes '((not erc-mode
                              eshell-mode
@@ -4235,8 +4265,30 @@ targets."
 
   :config
   (corfu-history-mode 1)
+  (with-eval-after-load 'savehist
+    (add-to-list 'savehist-additional-variables 'corfu-history))
+
+  ;; Let Orderless' completion style also apply to `lsp-mode' completions
+  ;; (category `lsp-capf'), mirroring the `eglot' override already set in
+  ;; the Orderless config.
+  (add-to-list 'completion-category-overrides
+               `(lsp-capf (styles ,@completion-styles)))
+
+  ;; Always close the popup on leaving insert state so it can't linger and
+  ;; cause a visual hiccup on the next keystroke.
+  (add-hook 'evil-insert-state-exit-hook #'corfu-quit)
+
   (add-hook 'before-save-hook #'corfu-quit)
   (advice-add #'persistent-scratch-save :before #'corfu-quit))
+
+;; ;; Ships with the corfu package — adds a documentation popup for the
+;; ;; selected candidate (Doom enables this by default alongside corfu-history).
+;; (use-package corfu-popupinfo
+;;   :ensure nil
+;;   :after corfu
+;;   :hook (corfu-mode . corfu-popupinfo-mode)
+;;   :custom
+;;   (corfu-popupinfo-delay '(0.5 . 1.0)))
 #+end_src
 
 ** Basic Completion
@@ -4252,9 +4304,9 @@ targets."
 ** Nerd Icons Corfu
 #+begin_src emacs-lisp
 (use-package nerd-icons-corfu
-  :autoload nerd-icons-corfu-formatter
   :after corfu
-  :init (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
+  :init
+  (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
 #+end_src
 
 ** Cape
@@ -4263,12 +4315,14 @@ targets."
   :init
   (add-hook 'completion-at-point-functions #'cape-keyword)
   (add-hook 'completion-at-point-functions #'cape-file)
-  (defun ar/cape-dabbrev-accept-all ()
-    "Like `cape-dabbrev' but accepts all inputs (cape README example 5).
-Required when `corfu-auto' is t for `corfu-preselect' to auto-insert
-the first candidate on popup open."
-    (cape-wrap-accept-all #'cape-dabbrev))
-  (add-hook 'completion-at-point-functions #'ar/cape-dabbrev-accept-all)
+
+  ;; NOTE: `corfu-preselect' is now `prompt' (see Corfu config above), so
+  ;; the previous `cape-wrap-accept-all' wrapper around `cape-dabbrev' is
+  ;; no longer needed — it existed solely to force-insert a preselected
+  ;; first candidate. Removing it also cuts extra per-keystroke capf churn
+  ;; that contributed to the stutter.
+  (setq cape-dabbrev-check-other-buffers t)
+  (add-hook 'completion-at-point-functions #'cape-dabbrev)
 
   (add-hook 'completion-at-point-functions #'cape-dict)
   (add-hook 'completion-at-point-functions #'cape-tex)
@@ -4318,6 +4372,8 @@ the first candidate on popup open."
 
   (add-hook 'org-mode-hook #'ar/setup-org-cape-completion)
 
+  ;; Make these capfs composable/asynchronous-friendly, so slow backends
+  ;; (LSP) don't block redisplay and cause typing to stutter.
   (advice-add #'lsp-completion-at-point :around #'cape-wrap-noninterruptible)
   (advice-add #'lsp-completion-at-point :around #'cape-wrap-nonexclusive)
   (advice-add #'comint-completion-at-point :around #'cape-wrap-nonexclusive)
@@ -4327,10 +4383,25 @@ the first candidate on popup open."
 
 ** Dabbrev
 #+begin_src emacs-lisp
+(defcustom ar/dabbrev-buffer-scanning-size-limit (* 1 1024 1024) ; 1 MB
+  "Size limit in bytes for a buffer to be scanned by `cape-dabbrev'/`dabbrev'.
+Scanning very large \"friend\" buffers on every keystroke is a common
+cause of typing stutter with in-buffer completion."
+  :type 'integer
+  :group 'dabbrev)
+
+(defun ar/dabbrev-friend-buffer-p (other-buffer)
+  "Only let dabbrev scan OTHER-BUFFER if it is under the size limit."
+  (< (buffer-size other-buffer) ar/dabbrev-buffer-scanning-size-limit))
+
 (use-package dabbrev
   :ensure nil
   :config
+  (setq dabbrev-friend-buffer-function #'ar/dabbrev-friend-buffer-p
+        dabbrev-upcase-means-case-search t)
   (add-to-list 'dabbrev-ignored-buffer-regexps "\\` ")
+  (add-to-list 'dabbrev-ignored-buffer-regexps
+               "\\(?:\\(?:[EG]?\\|GR\\)TAGS\\|e?tags\\|GPATH\\)\\(<[0-9]+>\\)?")
   (add-to-list 'dabbrev-ignored-buffer-modes 'doc-view-mode)
   (add-to-list 'dabbrev-ignored-buffer-modes 'pdf-view-mode)
   (add-to-list 'dabbrev-ignored-buffer-modes 'vterm-mode)
@@ -4349,139 +4420,56 @@ the first candidate on popup open."
 *Replace eglot with lsp-mode*
 #+begin_src emacs-lisp
 (use-package lsp-mode
-  :hook ((lsp-mode . lsp-diagnostics-mode)
-         (lsp-mode . lsp-completion-mode-maybe))
-  :custom
-  (lsp-keymap-prefix "C-c l")
-  (lsp-diagnostics-provider :flymake)
-  (lsp-completion-provider :none)
-  (lsp-session-file (expand-file-name ".lsp-session" user-emacs-directory))
-  (lsp-log-io nil)
-  (lsp-keep-workspace-alive nil)
-  (lsp-idle-delay 0.5)
-  ;; core
-  (lsp-enable-xref t)
-  (lsp-auto-configure nil)
-  (lsp-eldoc-enable-hover nil)
-  (lsp-enable-dap-auto-configure nil)
-  (lsp-enable-file-watchers nil)
-  (lsp-enable-folding nil)
-  (lsp-enable-imenu nil)
-  (lsp-enable-indentation nil)
-  (lsp-enable-links nil)
-  (lsp-enable-on-type-formatting nil)
-  (lsp-enable-suggest-server-download nil)
-  (lsp-enable-symbol-highlighting nil)
-  (lsp-enable-text-document-color nil)
-  ;; completion
-  (lsp-completion-enable t)
-  (lsp-completion-enable-additional-text-edit nil)
-  (lsp-enable-snippet nil)
-  (lsp-completion-show-kind nil)
-  ;; headerline
-  (lsp-headerline-breadcrumb-enable nil)
-  (lsp-headerline-breadcrumb-enable-diagnostics nil)
-  (lsp-headerline-breadcrumb-enable-symbol-numbers nil)
-  (lsp-headerline-breadcrumb-icons-enable nil)
-  ;; modeline
-  (lsp-modeline-code-actions-enable nil)
-  (lsp-modeline-diagnostics-enable nil)
-  (lsp-modeline-workspace-status-enable nil)
-  (lsp-signature-doc-lines 1)
-  ;; lens
-  (lsp-lens-enable nil)
-  ;; semantic
-  (lsp-semantic-tokens-enable nil)
+  :defer t
+  :commands (lsp lsp-deferred)
+  :hook (prog-mode . lsp-deferred)
   :init
-  (setq lsp-use-plists t))
+  (setq lsp-keymap-prefix "C-c l")
+  :custom
+  ;; --- UI & Functionality Enhancements ---
+  (lsp-semantic-tokens-enable t)
+  (lsp-headerline-breadcrumb-enable t)
+  (lsp-lens-enable t)
+  (lsp-modeline-diagnostics-enable t)
 
-;; (use-package org-src-context
-;;   :straight (:type built-in) ; Relies on lisp/org-src-context.el
-;;   :hook (after-init . org-src-context-mode)
-;;   :custom
-;;   ;; Visual: Set to 'nil' to see the grayed-out context surrounding your block.
-;;   ;; Set to 't' if you prefer a focused view (narrowed to just your code).
-;;   (org-src-context-narrow-p nil)
+  ;; --- Diagnostics & Completion Integration ---
+  (lsp-diagnostics-provider :flycheck)
+  (lsp-completion-provider :none)
 
-;;   ;; Safety: Disable context injection for files larger than 500KB to prevent lag.
-;;   (org-src-context-max-filesize 500000)
+  ;; --- Performance & Behavior ---
+  (lsp-eldoc-render-all nil)
+  (lsp-idle-delay 0.2)
+  (lsp-log-io nil)
+  (lsp-signature-render-documentation nil))
 
-;;   :config
-;;   ;; Enable Apheleia (auto-formatting) inside the edit buffer.
-;;   ;; The patched org-src-context ensures a valid file path exists for this to work.
-;;   (with-eval-after-load 'apheleia
-;;     (add-hook 'org-src-mode-hook
-;;               (lambda ()
-;;                 (apheleia-mode 1)))))
-
-;; ;; Integration with Consult for searching symbols
-;; (use-package consult-eglot
-;;   :defer t
-;;   :after consult
-;;   :bind (:map eglot-mode-map
-;;          ("C-M-." . consult-eglot-symbols)))
-
-;; (use-package consult-eglot-embark :defer t)
-
+(use-package lsp-ui
+  :defer t
+  :after lsp-mode
+  :commands lsp-ui-mode
+  :hook (lsp-mode . lsp-ui-mode)
+  :custom
+  (lsp-ui-doc-position 'at-point)
+  (lsp-ui-doc-show-with-mouse nil)
+  (lsp-ui-sideline-show-diagnostics t)
+  (lsp-ui-sideline-show-hover t)
+  (lsp-ui-sideline-show-code-actions t)
+  (lsp-ui-sideline-delay 0.2)
+  :custom-face
+  (lsp-ui-doc-background ((t (:background "#1e2030"))))
+  (lsp-ui-doc-header ((t (:foreground "#7aa2f7" :weight bold))))
+  (lsp-ui-sideline-background ((t (:background "#1e2030")))))
 #+end_src
 
 ** TODO Syntax Checking
 *Replace flymake with flycheck*
 #+begin_src emacs-lisp
-;; (use-package flymake
-;;   :straight (:type built-in)
-;;   :defer t
-;;   :hook (prog-mode . flymake-mode)
-;;   :custom
-;;   ;; Doom-inspired behavior: better navigation and visual density
-;;   (flymake-fringe-indicator-position 'right-fringe)
-;;   (flymake-wrap-around t)
-;;   (flymake-suppress-zero-counters t)
-;;   (flymake-no-changes-timeout 0.5)
-;;   (flymake-start-on-save-buffer t)
-;;   :config
-;;   ;; UI: Doom Emacs Double-Arrow Fringe Bitmaps
-;;   (define-fringe-bitmap 'ar/flymake-double-arrow
-;;     [#b00000000 #b00010000 #b00011000 #b00011100 #b00011110
-;;      #b00011100 #b00011000 #b00010000 #b00000000])
-
-;;   (setq flymake-error-bitmap   '(ar/flymake-double-arrow flymake-error)
-;;         flymake-warning-bitmap '(ar/flymake-double-arrow flymake-warning)
-;;         flymake-note-bitmap    '(ar/flymake-double-arrow flymake-note))
-
-;;   ;; UI: Nerd Icons in Diagnostics Buffer (SPC c B)
-;;   (defun ar/flymake-diagnostics-buffer-icons ()
-;;     "Apply nerd-icons to the Flymake diagnostics buffer."
-;;     (when (derived-mode-p 'flymake-diagnostics-mode)
-;;       (save-excursion
-;;         (goto-char (point-min))
-;;         (while (re-search-forward "^\\s-*\\(error\\|warning\\|note\\)" nil t)
-;;           (let* ((type (match-string 1))
-;;                  (icon (pcase type
-;;                          ("error"   (nerd-icons-faicon "nf-fa-times_circle" :face 'flymake-error))
-;;                          ("warning" (nerd-icons-faicon "nf-fa-exclamation_circle" :face 'flymake-warning))
-;;                          ("note"    (nerd-icons-faicon "nf-fa-info_circle" :face 'flymake-note)))))
-;;             (add-text-properties (match-beginning 1) (match-end 1) `(display ,icon)))))))
-;;   (add-hook 'flymake-diagnostics-mode-hook #'ar/flymake-diagnostics-buffer-icons)
-
-;;   ;; Navigation Logic
-;;   (defun ar/flymake-next-error () (interactive) (flymake-goto-next-error 1 '(:error :warning) t))
-;;   (defun ar/flymake-prev-error () (interactive) (flymake-goto-prev-error 1 '(:error :warning) t)))
-
-;; (use-package flymake-popon
-;;   :hook (flymake-mode . flymake-popon-mode)
-;;   :custom
-;;   (flymake-popon-method 'posframe)
-;;   (flymake-popon-delay 0.2)
-;;   :config
-;;   ;; Border logic to match your custom posframe configuration
-;;   (set-face-attribute 'flymake-popon-posframe-border nil
-;;                       :background (face-attribute 'posframe-border :background nil t)))
-
 (use-package flycheck
   :config
   (add-hook 'after-init-hook #'global-flycheck-mode))
 
+(use-package flycheck-posframe
+  :after flycheck
+  :config (add-hook 'flycheck-mode-hook #'flycheck-posframe-mode))
 #+end_src
 
 ** Formatting
@@ -4489,33 +4477,7 @@ the first candidate on popup open."
 (use-package apheleia
   :hook (after-init . apheleia-global-mode)
   :custom
-  (apheleia-log-only-errors t)
-  :config
-  (cl-defun ar/apheleia-format-with-eglot (&key buffer scratch callback &allow-other-keys)
-    "Format with Eglot if available; otherwise return nil to fallback."
-    (with-current-buffer buffer
-      (if (and (bound-and-true-p eglot--managed-mode)
-               (eglot-server-capable :documentFormattingProvider))
-          (progn
-            ;; Silence eglot messages during the background format
-            (cl-letf (((symbol-function 'message) #'ignore))
-              (eglot-format-buffer))
-            ;; After eglot-format-buffer runs on the original,
-            ;; we copy the result to scratch so Apheleia can diff it.
-            (with-current-buffer scratch
-              (erase-buffer)
-              (insert-buffer-substring buffer))
-            ;; Tell Apheleia we are done and provide the formatted scratch buffer
-            (funcall callback scratch))
-        ;; Return nil to tell Apheleia to move to the next CLI tool in the list
-        (funcall callback nil))))
-
-  ;; Add the corrected eglot bridge to formatters
-  (push '(eglot . ar/apheleia-format-with-eglot) apheleia-formatters)
-
-  ;; Inhibit for prose where whitespace is sensitive
-  (setq apheleia-inhibit-functions
-        (list (lambda () (derived-mode-p 'org-mode)))))
+  (apheleia-log-only-errors t))
 #+end_src
 
 ** TODO Debug Protocol
@@ -4582,77 +4544,11 @@ the first candidate on popup open."
 ;;   )
 #+end_src
 
-** Imenu-Breadcrumbs
-*Disable breadcrumbs in org buffers*
 #+begin_src emacs-lisp
-;; (defun ar/imenu-breadcrumb-get-path (index-alist point)
-;;   "Recursively traverse INDEX-ALIST to find the path to POINT.
-;; Returns a list of strings (e.g., '(\"Class\" \"Method\"))."
-;;   (let ((path nil))
-;;     (dolist (item index-alist)
-;;       (when (and (consp item) (not path))
-;;         (let ((name (car item))
-;;               (val (cdr item)))
-;;           (cond
-;;            ;; Case 1: Nested list (Class/Module with children)
-;;            ((and (listp val) (consp (car val)))
-;;             ;; We need to determine the start/end of this section.
-;;             ;; In standard Imenu/Eglot, a section usually has a special entry
-;;             ;; or we approximate bounds by the range of its children.
-;;             ;; For safety, we check if the point is within the *range* of this node's children.
-;;             (let* ((positions (mapcar (lambda (x)
-;;                                         (if (markerp (cdr x))
-;;                                             (marker-position (cdr x))
-;;                                           (or (cdr x) 0)))
-;;                                       val))
-;;                    (valid-pos (cl-remove-if-not #'numberp positions))
-;;                    (min-pos (if valid-pos (apply #'min valid-pos) 0))
-;;                    (max-pos (if valid-pos (apply #'max valid-pos) (point-max))))
-;;               (when (and (>= point min-pos) (<= point max-pos))
-;;                 (setq path (cons name (ar/imenu-breadcrumb-get-path val point))))))
-
-;;            ;; Case 2: Leaf node (Method/Function)
-;;            ;; Eglot usually provides markers. We check if point is near this marker.
-;;            ((or (markerp val) (integerp val))
-;;             (let ((pos (if (markerp val) (marker-position val) val)))
-;;               ;; Heuristic: If point is after definition start, it's a candidate.
-;;               ;; A stricter check would require end-positions, which Imenu lacks by default,
-;;               ;; but this works well for 'current function' detection.
-;;               (when (and (>= point pos)
-;;                          (< (- point pos) 5000)) ;; Sanity check: don't match if way far off
-;;                 (setq path (list name)))))))))
-;;     path))
-
-;; (defun ar/eldoc-breadcrumbs (callback &rest _)
-;;   "ElDoc backend to show Imenu breadcrumbs (Parent > Child).
-;; Arguments are CALLBACK and ignored."
-;;   (when (and (derived-mode-p 'prog-mode)
-;;              (bound-and-true-p imenu--index-alist)) ; Only run if Imenu is ready
-;;     (let* ((path (ar/imenu-breadcrumb-get-path imenu--index-alist (point)))
-;;            (breadcrumb-string
-;;             (when path
-;;               (concat
-;;                (if (fboundp 'nerd-icons-codicon)
-;;                    (concat (nerd-icons-codicon "nf-cod-symbol_structure" :face 'shadow) " ")
-;;                  "")
-;;                (mapconcat (lambda (s) (propertize s 'face 'shadow))
-;;                           path
-;;                           (propertize " > " 'face 'shadow))))))
-;;       (when breadcrumb-string
-;;         ;; We pass :thing and :face to play nice with other backends
-;;         (funcall callback breadcrumb-string
-;;                  :thing "Breadcrumb"
-;;                  :face 'shadow)))))
-
-;; ;; Register the backend
-;; (defun ar/setup-eldoc-breadcrumbs ()
-;;   "Add breadcrumbs to ElDoc with low priority."
-;;   ;; Priority 10 (positive) means it runs *after* the main docs (usually 0 or -10),
-;;   ;; effectively appending it to the end of the message in the echo area.
-;;   (add-hook 'eldoc-documentation-functions #'ar/eldoc-breadcrumbs 10 t))
-
-;; ;; Hook into Eglot/Prog-mode
-;; (add-hook 'eglot-managed-mode-hook #'ar/setup-eldoc-breadcrumbs)
+(use-package dap-mode
+  :defer t
+  :config
+  (setq dap-auto-configure-features '(sessions locals controls tooltip)))
 #+end_src
 
 ** Transient Menu
@@ -5431,16 +5327,14 @@ PLIST keys:
 (defun ar/get-project-bibliographies ()
   "Find .bib files in the current project root recursively.
 Works for both LaTeX and Org documents within a project."
-  (when-let* ((project (project-current nil))
-              (root (project-root project)))
+  (when-let* ((root (projectile-project-root)))
     (directory-files-recursively root "\\.bib$")))
 
 (defun ar/setup-project-bibliography ()
   "Create a references.bib file in the project root if it doesn't exist.
 This bibliography file can be used with both LaTeX and Org documents."
   (interactive)
-  (if-let* ((project (project-current t))
-            (root (project-root project))
+  (if-let* ((root (projectile-acquire-root))
             (bib-file (expand-file-name "references.bib" root)))
       (if (file-exists-p bib-file)
           (message "Bibliography already exists: %s" bib-file)
@@ -5949,7 +5843,7 @@ This bibliography file can be used with both LaTeX and Org documents."
 #+end_src
 
 * TODO Terminal
-*Replace eshell with term from doom emacs modules*
+*Replace eshell-mode with term from doom emacs modules*
 
 * Prettify Symbols
 ** Common Prettify Symbols
@@ -6745,43 +6639,26 @@ This bibliography file can be used with both LaTeX and Org documents."
 ** TODO Python
 *Replace with lsp-mode and flycheck*
 #+begin_src emacs-lisp
-;; (with-eval-after-load 'eglot
-;;   (add-to-list 'eglot-server-programs
-;;                '((python-ts-mode python-mode) "basedpyright-langserver" "--stdio")))
-
-;; (setq-default eglot-workspace-configuration
-;;               '(:basedpyright
-;;                 ( :typeCheckingMode      "standard"
-;;                   :disableOrganizeImports t)
-;;                 :basedpyright.analysis
-;;                 ( :autoImportCompletions  t
-;;                   :autoSearchPaths        t
-;;                   :diagnosticMode         "workspace"
-;;                   :useLibraryCodeForTypes t)))
-
-
-;; (with-eval-after-load 'eglot
-;;   (add-to-list 'eglot-server-programs
-;;                `((python-ts-mode python-mode)
-;;                  . ,(eglot-alternatives '(("pyrefly" "lsp"))))))
-
-;; (use-package flymake-ruff
-;;   :hook (eglot-managed-mode . flymake-ruff-load))
+(use-package lsp-pyrefly
+  :vc (:url "https://github.com/indigoviolet/lsp-pyrefly")
+  :after lsp-mode)
 
 (use-package python
   :ensure nil
-  :defer t
   :custom
   (python-shell-completion-native-enable nil)
   (python-shell-interpreter "python3")
   (python-indent-offset 3))
 
 (with-eval-after-load 'apheleia
-  (setf (alist-get 'ruff apheleia-formatters)
-        '("ruff" "format" "--quiet" "--stdin-filename" filepath "-"))
+  (setf (alist-get 'python-mode apheleia-mode-alist)
+        '(ruff-isort ruff))
+  (setf (alist-get 'python-ts-mode apheleia-mode-alist)
+        '(ruff-isort ruff)))
 
-  (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(ruff-isort ruff))
-  (setf (alist-get 'python-mode    apheleia-mode-alist) '(ruff-isort ruff)))
+(with-eval-after-load 'dap-mode
+  (require 'dap-python)
+  (setq dap-python-debugger 'debugpy))
 #+end_src
 
 ** kdl
@@ -6838,7 +6715,6 @@ This bibliography file can be used with both LaTeX and Org documents."
   (setq pdf-view-use-scaling t
         pdf-view-use-imagemagick nil
         pdf-annot-activate-created-annotations t
-        ;; Tokyo Night theme colors
         pdf-view-midnight-colors '("#c0caf5" . "#1a1b26"))
   :config
   (pdf-tools-install t nil t nil)
@@ -7624,17 +7500,17 @@ This bibliography file can be used with both LaTeX and Org documents."
     "TAB TAB" '(persp-switch :wk "Switch/create perspective")
     "TAB n"   '(persp-next :wk "Next perspective")
     "TAB p"   '(persp-prev :wk "Previous perspective")
-    "TAB `"   '(persp-switch-last :wk "Last perspective")
+    "TAB `"   '(ar/persp-switch-last :wk "Last perspective")
     "TAB r"   '(persp-rename :wk "Rename perspective")
     "TAB k"   '(persp-kill :wk "Kill perspective")
-    "TAB K"   '(persp-kill-others :wk "Kill other perspectives")
+    "TAB K"   '(ar/persp-kill-others :wk "Kill other perspectives")
 
     ;; Buffer management within perspectives
-    "TAB b"   '(persp-switch-to-buffer* :wk "Switch to buffer")
-    "TAB B"   '(ar/persp-switch-buffer-all :wk "Switch buffer (all persp)")
+    "TAB b"   '(persp-switch-to-buffer :wk "Switch to buffer")
+    "TAB B"   '(switch-to-buffer :wk "Switch buffer (all persp)")
     "TAB a"   '(persp-add-buffer :wk "Add buffer")
-    "TAB A"   '(persp-set-buffer :wk "Set buffer (remove from others)")
-    "TAB i"   '(persp-import :wk "Import buffer from perspective")
+    "TAB A"   '(ar/persp-set-buffer :wk "Set buffer (remove from others)")
+    "TAB i"   '(persp-import-buffers :wk "Import buffer from perspective")
     "TAB x"   '(persp-remove-buffer :wk "Remove buffer")
     "TAB X"   '(ar/persp-kill-other-buffers :wk "Kill other buffers")
 
@@ -7643,8 +7519,8 @@ This bibliography file can be used with both LaTeX and Org documents."
 
     ;; State management
     "TAB s"   '(:ignore t :wk "state")
-    "TAB s s" '(persp-state-save :wk "Save state")
-    "TAB s l" '(persp-state-load :wk "Load/restore state")
+    "TAB s s" '(persp-save-state-to-file :wk "Save state")
+    "TAB s l" '(persp-load-state-from-file :wk "Load/restore state")
 
     ;; Project integration
     "TAB P"   '(:ignore t :wk "project")
