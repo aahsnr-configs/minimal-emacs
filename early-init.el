@@ -2,22 +2,34 @@
 ;;; Commentary:
 ;;; Code:
 
-;; CRITICAL: Wrap in let to restore file-name-handler-alist
+;; ====================
+;; MAXIMUM GC DEFERRAL & SUBPROCESS OPTIMIZATION
+;; ====================
+;; These are global settings and belong OUTSIDE the `let` block, as they
+;; have nothing to do with lexical variable capture.
+(setq gc-cons-threshold most-positive-fixnum
+      gc-cons-percentage 1.0)
+
+;; Bumped to 4MB. Default is 4KB, which causes the main thread to block
+;; and stutter when reading massive JSON-RPC payloads from lsp-mode,
+;; ripgrep, or package archives during startup and general usage.
+(setq read-process-output-max (* 4 1024 1024))
+
+;; ====================
+;; FILE NAME HANDLERS (Lexical Capture)
+;; ====================
+;; We use `let` strictly to lexically capture the original handler alist
+;; so we can restore it in the `emacs-startup-hook` closure below.
 (let ((file-name-handler-alist-original file-name-handler-alist))
 
-  ;; ====================
-  ;; MAXIMUM GC DEFERRAL (startup-optimization trick, framework-agnostic)
-  ;; ====================
-  (setq gc-cons-threshold most-positive-fixnum
-        gc-cons-percentage 1.0)
-
-  ;; Disable file name handlers completely during startup
+  ;; Disable file name handlers completely during startup to prevent
+  ;; regex checks on every file path (e.g. TRAMP, magic modes).
   (setq file-name-handler-alist nil)
 
   ;; ====================
   ;; REDISPLAY OPTIMIZATIONS
   ;; ====================
-  (setq redisplay-skip-fontification-on-input t)  ; Skip font-lock during fast input
+  (setq redisplay-skip-fontification-on-input t)
   (setq fast-but-imprecise-scrolling t)
   (setq inhibit-compacting-font-caches t)
 
@@ -30,26 +42,11 @@
   ;; ====================
   ;; PACKAGE SYSTEM
   ;; ====================
-  ;; package-enable-at-startup nil means Emacs will NOT auto-call
-  ;; `package-initialize' before loading init.el. Because of that, init.el
-  ;; MUST call `(package-initialize)' itself, after setting `package-archives'
-  ;; (which must include "melpa" -- no-littering is not on GNU/NonGNU ELPA)
-  ;; and BEFORE `(require 'no-littering)'. This is not optional bookkeeping;
-  ;; without it, `package-install' has nothing to install into/from.
   (setq package-enable-at-startup nil)
 
   ;; ====================
   ;; NATIVE COMPILATION
   ;; ====================
-
-  ;; Redirect the eln-cache into the no-littering var/ tree. This has to
-  ;; happen here, in early-init.el, before native compilation of anything
-  ;; (including no-littering itself) can occur -- no-littering can't theme
-  ;; this variable for us because it isn't installed/loaded yet at this
-  ;; point in startup. The path below is written out by hand to match what
-  ;; `no-littering-var-directory' will resolve to once init.el runs
-  ;; (default: "var/" under `user-emacs-directory'). If you override
-  ;; `no-littering-var-directory' in init.el, update this path to match.
   (when (and (fboundp 'startup-redirect-eln-cache)
              (fboundp 'native-comp-available-p)
              (native-comp-available-p))
@@ -57,25 +54,15 @@
      (convert-standard-filename
       (expand-file-name "var/eln-cache/" user-emacs-directory))))
 
-  ;; ;; Make Emacs native-compile .elc files asynchronously by setting
-  ;; ;; `native-comp-jit-compilation' to t.
-  ;; ;; Left commented out deliberately: this is Emacs's own default since
-  ;; ;; 29+, and compile-angel.el (configured separately in init.el) expects
-  ;; ;; it to stay at its default rather than being disabled.
-  ;; (setq native-comp-jit-compilation t)
-  ;; (setq byte-compile-warnings '(not free-vars unresolved noruntime lexical make-local))
-
   ;; ====================
   ;; UI INITIALIZATION
   ;; ====================
+  ;; Disable UI elements via default-frame-alist BEFORE the first frame is drawn.
+  ;; This is significantly faster than calling (menu-bar-mode -1) etc.
   (push '(menu-bar-lines . 0) default-frame-alist)
   (push '(tool-bar-lines . 0) default-frame-alist)
-  (push '(vertical-scroll-bars) default-frame-alist)
+  (push '(vertical-scroll-bars . nil) default-frame-alist)
   (push '(mouse-color . "white") default-frame-alist)
-
-  (menu-bar-mode -1)
-  (when (fboundp 'tool-bar-mode) (tool-bar-mode -1))
-  (when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
 
   ;; ====================
   ;; STARTUP SCREEN
@@ -83,16 +70,12 @@
   (setq inhibit-startup-screen t
         inhibit-startup-echo-area-message user-login-name
         inhibit-startup-buffer-menu t
-        inhibit-splash-screen t
         initial-scratch-message nil)
-
-  ;; (setq inhibit-message t)
 
   ;; ====================
   ;; WARNINGS
   ;; ====================
   (setq warning-suppress-types '((org-element) (comp)))
-  (setq warning-minimum-level :error)
 
   ;; ====================
   ;; SITE FILES
@@ -105,8 +88,8 @@
   (add-hook 'emacs-startup-hook
             (lambda ()
               (setq file-name-handler-alist file-name-handler-alist-original)
-              (setq inhibit-message nil)
-              )
-            101))  ; Run late
+              (setq gc-cons-threshold (* 16 1024 1024) ; 16MB
+                    gc-cons-percentage 0.1)))
+  101)  ; Run late
 
 ;;; early-init.el ends here
