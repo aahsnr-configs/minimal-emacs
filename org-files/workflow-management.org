@@ -1,12 +1,12 @@
 * Workflow Management
 
-This section defines the architectural backbone of the editor's navigation, project isolation, and file management workflows. It relies on a "Mature External" stack (`projectile`, `persp-mode`, `dirvish`, `treemacs`) rather than Emacs' built-in `project.el` and `tab-bar-mode`. This decision is deliberate: `projectile` offers vastly superior `fd`/`ripgrep` hybrid indexing and transient menus, while `persp-mode` provides strict buffer isolation (hiding irrelevant buffers from `C-x b`) that native tabs cannot match.
+This section defines the architectural backbone of the editor's navigation, project isolation, and file management workflows. It relies on a "Mature External" stack (=projectile=, =persp-mode=, =dirvish=, =treemacs=) rather than Emacs' built-in =project.el= and =tab-bar-mode=. This decision is deliberate: =projectile= offers vastly superior =fd=/=ripgrep= hybrid indexing and transient menus, while =persp-mode= provides strict buffer isolation (hiding irrelevant buffers from =C-x b=) that native tabs cannot match.
 
-Crucially, this section includes several defensive patches inspired by Doom Emacs and verified against 2025/2026 edge cases. These include cross-platform Dired safeguards, a fix for Dirvish's multi-frame flicker bug (Issue #353), a custom glue code replacement for the abandoned `persp-mode-projectile-bridge`, and a critical patch to prevent `uniquify` from corrupting `persp-mode` session restorations.
+Crucially, this section includes several defensive patches inspired by Doom Emacs and verified against 2025/2026 edge cases. These include cross-platform Dired safeguards, a fix for Dirvish's multi-frame flicker bug (Issue #353), a custom glue code replacement for the abandoned =persp-mode-projectile-bridge=, a critical patch to prevent =uniquify= from corrupting =persp-mode= session restorations, and a robust =emacsclient= frame isolation engine.
 
 ** Dired
 
-Dired is the native Emacs file manager. By default, it is fragile across different operating systems and network connections. This configuration applies Doom Emacs-inspired safeguards: it dynamically strips unsupported GNU `ls` flags when running on macOS/BSD or over TRAMP, and it uses a stale-predicate to prevent massive I/O hangs when revisiting large or remote directories.
+Dired is the native Emacs file manager. By default, it is fragile across different operating systems and network connections. This configuration applies Doom Emacs-inspired safeguards: it dynamically strips unsupported GNU =ls= flags when running on macOS/BSD or over TRAMP, and it uses a stale-predicate to prevent massive I/O hangs when revisiting large or remote directories.
 
 #+begin_src emacs-lisp
 (use-package dired
@@ -63,7 +63,7 @@ Dired is the native Emacs file manager. By default, it is fragile across differe
 
 ** Dired Extensions
 
-These packages extend Dired's capabilities. `dired-x` provides advanced omitting and OS-integration, `diredfl` adds modern syntax highlighting (font-lock) to the directory listings, and `wdired` allows you to edit the Dired buffer like a text file to rename/move files in bulk.
+These packages extend Dired's capabilities. =dired-x= provides advanced omitting and OS-integration, =diredfl= adds modern syntax highlighting (font-lock) to the directory listings, and =wdired= allows you to edit the Dired buffer like a text file to rename/move files in bulk.
 
 #+begin_src emacs-lisp
 (use-package dired-x
@@ -108,8 +108,8 @@ These packages extend Dired's capabilities. `dired-x` provides advanced omitting
 
 ** Dirvish
 
-Dirvish transforms Dired into a modern, Ranger-like file manager with live previews, emerge groups, and a dedicated sidebar. 
-*Architectural Note:* Dirvish in 2025/2026 suffers from a known multi-frame feedback loop (Issue #353) that causes severe UI flickering when `emacsclient` opens new frames. We apply a Doom Emacs `define-advice` patch to debounce the redisplay hook. Additionally, we hook into `persp-before-switch-functions` to cleanly quit Dirvish side-windows before switching workspaces, preventing Emacs from throwing errors when trying to delete dedicated windows.
+Dirvish transforms Dired into a modern, Ranger-like file manager with live previews, emerge groups, and a dedicated sidebar.
+*Architectural Note:* Dirvish in 2025/2026 suffers from a known multi-frame feedback loop (Issue #353) that causes severe UI flickering when =emacsclient= opens new frames. We apply a Doom Emacs =define-advice= patch to debounce the redisplay hook. Additionally, we hook into =persp-before-switch-functions= to cleanly quit Dirvish side-windows before switching workspaces, preventing Emacs from throwing errors when trying to delete dedicated windows.
 
 #+begin_src emacs-lisp
 (use-package dirvish
@@ -218,8 +218,8 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
 
 ** Projectile
 
-Projectile is the project management engine. It relies on `fd` and `ripgrep` for lightning-fast hybrid indexing. 
-*Architectural Note:* We explicitly disable `projectile-track-known-projects-automatically` to prevent Projectile from aggressively scanning and caching every directory you open (like `~/Downloads`), which causes massive background I/O hangs and bloats the cache. We also implement a custom ignore function to prevent it from treating the Emacs configuration directory itself as a project.
+Projectile is the project management engine. It relies on =fd= and =ripgrep= for lightning-fast hybrid indexing.
+*Architectural Note:* We explicitly disable =projectile-track-known-projects-automatically= to prevent Projectile from aggressively scanning and caching every directory you open (like =~/Downloads=), which causes massive background I/O hangs and bloats the cache. We also implement a custom ignore function to prevent it from treating the Emacs configuration directory itself as a project.
 
 #+begin_src emacs-lisp
 (defun ar/projectile-ignore-emacs-config-p (project-root)
@@ -320,7 +320,7 @@ a project, which would otherwise pollute the project cache."
 
 ** iBuffer
 
-Ibuffer is the advanced buffer list manager. We configure it to hide empty filter groups (keeping the UI clean) and redefine the size column to display human-readable sizes (e.g., `1.2M`). It is integrated with `nerd-icons` for visual flair and `ibuffer-projectile` to automatically group all open buffers by their respective Projectile projects.
+Ibuffer is the advanced buffer list manager. We configure it to hide empty filter groups (keeping the UI clean) and redefine the size column to display human-readable sizes (e.g., =1.2M=). It is integrated with =nerd-icons= for visual flair and =ibuffer-projectile= to automatically group all open buffers by their respective Projectile projects.
 
 #+begin_src emacs-lisp
 (use-package ibuffer
@@ -368,7 +368,7 @@ Ibuffer is the advanced buffer list manager. We configure it to hide empty filte
 
 ** Treemacs
 
-Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. We configure it to silently refresh in the background, integrate with Magit to update on Git commits, and use `nerd-icons` for crisp directory/file icons. Evil bindings are added for seamless Vim-style navigation within the tree.
+Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. We configure it to silently refresh in the background, integrate with Magit to update on Git commits, and use =nerd-icons= for crisp directory/file icons. Evil bindings are added for seamless Vim-style navigation within the tree.
 
 #+begin_src emacs-lisp
 (use-package treemacs
@@ -448,12 +448,12 @@ Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. W
 
 ** Perspective
 
-`persp-mode` provides strict workspace isolation. Unlike Emacs' native `tab-bar-mode`, `persp-mode` partitions the buffer list, meaning `C-x b` (or `consult-buffer`) will *only* show buffers relevant to your current project/context.
+=persp-mode= provides strict workspace isolation. Unlike Emacs' native =tab-bar-mode=, =persp-mode= partitions the buffer list, meaning =C-x b= (or =consult-buffer=) will *only* show buffers relevant to your current project/context.
 
 *** Core
 
-This block configures the core engine. 
-*Critical Patch:* Emacs' built-in `uniquify` package dynamically renames buffers (e.g., `foo<2>`). However, `persp-mode` serializes workspace sessions by exact buffer names. If `uniquify` is active, `persp-mode` will fail to restore sessions on startup, throwing "Selecting deleted buffer" errors. We dynamically disable `uniquify` when `persp-mode` is active. We also filter out dead and TRAMP buffers from the save state to prevent Emacs from hanging on startup trying to restore offline SSH connections.
+This block configures the core engine.
+*Critical Patch:* Emacs' built-in =uniquify= package dynamically renames buffers (e.g., =foo<2>=). However, =persp-mode= serializes workspace sessions by exact buffer names. If =uniquify= is active, =persp-mode= will fail to restore sessions on startup, throwing "Selecting deleted buffer" errors. We dynamically disable =uniquify= when =persp-mode= is active. We also filter out dead and TRAMP buffers from the save state to prevent Emacs from hanging on startup trying to restore offline SSH connections.
 
 #+begin_src emacs-lisp
 (use-package persp-mode
@@ -513,12 +513,53 @@ This block configures the core engine.
   (add-hook 'persp-before-deactivate-functions #'deactivate-mark))
 #+end_src
 
-*** Projectile Integration (Path A: Custom Glue Code)
+*** Emacsclient Frame Isolation (Doom-style)
 
-The `persp-mode-projectile-bridge` package is effectively abandoned and relies on outdated internal APIs. Instead of using it, we implement Doom Emacs' robust "glue code" pattern directly. This guarantees a strict **1 Project = 1 Workspace** isolation rule without relying on unmaintained third-party dependencies. It hooks into Projectile's switch action to automatically create or switch to a perspective named after the project root.
+By default, =persp-mode= isolates buffers by workspace, not by =emacsclient= connection. However, Doom Emacs creates the illusion of per-client isolation by hooking into the server lifecycle. When a new frame is created or a file is visited via =emacsclient=, this hook detects the project root of the target buffer and automatically switches that specific frame to the corresponding perspective.
+
+*Fixes applied:* Corrected the =*scratch*= buffer race condition by adding =server-visit-hook=, replaced the hallucinated =persp-add-new= with the correct =persp-add= API, and removed dead `let` bindings.
 
 #+begin_src emacs-lisp
-;; PATH A: Replaced the abandoned `persp-mode-projectile-bridge` with
+;; ==========================================
+;; EMACSCLIENT FRAME ISOLATION (Doom-style)
+;; ==========================================
+;; Replicates Doom's behavior where opening a new frame via 'emacsclient -c /path/to/project'
+;; automatically binds that specific frame to the project's perspective.
+(with-eval-after-load 'persp-mode
+  (with-eval-after-load 'projectile
+    (defun ar/persp--bind-to-project-h ()
+      "Bind the current frame to the perspective of the current buffer's project.
+Handles both empty `emacsclient -c` calls and `emacsclient -c file` calls."
+      ;; Use `current-buffer` instead of `frame-selected-window` to ensure we
+      ;; get the directory of the file being visited, not the daemon's *scratch* buffer.
+      (when-let* ((dir (or (buffer-local-value 'default-directory (current-buffer))
+                           default-directory))
+                  (default-directory dir)
+                  (project-root (ignore-errors (projectile-project-root)))
+                  (persp-name (projectile-project-name)))
+        ;; Only switch if we aren't already in this perspective
+        (unless (equal persp-name (safe-persp-name (get-current-persp)))
+          (let ((persp (persp-get-by-name persp-name)))
+            ;; FIX: Use the correct `persp-add` API instead of the non-existent `persp-add-new`
+            (unless persp
+              (setq persp (persp-add nil persp-name)))
+            (persp-switch persp)))))
+    
+    ;; Hook 1: Catches empty `emacsclient -c` calls (falls back to daemon's directory)
+    (add-hook 'server-after-make-frame-hook #'ar/persp--bind-to-project-h)
+    
+    ;; Hook 2: Catches `emacsclient -c /path/to/file` calls AFTER the file is loaded
+    (add-hook 'server-visit-hook #'ar/persp--bind-to-project-h)))
+#+end_src
+
+*** Projectile Integration (Path A: Custom Glue Code)
+
+The =persp-mode-projectile-bridge= package is effectively abandoned and relies on outdated internal APIs. Instead of using it, we implement Doom Emacs' robust "glue code" pattern directly. This guarantees a strict **1 Project = 1 Workspace** isolation rule without relying on unmaintained third-party dependencies. It hooks into Projectile's switch action to automatically create or switch to a perspective named after the project root.
+
+*Fixes applied:* Replaced Doom-specific =defadvice!= macro with standard Vanilla Emacs =define-advice=, and corrected =persp-add-new= to =persp-add=.
+
+#+begin_src emacs-lisp
+;; PATH A: Replaced the abandoned 'persp-mode-projectile-bridge' with
 ;; custom Doom-style glue code. This provides robust 1:1 Project=Workspace
 ;; isolation without relying on unmaintained third-party bridge packages.
 (with-eval-after-load 'persp-mode
@@ -547,7 +588,8 @@ The `persp-mode-projectile-bridge` package is effectively abandoned and relies o
         (if persp
             (persp-switch persp-name)
           (let ((persp-auto-resume-time -1)) ; Prevent auto-resume interference
-            (persp-add-new persp-name)
+            ;; FIX: Use correct `persp-add` API instead of hallucinated `persp-add-new`
+            (persp-add nil persp-name)
             (persp-switch persp-name)))
         ;; Now execute the default find-file action within that perspective
         (let ((projectile-switch-project-action #'projectile-find-file))
@@ -557,11 +599,11 @@ The `persp-mode-projectile-bridge` package is effectively abandoned and relies o
     (setq projectile-switch-project-action #'ar/persp-switch-to-project-h)
 
     ;; 3. Kill the perspective when killing project buffers.
-    ;; This ensures that when you run `projectile-kill-buffers`, the associated
+    ;; This ensures that when you run 'projectile-kill-buffers', the associated
     ;; workspace is also destroyed, keeping your perspective list clean.
-    (defadvice! ar/persp-kill-on-project-kill-a (fn &rest args)
+    ;; FIX: Replaced Doom's `defadvice!` with Vanilla Emacs `define-advice`.
+    (define-advice projectile-kill-buffers (:around (fn &rest args) ar/kill-perspective)
       "Kill the associated perspective when killing project buffers."
-      :around #'projectile-kill-buffers
       (let* ((project-root (projectile-acquire-root))
              (persp-name (file-name-nondirectory (directory-file-name project-root)))
              (persp (persp-get-by-name persp-name)))
@@ -572,7 +614,7 @@ The `persp-mode-projectile-bridge` package is effectively abandoned and relies o
 
 *** Treemacs Integration
 
-By default, Treemacs shows the entire filesystem. By integrating it with `persp-mode`, we restrict Treemacs' scope so that each workspace only displays the project root associated with that specific perspective.
+By default, Treemacs shows the entire filesystem. By integrating it with =persp-mode=, we restrict Treemacs' scope so that each workspace only displays the project root associated with that specific perspective.
 
 #+begin_src emacs-lisp
 (use-package treemacs-persp
@@ -586,7 +628,7 @@ By default, Treemacs shows the entire filesystem. By integrating it with `persp-
 
 *** Compatibility Helpers
 
-These are custom utility functions built on top of the `persp-mode` API. They provide quick access to common workspace management tasks, such as killing all buffers in the current project, isolating a buffer to a single workspace, or generating a diagnostic report of all buffers and their assigned perspectives.
+These are custom utility functions built on top of the =persp-mode= API. They provide quick access to common workspace management tasks, such as killing all buffers in the current project, isolating a buffer to a single workspace, or generating a diagnostic report of all buffers and their assigned perspectives.
 
 #+begin_src emacs-lisp
 (with-eval-after-load 'persp-mode
