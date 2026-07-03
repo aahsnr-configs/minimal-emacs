@@ -1,0 +1,685 @@
+* Workflow Management
+
+This section defines the architectural backbone of the editor's navigation, project isolation, and file management workflows. It relies on a "Mature External" stack (`projectile`, `persp-mode`, `dirvish`, `treemacs`) rather than Emacs' built-in `project.el` and `tab-bar-mode`. This decision is deliberate: `projectile` offers vastly superior `fd`/`ripgrep` hybrid indexing and transient menus, while `persp-mode` provides strict buffer isolation (hiding irrelevant buffers from `C-x b`) that native tabs cannot match.
+
+Crucially, this section includes several defensive patches inspired by Doom Emacs and verified against 2025/2026 edge cases. These include cross-platform Dired safeguards, a fix for Dirvish's multi-frame flicker bug (Issue #353), a custom glue code replacement for the abandoned `persp-mode-projectile-bridge`, and a critical patch to prevent `uniquify` from corrupting `persp-mode` session restorations.
+
+** Dired
+
+Dired is the native Emacs file manager. By default, it is fragile across different operating systems and network connections. This configuration applies Doom Emacs-inspired safeguards: it dynamically strips unsupported GNU `ls` flags when running on macOS/BSD or over TRAMP, and it uses a stale-predicate to prevent massive I/O hangs when revisiting large or remote directories.
+
+#+begin_src emacs-lisp
+(use-package dired
+  :ensure nil
+  :defer t
+  :commands (dired dired-jump)
+  ;; Automatically hide verbose file details (permissions, owners) for a cleaner
+  ;; UI, and highlight the current line for better visual tracking.
+  :hook ((dired-mode . dired-hide-details-mode)
+         (dired-mode . hl-line-mode))
+  :custom
+  ;; Doom-like cleanup: Don't confirm simple recursive deletes.
+  ;; By default, Emacs prompts for every single recursive copy or delete,
+  ;; which is incredibly tedious. 'always and 'top suppress these prompts
+  ;; while maintaining a baseline of safety.
+  (dired-recursive-copies 'always)
+  (dired-recursive-deletes 'top)
+  ;; Move deleted files to the system trash instead of permanently deleting them.
+  (delete-by-moving-to-trash t)
+  ;; Do What I Mean: When copying/moving files between two split Dired windows,
+  ;; automatically suggest the other window's directory as the target.
+  (dired-dwim-target t)
+  
+  ;; Performance & UX
+  ;; DOOM FIX: Use stale predicate instead of `t` to prevent I/O hangs on large/remote dirs.
+  ;; Setting this to `t` forces Emacs to synchronously re-read the directory over TRAMP
+  ;; every time you switch back to the buffer, which can freeze the UI for seconds.
+  ;; `dired-buffer-stale-p` only reverts if the directory has actually changed on disk.
+  (dired-auto-revert-buffer #'dired-buffer-stale-p)
+  ;; Kill the old Dired buffer when opening a new one in the same directory
+  ;; to prevent massive buffer bloat during deep filesystem navigation.
+  (dired-kill-when-opening-new-dired-buffer t)
+  
+  :config
+  ;; DOOM FIX: Cross-platform ls switches.
+  ;; macOS/BSD requires `gls` from coreutils for advanced flags like `--group-directories-first`.
+  ;; If `gls` is missing, or if we are over TRAMP, we strip the unsupported flags 
+  ;; to prevent Dired from crashing or rendering blank screens.
+  (let ((args (list "-ahl" "-v" "--group-directories-first")))
+    (when (or (eq system-type 'darwin) (eq system-type 'berkeley-unix))
+      (if (executable-find "gls")
+          (setq insert-directory-program "gls")
+        (setq args (list (car args))))) ; Strip -v and --group-directories-first
+    (setq dired-listing-switches (string-join args " ")))
+  
+  ;; TRAMP Safety Hook: Remove extraneous GNU-specific switches when it's 
+  ;; uncertain they are supported (e.g., over an SSH connection to a minimal 
+  ;; Linux container or a BSD server).
+  (add-hook 'dired-mode-hook
+            (defun +dired-disable-gnu-ls-flags-maybe-h ()
+              (when (file-remote-p default-directory)
+                (setq-local dired-actual-switches "-ahl")))))
+#+end_src
+
+** Dired Extensions
+
+These packages extend Dired's capabilities. `dired-x` provides advanced omitting and OS-integration, `diredfl` adds modern syntax highlighting (font-lock) to the directory listings, and `wdired` allows you to edit the Dired buffer like a text file to rename/move files in bulk.
+
+#+begin_src emacs-lisp
+(use-package dired-x
+  :ensure nil
+  :defer t
+  ;; Enable omit mode to hide "uninteresting" files (compiled artifacts, VCS dirs).
+  :hook (dired-mode . dired-omit-mode)
+  :config
+  (setq dired-omit-verbose nil
+        ;; Regex defining which files to hide when `dired-omit-mode` is active.
+        ;; Hides lockfiles, flycheck temp files, VCS directories, and compiled binaries.
+        dired-omit-files
+        (concat "^\\.?#\\|^\\.$\\|^\\.\\.$"
+                "\\|^\\.DS_Store\\'"
+                "\\|^flycheck_.*"
+                "\\|^\\.project\\(?:ile\\)?\\'"
+                "\\|^\\.\\(?:svn\\|git\\)\\'"
+                "\\|^\\.ccls-cache\\'"
+                "\\|\\(?:\\.js\\)?\\.meta\\'"
+                "\\|\\.\\(?:elc\\|o\\|pyo\\|swp\\|class\\)\\'"))
+  ;; Don't prompt for confirmation when killing buffers associated with deleted files.
+  (setq dired-clean-confirm-killing-deleted-buffers nil))
+
+(use-package diredfl
+  ;; Apply syntax highlighting to both standard Dired and Dirvish's directory views.
+  :hook
+  ((dired-mode . diredfl-mode)
+   (dirvish-directory-view-mode . diredfl-mode))
+  :config
+  ;; Make directory names bold for better visual distinction.
+  (set-face-attribute 'diredfl-dir-name nil :bold t))
+
+(use-package wdired
+  :ensure nil
+  :after dired
+  :custom
+  ;; Allow changing file permissions directly in the WDired buffer.
+  (wdired-allow-to-change-permissions t)
+  ;; Automatically create parent directories if you rename a file to a non-existent subfolder.
+  (wdired-create-parent-directories t))
+#+end_src
+
+** Dirvish
+
+Dirvish transforms Dired into a modern, Ranger-like file manager with live previews, emerge groups, and a dedicated sidebar. 
+*Architectural Note:* Dirvish in 2025/2026 suffers from a known multi-frame feedback loop (Issue #353) that causes severe UI flickering when `emacsclient` opens new frames. We apply a Doom Emacs `define-advice` patch to debounce the redisplay hook. Additionally, we hook into `persp-before-switch-functions` to cleanly quit Dirvish side-windows before switching workspaces, preventing Emacs from throwing errors when trying to delete dedicated windows.
+
+#+begin_src emacs-lisp
+(use-package dirvish
+  :defer t
+  :after dired
+  :init
+  ;; MAGIC: This makes ALL dired commands use Dirvish interfaces.
+  ;; You never have to call `dirvish` explicitly; `dired` just becomes Dirvish.
+  (dirvish-override-dired-mode)
+  :custom
+  ;; Store image/video preview caches in the Emacs directory to avoid polluting ~/.cache.
+  (dirvish-cache-dir (expand-file-name "dirvish/" user-emacs-directory))
+  
+  ;; Layout configuration: (parent-depth preview-width file-list-width)
+  (dirvish-default-layout '(1 0.11 0.55))
+  (dirvish-layout-recipes
+   '((0 0   0.4)   ; No parent, smaller preview
+     (1 0.1 0.5)   ; Balanced layout
+     (1 0.15 0.6))) ; More preview space
+  
+  ;; Quick access shortcuts for commonly visited directories.
+  (dirvish-quick-access-entries
+   `(("h" "~/" "Home")
+     ("e" ,user-emacs-directory "Emacs")
+     ("d" "~/Downloads/" "Downloads")
+     ("D" "~/Documents/" "Documents")
+     ("p" "~/projects/" "Projects")
+     ("o" ,my/org-directory "Org")
+     ("c" "~/.config/" "Config")
+     ("t" "~/.local/share/Trash/files/" "Trash")))
+  
+  ;; Visual attributes rendered in the file list.
+  (dirvish-attributes
+   '(subtree-state nerd-icons collapse vc-state))
+  
+  ;; Doom-like UI: Enable custom headers and mode lines for Dirvish buffers.
+  (dirvish-use-header-line t)
+  (dirvish-use-mode-line t)
+  (dirvish-header-line-height '(25 . 35))
+  (dirvish-mode-line-height 25)
+  (dirvish-header-line-format '(:left (path) :right (free-space)))
+  (dirvish-mode-line-format
+   '(:left (sort file-time " " file-size symlink)
+           :right (omit yank index)))
+  
+  ;; Session behavior.
+  ;; DOOM FIX: Set to 'open to prevent broken leftover buffers on errors.
+  ;; If Dirvish crashes or is forcefully killed, setting this to `nil` leaves
+  ;; ghost buffers in the background. `'open` ensures clean recovery.
+  (dirvish-reuse-session 'open)
+  (dirvish-hide-cursor t)
+  (dirvish-hide-details '(dirvish dirvish-side))
+  
+  ;; Emerge groups: Automatically group files by type or recency.
+  (dirvish-emerge-groups
+   '(("Recent files" (predicate . recent-files-2h))
+     ("Documents" (extensions "pdf" "tex" "bib" "epub"))
+     ("Video" (extensions "mp4" "mkv" "webm"))
+     ("Pictures" (extensions "jpg" "png" "svg" "gif"))
+     ("Audio" (extensions "mp3" "flac" "wav" "ape"))
+     ("Archives" (extensions "gz" "rar" "zip"))))
+  
+  ;; Preview dispatchers: Define how different file types are previewed.
+  (dirvish-preview-dispatchers
+   '(image gif video audio epub archive pdf dired))
+  
+  :config
+  ;; Override the default mode-line format for the side-bar specifically.
+  (setq dirvish-mode-line-format
+        '(:left (sort symlink) :right (omit yank index)))
+  
+  ;; Open large directories (over 20000 files) asynchronously using the `fd` command
+  ;; to prevent Emacs from freezing during directory read.
+  (setq dirvish-large-directory-threshold 20000)
+  (require 'dirvish-fd)
+  (require 'dirvish-emerge)
+  (require 'dirvish-side)
+  
+  ;; Side window configuration.
+  ;; FIX: Syntax error corrected from original config. Set to left side to match width variable.
+  (setq dirvish-side-width 30
+        dirvish-side-follow-buffer-file t
+        dirvish-side-display-alist '((side . left) (slot . -1) (window-width . 30)))
+
+  ;; DOOM HACK: Prevent multi-frame feedback loop flickering (dirvish#353).
+  ;; In Emacs 30+, opening multiple frames with Dirvish active causes a redisplay
+  ;; feedback loop. This advice ensures the hook only fires for the selected window.
+  (define-advice dirvish-pre-redisplay-h (:around (fn window) debounce-redisplay)
+    (when (eq (frame-selected-window) window)
+      (funcall fn window)))
+
+  ;; DOOM HACK: Clean up Dirvish before switching workspaces/projects.
+  ;; If Dirvish is open in a dedicated side-window and you switch `persp-mode`
+  ;; workspaces, Emacs will throw an error trying to delete the dedicated window.
+  ;; This hook gracefully quits Dirvish before the workspace transition occurs.
+  (add-hook 'persp-before-switch-functions
+            (lambda (&rest _)
+              (when-let* ((dv (cl-loop for w in (window-list)
+                                       if (window-dedicated-p w)
+                                       if (with-current-buffer (window-buffer w) (dirvish-curr))
+                                       return it)))
+                (let (dirvish-reuse-session)
+                  (with-selected-window (dv-root-window dv)
+                    (dirvish-quit)))))))
+#+end_src
+
+** Projectile
+
+Projectile is the project management engine. It relies on `fd` and `ripgrep` for lightning-fast hybrid indexing. 
+*Architectural Note:* We explicitly disable `projectile-track-known-projects-automatically` to prevent Projectile from aggressively scanning and caching every directory you open (like `~/Downloads`), which causes massive background I/O hangs and bloats the cache. We also implement a custom ignore function to prevent it from treating the Emacs configuration directory itself as a project.
+
+#+begin_src emacs-lisp
+(defun ar/projectile-ignore-emacs-config-p (project-root)
+  "Return non-nil if PROJECT-ROOT is `user-emacs-directory' or a descendant of it.
+Prevents Projectile from tracking, listing, or switching to the Emacs
+configuration directory (~/.config/emacs) or any of its subfolders as
+a project, which would otherwise pollute the project cache."
+  (file-in-directory-p (file-truename project-root)
+                       (file-truename user-emacs-directory)))
+
+(use-package projectile
+  :defer t
+  :hook (after-init . projectile-mode)
+  :custom
+  ;; Persistent caching writes to disk; non-interactive (daemon) uses memory only.
+  (projectile-enable-caching (if noninteractive t 'persistent))
+  ;; Ignore macOS metadata and TAGS files globally.
+  (projectile-globally-ignored-files '(".DS_Store" "TAGS"))
+  ;; Ignore compiled binaries globally.
+  (projectile-globally-ignored-file-suffixes '(".elc" ".pyc" ".o"))
+  ;; When killing project buffers, only kill buffers visiting files, leaving
+  ;; scratch or REPL buffers alive.
+  (projectile-kill-buffers-filter 'kill-only-files)
+  ;; Hybrid indexing uses VCS for tracked files and `find`/`fd` for untracked files.
+  (projectile-indexing-method 'hybrid)
+  ;; Store cache files in the `no-littering` var directory to keep ~/.emacs.d clean.
+  (projectile-known-projects-file
+   (no-littering-expand-var-file-name "projectile/projects.eld"))
+  (projectile-cache-file
+   (no-littering-expand-var-file-name "projectile/projectile.cache"))
+  ;; Never track/list/switch to the Emacs config directory (or subfolders).
+  (projectile-ignored-projects (list (file-truename user-emacs-directory)))
+  (projectile-ignored-project-function #'ar/projectile-ignore-emacs-config-p)
+  
+  ;; DOOM FIX: Prevent Projectile from automatically tracking every directory
+  ;; you open as a project, which causes massive I/O hangs and bloats the cache.
+  (projectile-track-known-projects-automatically nil)
+  
+  :init
+  ;; Debian/Ubuntu ship `fd` as `fdfind`. Detect the correct executable name.
+  (defvar ar/fd-executable (cl-find-if #'executable-find '("fdfind" "fd"))
+    "Filename of the fd executable.")
+    
+  :config
+  ;; Reduce the number of root marker files/dirs Projectile checks when
+  ;; resolving a project's root, for performance (per Doom's +projectile.el).
+  (setq projectile-project-root-files '()
+        projectile-project-root-files-top-down-recurring '("Makefile"))
+  (add-to-list 'projectile-project-root-files-bottom-up ".project")
+
+  ;; Prefer fd/ripgrep over the VCS-specific commands (faster, respects
+  ;; .gitignore) instead of git ls-files/find.
+  (when ar/fd-executable
+    (setq projectile-fd-executable ar/fd-executable))
+  (setq projectile-git-submodule-command nil
+        projectile-git-fd-args (concat "-tl " projectile-git-fd-args)
+        projectile-generic-command
+        (lambda (_)
+          (cond
+           ((and ar/fd-executable projectile-git-use-fd)
+            (format "%s . --type f --hidden --follow --color=never -0 -E .git"
+                    ar/fd-executable))
+           ((executable-find "rg")
+            "rg -0 --files --follow --color=never --hidden -g!.git")
+           (t "find . -type f -print0"))))
+
+  ;; Doom-inspired: rely on the ripgrep-backed `consult-ripgrep' instead of
+  ;; Projectile's built-in (slower/less consistent) search commands.
+  (put 'projectile-ag 'disabled "Use consult-ripgrep instead")
+  (put 'projectile-ripgrep 'disabled "Use consult-ripgrep instead")
+  (put 'projectile-grep 'disabled "Use consult-ripgrep instead")
+
+  ;; Per-project compilation buffers: ensures `*compilation*` buffers are
+  ;; uniquely named per project, preventing them from overwriting each other.
+  (setq compilation-buffer-name-function #'projectile-compilation-buffer-name
+        compilation-save-buffers-predicate #'projectile-current-project-buffer-p))
+
+;; Helper to quickly open the Emacs config directory as a project.
+(defun ar/open-emacs-config-project ()
+  "Open Emacs config directory as a project."
+  (interactive)
+  (let ((default-directory user-emacs-directory))
+    (call-interactively #'projectile-find-file)))
+
+;; Helper to switch project and immediately open the file finder.
+(defun ar/project-switch-to-file ()
+  "Switch to a project and immediately find a file in it."
+  (interactive)
+  (let ((projectile-switch-project-action #'projectile-find-file))
+    (call-interactively #'projectile-switch-project)))
+
+;; Helper to switch project and show the dispatch menu.
+(defun ar/project-switch-with-menu ()
+  "Switch to a project and show the dispatch menu."
+  (interactive)
+  (call-interactively #'projectile-switch-project))
+#+end_src
+
+** iBuffer
+
+Ibuffer is the advanced buffer list manager. We configure it to hide empty filter groups (keeping the UI clean) and redefine the size column to display human-readable sizes (e.g., `1.2M`). It is integrated with `nerd-icons` for visual flair and `ibuffer-projectile` to automatically group all open buffers by their respective Projectile projects.
+
+#+begin_src emacs-lisp
+(use-package ibuffer
+  :ensure nil
+  :defer t
+  :init (setq ibuffer-filter-group-name-face '(:inherit (font-lock-string-face bold)))
+  :config
+  ;; DOOM FIX: Hide empty filter groups to keep the UI clean.
+  ;; Without this, ibuffer-projectile will show empty headers for projects
+  ;; that currently have no open buffers.
+  (setq ibuffer-show-empty-filter-groups nil)
+  
+  ;; DOOM OPTIMIZATION: Redefine size column to show human-readable sizes.
+  ;; The default byte count is hard to read; this converts it to K/M/G.
+  (define-ibuffer-column size
+    (:name "Size" :inline t :header-mouse-map ibuffer-size-header-map)
+    (file-size-human-readable (buffer-size))))
+
+;; Display icons for buffers based on their major mode or file extension.
+(use-package nerd-icons-ibuffer
+  :defer t
+  :hook (ibuffer-mode . nerd-icons-ibuffer-mode))
+
+;; Group ibuffer's list by project (Projectile-backed).
+(use-package ibuffer-projectile
+  :defer t
+  :commands (ibuffer-projectile-generate-filter-groups)
+  :functions icons-displayable-p
+  :hook (ibuffer . (lambda ()
+                     "Group ibuffer's list by project."
+                     (setq ibuffer-filter-groups (ibuffer-projectile-generate-filter-groups))
+                     (unless (eq ibuffer-sorting-mode 'alphabetic)
+                       (ibuffer-do-sort-by-alphabetic))))
+  :config
+  ;; Custom group name formatter: prepends a Git repo icon if nerd-icons is available.
+  (defun ar/ibuffer-projectile-group-name (project-name _root-dir)
+    "Return group name for PROJECT-NAME, prefixed with a repo icon if available."
+    (if (icons-displayable-p)
+        (format "%s %s"
+                (nerd-icons-octicon "nf-oct-repo" :height 1.2 :face ibuffer-filter-group-name-face)
+                project-name)
+      (format "Project: %s" project-name)))
+  (setq ibuffer-projectile-group-name-function #'ar/ibuffer-projectile-group-name))
+#+end_src
+
+** Treemacs
+
+Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. We configure it to silently refresh in the background, integrate with Magit to update on Git commits, and use `nerd-icons` for crisp directory/file icons. Evil bindings are added for seamless Vim-style navigation within the tree.
+
+#+begin_src emacs-lisp
+(use-package treemacs
+  :defer t
+  :custom-face
+  ;; Match the childframe border to the posframe border for visual consistency.
+  (cfrs-border-color ((t (:inherit posframe-border))))
+  ;; Make the root node stand out with a bold, constant-like face.
+  (treemacs-root-face ((t (:inherit font-lock-constant-face :height 1.1 :weight bold))))
+  :custom
+  (treemacs-width 33)
+  (treemacs-position 'left)
+  ;; Prevent Treemacs from being selected by `other-window` (C-x o), keeping
+  ;; the focus strictly on the editing and minibuffer windows.
+  (treemacs-is-never-other-window t)
+  (treemacs-space-between-root-nodes t)
+  ;; Silent background operations to prevent echo-area spam.
+  (treemacs-silent-refresh t)
+  (treemacs-silent-filewatch t)
+  ;; Delay before the sidebar follows the cursor to the current file.
+  (treemacs-file-follow-delay 0.2)
+  (treemacs-show-cursor nil)
+  
+  :config
+  ;; Automatically follow the currently visited file in the tree.
+  (treemacs-follow-mode t)
+  ;; Watch the filesystem for external changes (e.g., git checkouts, file creation).
+  (treemacs-filewatch-mode t)
+  ;; Show a visual indicator in the fringe for the currently selected node.
+  (treemacs-fringe-indicator-mode 'always)
+  
+  ;; DOOM FIX: Explicitly load the nerd-icons theme.
+  ;; Without this, treemacs falls back to missing or ugly default ASCII icons.
+  (use-package treemacs-nerd-icons
+    :after treemacs
+    :config (treemacs-load-theme "nerd-icons"))
+
+  ;; Git integration configuration.
+  ;; Deferred mode requires Python to parse git status asynchronously.
+  ;; If Python is missing, fall back to simple (synchronous) mode.
+  (when (and (executable-find "git")
+             (executable-find "python3"))
+    (treemacs-git-mode 'deferred)
+    (setq treemacs-collapse-dirs 3))
+  (when (and (executable-find "git")
+             (not (executable-find "python3")))
+    (treemacs-git-mode 'simple)
+    (setq treemacs-collapse-dirs 0)))
+
+;; Integrate Treemacs icons into standard Dired buffers.
+(use-package treemacs-icons-dired
+  :hook (dired-mode . treemacs-icons-dired-enable-once)
+  :ensure t)
+
+;; Magit integration: automatically refresh the sidebar after git operations.
+(use-package treemacs-magit
+  :after (treemacs magit)
+  :hook ((magit-post-commit
+          git-commit-post-finish
+          magit-post-stage
+          magit-post-unstage)
+         . treemacs-magit--schedule-update))
+
+;; Evil navigation in the sidebar with mouse interface.
+(use-package treemacs-evil
+  :after (treemacs evil)
+  :config
+  (evil-define-key 'normal treemacs-mode-map
+    (kbd "TAB") #'treemacs-TAB-action
+    (kbd "o")   #'treemacs-visit-node-ace
+    (kbd "q")   #'treemacs-quit
+    ;; Mouse interface for users who occasionally click the sidebar.
+    [mouse-1] #'treemacs-single-click-expand-action
+    [double-mouse-1] #'treemacs-doubleclick-action
+    [drag-mouse-1] #'treemacs-dragleftclick-action))
+#+end_src
+
+** Perspective
+
+`persp-mode` provides strict workspace isolation. Unlike Emacs' native `tab-bar-mode`, `persp-mode` partitions the buffer list, meaning `C-x b` (or `consult-buffer`) will *only* show buffers relevant to your current project/context.
+
+*** Core
+
+This block configures the core engine. 
+*Critical Patch:* Emacs' built-in `uniquify` package dynamically renames buffers (e.g., `foo<2>`). However, `persp-mode` serializes workspace sessions by exact buffer names. If `uniquify` is active, `persp-mode` will fail to restore sessions on startup, throwing "Selecting deleted buffer" errors. We dynamically disable `uniquify` when `persp-mode` is active. We also filter out dead and TRAMP buffers from the save state to prevent Emacs from hanging on startup trying to restore offline SSH connections.
+
+#+begin_src emacs-lisp
+(use-package persp-mode
+  :hook (after-init . persp-mode)
+  :init
+  ;; Name the default, global workspace "main" instead of "nil".
+  (setq persp-nil-name "main")
+  :custom
+  ;; When creating a new frame, inherit the perspective of the last focused frame.
+  (persp-set-last-persp-for-new-frames t)
+  ;; Automatically add a buffer to the current perspective when opened via find-file.
+  (persp-add-buffer-on-find-file t)
+  ;; Kill buffers when they are removed from all perspectives, preventing orphan buffers.
+  (persp-autokill-buffer-on-remove 'kill-weak)
+  ;; Store workspace state in the `no-littering` var directory.
+  (persp-save-dir (no-littering-expand-var-file-name "persp-confs/"))
+  ;; Save state on exit or when persp-mode is deactivated.
+  (persp-auto-save-opt 2)
+  (persp-auto-save-num-of-backups 3)
+  
+  ;; DOOM FIX: -1 prevents auto-resume hangs from heavy TRAMP/LSP buffers.
+  ;; Auto-resuming on startup forces Emacs to instantly reopen every buffer 
+  ;; from your last session. If your last session included offline TRAMP 
+  ;; connections or massive LSP workspaces, Emacs will freeze.
+  (persp-auto-resume-time -1)
+  ;; Use a shortened mode-line indicator for the current perspective.
+  (persp-modestring-short t)
+  
+  :config
+  ;; CRITICAL DOOM FIX: `uniquify` breaks persp-mode session restoration.
+  ;; It renames buffers dynamically, but persp serializes by exact name.
+  ;; We save the old uniquify style, disable it while persp is active,
+  ;; and restore it if persp is ever turned off.
+  (defvar ar/workspace--old-uniquify-style nil)
+  (add-hook 'persp-mode-hook
+            (lambda ()
+              (cond (persp-mode
+                     (when uniquify-buffer-name-style
+                       (setq ar/workspace--old-uniquify-style uniquify-buffer-name-style))
+                     (setq uniquify-buffer-name-style nil))
+                    (t
+                     (when ar/workspace--old-uniquify-style
+                       (setq uniquify-buffer-name-style ar/workspace--old-uniquify-style))))))
+
+  ;; DOOM FIX: Filter out dead and remote (TRAMP) buffers from being saved.
+  ;; If Emacs tries to restore a dead process buffer or an offline SSH 
+  ;; connection on startup, it will hang indefinitely waiting for a timeout.
+  (add-hook 'persp-filter-save-buffers-functions
+            (lambda (buf)
+              (or (not (buffer-live-p buf))
+                  (let ((dir (buffer-local-value 'default-directory buf)))
+                    (ignore-errors (file-remote-p dir))))))
+
+  ;; DOOM FIX: Clear visual selection on workspace change to prevent ghost regions.
+  ;; If you highlight text, switch workspaces, and switch back, the highlight
+  ;; can sometimes persist visually even though the region is inactive.
+  (add-hook 'persp-before-deactivate-functions #'deactivate-mark))
+#+end_src
+
+*** Projectile Integration (Path A: Custom Glue Code)
+
+The `persp-mode-projectile-bridge` package is effectively abandoned and relies on outdated internal APIs. Instead of using it, we implement Doom Emacs' robust "glue code" pattern directly. This guarantees a strict **1 Project = 1 Workspace** isolation rule without relying on unmaintained third-party dependencies. It hooks into Projectile's switch action to automatically create or switch to a perspective named after the project root.
+
+#+begin_src emacs-lisp
+;; PATH A: Replaced the abandoned `persp-mode-projectile-bridge` with
+;; custom Doom-style glue code. This provides robust 1:1 Project=Workspace
+;; isolation without relying on unmaintained third-party bridge packages.
+(with-eval-after-load 'persp-mode
+  (with-eval-after-load 'projectile
+    
+    ;; 1. Auto-add buffers to the current perspective when they are opened/switched to.
+    ;; This prevents buffers from "leaking" into the global workspace when you
+    ;; open a file via recentf or consult-buffer while inside a project.
+    (defun ar/persp-add-current-buffer-h ()
+      "Add current buffer to focused perspective."
+      (when (and (bound-and-true-p persp-mode)
+                 (not (persp-buffer-filtered-out-p
+                       (current-buffer)
+                       persp-add-buffer-on-after-change-major-mode-filter-functions)))
+        (persp-add-buffer (current-buffer) (get-current-persp) nil nil)))
+    
+    (add-hook 'window-configuration-change-hook #'ar/persp-add-current-buffer-h)
+    (add-hook 'bookmark-after-jump-hook #'ar/persp-add-current-buffer-h)
+
+    ;; 2. Switch to (or create) a perspective named after the project when switching projects.
+    (defun ar/persp-switch-to-project-h (dir)
+      "Hook for `projectile-switch-project-action' to manage perspectives."
+      (let* ((persp-name (file-name-nondirectory (directory-file-name dir)))
+             (persp (persp-get-by-name persp-name)))
+        ;; Switch to or create the perspective
+        (if persp
+            (persp-switch persp-name)
+          (let ((persp-auto-resume-time -1)) ; Prevent auto-resume interference
+            (persp-add-new persp-name)
+            (persp-switch persp-name)))
+        ;; Now execute the default find-file action within that perspective
+        (let ((projectile-switch-project-action #'projectile-find-file))
+          (projectile-switch-project-by-name dir))))
+
+    ;; Override projectile's default switch action with our custom glue code.
+    (setq projectile-switch-project-action #'ar/persp-switch-to-project-h)
+
+    ;; 3. Kill the perspective when killing project buffers.
+    ;; This ensures that when you run `projectile-kill-buffers`, the associated
+    ;; workspace is also destroyed, keeping your perspective list clean.
+    (defadvice! ar/persp-kill-on-project-kill-a (fn &rest args)
+      "Kill the associated perspective when killing project buffers."
+      :around #'projectile-kill-buffers
+      (let* ((project-root (projectile-acquire-root))
+             (persp-name (file-name-nondirectory (directory-file-name project-root)))
+             (persp (persp-get-by-name persp-name)))
+        (prog1 (apply fn args)
+          (when (and persp (persp-p persp) (not (persp-buffers persp)))
+            (persp-kill persp-name)))))))
+#+end_src
+
+*** Treemacs Integration
+
+By default, Treemacs shows the entire filesystem. By integrating it with `persp-mode`, we restrict Treemacs' scope so that each workspace only displays the project root associated with that specific perspective.
+
+#+begin_src emacs-lisp
+(use-package treemacs-persp
+  :after (treemacs persp-mode)
+  :config
+  ;; Set treemacs scope to work with perspectives (persp-mode backend).
+  ;; This makes treemacs buffers unique per perspective, ensuring that
+  ;; switching workspaces also switches the file tree root.
+  (treemacs-set-scope-type 'Perspectives))
+#+end_src
+
+*** Compatibility Helpers
+
+These are custom utility functions built on top of the `persp-mode` API. They provide quick access to common workspace management tasks, such as killing all buffers in the current project, isolating a buffer to a single workspace, or generating a diagnostic report of all buffers and their assigned perspectives.
+
+#+begin_src emacs-lisp
+(with-eval-after-load 'persp-mode
+  ;; Helper to safely get the current projectile project name.
+  (defun ar/persp-get-project-name ()
+    "Get the name of the current project."
+    (ignore-errors (projectile-project-name)))
+
+  ;; Switch to a project; custom glue code automatically creates/switches perspective.
+  (defun ar/persp-project-switch ()
+    "Switch to a project; custom glue code automatically
+    creates/switches to the matching perspective."
+    (interactive)
+    (call-interactively #'projectile-switch-project))
+
+  ;; Force switch to the perspective of the current project without changing files.
+  (defun ar/persp-project-perspective ()
+    "Switch to the perspective for the current project, creating it if necessary."
+    (interactive)
+    (if-let ((persp-name (ar/persp-get-project-name)))
+        (progn
+          (persp-switch persp-name)
+          (message "Switched to perspective: %s" persp-name))
+      (message "Not in a project")))
+
+  ;; Nuclear option: Kill all buffers and the perspective for the current project.
+  (defun ar/persp-project-kill ()
+    "Kill all buffers in the current project and its perspective."
+    (interactive)
+    (when-let* ((persp-name (ar/persp-get-project-name))
+                (persp (persp-get-by-name persp-name))
+                (buffers-to-kill (and persp (persp-buffers persp))))
+      (when (yes-or-no-p
+             (format "Kill %d buffer(s) in project %s and its perspective? "
+                     (length buffers-to-kill)
+                     persp-name))
+        (mapc #'kill-buffer buffers-to-kill)
+        (when (member persp-name (persp-names))
+          (persp-kill persp-name))
+        (message "Killed project buffers and perspective: %s" persp-name)))))
+
+  ;; Quickly toggle back to the last used workspace.
+  (defun ar/persp-switch-last ()
+    "Switch to the last active perspective."
+    (interactive)
+    (persp-switch persp-last-persp-name))
+
+  ;; Close all workspaces except the one you are currently in.
+  (defun ar/persp-kill-others ()
+    "Kill all perspectives except the current one."
+    (interactive)
+    (let ((current (safe-persp-name (get-current-persp))))
+      (dolist (name (persp-names))
+        (unless (or (equal name current) (equal name persp-nil-name))
+          (persp-kill name)))))
+
+  ;; Isolate a buffer: Remove it from all other workspaces and keep it only in the current one.
+  (defun ar/persp-set-buffer (buffer-or-name)
+    "Associate BUFFER-OR-NAME with the current perspective only,
+removing it from all other perspectives."
+    (interactive (list (read-buffer "Set buffer: ")))
+    (dolist (name (persp-names))
+      (let ((persp (persp-get-by-name name)))
+        (when (and persp (not (eq persp (get-current-persp))))
+          (persp-remove-buffer buffer-or-name persp))))
+    (persp-add-buffer buffer-or-name (get-current-persp) nil))
+
+  ;; Clean up the current workspace by killing all buffers except the active one.
+  (defun ar/persp-kill-other-buffers ()
+    "Kill all buffers in current perspective except the current buffer."
+    (interactive)
+    (let ((current-buf (current-buffer))
+          (killed-count 0))
+      (dolist (buf (persp-buffers (get-current-persp)))
+        (unless (eq buf current-buf)
+          (when (kill-buffer buf)
+            (setq killed-count (1+ killed-count)))))
+      (message "Killed %d buffer(s) in current perspective" killed-count)))
+
+  ;; Diagnostic tool: Print a table of all buffers and their assigned workspaces.
+  (defun ar/persp-list-all-buffers ()
+    "Display all buffers with their associated perspectives in a temporary buffer."
+    (interactive)
+    (let (buffer-persp-alist)
+      (dolist (name (persp-names))
+        (let ((persp (persp-get-by-name name)))
+          (dolist (buf (and persp (persp-buffers persp)))
+            (when (buffer-live-p buf)
+              (push (cons (buffer-name buf) name) buffer-persp-alist)))))
+      (with-output-to-temp-buffer "*Perspective Buffers*"
+        (princ (format "%-50s %s\n" "Buffer Name" "Perspective"))
+        (princ (format "%s %s\n" (make-string 50 ?-) (make-string 20 ?-)))
+        (dolist (item (sort buffer-persp-alist
+                            (lambda (a b) (string< (car a) (car b)))))
+          (princ (format "%-50s %s\n" (car item) (cdr item))))))))
+#+end_src
