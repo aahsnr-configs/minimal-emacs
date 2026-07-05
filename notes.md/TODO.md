@@ -20,3 +20,4 @@
 - [ ] I also need interactive custom functions for .dir-locals.el
 - [ ] `Important`: When working on development tools, after finalizing development tools main section, ask qwen to review the completion framework again to make sure if there are any overlapping configurations that need to be integrated with each other like vertico, cape and corfu.
 - [ ] `Important`: For both Completion Framework and Development Tools sections, use doom emacs keybindings whereever possible.
+- [ ] `Important`: Determine all the related packages that are integrated together in the whole emacs config.

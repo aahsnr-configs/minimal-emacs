@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.57
+#+VERSION: 0.58
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -4162,12 +4162,8 @@ removing it from all other perspectives."
           (princ (format "%-50s %s\n" (car item) (cdr item))))))))
 #+end_src
 
-* Completion Framework
+* DONE Completion Framework
 ** DONE Orderless
-CLOSED: [2026-07-04 Sat 18:31]
-:LOGBOOK:
-- State "DONE"       from              [2026-07-04 Sat 18:31]
-:END:
 =orderless= provides a flexible, space-separated completion style where each component can match anywhere in the candidate, in any order. This configuration implements a highly optimized, Doom Emacs-inspired dispatcher system while ensuring strict compatibility with Emacs' native file and TRAMP completion engines.
 
 *Architectural Decisions & Edge Cases Handled*
@@ -4480,10 +4476,6 @@ To replace the legacy =which-key= hack for Embark actions, =vertico-multiform= i
 #+end_src
 
 ** DONE Marginalia
-CLOSED: [2026-07-04 Sat 18:31]
-:LOGBOOK:
-- State "DONE"       from              [2026-07-04 Sat 18:31]
-:END:
 =marginalia= enriches Emacs' minibuffer completions with rich, contextual metadata (annotations). When paired with =vertico= and =consult=, it transforms a simple list of strings into a deeply informative dashboard, showing file sizes, modification dates, command keybindings, and variable types directly in the completion UI.
 
 1. *Absolute Timestamps for Developer Precision:*
@@ -4510,10 +4502,6 @@ CLOSED: [2026-07-04 Sat 18:31]
 #+end_src
 
 ** DONE Nerd Icons Completion
-CLOSED: [2026-07-04 Sat 18:31]
-:LOGBOOK:
-- State "DONE"       from              [2026-07-04 Sat 18:31]
-:END:
 Adds Nerd Font icons to minibuffer completion candidates. We hook it directly into =marginalia= so the icons render cleanly alongside the rich metadata annotations.
 #+begin_src emacs-lisp
 (use-package nerd-icons-completion
@@ -4524,10 +4512,6 @@ Adds Nerd Font icons to minibuffer completion candidates. We hook it directly in
 #+end_src
 
 ** DONE Consult
-CLOSED: [2026-07-04 Sat 19:46]
-:LOGBOOK:
-- State "DONE"       from              [2026-07-04 Sat 19:46]
-:END:
 =consult= provides search and navigation commands built on Emacs' native =completing-read= API. It replaces standard Emacs commands with asynchronous, interactive, and preview-enabled alternatives. This configuration strictly integrates =consult= with =persp-mode= for workspace isolation and =projectile= for project root detection, while optimizing the preview engine for performance and visual clarity.
 
 1. *Strict Projectile Reliance:*
@@ -4663,10 +4647,6 @@ CLOSED: [2026-07-04 Sat 19:46]
 #+end_src
 
 ** DONE Consult Dir
-CLOSED: [2026-07-04 Sat 19:46]
-:LOGBOOK:
-- State "DONE"       from              [2026-07-04 Sat 19:46]
-:END:
 =consult-dir= provides commands to insert directories into the minibuffer prompt, jump to recent directories, and switch contexts seamlessly while in the middle of a =find-file= operation.
 
 Upon strictly reviewing the =consult-dir= source code, it is evident that the package already possesses robust, built-in support for Projectile and external search tools. Writing custom glue code to inject a new source is redundant and mathematically unnecessary. Furthermore, the =consult-projectile= package is officially obsolete, unmaintained, and redundant since Projectile natively uses =completing-read= (which Vertico intercepts).
@@ -4782,20 +4762,48 @@ Because =embark-org= is bundled with the main =embark= package, it does not requ
   :after (embark org))
 #+end_src
 
-** Corfu
+** DONE Corfu
+=corfu= provides a minimalistic, highly performant in-buffer completion UI using child frames. It serves as the direct in-buffer counterpart to the =vertico= minibuffer UI. This configuration strictly adheres to the architectural boundary that Corfu must never enter the minibuffer, while leveraging upstream extensions to create a cohesive, IDE-grade completion stack.
+
+1. *Protocol Compliance (Explicit Minibuffer Confinement):*
+The system protocol strictly mandates that Corfu is confined to buffer editing and MUST NEVER be enabled in the minibuffer, as it fundamentally conflicts with =vertico=. While =global-corfu-mode= implicitly leaves the minibuffer disabled by default, relying on implicit defaults violates defensive programming paradigms. =global-corfu-minibuffer= is explicitly set to =nil= to mathematically guarantee confinement.
+
+2. *Load-Order Physics & Bundled Extensions (=ensure nil=):*
+Corfu's extensions (=corfu-quick=, =corfu-popupinfo=, =corfu-history=) reside in separate Elisp files within the same upstream repository. Because the global configuration sets =use-package-always-ensure= to =t=, declaring these extensions without =:ensure nil= forces =package.el= to query ELPA/MELPA for non-existent standalone packages, resulting in fatal startup errors. Furthermore, placing their activation or keybindings directly inside the main =corfu= =use-package= block violates =use-package= load-order physics, causing shadowed autoloads and =void-function= errors. To guarantee mathematical safety and preserve lazy-loading, each extension is declared in its own isolated =use-package= block with =:after corfu= and =:ensure nil=.
+
+3. *Upstream Synergy: Avy-Style Jumping (=corfu-quick=):*
+To maintain muscle-memory synergy with =vertico-quick=, the =corfu-quick= extension is loaded. Pressing =M-q= overlays 1-or-2 character jump tags next to every candidate in the popup, allowing instant selection of distant items without repetitive arrow-key navigation. Unlike =corfu-history= or =corfu-popupinfo=, =corfu-quick= consists purely of standalone interactive commands and does not require a minor mode. The bindings are strictly aligned with the capitalization logic of the completion stack: =M-q= performs the lesser action (insert and keep open), while =M-Q= performs the final action (complete and close).
+
+4. *Upstream Synergy: Manual Documentation (=corfu-popupinfo=):*
+The =corfu-popupinfo= extension renders LSP and Elisp docstrings in a floating child frame adjacent to the completion menu. However, automatic hover triggers cause UI flickering and spam the LSP server with =completionItem/resolve= network requests. To preserve typing fluidity, the automatic delay is disabled (=corfu-popupinfo-delay nil=), and the popup is strictly bound to a manual toggle (=M-h=).
+
+5. *TAB-and-Go Safety Net & LSP Integration:*
+=corfu-preselect= is set to ='prompt=. This ensures that accidentally hitting =RET= inserts exactly what was typed, rather than blindly committing the first LSP candidate. Additionally, the =lsp-capf= category is explicitly overridden to inherit the global =completion-styles=, guaranteeing that =orderless= filters LSP candidates correctly.
+
+6. *Cleanup & Scope Reduction:*
+The =read-extended-command-predicate= variable is an Emacs core setting that belongs in the =Basic Completion= block; it is excluded here to prevent conceptual bleeding. Eshell-specific =RET= filters and =persistent-scratch= advices are removed as they fall outside the scope of this specific buffer-editing workflow.
+
 #+begin_src emacs-lisp
 (use-package corfu
   :init
   (global-corfu-mode)
   :custom
+  ;; PROTOCOL COMPLIANCE: Explicit Minibuffer Confinement
+  ;; Corfu is strictly confined to buffer editing. It MUST NEVER be enabled
+  ;; in the minibuffer, as it conflicts with Vertico.
+  (global-corfu-minibuffer nil)
+
   (corfu-cycle t)
   (corfu-auto t)
   (corfu-quit-at-boundary 'separator)
   (corfu-quit-no-match 'separator)
   (corfu-count 16)
   (corfu-max-width 120)
+  ;; TAB-and-Go safety net: Preselect the prompt so accidental RET inserts
+  ;; exactly what was typed, rather than blindly committing the first LSP candidate.
   (corfu-preselect 'prompt)
   (corfu-on-exact-match nil)
+  ;; 0.2s delay prevents GC stutter when using Orderless with auto-completion.
   (corfu-auto-delay 0.2)
   (corfu-auto-prefix 2)
   (global-corfu-modes '((not erc-mode
@@ -4805,127 +4813,287 @@ Because =embark-org= is bundled with the main =embark= package, it does not requ
                              gud-mode
                              vterm-mode)
                         t))
-  (read-extended-command-predicate #'command-completion-default-include-p)
   :custom-face
   (corfu-border ((t (:inherit region :background unspecified))))
   :bind (:map corfu-map
-              ("TAB"       . corfu-next)
-              ("<tab>"     . corfu-next)
-              ("S-TAB"     . corfu-previous)
-              ("<backtab>" . corfu-previous)
-              ("RET"       . corfu-insert)
-              ("<escape>"  . corfu-quit))
+         ("TAB"       . corfu-next)
+         ("<tab>"     . corfu-next)
+         ("S-TAB"     . corfu-previous)
+         ("<backtab>" . corfu-previous)
+         ("RET"       . corfu-insert)
+         ("<escape>"  . corfu-quit))
   :config
-  (corfu-history-mode 1)
-  (with-eval-after-load 'savehist
-    (add-to-list 'savehist-additional-variables 'corfu-history))
-
   ;; Let Orderless' completion style also apply to `lsp-mode' completions
   (add-to-list 'completion-category-overrides
                `(lsp-capf (styles ,@completion-styles)))
 
   ;; Always close the popup on leaving insert state or saving
   (add-hook 'evil-insert-state-exit-hook #'corfu-quit)
-  (add-hook 'before-save-hook #'corfu-quit)
-  (advice-add #'persistent-scratch-save :before #'corfu-quit))
+  (add-hook 'before-save-hook #'corfu-quit))
+
+;; ==========================================
+;; CORFU EXTENSIONS (Isolated for Load-Order Safety)
+;; ==========================================
+;; Bundled extensions require `:ensure nil` because `use-package-always-ensure`
+;; is globally enabled. They are isolated in separate blocks to prevent
+;; use-package from generating shadowed autoloads that cause void-function errors.
+
+(use-package corfu-history
+  :ensure nil
+  :after corfu
+  :config
+  (corfu-history-mode 1)
+  (with-eval-after-load 'savehist
+    (add-to-list 'savehist-additional-variables 'corfu-history)))
+
+(use-package corfu-popupinfo
+  :ensure nil
+  :after corfu
+  :bind (:map corfu-map
+         ;; UPSTREAM SYNERGY: corfu-popupinfo (Manual Trigger)
+         ;; M-h toggles the documentation popup for the selected candidate.
+         ("M-h" . corfu-popupinfo-toggle))
+  :config
+  (corfu-popupinfo-mode 1)
+  ;; Documentation is ONLY shown on keybinding (M-h), never automatically.
+  ;; Setting the delay to nil prevents the automatic hover trigger, avoiding
+  ;; UI flicker and LSP network spam.
+  (setq corfu-popupinfo-delay nil))
+
+(use-package corfu-quick
+  :ensure nil
+  :after corfu
+  :bind (:map corfu-map
+         ;; UPSTREAM SYNERGY: corfu-quick (Avy-style Selection)
+         ;; M-q overlays jump-characters next to every candidate.
+         ;; Aligned with Vertico's capitalization logic:
+         ;; M-q (lesser action): Insert candidate but keep popup open.
+         ;; M-Q (final action): Insert candidate and close popup.
+         ("M-q" . corfu-quick-insert)
+         ("M-Q" . corfu-quick-complete)))
 #+end_src
 
-** Basic Completion
+** DONE Basic Completion
+This subsection configures the foundational, native Emacs completion variables found in =simple.el= and =minibuffer.el=. While packages like =corfu= and =vertico= provide the visual UI, they ultimately rely on these core Emacs settings to dictate when and how the underlying completion engine is triggered.
+
+1. *The Indent-Then-Complete Paradigm (=tab-always-indent=):*
+By setting =tab-always-indent= to ='complete=, the =TAB= key adopts a dual-role behavior. If the code is not properly indented, =TAB= indents it. If the code is already indented, =TAB= triggers =completion-at-point=, summoning the Corfu popup. This creates a seamless, context-aware workflow where indentation and code completion share a single keystroke.
+
+2. *Dictionary Spam Prevention (=text-mode-ispell-word-completion=):*
+By default, Emacs binds =M-TAB= (and sometimes =TAB= in text modes) to =ispell-complete-word=, which triggers a synchronous dictionary lookup. In modern workflows utilizing asynchronous Capfs (Completion at Point Functions) like =cape-dict= or LSP servers, this legacy behavior causes UI stuttering and unwanted dictionary popups. Setting this to =nil= disables the legacy Ispell integration.
+
+3. *Context-Aware =M-x= Decluttering (=read-extended-command-predicate=):*
+The =M-x= (=execute-extended-command=) menu often contains hundreds of commands that are entirely irrelevant to the current major mode (e.g., =magit-status= in a Python buffer). By setting the predicate to =#'command-completion-default-include-p=, Emacs filters the =M-x= candidate list to only show commands that explicitly declare compatibility with the current buffer's major mode, drastically reducing visual noise.
 #+begin_src emacs-lisp
 (use-package emacs
   :ensure nil
   :custom
+  ;; INDENT-THEN-COMPLETE:
+  ;; If the line is not indented, TAB indents it. If it is already indented,
+  ;; TAB triggers `completion-at-point', summoning the Corfu popup.
   (tab-always-indent 'complete)
+
+  ;; DICTIONARY SPAM PREVENTION:
+  ;; Disables the legacy synchronous Ispell dictionary lookup on M-TAB/TAB
+  ;; in text modes. Modern Capfs (like cape-dict or LSP) handle this
+  ;; asynchronously without blocking the main thread.
   (text-mode-ispell-word-completion nil)
+
+  ;; CONTEXT-AWARE M-x DECLUTTERING:
+  ;; Filters the `M-x' candidate list to only show commands that are
+  ;; explicitly compatible with the current major mode, hiding irrelevant
+  ;; commands and drastically reducing visual noise.
   (read-extended-command-predicate #'command-completion-default-include-p))
 #+end_src
 
-** Nerd Icons Corfu
+** DONE Nerd Icons Corfu
+=corfu= intentionally omits native icon rendering to maintain its minimalistic, high-performance footprint. Instead, it exposes a margin-formatter API (=corfu-margin-formatters=) that allows external packages to inject visual glyphs into the completion popup.
+
+=nerd-icons-corfu= bridges this gap by mapping LSP and Tree-sitter completion categories (e.g., variables, functions, classes, snippets) to their corresponding Nerd Font glyphs. This creates visual parity with the minibuffer, where =nerd-icons-completion= renders identical icons next to =vertico= candidates.
+
+*Load-Order Physics:* The formatter function (=#'nerd-icons-corfu-formatter=) must be registered in the =:init= block. If deferred to =:config=, the registration will occur after Corfu has already initialized its rendering engine, causing the first few completion popups to render without icons until the internal cache is invalidated.
+
 #+begin_src emacs-lisp
 (use-package nerd-icons-corfu
   :after corfu
   :init
+  ;; Register the Nerd Icons formatter with Corfu's margin API.
+  ;; This MUST happen in `:init' so the formatter is available the very
+  ;; first time Corfu renders a popup, preventing missing-icon flicker.
   (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
 #+end_src
 
-** Cape
+** DONE Cape
+=cape= (Completion At Point Extensions) provides a suite of modular Completion at Point Functions (Capfs) and transformer utilities. It acts as the backend engine for =corfu=, supplying candidates from diverse sources like file paths, dictionary words, shell history, and buffer text.
+
+This configuration strictly implements a /Lean Pipeline Architecture/ optimized for a heavy IDE workflow (Python, C/C++, Rust, Web Dev, and Bash). The =completion-at-point-functions= hook is evaluated by Emacs on almost every keystroke. Adding heavy or overly aggressive Capfs to this global hook causes micro-stutters and completion boundary shadowing (where the first Capf to return a candidate halts the engine, hiding subsequent candidates).
+
+1. *The Lean Global Pipeline (Defensive Boundary Guards):*
+Only lightweight Capfs with strict internal boundary guards are added to the global hook:
+- =cape-elisp-block=: Natively handles Elisp completion inside Org and Markdown source blocks with zero overhead outside of them.
+- =cape-file=: Wrapped in =cape-capf-inside-string=. This mathematically restricts file path completion to trigger /only/ when the cursor is inside a string literal. This is critical for Python, C/C++, Rust, and Web Dev, preventing =cape-file= from aggressively hijacking the completion boundary when typing standard code operators like division (=/=), regex, or object access (=.=).
+- =cape-dabbrev=: Wrapped in =cape-capf-prefix-length= with a minimum threshold of 2 characters. This prevents Dabbrev from scanning all open buffers and spamming the UI when only a single character has been typed.
+
+2. *The Bash/Shell Hybrid Approach:*
+While string-literal restriction is mathematically perfect for compiled and interpreted programming languages, shell scripts (Bash) frequently utilize unquoted file paths (e.g., =cp src/ dest/=). To support this without polluting the global pipeline, the unwrapped =cape-file= Capf is injected exclusively into the buffer-local hooks of =sh-mode= and =bash-ts-mode=.
+
+3. *Context-Specific Local Hooks (=cape-history=):*
+=cape-history= is computationally expensive and only relevant in environments with an active history ring. It is strictly relegated to =comint-mode-hook= (powering history completion for inferior Python, Rust, and Node REPLs) and =minibuffer-setup-hook=.
+
+4. *On-Demand Specialized Capfs (=cape-prefix-map=):*
+Heavy or highly specific Capfs (=cape-line=, =cape-emoji=, =cape-dict=, =cape-keyword=, =cape-tex=) are completely removed from the automatic global pipeline. They are exposed on-demand via the =cape-prefix-map= bound to =C-c p=, guaranteeing zero typing stutter while providing instant mnemonic access to the entire Cape arsenal.
+
+5. *LSP & Comint Merging Engine (=cape-wrap-nonexclusive= & =cape-wrap-noninterruptible=):*
+By default, Emacs Capfs are exclusive (the first to return wins) and interruptible (aborted if the user types during computation). LSP network requests are inherently slow.
+- =cape-wrap-noninterruptible= shields =lsp-completion-at-point= from =quit= signals triggered by =input-pending-p=, forcing the main thread to wait for the network payload and preventing the "stutter-and-vanish" popup bug.
+- =cape-wrap-nonexclusive= tells the completion engine to accept LSP/Comint results but continue evaluating the rest of the Capf list, merging network candidates with local Dabbrev and File candidates into a single, unified Corfu popup.
 #+begin_src emacs-lisp
 (use-package cape
+  ;; Bind prefix keymap providing all Cape commands under a mnemonic key.
+  ;; Exposes heavy Capfs (cape-line, cape-emoji, cape-dict, etc.) on-demand
+  ;; without adding their runtime cost to the automatic global pipeline.
+  :bind ("C-c p" . cape-prefix-map)
   :init
-  (add-hook 'completion-at-point-functions #'cape-keyword)
-  (add-hook 'completion-at-point-functions #'cape-file)
+  ;; ==========================================
+  ;; THE LEAN GLOBAL PIPELINE
+  ;; ==========================================
+  ;; Only Capfs that are lightweight and possess strict internal boundary
+  ;; guards belong in the global hook. Heavy or overly aggressive Capfs
+  ;; are relegated to the on-demand `cape-prefix-map` (C-c p) to prevent
+  ;; runtime overhead and completion boundary shadowing.
 
+  ;; 1. Elisp in Org/Markdown blocks (Native AST guard)
+  (add-hook 'completion-at-point-functions #'cape-elisp-block)
+
+  ;; 2. File completion (Strictly confined to string literals globally)
+  ;; Protects Python, C/C++, Rust, and Web Dev from `cape-file` hijacking
+  ;; division operators (/), regex, or object access (.) in normal code.
+  (add-hook 'completion-at-point-functions (cape-capf-inside-string #'cape-file))
+
+  ;; 3. Dabbrev (Buffer words)
+  ;; Wrapped in `cape-capf-prefix-length` to require at least 2 characters,
+  ;; preventing UI spam and expensive cross-buffer scans on single keystrokes.
   (setq cape-dabbrev-check-other-buffers t)
-  (add-hook 'completion-at-point-functions #'cape-dabbrev)
-  (add-hook 'completion-at-point-functions #'cape-dict)
-  (add-hook 'completion-at-point-functions #'cape-tex)
+  (add-hook 'completion-at-point-functions (cape-capf-prefix-length #'cape-dabbrev 2))
 
-  (defun ar/org-elisp-capf ()
-    "A robust Capf for Elisp in Org mode."
-    (when (org-in-src-block-p)
-      (let ((element (org-element-at-point)))
-        (when (and (eq (org-element-type element) 'src-block)
-                   (member (org-element-property :language element)
-                           '("elisp" "emacs-lisp")))
-          (let* ((block-start (org-element-property :post-affiliated element))
-                 (block-end (org-element-property :end element))
-                 (code-beg (save-excursion
-                             (goto-char block-start)
-                             (forward-line 1)
-                             (point)))
-                 (code-end (save-excursion
-                             (goto-char block-end)
-                             (forward-line -1)
-                             (point))))
-            (when (and (numberp code-beg)
-                       (numberp code-end)
-                       (< code-beg code-end))
-              (when (and (>= (point) code-beg)
-                         (<= (point) code-end))
-                (save-restriction
-                  (narrow-to-region code-beg code-end)
-                  (with-syntax-table emacs-lisp-mode-syntax-table
-                    (elisp-completion-at-point))))))))))
+  :config
+  ;; ==========================================
+  ;; CONTEXT-SPECIFIC LOCAL HOOKS
+  ;; ==========================================
+  ;; `cape-history` is restricted to environments with an active history ring
+  ;; to prevent global overhead. Powers history completion for inferior
+  ;; Python, Rust, Node REPLs, and the minibuffer.
+  (add-hook 'comint-mode-hook
+            (lambda () (add-hook 'completion-at-point-functions #'cape-history nil t)))
+  (add-hook 'minibuffer-setup-hook
+            (lambda () (add-hook 'completion-at-point-functions #'cape-history nil t)))
 
-  (defun ar/setup-org-cape-completion ()
-    (add-hook 'completion-at-point-functions #'ar/org-elisp-capf -100 t))
-  (add-hook 'org-mode-hook #'ar/setup-org-cape-completion)
+  ;; Bash/Shell scripts: Enable unwrapped `cape-file` locally.
+  ;; Shell scripts frequently use unquoted file paths (e.g., `cp src/ dest/`).
+  ;; Adding it locally here bypasses the global `inside-string` restriction
+  ;; without polluting the global pipeline for Python/Rust/C++.
+  (add-hook 'sh-mode-hook
+            (lambda () (add-hook 'completion-at-point-functions #'cape-file nil t)))
+  (add-hook 'bash-ts-mode-hook
+            (lambda () (add-hook 'completion-at-point-functions #'cape-file nil t)))
 
-  ;; Make these capfs composable/asynchronous-friendly, so slow backends
-  ;; (LSP) don't block redisplay and cause typing to stutter.
-  ;; FIX: Wrapped in `with-eval-after-load` to prevent void-function errors on startup.
+  ;; ==========================================
+  ;; LSP & COMINT INTEGRATION (Typing Safeguards)
+  ;; ==========================================
+  ;; By default, Emacs Capfs are exclusive (the first to return wins) and
+  ;; interruptible (aborted if the user types during computation).
+  ;; LSP network requests and Comint history lookups are slow. Without these
+  ;; wrappers, LSP completions block the main thread (causing UI stutter) and
+  ;; exclusive behavior prevents Cape's Dabbrev/File candidates from merging
+  ;; with LSP candidates.
+
   (with-eval-after-load 'lsp-mode
+    ;; `cape-wrap-noninterruptible`: Shields LSP from `quit` signals triggered
+    ;; by `input-pending-p`, forcing the main thread to wait for the network
+    ;; payload and preventing the "stutter-and-vanish" popup bug.
     (advice-add #'lsp-completion-at-point :around #'cape-wrap-noninterruptible)
+    ;; `cape-wrap-nonexclusive`: Tells the completion engine to accept LSP
+    ;; results but continue evaluating the rest of the Capf list, merging
+    ;; LSP candidates with Dabbrev and File candidates.
     (advice-add #'lsp-completion-at-point :around #'cape-wrap-nonexclusive))
 
+  ;; Apply non-exclusive merging to Comint and Pcomplete (Shell)
+  ;; so shell history and file paths merge with native shell completions.
   (advice-add #'comint-completion-at-point :around #'cape-wrap-nonexclusive)
   (advice-add #'pcomplete-completions-at-point :around #'cape-wrap-nonexclusive))
 #+end_src
 
-** Dabbrev
+** DONE Dabbrev
+=dabbrev= (Dynamic Abbreviation) provides native, buffer-scanning word completion. While modern setups often rely on =cape-dabbrev= for asynchronous integration with the Corfu UI, the underlying =dabbrev= engine must be rigorously configured to prevent main-thread freezing, secure sensitive credentials, and eliminate noise pollution from machine-generated buffers.
+
+1. *Defensive Buffer Sizing & Scanning Limits:*
+The custom =ar/dabbrev-friend-buffer-p= function prevents =dabbrev= from freezing the main thread when it attempts to scan massive buffers like minified JSON, huge log files, or compiled artifacts. A strict =buffer-live-p= guard is mathematically required to prevent =wrong-type-argument= crashes during asynchronous buffer killing or garbage collection cycles.
+
+2. *Security & Noise Pollution Safeguards:*
+By default, =dabbrev= scans all open buffers for word matches. If an =authinfo= or =.netrc= file is open, plaintext passwords and API tokens will silently leak into the Corfu completion popup. =authinfo-mode= is explicitly added to the ignored modes list to guarantee credential isolation. Additionally, machine-generated output buffers (=compilation-mode=, =magit-status-mode=, =magit-log-mode=, and the catch-all =special-mode=) are excluded to prevent garbage text (e.g., =warning:=, =commit=) from polluting the candidate list.
+
+3. *Corfu Synergy (Keybinding Inversion):*
+The legacy Emacs binding for =M-/ = is =dabbrev-expand=, which blindly inserts the first matching word inline, bypassing the Corfu UI and Orderless filtering. The bindings are swapped: =M-/ = is mapped to =dabbrev-completion= (summoning the Corfu popup), while =C-M-/ = falls back to the legacy inline =dabbrev-expand= for instant insertion.
+
+4. *Cross-Buffer Scanning Parity:*
+=dabbrev-check-other-buffers= is explicitly set to =t=. This guarantees that native =M-/ = behavior perfectly mirrors the =cape-dabbrev= Capf configured in the Cape subsection, allowing both engines to scan adjacent and project buffers for word matches.
+
+5. *Case-Sensitivity Preservation:*
+=dabbrev-upcase-means-case-search= is set to =t=. This ensures that typing an uppercase letter forces =dabbrev= to only match uppercase candidates, preserving case-sensitivity when explicitly requested.
 #+begin_src emacs-lisp
 (defcustom ar/dabbrev-buffer-scanning-size-limit (* 1 1024 1024) ; 1 MB
-  "Size limit in bytes for a buffer to be scanned by `cape-dabbrev'/`dabbrev'."
+  "Size limit in characters for a buffer to be scanned by `cape-dabbrev'/`dabbrev'."
   :type 'integer
   :group 'dabbrev)
 
 (defun ar/dabbrev-friend-buffer-p (other-buffer)
-  "Only let dabbrev scan OTHER-BUFFER if it is under the size limit."
-  (< (buffer-size other-buffer) ar/dabbrev-buffer-scanning-size-limit))
+  "Return non-nil if OTHER-BUFFER is safe and under the size limit for scanning.
+Includes a `buffer-live-p' guard to prevent crashes during asynchronous
+buffer killing or garbage collection cycles."
+  (and (buffer-live-p other-buffer)
+       (< (buffer-size other-buffer) ar/dabbrev-buffer-scanning-size-limit)))
 
 (use-package dabbrev
   :ensure nil
+  ;; CORFU SYNERGY: Keybinding Inversion
+  ;; Swap M-/ and C-M-/. M-/ summons the Corfu popup (dabbrev-completion),
+  ;; allowing Orderless filtering. C-M-/ falls back to legacy inline insertion.
+  :bind (("M-/" . dabbrev-completion)
+         ("C-M-/" . dabbrev-expand))
   :config
   (setq dabbrev-friend-buffer-function #'ar/dabbrev-friend-buffer-p
-        dabbrev-upcase-means-case-search t)
+        dabbrev-upcase-means-case-search t
+        ;; CROSS-BUFFER SCANNING PARITY:
+        ;; Explicitly enable scanning other buffers to guarantee that native
+        ;; M-/ behavior perfectly mirrors the `cape-dabbrev` Capf.
+        dabbrev-check-other-buffers t)
+
+  ;; Ignore hidden/internal Emacs buffers
   (add-to-list 'dabbrev-ignored-buffer-regexps "\\` ")
+
+  ;; Ignore TAGS and generated index files
   (add-to-list 'dabbrev-ignored-buffer-regexps
                "\\(?:\\(?:[EG]?\\|GR\\)TAGS\\|e?tags\\|GPATH\\)\\(<[0-9]+>\\)?")
-  (add-to-list 'dabbrev-ignored-buffer-modes 'doc-view-mode)
-  (add-to-list 'dabbrev-ignored-buffer-modes 'pdf-view-mode)
-  (add-to-list 'dabbrev-ignored-buffer-modes 'vterm-mode)
-  (add-to-list 'dabbrev-ignored-buffer-modes 'eshell-mode)
-  (add-to-list 'dabbrev-ignored-buffer-modes 'tags-table-mode))
+
+  ;; SECURITY & NOISE POLLUTION SAFEGUARDS:
+  ;; - authinfo-mode: Prevents plaintext passwords and API tokens from leaking
+  ;;   into the Corfu completion popup when credential files are open.
+  ;; - compilation/magit/special-mode: Excludes machine-generated output buffers
+  ;;   to prevent garbage text (warnings, commits) from polluting candidates.
+  ;; - doc-view/pdf-view/vterm/eshell: Excludes binary, terminal, and shell buffers.
+  (dolist (mode '(doc-view-mode
+                  pdf-view-mode
+                  dirvish-directory-view-mode
+                  vterm-mode
+                  term-mode
+                  eshell-mode
+                  tags-table-mode
+                  authinfo-mode
+                  compilation-mode
+                  magit-status-mode
+                  magit-log-mode
+                  special-mode))
+    (add-to-list 'dabbrev-ignored-buffer-modes mode)))
 #+end_src
 
 * Development Tools
@@ -4981,6 +5149,7 @@ Because =embark-org= is bundled with the main =embark= package, it does not requ
 
 ** TODO Syntax Checking
 *Replace flymake with flycheck*
+=flycheck and lsp-mode diagnostics must work together=
 #+begin_src emacs-lisp
 (use-package flycheck
   :config

@@ -37,6 +37,7 @@ When the user uploads the following 4 files: `early-init.el.txt`, `config.org.tx
 - **Workspace Isolation:** `persp-mode` is used. Code querying perspective buffers MUST include a safe `let` guard to prevent `wrong-type-argument` crashes in the global `nil` perspective.
 - **Minibuffer Navigation:** Arrow keys are preferred over `hjkl` to preserve the "type-to-filter" paradigm and prevent Evil state conflicts.
 - **Keybinding Management:** `general.el` is the centralized manager, but native `use-package` `:bind` or `:commands` are preferred for core packages to guarantee safe deferred autoloading.
+- Bundled Extensions & `:ensure nil`: Because `use-package-always-ensure` is set to `t` globally, any `use-package` declaration for an extension that is bundled within a parent package's repository (e.g., `corfu-quick` inside `corfu`, `vertico-repeat` inside `vertico`, or `embark-org` inside `embark`) MUST explicitly include `:ensure nil`. This prevents `package.el` from attempting to fetch a non-existent standalone package from ELPA/MELPA and throwing a startup error.
 
 ## 6. Negative Constraints (The "Never" List)
 
