@@ -17,6 +17,7 @@
 - [ ] orderless only matches letters next to each other; I dont want that
 - [ ] add keybindings for embark
 - [ ] add lsp-ltex-plus
+- [ ] lsp-mode ideas: 1. how would code lens be useful in python programming
 - [ ] I also need interactive custom functions for .dir-locals.el
 - [ ] `Important`: When working on development tools, after finalizing development tools main section, ask qwen to review the completion framework again to make sure if there are any overlapping configurations that need to be integrated with each other like vertico, cape and corfu.
 - [ ] `Important`: For both Completion Framework and Development Tools sections, use doom emacs keybindings whereever possible.

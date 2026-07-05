@@ -1466,50 +1466,6 @@ and sets up vim-style navigation."
               (select-window (get-buffer-window ediff-control-buffer)))))
 #+end_src
 
-** Dashboard
-#+begin_src emacs-lisp
-(use-package dashboard
-  :init
-  (setq dashboard-banner-logo-title "Welcome to Emacs!")
-  (setq dashboard-startup-banner 'logo)
-  (setq dashboard-items '((recents   . 10)
-                         (bookmarks . 3)
-                         (projects  . 6)))
-
-  ;; CRITICAL: Close org files after reading them for agenda
-  (setq dashboard-agenda-release-buffers t)
-
-  (setq dashboard-center-content t)
-  (setq dashboard-set-heading-icons t)
-  (setq dashboard-set-file-icons t)
-  (setq dashboard-icon-type 'nerd-icons)
-
-  :config
-  ;; CRITICAL FIX: Suppress "Followed link to" messages in daemon mode
-  (defun ar/dashboard-setup-startup-hook-quiet ()
-    "Setup dashboard but suppress messages during daemon startup."
-    (if (daemonp)
-        ;; In daemon mode: suppress all messages during dashboard init
-        (let ((inhibit-message t)
-              (message-log-max nil))  ; Don't even log to *Messages*
-          (dashboard-setup-startup-hook))
-      ;; Normal mode: show messages as usual
-      (dashboard-setup-startup-hook)))
-
-  (ar/dashboard-setup-startup-hook-quiet)
-
-;; FIX: Use get-buffer-create instead of get-buffer to avoid nil error
-  ;; This creates the buffer if it doesn't exist
-  ;; Also handle command-line files gracefully
-  (unless noninteractive
-    (setq initial-buffer-choice
-          (lambda ()
-            ;; If files were passed on command line, don't force dashboard.
-            ;; Return (current-buffer) instead of nil to prevent "not a live buffer" errors.
-            (if (> (length command-line-args) 2)
-                (current-buffer)
-              (get-buffer-create "*dashboard*"))))))
-#+end_src
 
 * Version Control
 ** Magit: The Git Porcelain
@@ -3661,18 +3617,42 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
                     (dirvish-quit)))))))
 #+end_src
 
-** DONE Projectile
-Projectile is the project management engine. It relies on =fd= and =ripgrep= for lightning-fast hybrid indexing.
-*Architectural Note:* We explicitly disable =projectile-track-known-projects-automatically= to prevent Projectile from aggressively scanning and caching every directory you open (like =~/Downloads=), which causes massive background I/O hangs and bloats the cache. We also implement a custom ignore function to prevent it from treating the Emacs configuration directory itself as a project.
 
+
+** DONE Projectile
+=projectile= serves as the foundational project management engine, relying on =fd= and =ripgrep= for lightning-fast hybrid indexing. This configuration implements a frictionless, reactive project discovery workflow while mathematically guaranteeing safety against cache pollution and remote I/O hangs.
+
+1. *Automatic Tracking & Cache Pollution Safeguards:*
+By default, =projectile= can aggressively scan and cache every directory opened, which leads to massive background I/O hangs and severe cache bloat from transient directories (e.g., =~/Downloads=). To provide a frictionless workflow where directories are passively added to the cache upon file visitation, =projectile-track-known-projects-automatically= is set to =t=. To mathematically guarantee safety, a robust ignore function (=ar/projectile-ignore-project-p=) is implemented. This function strictly intercepts and excludes remote TRAMP paths, the Emacs configuration directory, and transient junk directories before they can enter the known projects cache.
+
+2. *Hybrid Indexing & Executable Detection:*
+Indexing is configured to use the =hybrid= method, leveraging VCS for tracked files and =fd= for untracked files. A cross-platform executable detection mechanism (=ar/fd-executable=) is initialized to locate =fd= or its Debian/Ubuntu alias =fdfind=. If neither is found, the configuration gracefully falls back to =ripgrep= or standard =find=.
+
+3. *Doom-Inspired Search Delegation:*
+Projectile's built-in search commands (=projectile-grep=, =projectile-ripgrep=, =projectile-ag=) are explicitly disabled and marked as obsolete. All project-wide searching is strictly delegated to =consult-ripgrep=, which provides superior asynchronous performance, live preview capabilities, and seamless integration with the =vertico= minibuffer UI.
+
+4. *Per-Project Compilation Isolation:*
+To prevent compilation buffers from overwriting each other when working across multiple projects simultaneously, =compilation-buffer-name-function= is bound to =projectile-compilation-buffer-name=. This ensures that each =*compilation*= buffer is uniquely named according to its project root.
 #+begin_src emacs-lisp
-(defun ar/projectile-ignore-emacs-config-p (project-root)
-  "Return non-nil if PROJECT-ROOT is `user-emacs-directory' or a descendant of it.
-Prevents Projectile from tracking, listing, or switching to the Emacs
-configuration directory (~/.config/emacs) or any of its subfolders as
-a project, which would otherwise pollute the project cache."
-  (file-in-directory-p (file-truename project-root)
-                       (file-truename user-emacs-directory)))
+(defun ar/projectile-ignore-project-p (project-root)
+  "Return non-nil if PROJECT-ROOT should be ignored by Projectile.
+Prevents cache pollution from transient directories, the Emacs config
+directory, and remote TRAMP connections (which cause severe I/O hangs
+when `projectile-track-known-projects-automatically' is enabled)."
+  (let ((true-root (ignore-errors (file-truename project-root))))
+    (or
+     ;; 1. Ignore TRAMP / Remote paths (CRITICAL for preventing SSH hangs)
+     (file-remote-p project-root)
+     ;; 2. Ignore Emacs config directory
+     (and true-root
+          (file-in-directory-p true-root (file-truename user-emacs-directory)))
+     ;; 3. Ignore transient / junk directories
+     (and true-root
+          (or (file-in-directory-p true-root (expand-file-name "~/Downloads/"))
+              (file-in-directory-p true-root (expand-file-name "~/Desktop/"))
+              (string-prefix-p "/tmp/" true-root)
+              (string-prefix-p "/var/folders/" true-root)
+              (string-prefix-p "/private/var/folders/" true-root))))))
 
 (use-package projectile
   :defer t
@@ -3694,26 +3674,28 @@ a project, which would otherwise pollute the project cache."
    (no-littering-expand-var-file-name "projectile/projects.eld"))
   (projectile-cache-file
    (no-littering-expand-var-file-name "projectile/projectile.cache"))
-  ;; Never track/list/switch to the Emacs config directory (or subfolders).
+  ;; Never track/list/switch to ignored projects.
   (projectile-ignored-projects (list (file-truename user-emacs-directory)))
-  (projectile-ignored-project-function #'ar/projectile-ignore-emacs-config-p)
-
-  ;; DOOM FIX: Prevent Projectile from automatically tracking every directory
-  ;; you open as a project, which causes massive I/O hangs and bloats the cache.
-  (projectile-track-known-projects-automatically nil)
-
+  (projectile-ignored-project-function #'ar/projectile-ignore-project-p)
+  ;; APPROACH 1: AUTOMATIC TRACKING
+  ;; Passively adds any directory containing a `.git` or `Makefile` to the
+  ;; cache the moment a file inside it is opened. This provides a frictionless
+  ;; workflow where new projects are automatically registered without needing
+  ;; manual discovery commands.
+  ;; CRITICAL: This requires a robust `projectile-ignored-project-function`
+  ;; (defined above) to prevent cache pollution from ~/Downloads and fatal
+  ;; UI freezes from TRAMP/SSH directory traversal.
+  (projectile-track-known-projects-automatically t)
   :init
   ;; Debian/Ubuntu ship `fd` as `fdfind`. Detect the correct executable name.
   (defvar ar/fd-executable (cl-find-if #'executable-find '("fdfind" "fd"))
     "Filename of the fd executable.")
-
   :config
   ;; Reduce the number of root marker files/dirs Projectile checks when
   ;; resolving a project's root, for performance (per Doom's +projectile.el).
   (setq projectile-project-root-files '()
         projectile-project-root-files-top-down-recurring '("Makefile"))
   (add-to-list 'projectile-project-root-files-bottom-up ".project")
-
   ;; Prefer fd/ripgrep over the VCS-specific commands (faster, respects
   ;; .gitignore) instead of git ls-files/find.
   (when ar/fd-executable
@@ -3729,13 +3711,11 @@ a project, which would otherwise pollute the project cache."
            ((executable-find "rg")
             "rg -0 --files --follow --color=never --hidden -g!.git")
            (t "find . -type f -print0"))))
-
   ;; Doom-inspired: rely on the ripgrep-backed `consult-ripgrep' instead of
   ;; Projectile's built-in (slower/less consistent) search commands.
   (put 'projectile-ag 'disabled "Use consult-ripgrep instead")
   (put 'projectile-ripgrep 'disabled "Use consult-ripgrep instead")
   (put 'projectile-grep 'disabled "Use consult-ripgrep instead")
-
   ;; Per-project compilation buffers: ensures `*compilation*` buffers are
   ;; uniquely named per project, preventing them from overwriting each other.
   (setq compilation-buffer-name-function #'projectile-compilation-buffer-name
@@ -3752,15 +3732,94 @@ a project, which would otherwise pollute the project cache."
 (defun ar/project-switch-to-file ()
   "Switch to a project and immediately find a file in it."
   (interactive)
-  (let ((projectile-switch-project-action #'projectile-find-file))
-    (call-interactively #'projectile-switch-project)))
+  (call-interactively #'projectile-switch-project))
 
 ;; Helper to switch project and show the dispatch menu.
+;; CRITICAL FIX: Inlines the 0-argument perspective switch directly into the
+;; lambda to prevent any external function signature mismatches.
 (defun ar/project-switch-with-menu ()
   "Switch to a project and show the dispatch menu."
   (interactive)
-  (call-interactively #'projectile-switch-project))
+  (let ((projectile-switch-project-action
+         (lambda ()
+           (let* ((dir default-directory)
+                  (persp-name (file-name-nondirectory (directory-file-name dir)))
+                  (persp (persp-get-by-name persp-name)))
+             (if persp
+                 (persp-switch persp-name)
+               (let ((persp-auto-resume-time -1))
+                 (persp-add nil persp-name)
+                 (persp-switch persp-name))))
+           (projectile-commander))))
+    (call-interactively #'projectile-switch-project)))
 #+end_src
+
+*** DONE Projectile Integration (Path A: Custom Glue Code)
+The =persp-mode-projectile-bridge= package is effectively abandoned and relies on outdated internal APIs. Instead of utilizing unmaintained third-party dependencies, Doom Emacs' robust "glue code" pattern is implemented directly. This guarantees a strict *1 Project = 1 Workspace* isolation rule by hooking into Projectile's switch action to automatically create or switch to a perspective named after the project root.
+
+1. *Buffer Leakage Prevention:*
+When files are opened via =recentf= or =consult-buffer= while inside a project, buffers can "leak" into the global workspace. To prevent this, =ar/persp-add-current-buffer-h= is hooked into =window-configuration-change-hook= and =bookmark-after-jump-hook=. This ensures that any buffer brought into focus is automatically bound to the currently active perspective.
+
+2. *The 0-Argument Inline Lambda Fix:*
+The =projectile-switch-project-action= hook is strictly called by Projectile with exactly 0 arguments. Previous implementations utilizing a 1-argument function signature caused fatal crashes. The standalone helper function has been completely excised. The logic is now injected directly into an inline 0-argument lambda assigned to =projectile-switch-project-action=. It relies on the dynamically bound =default-directory=, which Projectile safely provides, guaranteeing absolute mathematical safety against argument mismatches.
+
+3. *Perspective Lifecycle Management:*
+When =projectile-kill-buffers= is executed, the associated workspace must also be destroyed to keep the perspective list clean. A =define-advice= wrapper is applied to =projectile-kill-buffers=. It captures the project root, executes the buffer killing, and subsequently checks if the perspective is empty. If empty, the perspective is safely terminated via =persp-kill=.
+
+4. *Doom Macro Translation:*
+Doom-specific proprietary macros are strictly translated into native Vanilla Emacs equivalents. The =defadvice!= macro is replaced with standard =define-advice=, and the hallucinated =persp-add-new= API is corrected to the mathematically valid =persp-add= function.
+#+begin_src emacs-lisp
+;; PATH A: Replaced the abandoned 'persp-mode-projectile-bridge' with
+;; custom Doom-style glue code. This provides robust 1:1 Project=Workspace
+;; isolation without relying on unmaintained third-party bridge packages.
+(with-eval-after-load 'persp-mode
+  (with-eval-after-load 'projectile
+    ;; 1. Auto-add buffers to the current perspective when they are opened/switched to.
+    ;; This prevents buffers from "leaking" into the global workspace when
+    ;; opening a file via recentf or consult-buffer while inside a project.
+    (defun ar/persp-add-current-buffer-h ()
+      "Add current buffer to focused perspective."
+      (when (and (bound-and-true-p persp-mode)
+                 (not (persp-buffer-filtered-out-p
+                       (current-buffer)
+                       persp-add-buffer-on-after-change-major-mode-filter-functions)))
+        (persp-add-buffer (current-buffer) (get-current-persp) nil nil)))
+
+    (add-hook 'window-configuration-change-hook #'ar/persp-add-current-buffer-h)
+    (add-hook 'bookmark-after-jump-hook #'ar/persp-add-current-buffer-h)
+
+    ;; 2. Override projectile's default switch action.
+    ;; CRITICAL FIX: `projectile-switch-project-action` is strictly called with
+    ;; 0 arguments by `projectile-switch-project-by-name`. Defining it as a
+    ;; 1-argument function `(dir)` causes a fatal `Wrong number of arguments`
+    ;; crash. We use an inline 0-argument lambda that relies on `default-directory`,
+    ;; which Projectile dynamically binds to the new project root before calling.
+    (setq projectile-switch-project-action
+          (lambda ()
+            (let* ((dir default-directory)
+                   (persp-name (file-name-nondirectory (directory-file-name dir)))
+                   (persp (persp-get-by-name persp-name)))
+              (if persp
+                  (persp-switch persp-name)
+                (let ((persp-auto-resume-time -1))
+                  (persp-add nil persp-name)
+                  (persp-switch persp-name))))
+            (projectile-find-file)))
+
+    ;; 3. Kill the perspective when killing project buffers.
+    ;; This ensures that when 'projectile-kill-buffers' is executed, the associated
+    ;; workspace is also destroyed, keeping the perspective list clean.
+    ;; FIX: Replaced Doom's `defadvice!` with Vanilla Emacs `define-advice`.
+    (define-advice projectile-kill-buffers (:around (fn &rest args) ar/kill-perspective)
+      "Kill the associated perspective when killing project buffers."
+      (let* ((project-root (projectile-acquire-root))
+             (persp-name (file-name-nondirectory (directory-file-name project-root)))
+             (persp (persp-get-by-name persp-name)))
+        (prog1 (apply fn args)
+          (when (and persp (persp-p persp) (not (persp-buffers persp)))
+            (persp-kill persp-name)))))))
+#+end_src
+
 
 ** DONE iBuffer
 Ibuffer is the advanced buffer list manager. We configure it to hide empty filter groups (keeping the UI clean) and redefine the size column to display human-readable sizes (e.g., =1.2M=). It is integrated with =nerd-icons= for visual flair and =ibuffer-projectile= to automatically group all open buffers by their respective Projectile projects.
@@ -5097,10 +5156,114 @@ buffer killing or garbage collection cycles."
 #+end_src
 
 * Development Tools
-** Direnv
+** DONE Direnv
+=envrc= integrates =direnv= into Emacs, applying project-specific environment variables on a strict per-buffer basis. This guarantees environment isolation across multiple simultaneously open projects, preventing variable leakage that occurs with global environment mutation.
+
+To ensure mathematical safety and seamless integration with modern IDE workflows (specifically =lsp-mode= and =org-babel= with Jupyter kernels), several architectural gaps in the default =envrc= behavior are patched:
+
+1. *Hook Timing (The LSP Race Condition):* By default, =envrc= hooks into =after-change-major-mode-hook=, which runs *after* major mode hooks. If an LSP client initializes inside a major mode hook, it spawns with the global Emacs environment rather than the project-specific =.envrc= environment. Initialization is moved to =change-major-mode-after-body-hook= to guarantee the environment is fully resolved before LSP servers spawn. The teardown logic is patched to safely remove the hook from both locations when the mode is disabled.
+2. *Org Babel Environment Propagation (Jupyter Support):* Org Babel subprocesses natively inherit the global Emacs environment, ignoring buffer-local =envrc= variables. While upstream =envrc= advises the low-level =org-babel-eval= function, Jupyter kernel initialization occurs *before* that shell evaluation step. An =:around= advice is applied to the higher-level =org-babel-execute-src-block= using =envrc-propagate-environment=, ensuring that Jupyter kernels and persistent sessions inherit the exact project environment (e.g., =VIRTUAL_ENV=, =PATH=) of the buffer they reside in.
+3. *Graceful Degradation (Missing Executable Guard):* If Emacs is opened in an environment where the =direnv= binary is missing (e.g., minimal Docker containers or remote TRAMP connections), =envrc-global-mode= will spam the =*Messages*= buffer and cause UI micro-stutters. A =:before-while= advice silently aborts mode activation if =executable-find= fails to locate the binary.
+4. *Internal Buffer Debouncing:* When =envrc= encounters an error, it outputs logs to the =*envrc*= buffer. Switching focus to this log buffer can trigger redundant =envrc--update= evaluations. A string-prefix guard prevents =envrc= from evaluating its own internal log buffers, avoiding feedback loops.
+5. *LSP Server Restart on Reload:* Modifying and reloading a =.envrc= file updates the buffer's environment variables, but leaves running LSP servers attached to the stale environment. An =:after= advice on the internal =envrc--update-env= function intercepts standard reloads. Additionally, because the bulk =envrc-reload-all= command bypasses this internal function and clears the cache directly, a secondary =:after= advice is applied to =envrc-reload-all= to catch this vector and restart all unique =lsp-mode= workspaces.
+
 #+begin_src emacs-lisp
 (use-package envrc
-  :hook (after-init . envrc-global-mode))
+  :hook (after-init . envrc-global-mode)
+  :config
+  ;; ==========================================
+  ;; 1. HOOK TIMING (The LSP Race Condition Fix)
+  ;; ==========================================
+  ;; By default, `envrc` hooks into `after-change-major-mode-hook`. This runs
+  ;; AFTER major mode hooks (like `python-mode-hook`). If `lsp-deferred` is
+  ;; in `python-mode-hook`, the LSP server starts before `envrc` applies the
+  ;; project's `VIRTUAL_ENV` or `PATH`.
+  ;; It is moved to `change-major-mode-after-body-hook`, which runs BEFORE
+  ;; major mode hooks, guaranteeing the environment is ready for LSP.
+  (add-hook 'envrc-global-mode-hook
+            (lambda ()
+              ;; Emacs 30+ / newer envrc versions renamed this internal function.
+              ;; The `fboundp` guard ensures compatibility across versions.
+              (let ((fn (if (fboundp #'envrc-global-mode-enable-in-buffers)
+                            #'envrc-global-mode-enable-in-buffers
+                          #'envrc-global-mode-enable-in-buffer)))
+                (if (not envrc-global-mode)
+                    ;; Teardown safety: remove from BOTH hooks when disabled
+                    ;; to prevent orphaned hook references.
+                    (progn
+                      (remove-hook 'change-major-mode-after-body-hook fn)
+                      (remove-hook 'after-change-major-mode-hook fn))
+                  (remove-hook 'after-change-major-mode-hook fn)
+                  (add-hook 'change-major-mode-after-body-hook fn 100)))))
+
+  ;; ==========================================
+  ;; 2. ORG BABEL ENVIRONMENT PROPAGATION (Jupyter Support)
+  ;; ==========================================
+  ;; Upstream `envrc` advises `org-babel-eval`, but Jupyter kernel initialization
+  ;; happens BEFORE that low-level shell spawn. Advising the higher-level
+  ;; `org-babel-execute-src-block` ensures Jupyter kernels and persistent
+  ;; sessions inherit the buffer-local `envrc` environment (e.g. VIRTUAL_ENV).
+  (advice-add #'org-babel-execute-src-block :around #'envrc-propagate-environment)
+
+  ;; ==========================================
+  ;; 3. GRACEFUL FAILURE (Missing Executable Guard)
+  ;; ==========================================
+  ;; Prevents `envrc-global-mode` from spamming errors on every file open
+  ;; if the `direnv` binary is not installed on the system (or over TRAMP).
+  (define-advice envrc-global-mode (:before-while (&rest _) fail-gracefully)
+    (or (executable-find envrc-direnv-executable)
+        (ignore (message "Failed to locate direnv executable; aborting envrc-global-mode"))))
+
+  ;; ==========================================
+  ;; 4. DEBOUNCE INTERNAL BUFFERS
+  ;; ==========================================
+  ;; Prevents envrc from triggering inside its own *envrc* log buffers,
+  ;; avoiding redundant processing or feedback loops.
+  (define-advice envrc--update (:before-while (&rest _) debounce)
+    (not (string-prefix-p "*envrc" (buffer-name))))
+
+  ;; ==========================================
+  ;; 5. LSP SERVER RESTART ON ENVRC RELOAD
+  ;; ==========================================
+  ;; When `.envrc` is updated, the environment changes, but the running LSP
+  ;; server is still using the old environment. This advice catches the
+  ;; update and restarts associated `lsp-mode` workspaces.
+  (with-eval-after-load 'lsp-mode
+    (when (fboundp 'envrc--mode-buffers)
+      ;; Helper to restart LSP servers for a specific environment directory
+      (defun ar/envrc--restart-lsp-workspaces (env-dir)
+        "Restart `lsp-mode' workspaces associated with ENV-DIR."
+        (let ((lsp-servers nil))
+          (dolist (buf (envrc--mode-buffers))
+            (with-current-buffer buf
+              (let ((buf-env-dir (ignore-errors (envrc--find-env-dir))))
+                (when (and buf-env-dir (string= buf-env-dir env-dir))
+                  (when (bound-and-true-p lsp-mode)
+                    (dolist (ws (lsp-workspaces))
+                      (cl-pushnew ws lsp-servers :test #'equal)))))))
+          (when lsp-servers
+            (mapc #'lsp-workspace-restart lsp-servers)
+            (message "Restarted %d LSP servers associated with direnv"
+                     (length lsp-servers)))))
+
+      ;; Standard reload vector (e.g., M-x envrc-reload)
+      (define-advice envrc--update-env (:after (env-dir) restart-lsp)
+        (ar/envrc--restart-lsp-workspaces env-dir))
+
+      ;; Bulk reload vector (e.g., M-x envrc-reload-all)
+      ;; Bypasses `envrc--update-env`, so it is caught here to restart
+      ;; all unique LSP workspaces across all active envrc buffers.
+      (define-advice envrc-reload-all (:after () restart-lsp-all)
+        (let ((lsp-servers nil))
+          (dolist (buf (envrc--mode-buffers))
+            (with-current-buffer buf
+              (when (bound-and-true-p lsp-mode)
+                (dolist (ws (lsp-workspaces))
+                  (cl-pushnew ws lsp-servers :test #'equal)))))
+          (when lsp-servers
+            (mapc #'lsp-workspace-restart lsp-servers)
+            (message "Restarted %d LSP servers after direnv bulk reload"
+                     (length lsp-servers))))))))
 #+end_src
 
 ** TODO LSP
@@ -7801,6 +7964,7 @@ Automatically generates and updates a Table of Contents based on headings.
           "\\*Pp Eval Output\\*$"
           "\\*Pp Macroexpand Output\\*$"
           "^\\*eldoc.*\\*$"
+          "^\\*envrc.*\\*$"
           "\\*Compile-Log\\*$"
           "\\*compilation\\*$"
           "\\*Completions\\*$"
