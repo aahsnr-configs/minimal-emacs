@@ -7,3 +7,16 @@
 - [ ] don't add ~/.config/emacs or ~/.config/emacs/var/elpa/flycheck-hl-todo/ to projects
 - [ ] add eval +overlay module packages from doom emacs into my vanilla emacs config
 - [ ] go back to openrouter.ai for my corfu configuration.
+- [ ] make sure there are no modelines for popper and winne
+- [ ] implement settings from eval-overlay.md
+- [ ] recentf-mode not showing files in dashboard, but shows recent files in working buffers
+- [ ] I don't want to see files enclosed with \*\* when I execute consult-buffer
+- [ ] Add epithet and math-delimiters package from https://github.com/oantolin
+- [ ] Mismatched bracket error in the new consult config
+- [ ] show-paren-mode should highlight matching brackets when cursor is inside that the bracket pair
+- [ ] orderless only matches letters next to each other; I dont want that
+- [ ] add keybindings for embark
+- [ ] add lsp-ltex-plus
+- [ ] I also need interactive custom functions for .dir-locals.el
+- [ ] `Important`: When working on development tools, after finalizing development tools main section, ask qwen to review the completion framework again to make sure if there are any overlapping configurations that need to be integrated with each other like vertico, cape and corfu.
+- [ ] `Important`: For both Completion Framework and Development Tools sections, use doom emacs keybindings whereever possible.
