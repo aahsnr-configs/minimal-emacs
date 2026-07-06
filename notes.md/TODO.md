@@ -25,3 +25,4 @@
 - [ ] `Important`: Determine all the related packages that are integrated together in the whole emacs config.
 - [ ] `Urgent`: Update project-state.md file with the following additions: 1. Keep track of TODO, NOTE, etc. keywords in the source code block itself; 2. Keep track of all the NOTE keywords anywhere they appear. 3. Also keep track of tasks that still needs to be done from the Remaining Work section near the end of file. This section just contains checkboxes. 4. Also keep track of questions from the Questions sections near end of file. 5. Keep track of TODO, NOTE, etc. keywords in areas other than org headers and org source code blocks, in other words, in general org text
 - [ ] `Important`: add denote-explore package
+- [ ] `Important`: package-quickstart\*, eln-cache/ should be in either var or etc
