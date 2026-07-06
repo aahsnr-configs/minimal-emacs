@@ -95,11 +95,41 @@ This section initializes the built-in *package.el* system. It configures the sta
       use-package-enable-imenu-support t) ; Allow imenu to jump to use-package blocks
 #+end_src
 
+** DONE Bug Workarounds
+This section contains critical shields for known Emacs core bugs that trigger during batch package installation on fresh clones.
+#+begin_src emacs-lisp
+;; ==========================================
+;; CRITICAL BUG WORKAROUND (Bug#77464 / lsp-mode#4898)
+;; ==========================================
+;; During a fresh clone batch-install, `lsp-mode` spins up a temporary
+;; `(org-mode)` buffer to check for Element API compatibility. If your
+;; `org-mode-hook` contains packages that haven't been installed yet
+;; (e.g., org-modern, rainbow-mode), the hook throws a void-function error.
+;; This specific error triggers Emacs Bug#77464, which permanently corrupts
+;; the `cl-generic` dispatch system for the rest of the session, causing
+;; all subsequent package installations to crash with "already defined as
+;; something else than a generic function".
+;;
+;; This advice temporarily neutralizes org-mode hooks during init.el
+;; evaluation and byte-compilation, guaranteeing a sterile environment.
+(define-advice org-mode (:around (orig-fn &rest args) shield-during-init)
+  "Prevent org-mode from running custom hooks during init/compilation."
+  (if (or (bound-and-true-p byte-compile-current-file)
+          (not after-init-time))
+      (let ((org-mode-hook nil)
+            (org-agenda-mode-hook nil)
+            (org-capture-mode-hook nil)
+            (org-src-mode-hook nil))
+        (apply orig-fn args))
+    (apply orig-fn args)))
+#+end_src
+
+
 ** DONE Compile Angel
-=compile-angel= enables background byte/native-compilation for max Elisp perf.
-- *State Exclusions:* Skips =savehist=, =recentf=, =custom-file= to avoid I/O locks/warnings on serialized data.
-- *Bug#77464 Fix:* Prevents =function-history= corruption (e.g., =lsp-execute-command= redef) on fresh clones where =package.el= sync-compiles intersect =load= interception.
-- *Boot Sequence:* Uses =:demand t= for instant exclusion registration, but defers =compile-angel-on-load-mode= to =after-init-hook= so =package.el= completes undisturbed.
+*compile-angel* automatically byte-compiles and native-compiles Emacs Lisp files in the background, ensuring that your configuration and installed packages always run at maximum C-level speed. Crucially, this section configures explicit exclusions for frequently written state files *(savehist, recentf, custom-file)*. Compiling these files would cause severe I/O locks, async compilation warnings, and unnecessary CPU cycles, as they contain serialized data structures, not executable code.
+
+*Architectural Note:* 
+Because we have implemented the =org-mode= shield (Bug#77464 workaround) earlier in the configuration, it is completely safe to activate =compile-angel= synchronously here. The shield prevents the =cl-generic= corruption during =lsp-mode= installation, allowing =compile-angel= to safely intercept =load= calls and native-compile packages in the background without triggering race conditions.
 #+begin_src emacs-lisp
 ;; Exclude anything you don't want silently compiled (adjust to taste)
 ;; (setq compile-angel-excluded-files-regexps '("/\\.dir-config\\.el$"))
@@ -115,7 +145,28 @@ This section initializes the built-in *package.el* system. It configures the sta
   (push "/early-init.el" compile-angel-excluded-path-suffixes)
   
   ;; Automatically compile elisp files on save
-  (add-hook 'emacs-lisp-mode-hook #'compile-angel-on-save-local-mode))
+  (add-hook 'emacs-lisp-mode-hook #'compile-angel-on-save-local-mode)
+
+  ;; Exclude state files that are frequently written to prevent I/O locks
+  ;; and native-comp warnings on non-code data structures.
+  ;; We use `with-eval-after-load` to ensure the variables are defined
+  ;; before we attempt to read their file paths.
+  (with-eval-after-load "savehist"
+    (push (concat "/" (file-name-nondirectory savehist-file))
+          compile-angel-excluded-path-suffixes))
+  (with-eval-after-load "recentf"
+    (push (concat "/" (file-name-nondirectory recentf-save-file))
+          compile-angel-excluded-path-suffixes))
+  (with-eval-after-load "cus-edit"
+    (when (stringp custom-file)
+      (push (concat "/" (file-name-nondirectory custom-file))
+            compile-angel-excluded-path-suffixes)))
+
+  ;; SYNCHRONOUS ACTIVATION:
+  ;; Now that exclusions are registered, turn on the interception itself.
+  ;; This globally monitors `load` and `require` calls and compiles missing 
+  ;; .elc/.eln files in the background as packages are loaded by use-package.
+  (compile-angel-on-load-mode 1))
 
 (setq compile-angel-enable-byte-compile t)
 (setq compile-angel-enable-native-compile t)
@@ -124,27 +175,6 @@ This section initializes the built-in *package.el* system. It configures the sta
 ;; This forces Emacs to wait for the native-comp worker to finish or abort cleanly.
 (setq native-comp-async-query-on-exit t)
 (setq confirm-kill-processes t)
-
-;; Exclude state files that are frequently written to prevent I/O locks
-;; and native-comp warnings on non-code data structures.
-;; We use `with-eval-after-load` to ensure the variables are defined
-;; before we attempt to read their file paths.
-(with-eval-after-load "savehist"
-  (push (concat "/" (file-name-nondirectory savehist-file))
-        compile-angel-excluded-path-suffixes))
-(with-eval-after-load "recentf"
-  (push (concat "/" (file-name-nondirectory recentf-save-file))
-        compile-angel-excluded-path-suffixes))
-(with-eval-after-load "cus-edit"
-  (when (stringp custom-file)
-    (push (concat "/" (file-name-nondirectory custom-file))
-          compile-angel-excluded-path-suffixes)))
-
-;; CRITICAL FIX: DEFERRED ACTIVATION
-;; The package is loaded (because of :demand t), but the global interceptor
-;; is kept OFF until init.el is completely finished. This prevents the
-;; lsp-mode generic function race condition with package.el.
-(add-hook 'after-init-hook (lambda () (compile-angel-on-load-mode 1)))
 #+end_src
 
 ** DONE Custom Functions
