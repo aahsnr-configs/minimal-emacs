@@ -94,7 +94,6 @@ This section initializes the built-in *package.el* system. It configures the sta
       use-package-compute-statistics nil  ; Disable profiling overhead for faster startup
       use-package-enable-imenu-support t) ; Allow imenu to jump to use-package blocks
 #+end_src
-#+end_src
 
 ** DONE Compile Angel
 =compile-angel= enables background byte/native-compilation for max Elisp perf.
