@@ -6,10 +6,16 @@
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
 * DONE Core Emacs
-This section forms the foundational bedrock of the Emacs configuration. It handles the critical bootstrap sequence, package management, deep performance tuning, session persistence, and cross-platform environment normalization. Every setting here is meticulously optimized for Emacs 30/31, ensuring that the editor remains responsive, mathematically safe across different operating systems, and capable of handling heavy, modern IDE workloads (like LSP and Tree-sitter) without stuttering.
+Foundational layer of the config: bootstrap sequence, package management, performance tuning, session persistence, and cross-platform env normalization. Tuned for Emacs 30/31 — responsive, OS-safe, and stutter-free under heavy IDE workloads (LSP, Tree-sitter).
 
 ** DONE Lexical Binding
-Lexical binding is a strict requirement for modern Emacs Lisp. Unlike dynamic binding, lexical binding scopes variables to their enclosing block, enabling the use of closures, preventing subtle variable-bleeding bugs, and allowing the byte-compiler to generate significantly faster, optimized machine code. The *no-byte-compile: t* directive in the header ensures that Emacs does not attempt to prematurely compile this tangled file before *compile-angel* has registered its exclusion rules.
+** Emacs Lisp Configuration Notes
+
+** Emacs Lisp Configuration Notes
+
+Lexical binding is a strict requirement for modern Emacs Lisp. Unlike dynamic binding, it scopes variables to their enclosing block, enabling closures, preventing variable-bleeding bugs, and letting the byte-compiler generate faster, optimized code.
+
+The =no-byte-compile: t= header directive stops Emacs from prematurely compiling this tangled file before =compile-angel= registers its exclusion rules.
 
 #+begin_src emacs-lisp
 ;;; init.el --- Main Configuration File -*- no-byte-compile: t; lexical-binding: t; -*-
@@ -1811,217 +1817,219 @@ If the file does not exist, creates it. Returns the full path."
 
 ** Per-Project Org Context
 #+begin_src emacs-lisp
-;;; ── Registry ─────────────────────────────────────────────────────────────
-;; Each entry: (ABSOLUTE-ROOT plist...)
-;; Plist keys:
-;;   :name           Human-readable label shown in echo area
-;;   :org-directory  Replaces my/org-directory + org-directory
-;;   :denote-dir     Replaces my/denote-directory + denote-directory
-;;   :gtd-dir        Replaces my/org-gtd-directory + org-gtd-directory
-;;   :agenda-files   Replaces org-agenda-files entirely
-;;   :capture-tpls   Extra capture templates PREPENDED to the global list.
-;;
-(defvar my/project-org-contexts '()
-  "Alist mapping absolute (truename) project roots to org context plists.
-All directory paths should be pre-expanded with file-truename so that
-runtime comparisons are fast string-equal checks with no I/O.
-Populate via `my/register-project-org-context'.")
+;; TODO: Replace this whole source code block with projectile alternatives
+;; TODO: Determine if persp-mode is used, then replace with persp-mode alternative if needed
+;; ;;; ── Registry ─────────────────────────────────────────────────────────────
+;; ;; Each entry: (ABSOLUTE-ROOT plist...)
+;; ;; Plist keys:
+;; ;;   :name           Human-readable label shown in echo area
+;; ;;   :org-directory  Replaces my/org-directory + org-directory
+;; ;;   :denote-dir     Replaces my/denote-directory + denote-directory
+;; ;;   :gtd-dir        Replaces my/org-gtd-directory + org-gtd-directory
+;; ;;   :agenda-files   Replaces org-agenda-files entirely
+;; ;;   :capture-tpls   Extra capture templates PREPENDED to the global list.
+;; ;;
+;; (defvar my/project-org-contexts '()
+;;   "Alist mapping absolute (truename) project roots to org context plists.
+;; All directory paths should be pre-expanded with file-truename so that
+;; runtime comparisons are fast string-equal checks with no I/O.
+;; Populate via `my/register-project-org-context'.")
 
-;;; ── Registration helper ──────────────────────────────────────
-(defun my/register-project-org-context (root &rest plist)
-  "Register ROOT as a project-specific org context with PLIST settings.
+;; ;;; ── Registration helper ──────────────────────────────────────
+;; (defun my/register-project-org-context (root &rest plist)
+;;   "Register ROOT as a project-specific org context with PLIST settings.
 
-ROOT is the project's root directory; it is expanded and resolved via
-`file-truename' automatically, so you can pass a raw path like \"~/myproject/\".
+;; ROOT is the project's root directory; it is expanded and resolved via
+;; `file-truename' automatically, so you can pass a raw path like \"~/myproject/\".
 
-PLIST accepts the same keys documented in `my/project-org-contexts':
-  :name         Human-readable label (defaults to last component of ROOT)
-  :org-directory  Custom org base directory for this project
-  :denote-dir     Custom Denote notes directory for this project
-  :gtd-dir        Custom GTD directory
-  :agenda-files   Agenda files list (replaces global value)
-  :capture-tpls   Capture templates prepended to the global list
+;; PLIST accepts the same keys documented in `my/project-org-contexts':
+;;   :name         Human-readable label (defaults to last component of ROOT)
+;;   :org-directory  Custom org base directory for this project
+;;   :denote-dir     Custom Denote notes directory for this project
+;;   :gtd-dir        Custom GTD directory
+;;   :agenda-files   Agenda files list (replaces global value)
+;;   :capture-tpls   Capture templates prepended to the global list
 
-Example — register a project with its own roam DB and capture templates:
+;; Example — register a project with its own roam DB and capture templates:
 
-  (my/register-project-org-context \"~/code/myproject/\"
-    :name        \"myproject\"
-    :roam-dir    (expand-file-name \"~/code/myproject/notes/\")
-    :roam-db     (expand-file-name \"~/code/myproject/notes/org-roam.db\")
-    :gtd-dir     (expand-file-name \"~/code/myproject/gtd/\")
-    :agenda-files (list (expand-file-name \"~/code/myproject/\")
-                        (expand-file-name \"~/code/myproject/gtd/\"))
-    :capture-tpls
-    '((\"P\" \"MyProject\")
-      (\"Pj\" \"MyProject Journal\" entry
-       (file+olp+datetree \"~/code/myproject/journal.org\")
-       \"* %<%H:%M> %?\\n\" :empty-lines 1)))"
-  (let* ((truename (file-truename (expand-file-name root)))
-         ;; Default :name to the last path component if not supplied
-         (name (or (plist-get plist :name)
-                   (file-name-nondirectory (directory-file-name truename))))
-         (ctx (plist-put plist :name name)))
-    ;; Replace any existing entry for this root
-    (setq my/project-org-contexts
-          (cons (cons truename ctx)
-                (assoc-delete-all truename my/project-org-contexts)))))
+;;   (my/register-project-org-context \"~/code/myproject/\"
+;;     :name        \"myproject\"
+;;     :roam-dir    (expand-file-name \"~/code/myproject/notes/\")
+;;     :roam-db     (expand-file-name \"~/code/myproject/notes/org-roam.db\")
+;;     :gtd-dir     (expand-file-name \"~/code/myproject/gtd/\")
+;;     :agenda-files (list (expand-file-name \"~/code/myproject/\")
+;;                         (expand-file-name \"~/code/myproject/gtd/\"))
+;;     :capture-tpls
+;;     '((\"P\" \"MyProject\")
+;;       (\"Pj\" \"MyProject Journal\" entry
+;;        (file+olp+datetree \"~/code/myproject/journal.org\")
+;;        \"* %<%H:%M> %?\\n\" :empty-lines 1)))"
+;;   (let* ((truename (file-truename (expand-file-name root)))
+;;          ;; Default :name to the last path component if not supplied
+;;          (name (or (plist-get plist :name)
+;;                    (file-name-nondirectory (directory-file-name truename))))
+;;          (ctx (plist-put plist :name name)))
+;;     ;; Replace any existing entry for this root
+;;     (setq my/project-org-contexts
+;;           (cons (cons truename ctx)
+;;                 (assoc-delete-all truename my/project-org-contexts)))))
 
-;;; ── State ─────────────────────────────────────────────────────────────────
-(defvar my/global-org-context nil
-  "Snapshot of the global org context taken on first project activation.
-nil means no project has ever been activated this session.
-Plist shape mirrors `my/project-org-contexts' entries, plus:
-  :capture-tpls — the full `org-capture-templates' list at snapshot time.")
+;; ;;; ── State ─────────────────────────────────────────────────────────────────
+;; (defvar my/global-org-context nil
+;;   "Snapshot of the global org context taken on first project activation.
+;; nil means no project has ever been activated this session.
+;; Plist shape mirrors `my/project-org-contexts' entries, plus:
+;;   :capture-tpls — the full `org-capture-templates' list at snapshot time.")
 
-(defvar my/active-org-project nil
-  "Truename root of the currently active project, or nil for global.")
+;; (defvar my/active-org-project nil
+;;   "Truename root of the currently active project, or nil for global.")
 
-;;; ── Snapshot ──────────────────────────────────────────────────────────────
-(defun my/project-org--snapshot ()
-  "Save current global org variable values into `my/global-org-context'.
-Called lazily the first time any project is activated."
-  (setq my/global-org-context
-        (list :name          "global"
-              :org-directory  my/org-directory
-              :denote-dir     my/denote-directory
-              :gtd-dir        my/org-gtd-directory
-              :agenda-files   (and (boundp 'org-agenda-files)
-                                   (copy-sequence org-agenda-files))
-              ;; FIX: was set twice; now correctly captures capture templates
-              ;; so deactivation can restore the full list exactly.
-              :capture-tpls   (and (boundp 'org-capture-templates)
-                                   (copy-sequence org-capture-templates)))))
+;; ;;; ── Snapshot ──────────────────────────────────────────────────────────────
+;; (defun my/project-org--snapshot ()
+;;   "Save current global org variable values into `my/global-org-context'.
+;; Called lazily the first time any project is activated."
+;;   (setq my/global-org-context
+;;         (list :name          "global"
+;;               :org-directory  my/org-directory
+;;               :denote-dir     my/denote-directory
+;;               :gtd-dir        my/org-gtd-directory
+;;               :agenda-files   (and (boundp 'org-agenda-files)
+;;                                    (copy-sequence org-agenda-files))
+;;               ;; FIX: was set twice; now correctly captures capture templates
+;;               ;; so deactivation can restore the full list exactly.
+;;               :capture-tpls   (and (boundp 'org-capture-templates)
+;;                                    (copy-sequence org-capture-templates)))))
 
-;;; ── Directory application ─────────────────────────────────────────────────
-(defun my/project-org--set-dirs (ctx)
-  "Apply directory-related keys from context plist CTX."
-  (let ((odir (plist-get ctx :org-directory))
-        (ddir (plist-get ctx :denote-dir))
-        (gdir (plist-get ctx :gtd-dir))
-        (af   (plist-get ctx :agenda-files)))
-    (when odir
-      (setq my/org-directory odir
-            org-directory    odir))
-    (when ddir
-      (make-directory ddir t)
-      (setq my/denote-directory ddir
-            denote-directory    ddir))
-    (when gdir
-      (make-directory gdir t)
-      (setq my/org-gtd-directory gdir
-            org-gtd-directory    gdir))
-    (when af
-      (setq org-agenda-files af))))
+;; ;;; ── Directory application ─────────────────────────────────────────────────
+;; (defun my/project-org--set-dirs (ctx)
+;;   "Apply directory-related keys from context plist CTX."
+;;   (let ((odir (plist-get ctx :org-directory))
+;;         (ddir (plist-get ctx :denote-dir))
+;;         (gdir (plist-get ctx :gtd-dir))
+;;         (af   (plist-get ctx :agenda-files)))
+;;     (when odir
+;;       (setq my/org-directory odir
+;;             org-directory    odir))
+;;     (when ddir
+;;       (make-directory ddir t)
+;;       (setq my/denote-directory ddir
+;;             denote-directory    ddir))
+;;     (when gdir
+;;       (make-directory gdir t)
+;;       (setq my/org-gtd-directory gdir
+;;             org-gtd-directory    gdir))
+;;     (when af
+;;       (setq org-agenda-files af))))
 
-;;; ── Post-switch side-effects ────────────────────────────
-(defun my/project-org--post-switch ()
-  "Refresh any open agenda buffer after a project context switch."
-  (when (and (featurep 'org-agenda)
-             (boundp 'org-agenda-buffer-name)
-             (get-buffer org-agenda-buffer-name))
-    (with-current-buffer org-agenda-buffer-name
-      (org-agenda-redo t))))
+;; ;;; ── Post-switch side-effects ────────────────────────────
+;; (defun my/project-org--post-switch ()
+;;   "Refresh any open agenda buffer after a project context switch."
+;;   (when (and (featurep 'org-agenda)
+;;              (boundp 'org-agenda-buffer-name)
+;;              (get-buffer org-agenda-buffer-name))
+;;     (with-current-buffer org-agenda-buffer-name
+;;       (org-agenda-redo t))))
 
-;;; ── Public API ───────────────────────────────────────────
-(defun my/project-org-activate (root)
-  "Switch org context to the registered project at ROOT (truename string)."
-  (unless my/global-org-context
-    (my/project-org--snapshot))
-  (let* ((ctx       (cdr (assoc root my/project-org-contexts)))
-         (proj-tpls (plist-get ctx :capture-tpls))
-         (base-tpls (plist-get my/global-org-context :capture-tpls)))
-    (setq my/active-org-project root)
-    (my/project-org--set-dirs ctx)
-    (setq org-capture-templates
-          (if proj-tpls
-              (append proj-tpls base-tpls)
-            base-tpls))
-    (my/project-org--post-switch)
-    (message "[org-ctx] ▶ %s" (plist-get ctx :name))))
+;; ;;; ── Public API ───────────────────────────────────────────
+;; (defun my/project-org-activate (root)
+;;   "Switch org context to the registered project at ROOT (truename string)."
+;;   (unless my/global-org-context
+;;     (my/project-org--snapshot))
+;;   (let* ((ctx       (cdr (assoc root my/project-org-contexts)))
+;;          (proj-tpls (plist-get ctx :capture-tpls))
+;;          (base-tpls (plist-get my/global-org-context :capture-tpls)))
+;;     (setq my/active-org-project root)
+;;     (my/project-org--set-dirs ctx)
+;;     (setq org-capture-templates
+;;           (if proj-tpls
+;;               (append proj-tpls base-tpls)
+;;             base-tpls))
+;;     (my/project-org--post-switch)
+;;     (message "[org-ctx] ▶ %s" (plist-get ctx :name))))
 
-(defun my/project-org-deactivate ()
-  "Restore the global org context saved before any project activation."
-  (when (and my/active-org-project my/global-org-context)
-    (setq my/active-org-project nil)
-    (my/project-org--set-dirs my/global-org-context)
-    (setq org-capture-templates
-          (copy-sequence (plist-get my/global-org-context :capture-tpls)))
-    (my/project-org--post-switch)
-    (message "[org-ctx] ▶ global")))
+;; (defun my/project-org-deactivate ()
+;;   "Restore the global org context saved before any project activation."
+;;   (when (and my/active-org-project my/global-org-context)
+;;     (setq my/active-org-project nil)
+;;     (my/project-org--set-dirs my/global-org-context)
+;;     (setq org-capture-templates
+;;           (copy-sequence (plist-get my/global-org-context :capture-tpls)))
+;;     (my/project-org--post-switch)
+;;     (message "[org-ctx] ▶ global")))
 
-(defun my/project-org-maybe-switch ()
-  "Detect project root change and switch org context if needed.
-Called from `find-file-hook' and `dired-mode-hook'.
+;; (defun my/project-org-maybe-switch ()
+;;   "Detect project root change and switch org context if needed.
+;; Called from `find-file-hook' and `dired-mode-hook'.
 
-Short-circuits immediately when:
-  - neither org nor org-roam have been loaded yet (avoids eager loading), or
-  - the project root is identical to the last seen root (avoids redundant work).
+;; Short-circuits immediately when:
+;;   - neither org nor org-roam have been loaded yet (avoids eager loading), or
+;;   - the project root is identical to the last seen root (avoids redundant work).
 
-FIX: No hardcoded project roots. Detection is fully dynamic: Projectile
-identifies any recognized project root; only roots that appear in
-`my/project-org-contexts' (populated by `my/register-project-org-context')
-trigger a context switch. All other projects simply stay on global context."
-  (let* ((root (ignore-errors (projectile-project-root)))
-         (root (and root (file-truename root))))
-    (cond
-     ;; Entering a registered project we are not already in
-     ((and root
-           (assoc root my/project-org-contexts)
-           (not (equal root my/active-org-project)))
-      (my/project-org-activate root))
-     ;; Leaving the active project — root is nil or unregistered
-     ((and my/active-org-project
-           (not (equal root my/active-org-project)))
-      (my/project-org-deactivate)))))
+;; FIX: No hardcoded project roots. Detection is fully dynamic: Projectile
+;; identifies any recognized project root; only roots that appear in
+;; `my/project-org-contexts' (populated by `my/register-project-org-context')
+;; trigger a context switch. All other projects simply stay on global context."
+;;   (let* ((root (ignore-errors (projectile-project-root)))
+;;          (root (and root (file-truename root))))
+;;     (cond
+;;      ;; Entering a registered project we are not already in
+;;      ((and root
+;;            (assoc root my/project-org-contexts)
+;;            (not (equal root my/active-org-project)))
+;;       (my/project-org-activate root))
+;;      ;; Leaving the active project — root is nil or unregistered
+;;      ((and my/active-org-project
+;;            (not (equal root my/active-org-project)))
+;;       (my/project-org-deactivate)))))
 
-(defun my/project-org-status ()
-  "Echo the currently active org context."
-  (interactive)
-  (if my/active-org-project
-      (message "[org-ctx] project=%s  denote=%s  gtd=%s  agenda=%s"
-               my/active-org-project
-               (bound-and-true-p denote-directory)
-               (bound-and-true-p org-gtd-directory)
-               org-agenda-files)
-    (message "[org-ctx] global  denote=%s  gtd=%s"
-             my/denote-directory
-             my/org-gtd-directory)))
+;; (defun my/project-org-status ()
+;;   "Echo the currently active org context."
+;;   (interactive)
+;;   (if my/active-org-project
+;;       (message "[org-ctx] project=%s  denote=%s  gtd=%s  agenda=%s"
+;;                my/active-org-project
+;;                (bound-and-true-p denote-directory)
+;;                (bound-and-true-p org-gtd-directory)
+;;                org-agenda-files)
+;;     (message "[org-ctx] global  denote=%s  gtd=%s"
+;;              my/denote-directory
+;;              my/org-gtd-directory)))
 
-(defun my/project-org-force-global ()
-  "Manually reset to the global org context, ignoring the current project."
-  (interactive)
-  (my/project-org-deactivate))
+;; (defun my/project-org-force-global ()
+;;   "Manually reset to the global org context, ignoring the current project."
+;;   (interactive)
+;;   (my/project-org-deactivate))
 
-;;; ── Hooks — covers every path into a project buffer ──────────────────────
-;; find-file-hook:  fires when any file is opened (SPC p f, C-x p f, etc.)
-;; dired-mode-hook: fires when dired opens a project directory
-(add-hook 'find-file-hook  #'my/project-org-maybe-switch)
-(add-hook 'dired-mode-hook #'my/project-org-maybe-switch)
+;; ;;; ── Hooks — covers every path into a project buffer ──────────────────────
+;; ;; find-file-hook:  fires when any file is opened (SPC p f, C-x p f, etc.)
+;; ;; dired-mode-hook: fires when dired opens a project directory
+;; (add-hook 'find-file-hook  #'my/project-org-maybe-switch)
+;; (add-hook 'dired-mode-hook #'my/project-org-maybe-switch)
 #+end_src
 
 ** Register Projects
 #+begin_src emacs-lisp
-(my/register-project-org-context "~/physics/"
-  :name "physics"
-  :org-directory (file-truename (expand-file-name "~/physics/"))
-  :denote-dir    (file-truename (expand-file-name "~/physics/notes/"))
-  :gtd-dir       (file-truename (expand-file-name "~/physics/gtd/"))
-  :agenda-files  (list (file-truename (expand-file-name "~/physics/"))
-                       (file-truename (expand-file-name "~/physics/gtd/")))
-  :capture-tpls
-  '(("P"  "Physics")
-    ("Pj" "Physics Journal" entry
-     (file denote-journal-path-to-new-or-existing-entry)
-     "* %<%H:%M> %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n"
-     :empty-lines 1 :kill-buffer t)
-    ("Pt" "Physics Task" entry
-     (file "~/physics/gtd/inbox.org")
-     "* INBOX %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n"
-     :empty-lines 1)
-    ("Pr" "Physics Reading" entry
-     (file "~/physics/reading.org")
-     "* %? :read:\n:PROPERTIES:\n:CREATED: %U\n:AUTHOR: \n:STATUS: Reading\n:END:\n"
-     :empty-lines 1)))
+; (my/register-project-org-context "~/physics/"
+;   :name "physics"
+;   :org-directory (file-truename (expand-file-name "~/physics/"))
+;   :denote-dir    (file-truename (expand-file-name "~/physics/notes/"))
+;   :gtd-dir       (file-truename (expand-file-name "~/physics/gtd/"))
+;   :agenda-files  (list (file-truename (expand-file-name "~/physics/"))
+;                        (file-truename (expand-file-name "~/physics/gtd/")))
+;   :capture-tpls
+;   '(("P"  "Physics")
+;     ("Pj" "Physics Journal" entry
+;      (file denote-journal-path-to-new-or-existing-entry)
+;      "* %<%H:%M> %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n"
+;      :empty-lines 1 :kill-buffer t)
+;     ("Pt" "Physics Task" entry
+;      (file "~/physics/gtd/inbox.org")
+;      "* INBOX %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n"
+;      :empty-lines 1)
+;     ("Pr" "Physics Reading" entry
+;      (file "~/physics/reading.org")
+;      "* %? :read:\n:PROPERTIES:\n:CREATED: %U\n:AUTHOR: \n:STATUS: Reading\n:END:\n"
+;      :empty-lines 1)))
 #+end_src
 
 ** Better Font Faces
@@ -2261,7 +2269,7 @@ trigger a context switch. All other projects simply stay on global context."
   (setq org-modern-hide-stars nil
         org-modern-star '("◉" "○" "✸" "✿" "✤" "✜" "◇" "▷"))
 
-  (setq org-modern-checkbox nil
+  (setq org-modern-checkbox t
         org-modern-todo t
         org-modern-tag t
         org-modern-priority t)
@@ -3403,11 +3411,8 @@ Top-level keys:
                          '((:auto-priority t))))))))))
 #+end_src
 
-* DONE Workflow Management
-This section defines the architectural backbone of the editor's navigation, project isolation, and file management workflows. It relies on a "Mature External" stack (=projectile=, =persp-mode=, =dirvish=, =treemacs=) rather than Emacs' built-in =project.el= and =tab-bar-mode=. This decision is deliberate: =projectile= offers vastly superior =fd=/=ripgrep= hybrid indexing and transient menus, while =persp-mode= provides strict buffer isolation (hiding irrelevant buffers from =C-x b=) that native tabs cannot match.
 
-Crucially, this section includes several defensive patches inspired by Doom Emacs and verified against 2025/2026 edge cases. These include cross-platform Dired safeguards, a fix for Dirvish's multi-frame flicker bug (Issue #353), a custom glue code replacement for the abandoned =persp-mode-projectile-bridge=, a critical patch to prevent =uniquify= from corrupting =persp-mode= session restorations, and a robust =emacsclient= frame isolation engine.
-
+* Workflow Management
 ** DONE Dired
 Dired is the native Emacs file manager. By default, it is fragile across different operating systems and network connections. This configuration applies Doom Emacs-inspired safeguards: it dynamically strips unsupported GNU =ls= flags when running on macOS/BSD or over TRAMP, and it uses a stale-predicate to prevent massive I/O hangs when revisiting large or remote directories.
 
@@ -3602,224 +3607,28 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
     (when (eq (frame-selected-window) window)
       (funcall fn window)))
 
+  ;; TODO: modify this to work with projectile alternative
   ;; DOOM HACK: Clean up Dirvish before switching workspaces/projects.
   ;; If Dirvish is open in a dedicated side-window and you switch `persp-mode`
   ;; workspaces, Emacs will throw an error trying to delete the dedicated window.
   ;; This hook gracefully quits Dirvish before the workspace transition occurs.
-  (add-hook 'persp-before-switch-functions
-            (lambda (&rest _)
-              (when-let* ((dv (cl-loop for w in (window-list)
-                                       if (window-dedicated-p w)
-                                       if (with-current-buffer (window-buffer w) (dirvish-curr))
-                                       return it)))
-                (let (dirvish-reuse-session)
-                  (with-selected-window (dv-root-window dv)
-                    (dirvish-quit)))))))
+  ;; (add-hook 'persp-before-switch-functions
+  ;;           (lambda (&rest _)
+  ;;             (when-let* ((dv (cl-loop for w in (window-list)
+  ;;                                      if (window-dedicated-p w)
+  ;;                                      if (with-current-buffer (window-buffer w) (dirvish-curr))
+  ;;                                      return it)))
+  ;;               (let (dirvish-reuse-session)
+  ;;                 (with-selected-window (dv-root-window dv)
+  ;;                   (dirvish-quit))))))
+
+
+  )
 #+end_src
 
 
 
-** DONE Projectile
-=projectile= serves as the foundational project management engine, relying on =fd= and =ripgrep= for lightning-fast hybrid indexing. This configuration implements a frictionless, reactive project discovery workflow while mathematically guaranteeing safety against cache pollution and remote I/O hangs.
-
-1. *Automatic Tracking & Cache Pollution Safeguards:*
-By default, =projectile= can aggressively scan and cache every directory opened, which leads to massive background I/O hangs and severe cache bloat from transient directories (e.g., =~/Downloads=). To provide a frictionless workflow where directories are passively added to the cache upon file visitation, =projectile-track-known-projects-automatically= is set to =t=. To mathematically guarantee safety, a robust ignore function (=ar/projectile-ignore-project-p=) is implemented. This function strictly intercepts and excludes remote TRAMP paths, the Emacs configuration directory, and transient junk directories before they can enter the known projects cache.
-
-2. *Hybrid Indexing & Executable Detection:*
-Indexing is configured to use the =hybrid= method, leveraging VCS for tracked files and =fd= for untracked files. A cross-platform executable detection mechanism (=ar/fd-executable=) is initialized to locate =fd= or its Debian/Ubuntu alias =fdfind=. If neither is found, the configuration gracefully falls back to =ripgrep= or standard =find=.
-
-3. *Doom-Inspired Search Delegation:*
-Projectile's built-in search commands (=projectile-grep=, =projectile-ripgrep=, =projectile-ag=) are explicitly disabled and marked as obsolete. All project-wide searching is strictly delegated to =consult-ripgrep=, which provides superior asynchronous performance, live preview capabilities, and seamless integration with the =vertico= minibuffer UI.
-
-4. *Per-Project Compilation Isolation:*
-To prevent compilation buffers from overwriting each other when working across multiple projects simultaneously, =compilation-buffer-name-function= is bound to =projectile-compilation-buffer-name=. This ensures that each =*compilation*= buffer is uniquely named according to its project root.
-#+begin_src emacs-lisp
-(defun ar/projectile-ignore-project-p (project-root)
-  "Return non-nil if PROJECT-ROOT should be ignored by Projectile.
-Prevents cache pollution from transient directories, the Emacs config
-directory, and remote TRAMP connections (which cause severe I/O hangs
-when `projectile-track-known-projects-automatically' is enabled)."
-  (let ((true-root (ignore-errors (file-truename project-root))))
-    (or
-     ;; 1. Ignore TRAMP / Remote paths (CRITICAL for preventing SSH hangs)
-     (file-remote-p project-root)
-     ;; 2. Ignore Emacs config directory
-     (and true-root
-          (file-in-directory-p true-root (file-truename user-emacs-directory)))
-     ;; 3. Ignore transient / junk directories
-     (and true-root
-          (or (file-in-directory-p true-root (expand-file-name "~/Downloads/"))
-              (file-in-directory-p true-root (expand-file-name "~/Desktop/"))
-              (string-prefix-p "/tmp/" true-root)
-              (string-prefix-p "/var/folders/" true-root)
-              (string-prefix-p "/private/var/folders/" true-root))))))
-
-(use-package projectile
-  :defer t
-  :hook (after-init . projectile-mode)
-  :custom
-  ;; Persistent caching writes to disk; non-interactive (daemon) uses memory only.
-  (projectile-enable-caching (if noninteractive t 'persistent))
-  ;; Ignore macOS metadata and TAGS files globally.
-  (projectile-globally-ignored-files '(".DS_Store" "TAGS"))
-  ;; Ignore compiled binaries globally.
-  (projectile-globally-ignored-file-suffixes '(".elc" ".pyc" ".o"))
-  ;; When killing project buffers, only kill buffers visiting files, leaving
-  ;; scratch or REPL buffers alive.
-  (projectile-kill-buffers-filter 'kill-only-files)
-  ;; Hybrid indexing uses VCS for tracked files and `find`/`fd` for untracked files.
-  (projectile-indexing-method 'hybrid)
-  ;; Store cache files in the `no-littering` var directory to keep ~/.emacs.d clean.
-  (projectile-known-projects-file
-   (no-littering-expand-var-file-name "projectile/projects.eld"))
-  (projectile-cache-file
-   (no-littering-expand-var-file-name "projectile/projectile.cache"))
-  ;; Never track/list/switch to ignored projects.
-  (projectile-ignored-projects (list (file-truename user-emacs-directory)))
-  (projectile-ignored-project-function #'ar/projectile-ignore-project-p)
-  ;; APPROACH 1: AUTOMATIC TRACKING
-  ;; Passively adds any directory containing a `.git` or `Makefile` to the
-  ;; cache the moment a file inside it is opened. This provides a frictionless
-  ;; workflow where new projects are automatically registered without needing
-  ;; manual discovery commands.
-  ;; CRITICAL: This requires a robust `projectile-ignored-project-function`
-  ;; (defined above) to prevent cache pollution from ~/Downloads and fatal
-  ;; UI freezes from TRAMP/SSH directory traversal.
-  (projectile-track-known-projects-automatically t)
-  :init
-  ;; Debian/Ubuntu ship `fd` as `fdfind`. Detect the correct executable name.
-  (defvar ar/fd-executable (cl-find-if #'executable-find '("fdfind" "fd"))
-    "Filename of the fd executable.")
-  :config
-  ;; Reduce the number of root marker files/dirs Projectile checks when
-  ;; resolving a project's root, for performance (per Doom's +projectile.el).
-  (setq projectile-project-root-files '()
-        projectile-project-root-files-top-down-recurring '("Makefile"))
-  (add-to-list 'projectile-project-root-files-bottom-up ".project")
-  ;; Prefer fd/ripgrep over the VCS-specific commands (faster, respects
-  ;; .gitignore) instead of git ls-files/find.
-  (when ar/fd-executable
-    (setq projectile-fd-executable ar/fd-executable))
-  (setq projectile-git-submodule-command nil
-        projectile-git-fd-args (concat "-tl " projectile-git-fd-args)
-        projectile-generic-command
-        (lambda (_)
-          (cond
-           ((and ar/fd-executable projectile-git-use-fd)
-            (format "%s . --type f --hidden --follow --color=never -0 -E .git"
-                    ar/fd-executable))
-           ((executable-find "rg")
-            "rg -0 --files --follow --color=never --hidden -g!.git")
-           (t "find . -type f -print0"))))
-  ;; Doom-inspired: rely on the ripgrep-backed `consult-ripgrep' instead of
-  ;; Projectile's built-in (slower/less consistent) search commands.
-  (put 'projectile-ag 'disabled "Use consult-ripgrep instead")
-  (put 'projectile-ripgrep 'disabled "Use consult-ripgrep instead")
-  (put 'projectile-grep 'disabled "Use consult-ripgrep instead")
-  ;; Per-project compilation buffers: ensures `*compilation*` buffers are
-  ;; uniquely named per project, preventing them from overwriting each other.
-  (setq compilation-buffer-name-function #'projectile-compilation-buffer-name
-        compilation-save-buffers-predicate #'projectile-current-project-buffer-p))
-
-;; Helper to quickly open the Emacs config directory as a project.
-(defun ar/open-emacs-config-project ()
-  "Open Emacs config directory as a project."
-  (interactive)
-  (let ((default-directory user-emacs-directory))
-    (call-interactively #'projectile-find-file)))
-
-;; Helper to switch project and immediately open the file finder.
-(defun ar/project-switch-to-file ()
-  "Switch to a project and immediately find a file in it."
-  (interactive)
-  (call-interactively #'projectile-switch-project))
-
-;; Helper to switch project and show the dispatch menu.
-;; CRITICAL FIX: Inlines the 0-argument perspective switch directly into the
-;; lambda to prevent any external function signature mismatches.
-(defun ar/project-switch-with-menu ()
-  "Switch to a project and show the dispatch menu."
-  (interactive)
-  (let ((projectile-switch-project-action
-         (lambda ()
-           (let* ((dir default-directory)
-                  (persp-name (file-name-nondirectory (directory-file-name dir)))
-                  (persp (persp-get-by-name persp-name)))
-             (if persp
-                 (persp-switch persp-name)
-               (let ((persp-auto-resume-time -1))
-                 (persp-add nil persp-name)
-                 (persp-switch persp-name))))
-           (projectile-commander))))
-    (call-interactively #'projectile-switch-project)))
-#+end_src
-
-*** DONE Projectile Integration (Path A: Custom Glue Code)
-The =persp-mode-projectile-bridge= package is effectively abandoned and relies on outdated internal APIs. Instead of utilizing unmaintained third-party dependencies, Doom Emacs' robust "glue code" pattern is implemented directly. This guarantees a strict *1 Project = 1 Workspace* isolation rule by hooking into Projectile's switch action to automatically create or switch to a perspective named after the project root.
-
-1. *Buffer Leakage Prevention:*
-When files are opened via =recentf= or =consult-buffer= while inside a project, buffers can "leak" into the global workspace. To prevent this, =ar/persp-add-current-buffer-h= is hooked into =window-configuration-change-hook= and =bookmark-after-jump-hook=. This ensures that any buffer brought into focus is automatically bound to the currently active perspective.
-
-2. *The 0-Argument Inline Lambda Fix:*
-The =projectile-switch-project-action= hook is strictly called by Projectile with exactly 0 arguments. Previous implementations utilizing a 1-argument function signature caused fatal crashes. The standalone helper function has been completely excised. The logic is now injected directly into an inline 0-argument lambda assigned to =projectile-switch-project-action=. It relies on the dynamically bound =default-directory=, which Projectile safely provides, guaranteeing absolute mathematical safety against argument mismatches.
-
-3. *Perspective Lifecycle Management:*
-When =projectile-kill-buffers= is executed, the associated workspace must also be destroyed to keep the perspective list clean. A =define-advice= wrapper is applied to =projectile-kill-buffers=. It captures the project root, executes the buffer killing, and subsequently checks if the perspective is empty. If empty, the perspective is safely terminated via =persp-kill=.
-
-4. *Doom Macro Translation:*
-Doom-specific proprietary macros are strictly translated into native Vanilla Emacs equivalents. The =defadvice!= macro is replaced with standard =define-advice=, and the hallucinated =persp-add-new= API is corrected to the mathematically valid =persp-add= function.
-#+begin_src emacs-lisp
-;; PATH A: Replaced the abandoned 'persp-mode-projectile-bridge' with
-;; custom Doom-style glue code. This provides robust 1:1 Project=Workspace
-;; isolation without relying on unmaintained third-party bridge packages.
-(with-eval-after-load 'persp-mode
-  (with-eval-after-load 'projectile
-    ;; 1. Auto-add buffers to the current perspective when they are opened/switched to.
-    ;; This prevents buffers from "leaking" into the global workspace when
-    ;; opening a file via recentf or consult-buffer while inside a project.
-    (defun ar/persp-add-current-buffer-h ()
-      "Add current buffer to focused perspective."
-      (when (and (bound-and-true-p persp-mode)
-                 (not (persp-buffer-filtered-out-p
-                       (current-buffer)
-                       persp-add-buffer-on-after-change-major-mode-filter-functions)))
-        (persp-add-buffer (current-buffer) (get-current-persp) nil nil)))
-
-    (add-hook 'window-configuration-change-hook #'ar/persp-add-current-buffer-h)
-    (add-hook 'bookmark-after-jump-hook #'ar/persp-add-current-buffer-h)
-
-    ;; 2. Override projectile's default switch action.
-    ;; CRITICAL FIX: `projectile-switch-project-action` is strictly called with
-    ;; 0 arguments by `projectile-switch-project-by-name`. Defining it as a
-    ;; 1-argument function `(dir)` causes a fatal `Wrong number of arguments`
-    ;; crash. We use an inline 0-argument lambda that relies on `default-directory`,
-    ;; which Projectile dynamically binds to the new project root before calling.
-    (setq projectile-switch-project-action
-          (lambda ()
-            (let* ((dir default-directory)
-                   (persp-name (file-name-nondirectory (directory-file-name dir)))
-                   (persp (persp-get-by-name persp-name)))
-              (if persp
-                  (persp-switch persp-name)
-                (let ((persp-auto-resume-time -1))
-                  (persp-add nil persp-name)
-                  (persp-switch persp-name))))
-            (projectile-find-file)))
-
-    ;; 3. Kill the perspective when killing project buffers.
-    ;; This ensures that when 'projectile-kill-buffers' is executed, the associated
-    ;; workspace is also destroyed, keeping the perspective list clean.
-    ;; FIX: Replaced Doom's `defadvice!` with Vanilla Emacs `define-advice`.
-    (define-advice projectile-kill-buffers (:around (fn &rest args) ar/kill-perspective)
-      "Kill the associated perspective when killing project buffers."
-      (let* ((project-root (projectile-acquire-root))
-             (persp-name (file-name-nondirectory (directory-file-name project-root)))
-             (persp (persp-get-by-name persp-name)))
-        (prog1 (apply fn args)
-          (when (and persp (persp-p persp) (not (persp-buffers persp)))
-            (persp-kill persp-name)))))))
-#+end_src
-
+** TODO Project Management
 
 ** DONE iBuffer
 Ibuffer is the advanced buffer list manager. We configure it to hide empty filter groups (keeping the UI clean) and redefine the size column to display human-readable sizes (e.g., =1.2M=). It is integrated with =nerd-icons= for visual flair and =ibuffer-projectile= to automatically group all open buffers by their respective Projectile projects.
@@ -3846,26 +3655,26 @@ Ibuffer is the advanced buffer list manager. We configure it to hide empty filte
   :defer t
   :hook (ibuffer-mode . nerd-icons-ibuffer-mode))
 
-;; Group ibuffer's list by project (Projectile-backed).
-(use-package ibuffer-projectile
-  :defer t
-  :commands (ibuffer-projectile-generate-filter-groups)
-  :functions icons-displayable-p
-  :hook (ibuffer . (lambda ()
-                     "Group ibuffer's list by project."
-                     (setq ibuffer-filter-groups (ibuffer-projectile-generate-filter-groups))
-                     (unless (eq ibuffer-sorting-mode 'alphabetic)
-                       (ibuffer-do-sort-by-alphabetic))))
-  :config
-  ;; Custom group name formatter: prepends a Git repo icon if nerd-icons is available.
-  (defun ar/ibuffer-projectile-group-name (project-name _root-dir)
-    "Return group name for PROJECT-NAME, prefixed with a repo icon if available."
-    (if (icons-displayable-p)
-        (format "%s %s"
-                (nerd-icons-octicon "nf-oct-repo" :height 1.2 :face ibuffer-filter-group-name-face)
-                project-name)
-      (format "Project: %s" project-name)))
-  (setq ibuffer-projectile-group-name-function #'ar/ibuffer-projectile-group-name))
+;; ;; Group ibuffer's list by project (Projectile-backed).
+;; (use-package ibuffer-projectile
+;;   :defer t
+;;   :commands (ibuffer-projectile-generate-filter-groups)
+;;   :functions icons-displayable-p
+;;   :hook (ibuffer . (lambda ()
+;;                      "Group ibuffer's list by project."
+;;                      (setq ibuffer-filter-groups (ibuffer-projectile-generate-filter-groups))
+;;                      (unless (eq ibuffer-sorting-mode 'alphabetic)
+;;                        (ibuffer-do-sort-by-alphabetic))))
+;;   :config
+;;   ;; Custom group name formatter: prepends a Git repo icon if nerd-icons is available.
+;;   (defun ar/ibuffer-projectile-group-name (project-name _root-dir)
+;;     "Return group name for PROJECT-NAME, prefixed with a repo icon if available."
+;;     (if (icons-displayable-p)
+;;         (format "%s %s"
+;;                 (nerd-icons-octicon "nf-oct-repo" :height 1.2 :face ibuffer-filter-group-name-face)
+;;                 project-name)
+;;       (format "Project: %s" project-name)))
+;;   (setq ibuffer-projectile-group-name-function #'ar/ibuffer-projectile-group-name))
 #+end_src
 
 ** DONE Treemacs
@@ -3947,281 +3756,9 @@ Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. W
     [drag-mouse-1] #'treemacs-dragleftclick-action))
 #+end_src
 
-** DONE Perspective
-=persp-mode= provides strict workspace isolation. Unlike Emacs' native =tab-bar-mode=, =persp-mode= partitions the buffer list, meaning =C-x b= (or =consult-buffer=) will *only* show buffers relevant to your current project/context.
 
-*** DONE Core
-This block configures the core engine.
-*Critical Patch:* Emacs' built-in =uniquify= package dynamically renames buffers (e.g., =foo<2>=). However, =persp-mode= serializes workspace sessions by exact buffer names. If =uniquify= is active, =persp-mode= will fail to restore sessions on startup, throwing "Selecting deleted buffer" errors. We dynamically disable =uniquify= when =persp-mode= is active. We also filter out dead and TRAMP buffers from the save state to prevent Emacs from hanging on startup trying to restore offline SSH connections.
 
-#+begin_src emacs-lisp
-(use-package persp-mode
-  :hook (after-init . persp-mode)
-  :init
-  ;; Name the default, global workspace "main" instead of "nil".
-  (setq persp-nil-name "main")
-  :custom
-  ;; When creating a new frame, inherit the perspective of the last focused frame.
-  (persp-set-last-persp-for-new-frames t)
-  ;; Automatically add a buffer to the current perspective when opened via find-file.
-  (persp-add-buffer-on-find-file t)
-  ;; Kill buffers when they are removed from all perspectives, preventing orphan buffers.
-  (persp-autokill-buffer-on-remove 'kill-weak)
-  ;; Store workspace state in the `no-littering` var directory.
-  (persp-save-dir (no-littering-expand-var-file-name "persp-confs/"))
-  ;; Save state on exit or when persp-mode is deactivated.
-  (persp-auto-save-opt 2)
-  (persp-auto-save-num-of-backups 3)
-
-  ;; DOOM FIX: -1 prevents auto-resume hangs from heavy TRAMP/LSP buffers.
-  ;; Auto-resuming on startup forces Emacs to instantly reopen every buffer
-  ;; from your last session. If your last session included offline TRAMP
-  ;; connections or massive LSP workspaces, Emacs will freeze.
-  (persp-auto-resume-time -1)
-  ;; Use a shortened mode-line indicator for the current perspective.
-  (persp-modestring-short t)
-
-  :config
-  ;; CRITICAL DOOM FIX: `uniquify` breaks persp-mode session restoration.
-  ;; It renames buffers dynamically, but persp serializes by exact name.
-  ;; We save the old uniquify style, disable it while persp is active,
-  ;; and restore it if persp is ever turned off.
-  (defvar ar/workspace--old-uniquify-style nil)
-  (add-hook 'persp-mode-hook
-            (lambda ()
-              (cond (persp-mode
-                     (when uniquify-buffer-name-style
-                       (setq ar/workspace--old-uniquify-style uniquify-buffer-name-style))
-                     (setq uniquify-buffer-name-style nil))
-                    (t
-                     (when ar/workspace--old-uniquify-style
-                       (setq uniquify-buffer-name-style ar/workspace--old-uniquify-style))))))
-
-  ;; DOOM FIX: Filter out dead and remote (TRAMP) buffers from being saved.
-  ;; If Emacs tries to restore a dead process buffer or an offline SSH
-  ;; connection on startup, it will hang indefinitely waiting for a timeout.
-  (add-hook 'persp-filter-save-buffers-functions
-            (lambda (buf)
-              (or (not (buffer-live-p buf))
-                  (let ((dir (buffer-local-value 'default-directory buf)))
-                    (ignore-errors (file-remote-p dir))))))
-
-  ;; DOOM FIX: Clear visual selection on workspace change to prevent ghost regions.
-  ;; If you highlight text, switch workspaces, and switch back, the highlight
-  ;; can sometimes persist visually even though the region is inactive.
-    (add-hook 'persp-before-deactivate-functions (lambda (&rest _) (deactivate-mark))))
-#+end_src
-
-*** DONE Emacsclient Frame Isolation (Doom-style)
-By default, =persp-mode= isolates buffers by workspace, not by =emacsclient= connection. However, Doom Emacs creates the illusion of per-client isolation by hooking into the server lifecycle. When a new frame is created or a file is visited via =emacsclient=, this hook detects the project root of the target buffer and automatically switches that specific frame to the corresponding perspective.
-
-*Fixes applied:* Corrected the =*scratch*= buffer race condition by adding =server-visit-hook=, replaced the hallucinated =persp-add-new= with the correct =persp-add= API, and removed dead `let` bindings.
-
-#+begin_src emacs-lisp
-;; ==========================================
-;; EMACSCLIENT FRAME ISOLATION (Doom-style)
-;; ==========================================
-;; Replicates Doom's behavior where opening a new frame via 'emacsclient -c /path/to/project'
-;; automatically binds that specific frame to the project's perspective.
-(with-eval-after-load 'persp-mode
-  (with-eval-after-load 'projectile
-    (defun ar/persp--bind-to-project-h ()
-      "Bind the current frame to the perspective of the current buffer's project.
-Handles both empty `emacsclient -c` calls and `emacsclient -c file` calls."
-      ;; Use `current-buffer` instead of `frame-selected-window` to ensure we
-      ;; get the directory of the file being visited, not the daemon's *scratch* buffer.
-      (when-let* ((dir (or (buffer-local-value 'default-directory (current-buffer))
-                           default-directory))
-                  (default-directory dir)
-                  (project-root (ignore-errors (projectile-project-root)))
-                  (persp-name (projectile-project-name)))
-        ;; Only switch if we aren't already in this perspective
-        (unless (equal persp-name (safe-persp-name (get-current-persp)))
-          (let ((persp (persp-get-by-name persp-name)))
-            ;; FIX: Use the correct `persp-add` API instead of the non-existent `persp-add-new`
-            (unless persp
-              (setq persp (persp-add nil persp-name)))
-            (persp-switch persp)))))
-
-    ;; Hook 1: Catches empty `emacsclient -c` calls (falls back to daemon's directory)
-    (add-hook 'server-after-make-frame-hook #'ar/persp--bind-to-project-h)
-
-    ;; Hook 2: Catches `emacsclient -c /path/to/file` calls AFTER the file is loaded
-    (add-hook 'server-visit-hook #'ar/persp--bind-to-project-h)))
-#+end_src
-
-*** DONE Projectile Integration (Path A: Custom Glue Code)
-The =persp-mode-projectile-bridge= package is effectively abandoned and relies on outdated internal APIs. Instead of using it, we implement Doom Emacs' robust "glue code" pattern directly. This guarantees a strict **1 Project = 1 Workspace** isolation rule without relying on unmaintained third-party dependencies. It hooks into Projectile's switch action to automatically create or switch to a perspective named after the project root.
-
-*Fixes applied:* Replaced Doom-specific =defadvice!= macro with standard Vanilla Emacs =define-advice=, and corrected =persp-add-new= to =persp-add=.
-
-#+begin_src emacs-lisp
-;; PATH A: Replaced the abandoned 'persp-mode-projectile-bridge' with
-;; custom Doom-style glue code. This provides robust 1:1 Project=Workspace
-;; isolation without relying on unmaintained third-party bridge packages.
-(with-eval-after-load 'persp-mode
-  (with-eval-after-load 'projectile
-
-    ;; 1. Auto-add buffers to the current perspective when they are opened/switched to.
-    ;; This prevents buffers from "leaking" into the global workspace when you
-    ;; open a file via recentf or consult-buffer while inside a project.
-    (defun ar/persp-add-current-buffer-h ()
-      "Add current buffer to focused perspective."
-      (when (and (bound-and-true-p persp-mode)
-                 (not (persp-buffer-filtered-out-p
-                       (current-buffer)
-                       persp-add-buffer-on-after-change-major-mode-filter-functions)))
-        (persp-add-buffer (current-buffer) (get-current-persp) nil nil)))
-
-    (add-hook 'window-configuration-change-hook #'ar/persp-add-current-buffer-h)
-    (add-hook 'bookmark-after-jump-hook #'ar/persp-add-current-buffer-h)
-
-    ;; 2. Switch to (or create) a perspective named after the project when switching projects.
-    (defun ar/persp-switch-to-project-h (dir)
-      "Hook for `projectile-switch-project-action' to manage perspectives."
-      (let* ((persp-name (file-name-nondirectory (directory-file-name dir)))
-             (persp (persp-get-by-name persp-name)))
-        ;; Switch to or create the perspective
-        (if persp
-            (persp-switch persp-name)
-          (let ((persp-auto-resume-time -1)) ; Prevent auto-resume interference
-            ;; FIX: Use correct `persp-add` API instead of hallucinated `persp-add-new`
-            (persp-add nil persp-name)
-            (persp-switch persp-name)))
-        ;; Now execute the default find-file action within that perspective
-        (let ((projectile-switch-project-action #'projectile-find-file))
-          (projectile-switch-project-by-name dir))))
-
-    ;; Override projectile's default switch action with our custom glue code.
-    (setq projectile-switch-project-action #'ar/persp-switch-to-project-h)
-
-    ;; 3. Kill the perspective when killing project buffers.
-    ;; This ensures that when you run 'projectile-kill-buffers', the associated
-    ;; workspace is also destroyed, keeping your perspective list clean.
-    ;; FIX: Replaced Doom's `defadvice!` with Vanilla Emacs `define-advice`.
-    (define-advice projectile-kill-buffers (:around (fn &rest args) ar/kill-perspective)
-      "Kill the associated perspective when killing project buffers."
-      (let* ((project-root (projectile-acquire-root))
-             (persp-name (file-name-nondirectory (directory-file-name project-root)))
-             (persp (persp-get-by-name persp-name)))
-        (prog1 (apply fn args)
-          (when (and persp (persp-p persp) (not (persp-buffers persp)))
-             (persp-kill persp-name))))))
-#+end_src
-
-*** DONE Treemacs Integration
-By default, Treemacs shows the entire filesystem. By integrating it with =persp-mode=, we restrict Treemacs' scope so that each workspace only displays the project root associated with that specific perspective.
-
-#+begin_src emacs-lisp
-(use-package treemacs-persp
-  :after (treemacs persp-mode)
-  :config
-  ;; Set treemacs scope to work with perspectives (persp-mode backend).
-  ;; This makes treemacs buffers unique per perspective, ensuring that
-  ;; switching workspaces also switches the file tree root.
-  (treemacs-set-scope-type 'Perspectives))
-#+end_src
-
-*** DONE Compatibility Helpers
-These are custom utility functions built on top of the =persp-mode= API. They provide quick access to common workspace management tasks, such as killing all buffers in the current project, isolating a buffer to a single workspace, or generating a diagnostic report of all buffers and their assigned perspectives.
-
-#+begin_src emacs-lisp
-(with-eval-after-load 'persp-mode
-  ;; Helper to safely get the current projectile project name.
-  (defun ar/persp-get-project-name ()
-    "Get the name of the current project."
-    (ignore-errors (projectile-project-name)))
-
-  ;; Switch to a project; custom glue code automatically creates/switches perspective.
-  (defun ar/persp-project-switch ()
-    "Switch to a project; custom glue code automatically
-    creates/switches to the matching perspective."
-    (interactive)
-    (call-interactively #'projectile-switch-project))
-
-  ;; Force switch to the perspective of the current project without changing files.
-  (defun ar/persp-project-perspective ()
-    "Switch to the perspective for the current project, creating it if necessary."
-    (interactive)
-    (if-let ((persp-name (ar/persp-get-project-name)))
-        (progn
-          (persp-switch persp-name)
-          (message "Switched to perspective: %s" persp-name))
-      (message "Not in a project")))
-
-  ;; Nuclear option: Kill all buffers and the perspective for the current project.
-  (defun ar/persp-project-kill ()
-    "Kill all buffers in the current project and its perspective."
-    (interactive)
-    (when-let* ((persp-name (ar/persp-get-project-name))
-                (persp (persp-get-by-name persp-name))
-                (buffers-to-kill (and persp (persp-buffers persp))))
-      (when (yes-or-no-p
-             (format "Kill %d buffer(s) in project %s and its perspective? "
-                     (length buffers-to-kill)
-                     persp-name))
-        (mapc #'kill-buffer buffers-to-kill)
-        (when (member persp-name (persp-names))
-          (persp-kill persp-name))
-        (message "Killed project buffers and perspective: %s" persp-name)))))
-
-  ;; Quickly toggle back to the last used workspace.
-  (defun ar/persp-switch-last ()
-    "Switch to the last active perspective."
-    (interactive)
-    (persp-switch persp-last-persp-name))
-
-  ;; Close all workspaces except the one you are currently in.
-  (defun ar/persp-kill-others ()
-    "Kill all perspectives except the current one."
-    (interactive)
-    (let ((current (safe-persp-name (get-current-persp))))
-      (dolist (name (persp-names))
-        (unless (or (equal name current) (equal name persp-nil-name))
-          (persp-kill name)))))
-
-  ;; Isolate a buffer: Remove it from all other workspaces and keep it only in the current one.
-  (defun ar/persp-set-buffer (buffer-or-name)
-    "Associate BUFFER-OR-NAME with the current perspective only,
-removing it from all other perspectives."
-    (interactive (list (read-buffer "Set buffer: ")))
-    (dolist (name (persp-names))
-      (let ((persp (persp-get-by-name name)))
-        (when (and persp (not (eq persp (get-current-persp))))
-          (persp-remove-buffer buffer-or-name persp))))
-    (persp-add-buffer buffer-or-name (get-current-persp) nil))
-
-  ;; Clean up the current workspace by killing all buffers except the active one.
-  (defun ar/persp-kill-other-buffers ()
-    "Kill all buffers in current perspective except the current buffer."
-    (interactive)
-    (let ((current-buf (current-buffer))
-          (killed-count 0))
-      (dolist (buf (persp-buffers (get-current-persp)))
-        (unless (eq buf current-buf)
-          (when (kill-buffer buf)
-            (setq killed-count (1+ killed-count)))))
-      (message "Killed %d buffer(s) in current perspective" killed-count)))
-
-  ;; Diagnostic tool: Print a table of all buffers and their assigned workspaces.
-  (defun ar/persp-list-all-buffers ()
-    "Display all buffers with their associated perspectives in a temporary buffer."
-    (interactive)
-    (let (buffer-persp-alist)
-      (dolist (name (persp-names))
-        (let ((persp (persp-get-by-name name)))
-          (dolist (buf (and persp (persp-buffers persp)))
-            (when (buffer-live-p buf)
-              (push (cons (buffer-name buf) name) buffer-persp-alist)))))
-      (with-output-to-temp-buffer "*Perspective Buffers*"
-        (princ (format "%-50s %s\n" "Buffer Name" "Perspective"))
-        (princ (format "%s %s\n" (make-string 50 ?-) (make-string 20 ?-)))
-        (dolist (item (sort buffer-persp-alist
-                            (lambda (a b) (string< (car a) (car b)))))
-          (princ (format "%-50s %s\n" (car item) (cdr item))))))))
-#+end_src
-
-* DONE Completion Framework
+* Completion Framework
 ** DONE Orderless
 =orderless= provides a flexible, space-separated completion style where each component can match anywhere in the candidate, in any order. This configuration implements a highly optimized, Doom Emacs-inspired dispatcher system while ensuring strict compatibility with Emacs' native file and TRAMP completion engines.
 
@@ -4629,9 +4166,10 @@ Adds Nerd Font icons to minibuffer completion candidates. We hook it directly in
   ;; Projectile config. We omit `--full-path` so candidates render as clean
   ;; relative paths in the minibuffer instead of ugly absolute paths.
   ;; We pass a list instead of a string to bypass shell quoting entirely.
-  (with-eval-after-load 'projectile
-    (when (boundp 'ar/fd-executable)
-      (setq consult-fd-args (list ar/fd-executable "--color=never" "--hidden" "--exclude" ".git"))))
+  ;; TODO replace with projectile alternative
+  ;; (with-eval-after-load 'projectile
+  ;;   (when (boundp 'ar/fd-executable)
+  ;;     (setq consult-fd-args (list ar/fd-executable "--color=never" "--hidden" "--exclude" ".git"))))
 
   ;; Allow `hl-todo-mode` during live previews.
   ;; When scrolling through `consult-ripgrep` or `consult-line` results,
@@ -4642,6 +4180,7 @@ Adds Nerd Font icons to minibuffer completion candidates. We hook it directly in
     (add-to-list 'consult-preview-allowed-hooks 'hl-todo-mode)
     (add-to-list 'consult-preview-allowed-hooks 'global-hl-todo-mode))
 
+  ;; TODO: Replace with projectile/persp-mode alternatives
   ;; ==========================================
   ;; 2. STRICT PROJECTILE & PERSP-MODE INTEGRATION
   ;; ==========================================
@@ -4649,39 +4188,39 @@ Adds Nerd Font icons to minibuffer completion candidates. We hook it directly in
   ;; project root detection, ignoring Emacs' native project.el.
   ;; `ignore-errors` ensures that if Projectile hasn't found a project root,
   ;; it returns `nil` gracefully instead of throwing a `user-error`.
-  (autoload 'projectile-project-root "projectile")
-  (setq consult-project-function (lambda (_) (ignore-errors (projectile-project-root))))
+  ;; (autoload 'projectile-project-root "projectile")
+  ;; (setq consult-project-function (lambda (_) (ignore-errors (projectile-project-root))))
 
-  (with-eval-after-load 'persp-mode
-    ;; Define custom perspective buffer source for file-visiting buffers only
-    (defvar consult--source-persp-file-visiting-buffer
-      `(:name     "Persp Buffers"
-        :narrow   ?p
-        :category buffer
-        :face     consult-buffer
-        :history  buffer-name-history
-        :state    ,#'consult--buffer-state
-        :default  t
-        :items
-        ,(lambda ()
-           ;; SAFE PERSP CHECK: `persp-buffers` is a struct accessor and will crash if passed 'nil' (the global perspective). We guard against this.
-           (let ((persp (get-current-persp)))
-             (consult--buffer-query
-              :sort 'visibility
-              :predicate (lambda (buf)
-                           (and (buffer-file-name buf)
-                                (if persp
-                                    (memq buf (persp-buffers persp))
-                                  t))) ; Fallback for nil perspective
-              :as #'buffer-name))))
-      "Perspective buffer source showing only file-visiting buffers in current perspective.")
+  ;; (with-eval-after-load 'persp-mode
+  ;;   ;; Define custom perspective buffer source for file-visiting buffers only
+  ;;   (defvar consult--source-persp-file-visiting-buffer
+  ;;     `(:name     "Persp Buffers"
+  ;;       :narrow   ?p
+  ;;       :category buffer
+  ;;       :face     consult-buffer
+  ;;       :history  buffer-name-history
+  ;;       :state    ,#'consult--buffer-state
+  ;;       :default  t
+  ;;       :items
+  ;;       ,(lambda ()
+  ;;          ;; SAFE PERSP CHECK: `persp-buffers` is a struct accessor and will crash if passed 'nil' (the global perspective). We guard against this.
+  ;;          (let ((persp (get-current-persp)))
+  ;;            (consult--buffer-query
+  ;;             :sort 'visibility
+  ;;             :predicate (lambda (buf)
+  ;;                          (and (buffer-file-name buf)
+  ;;                               (if persp
+  ;;                                   (memq buf (persp-buffers persp))
+  ;;                                 t))) ; Fallback for nil perspective
+  ;;             :as #'buffer-name))))
+  ;;     "Perspective buffer source showing only file-visiting buffers in current perspective.")
 
-    ;; Override default sources to use our custom persp source + recent files + bookmarks
-    (setq consult-buffer-sources
-          '(consult--source-persp-file-visiting-buffer
-            consult--source-recent-file
-            consult--source-bookmark
-            consult--source-hidden-buffer)))
+  ;;   ;; Override default sources to use our custom persp source + recent files + bookmarks
+  ;;   (setq consult-buffer-sources
+  ;;         '(consult--source-persp-file-visiting-buffer
+  ;;           consult--source-recent-file
+  ;;           consult--source-bookmark
+  ;;           consult--source-hidden-buffer)))
 
   ;; ==========================================
   ;; 3. PREVIEW & NARROWING CONFIGURATION
@@ -4719,10 +4258,11 @@ Instead of writing fragile custom functions or relying on abandoned packages, we
 (use-package consult-dir
   :defer t
   :custom
+  ;; TODO Replace with projectile alternative
   ;; NATIVE PROJECTILE INTEGRATION:
   ;; Instruct consult-dir's built-in project source to use Projectile's
   ;; known projects list instead of Emacs' native project.el.
-  (consult-dir-project-list-function #'consult-dir-projectile-dirs)
+  ;; (consult-dir-project-list-function #'consult-dir-projectile-dirs)
 
   ;; NATIVE FD INTEGRATION:
   ;; When using 'consult-dir-jump-file' to asynchronously search inside
@@ -5266,14 +4806,15 @@ To ensure mathematical safety and seamless integration with modern IDE workflows
                      (length lsp-servers))))))))
 #+end_src
 
-** TODO LSP
-*Replace eglot with lsp-mode*
+** Language Server Protocol
+
 #+begin_src emacs-lisp
 (use-package lsp-mode
   :defer t
   :commands (lsp lsp-deferred)
   :hook (prog-mode . lsp-deferred)
   :init
+  ;; TODO Use a doom emacs prefix and use all lsp keybindings under that prefix. Use all the same keybindings in doom emacs for lsp-mode.
   (setq lsp-keymap-prefix "C-c l")
   :custom
   ;; --- UI & Functionality Enhancements ---
@@ -5283,7 +4824,8 @@ To ensure mathematical safety and seamless integration with modern IDE workflows
   (lsp-modeline-diagnostics-enable t)
 
   ;; --- Diagnostics & Completion Integration ---
-  (lsp-diagnostics-provider :flycheck)
+  ;; TODO Uncomment this when setting up flycheck
+  ;;(lsp-diagnostics-provider :flycheck)
   (lsp-completion-provider :none)
 
   ;; --- Performance & Behavior ---
@@ -5314,16 +4856,16 @@ To ensure mathematical safety and seamless integration with modern IDE workflows
 *Replace flymake with flycheck*
 =flycheck and lsp-mode diagnostics must work together=
 #+begin_src emacs-lisp
-(use-package flycheck
-  :config
-  (add-hook 'after-init-hook #'global-flycheck-mode))
+;; (use-package flycheck
+;;   :config
+;;   (add-hook 'after-init-hook #'global-flycheck-mode))
 
-(with-eval-after-load 'flycheck
-  (setq flycheck-disabled-checkers (cons 'org-lint flycheck-disabled-checkers)))
+;; (with-eval-after-load 'flycheck
+;;   (setq flycheck-disabled-checkers (cons 'org-lint flycheck-disabled-checkers)))
 
-(use-package flycheck-posframe
-  :after flycheck
-  :config (add-hook 'flycheck-mode-hook #'flycheck-posframe-mode))
+;; (use-package flycheck-posframe
+;;   :after flycheck
+;;   :config (add-hook 'flycheck-mode-hook #'flycheck-posframe-mode))
 #+end_src
 
 ** Formatting
@@ -5334,8 +4876,9 @@ To ensure mathematical safety and seamless integration with modern IDE workflows
   (apheleia-log-only-errors t))
 #+end_src
 
-** TODO Debug Protocol
-*Replace Dape with dap-mode*
+** Debug Adapter Protocol
+TODO: =Replace Dape with dap-mode=
+
 #+begin_src emacs-lisp
 ;; (use-package dape
 ;;   :defer t
@@ -5471,7 +5014,7 @@ To ensure mathematical safety and seamless integration with modern IDE workflows
 
 * Treesitter/Folding
 ** Treesit
-*Like add treesitter-langs or the automatic approach from doom emacs treesitter module. The grammars should not be in the main emacs config folder*
+NOTE: =Wait for Emacs 31 to be released as they will introduce automatic tree-sitter grammar installation when any specific prog-mode buffer is opened. The grammars should not be in the main emacs config folder.=
 #+begin_src emacs-lisp
 (use-package treesit
   :ensure nil
@@ -5503,6 +5046,7 @@ To ensure mathematical safety and seamless integration with modern IDE workflows
           (typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
           (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")))
 
+  ;; NOTE: Will no longer be needed for emacs 31
   (setq major-mode-remap-alist
         '((python-mode . python-ts-mode)
           (json-mode . json-ts-mode)
@@ -5515,11 +5059,8 @@ To ensure mathematical safety and seamless integration with modern IDE workflows
           (c++-mode . c++-ts-mode))))
 #+end_src
 
-#+RESULTS:
-: ((\.[pP][dD][fF]\' . pdf-view-mode) (\.kbd\' . kbd-mode) (\.kdl\' . kdl-mode) (\.cmake\' . cmake-ts-mode) (CMakeLists\.txt\' . cmake-ts-mode) (\.\(plantuml\|puml\|pum\|plu\)\' . plantuml-mode) (\.\(pu\|uml\|plantuml\|pum\|plu\)\' . plantuml-mode) (\.nix\' . nix-ts-mode) (\.nix\' . nix-mode) (\flake.lock\' . js-mode) (^/nix/store/.+\.drv\' . nix-drv-mode) (\.hva\' . LaTeX-mode) (\.tsx\' . tsx-ts-mode) (\.envrc\' . envrc-file-mode) (/git-rebase-todo\' . git-rebase-mode) (\.markdown\' . markdown-mode) (\.md\' . markdown-mode) (README\.md\' . gfm-mode) (\.\(?:md\|markdown\|mkd\|mdown\|mkdn\|mdwn\|mdx\)\' . markdown-mode) (\.Rmd\' . markdown-mode) (\.bbclass\' . shell-script-mode) (\.bb\' . shell-script-mode) (\.args\' . text-mode) (\.out\' . text-mode) (\.in\' . text-mode) (\.gpg\(~\|\.~[0-9]+~\)?\' nil epa-file) (\.elc\' . elisp-byte-code-mode) (\.zst\' nil jka-compr) (\.dz\' nil jka-compr) (\.xz\' nil jka-compr) (\.lzma\' nil jka-compr) (\.lz\' nil jka-compr) (\.g?z\' nil jka-compr) (\.bz2\' nil jka-compr) (\.Z\' nil jka-compr) (\.vr[hi]?\' . vera-mode) (\(?:\.\(?:rbw?\|ru\|rake\|thor\|axlsx\|jbuilder\|rabl\|gemspec\|podspec\)\|/\(?:Gem\|Rake\|Cap\|Thor\|Puppet\|Berks\|Brew\|Fast\|Vagrant\|Guard\|Pod\)file\)\' . ruby-mode) (\.re?st\' . rst-mode) (/\(?:Pipfile\|\.?flake8\)\' . conf-mode) (\.py[iw]?\' . python-mode) (\.m\' . octave-maybe-mode) (\.less\' . less-css-mode) (\.editorconfig\' . editorconfig-conf-mode) (\.scss\' . scss-mode) (\.cs\' . csharp-mode) (\.awk\' . awk-mode) (\.\(u?lpc\|pike\|pmod\(\.in\)?\)\' . pike-mode) (\.idl\' . idl-mode) (\.java\' . java-mode) (\.m\' . objc-mode) (\.ii\' . c++-mode) (\.i\' . c-mode) (\.lex\' . c-mode) (\.y\(acc\)?\' . c-mode) (\.h\' . c-or-c++-mode) (\.c\' . c-mode) (\.\(CC?\|HH?\)\' . c++-mode) (\.[ch]\(pp\|xx\|\+\+\)\' . c++-mode) (\.\(cc\|hh\)\' . c++-mode) (\.\(bat\|cmd\)\' . bat-mode) (\.[sx]?html?\(\.[a-zA-Z_]+\)?\' . mhtml-mode) (\.svgz?\' . image-mode) (\.svgz?\' . xml-mode) (\.x[bp]m\' . image-mode) (\.x[bp]m\' . c-mode) (\.p[bpgn]m\' . image-mode) (\.tiff?\' . image-mode) (\.gif\' . image-mode) (\.png\' . image-mode) (\.jpe?g\' . image-mode) (\.webp\' . image-mode) (\.te?xt\' . text-mode) (\.[tT]e[xX]\' . tex-mode) (\.ins\' . tex-mode) (\.ltx\' . latex-mode) (\.dtx\' . doctex-mode) (\.org\' . org-mode) (\.dir-locals\(?:-2\)?\.el\' . lisp-data-mode) (\.eld\' . lisp-data-mode) (eww-bookmarks\' . lisp-data-mode) (tramp\' . lisp-data-mode) (/archive-contents\' . lisp-data-mode) (places\' . lisp-data-mode) (\.emacs-places\' . lisp-data-mode) (\.el\' . emacs-lisp-mode) (Project\.ede\' . emacs-lisp-mode) (\(?:\.\(?:scm\|sls\|sld\|stk\|ss\|sch\)\|/\.guile\)\' . scheme-mode) (\.l\' . lisp-mode) (\.li?sp\' . lisp-mode) (\.[fF]\' . fortran-mode) (\.for\' . fortran-mode) (\.p\' . pascal-mode) (\.pas\' . pascal-mode) (\.\(dpr\|DPR\)\' . delphi-mode) (\.\([pP]\([Llm]\|erl\|od\)\|al\)\' . perl-mode) (Imakefile\' . makefile-imake-mode) (Makeppfile\(?:\.mk\)?\' . makefile-makepp-mode) (\.makepp\' . makefile-makepp-mode) (\.mk\' . makefile-gmake-mode) (\.make\' . makefile-gmake-mode) ([Mm]akefile\' . makefile-gmake-mode) (\.am\' . makefile-automake-mode) (\.texinfo\' . texinfo-mode) (\.te?xi\' . texinfo-mode) (\.[sS]\' . asm-mode) (\.asm\' . asm-mode) (\.css\' . css-mode) (\.mixal\' . mixal-mode) (\.gcov\' . compilation-mode) (/\.[a-z0-9-]*gdbinit . gdb-script-mode) (-gdb\.gdb . gdb-script-mode) ([cC]hange\.?[lL]og?\' . change-log-mode) ([cC]hange[lL]og[-.][0-9]+\' . change-log-mode) (\$CHANGE_LOG\$\.TXT . change-log-mode) (\.scm\.[0-9]*\' . scheme-mode) (\.[ckz]?sh\'\|\.shar\'\|/\.z?profile\' . sh-mode) (\.bash\' . sh-mode) (/PKGBUILD\' . sh-mode) (\(/\|\`\)\.\(bash_\(profile\|history\|log\(in\|out\)\)\|z?log\(in\|out\)\)\' . sh-mode) (\(/\|\`\)\.\(shrc\|zshrc\|m?kshrc\|bashrc\|t?cshrc\|esrc\)\' . sh-mode) (\(/\|\`\)\.\([kz]shenv\|xinitrc\|startxrc\|xsession\)\' . sh-mode) (\.m?spec\' . sh-mode) (\.m[mes]\' . nroff-mode) (\.man\' . nroff-mode) (\.sty\' . latex-mode) (\.cl[so]\' . latex-mode) (\.bbl\' . latex-mode) (\.bib\' . bibtex-mode) (\.bst\' . bibtex-style-mode) (\.sql\' . sql-mode) (\(acinclude\|aclocal\|acsite\)\.m4\' . autoconf-mode) (\.m[4c]\' . m4-mode) (\.mf\' . metafont-mode) (\.mp\' . metapost-mode) (\.vhdl?\' . vhdl-mode) (\.article\' . text-mode) (\.letter\' . text-mode) (\.i?tcl\' . tcl-mode) (\.exp\' . tcl-mode) (\.itk\' . tcl-mode) (\.icn\' . icon-mode) (\.sim\' . simula-mode) (\.mss\' . scribe-mode) (\.f9[05]\' . f90-mode) (\.f0[38]\' . f90-mode) (\.indent\.pro\' . fundamental-mode) (\.\(pro\|PRO\)\' . idlwave-mode) (\.srt\' . srecode-template-mode) (\.prolog\' . prolog-mode) (\.tar\' . tar-mode) (\.\(arc\|zip\|lzh\|lha\|zoo\|[jew]ar\|xpi\|rar\|cbr\|7z\|squashfs\|ARC\|ZIP\|LZH\|LHA\|ZOO\|[JEW]AR\|XPI\|RAR\|CBR\|7Z\|SQUASHFS\)\' . archive-mode) (\.oxt\' . archive-mode) (\.\(deb\|[oi]pk\)\' . archive-mode) (\`/tmp/Re . text-mode) (/Message[0-9]*\' . text-mode) (\`/tmp/fol/ . text-mode) (\.oak\' . scheme-mode) (\.sgml?\' . sgml-mode) (\.x[ms]l\' . xml-mode) (\.dbk\' . xml-mode) (\.dtd\' . sgml-mode) (\.ds\(ss\)?l\' . dsssl-mode) (\.js[mx]?\' . javascript-mode) (\.har\' . javascript-mode) (\.json\' . js-json-mode) (\.[ds]?va?h?\' . verilog-mode) (\.by\' . bovine-grammar-mode) (\.wy\' . wisent-grammar-mode) (\.erts\' . erts-mode) ([:/\]\..*\(emacs\|gnus\|viper\)\' . emacs-lisp-mode) (\`\..*emacs\' . emacs-lisp-mode) ([:/]_emacs\' . emacs-lisp-mode) (/crontab\.X*[0-9]+\' . shell-script-mode) (\.ml\' . lisp-mode) (\.ld[si]?\' . ld-script-mode) (ld\.?script\' . ld-script-mode) (\.xs\' . c-mode) (\.x[abdsru]?[cnw]?\' . ld-script-mode) (\.zone\' . dns-mode) (\.soa\' . dns-mode) (\.asd\' . lisp-mode) (\.\(asn\|mib\|smi\)\' . snmp-mode) (\.\(as\|mi\|sm\)2\' . snmpv2-mode) (\.\(diffs?\|patch\|rej\)\' . diff-mode) (\.\(dif\|pat\)\' . diff-mode) (\.[eE]?[pP][sS]\' . ps-mode) (\.\(?:PDF\|EPUB\|CBZ\|FB2\|O?XPS\|DVI\|OD[FGPST]\|DOCX\|XLSX?\|PPTX?\|pdf\|epub\|cbz\|fb2\|o?xps\|djvu\|dvi\|od[fgpst]\|docx\|xlsx?\|pptx?\)\' . doc-view-mode-maybe) (configure\.\(ac\|in\)\' . autoconf-mode) (\.s\(v\|iv\|ieve\)\' . sieve-mode) (BROWSE\' . ebrowse-tree-mode) (\.ebrowse\' . ebrowse-tree-mode) (#\*mail\* . mail-mode) (\.g\' . antlr-mode) (\.mod\' . m2-mode) (\.ses\' . ses-mode) (\.docbook\' . sgml-mode) (\.com\' . dcl-mode) (/config\.\(?:bat\|log\)\' . fundamental-mode) (/\.?\(authinfo\|netrc\)\' . authinfo-mode) (\.\(?:[iI][nN][iI]\|[lL][sS][tT]\|[rR][eE][gG]\|[sS][yY][sS]\)\' . conf-mode) (\.la\' . conf-unix-mode) (\.ppd\' . conf-ppd-mode) (java.+\.conf\' . conf-javaprop-mode) (\.properties\(?:\.[a-zA-Z0-9._-]+\)?\' . conf-javaprop-mode) (\.toml\' . conf-toml-mode) (\.desktop\' . conf-desktop-mode) (/\.redshift\.conf\' . conf-windows-mode) (\`/etc/\(?:DIR_COLORS\|ethers\|.?fstab\|.*hosts\|lesskey\|login\.?de\(?:fs\|vperm\)\|magic\|mtab\|pam\.d/.*\|permissions\(?:\.d/.+\)?\|protocols\|rpc\|services\)\' . conf-space-mode) (\`/etc/\(?:acpid?/.+\|aliases\(?:\.d/.+\)?\|default/.+\|group-?\|hosts\..+\|inittab\|ksysguarddrc\|opera6rc\|passwd-?\|shadow-?\|sysconfig/.+\)\' . conf-mode) ([cC]hange[lL]og[-.][-0-9a-z]+\' . change-log-mode) (/\.?\(?:gitconfig\|gnokiirc\|hgrc\|kde.*rc\|mime\.types\|wgetrc\)\' . conf-mode) (/\.mailmap\' . conf-unix-mode) (/\.\(?:asound\|enigma\|fetchmail\|gltron\|gtk\|hxplayer\|mairix\|mbsync\|msmtp\|net\|neverball\|nvidia-settings-\|offlineimap\|qt/.+\|realplayer\|reportbug\|rtorrent\.\|screen\|scummvm\|sversion\|sylpheed/.+\|xmp\)rc\' . conf-mode) (/\.\(?:gdbtkinit\|grip\|mpdconf\|notmuch-config\|orbital/.+txt\|rhosts\|tuxracer/options\)\' . conf-mode) (/\.?X\(?:default\|resource\|re\)s\> . conf-xdefaults-mode) (/X11.+app-defaults/\|\.ad\' . conf-xdefaults-mode) (/X11.+locale/.+/Compose\' . conf-colon-mode) (/X11.+locale/compose\.dir\' . conf-javaprop-mode) (\.~?[0-9]+\.[0-9][-.0-9]*~?\' nil t) (\.\(?:orig\|in\|[bB][aA][kK]\)\' nil t) ([/.]c\(?:on\)?f\(?:i?g\)?\(?:\.[a-zA-Z0-9._-]+\)?\' . conf-mode-maybe) (\.[1-9]\' . nroff-mode) (\.art\' . image-mode) (\.avs\' . image-mode) (\.bmp\' . image-mode) (\.cmyk\' . image-mode) (\.cmyka\' . image-mode) (\.crw\' . image-mode) (\.dcr\' . image-mode) (\.dcx\' . image-mode) (\.dng\' . image-mode) (\.dpx\' . image-mode) (\.fax\' . image-mode) (\.heic\' . image-mode) (\.hrz\' . image-mode) (\.icb\' . image-mode) (\.icc\' . image-mode) (\.icm\' . image-mode) (\.ico\' . image-mode) (\.icon\' . image-mode) (\.jbg\' . image-mode) (\.jbig\' . image-mode) (\.jng\' . image-mode) (\.jnx\' . image-mode) (\.miff\' . image-mode) (\.mng\' . image-mode) (\.mvg\' . image-mode) (\.otb\' . image-mode) (\.p7\' . image-mode) (\.pcx\' . image-mode) (\.pdb\' . image-mode) (\.pfa\' . image-mode) (\.pfb\' . image-mode) (\.picon\' . image-mode) (\.pict\' . image-mode) (\.rgb\' . image-mode) (\.rgba\' . image-mode) (\.tga\' . image-mode) (\.wbmp\' . image-mode) (\.webp\' . image-mode) (\.wmf\' . image-mode) (\.wpg\' . image-mode) (\.xcf\' . image-mode) (\.xmp\' . image-mode) (\.xwd\' . image-mode) (\.yuv\' . image-mode) (\.tgz\' . tar-mode) (\.tbz2?\' . tar-mode) (\.txz\' . tar-mode) (\.tzst\' . tar-mode) (\.drv\' . LaTeX-mode))
-
-** TODO Treesit-Fold
-*check with doom-emacs modules*
+** Treesit-Fold
+NOTE: =check with doom-emacs modules=
 #+begin_src emacs-lisp
 ;; (use-package treesit-fold
 ;;   :defer t
@@ -5531,8 +5072,8 @@ To ensure mathematical safety and seamless integration with modern IDE workflows
 ;;   (global-treesit-fold-indicators-mode 1))
 #+end_src
 
-** TODO Vimish Fold
-*check with doom emacs modules*
+** Vimish Fold
+NOTE: =check with doom-emacs modules=
 #+begin_src emacs-lisp
 (use-package vimish-fold
   :defer t
@@ -5601,14 +5142,14 @@ To ensure mathematical safety and seamless integration with modern IDE workflows
       (add-to-list 'consult-preview-allowed-hooks 'global-hl-todo-mode))))
 #+end_src
 
-** TODO flycheck-todo
-*replace with flycheck*
+**  flycheck-todo
+TODO: Uncomment when setting up flycheck
 #+begin_src emacs-lisp
-(use-package flycheck-hl-todo
-  :defer 5 ; Need to be initialized after the rest of checkers
-  :vc (:url "https://github.com/alvarogonzalezsotillo/flycheck-hl-todo")
-  :config
-  (flycheck-hl-todo-setup))
+;; (use-package flycheck-hl-todo
+;;   :defer 5 ; Need to be initialized after the rest of checkers
+;;   :vc (:url "https://github.com/alvarogonzalezsotillo/flycheck-hl-todo")
+;;   :config
+;;   (flycheck-hl-todo-setup))
 #+end_src
 
 ** consult-todo
@@ -6179,26 +5720,27 @@ PLIST keys:
 
 ** Project Awareness
 #+begin_src emacs-lisp
-(defun ar/get-project-bibliographies ()
-  "Find .bib files in the current project root recursively.
-Works for both LaTeX and Org documents within a project."
-  (when-let* ((root (projectile-project-root)))
-    (directory-files-recursively root "\\.bib$")))
+;; TODO: Replace this whole block with projectile alternative
+;; (defun ar/get-project-bibliographies ()
+;;   "Find .bib files in the current project root recursively.
+;; Works for both LaTeX and Org documents within a project."
+;;   (when-let* ((root (projectile-project-root)))
+;;     (directory-files-recursively root "\\.bib$")))
 
-(defun ar/setup-project-bibliography ()
-  "Create a references.bib file in the project root if it doesn't exist.
-This bibliography file can be used with both LaTeX and Org documents."
-  (interactive)
-  (if-let* ((root (projectile-acquire-root))
-            (bib-file (expand-file-name "references.bib" root)))
-      (if (file-exists-p bib-file)
-          (message "Bibliography already exists: %s" bib-file)
-        (with-temp-file bib-file
-          (insert "% Bibliography for " (file-name-nondirectory (directory-file-name root)) "\n")
-          (insert "% Created: " (format-time-string "%Y-%m-%d") "\n")
-          (insert "% This file can be used with both LaTeX and Org documents\n\n"))
-        (message "Created project bibliography: %s" bib-file))
-    (message "Not currently visiting a project.")))
+;; (defun ar/setup-project-bibliography ()
+;;   "Create a references.bib file in the project root if it doesn't exist.
+;; This bibliography file can be used with both LaTeX and Org documents."
+;;   (interactive)
+;;   (if-let* ((root (projectile-acquire-root))
+;;             (bib-file (expand-file-name "references.bib" root)))
+;;       (if (file-exists-p bib-file)
+;;           (message "Bibliography already exists: %s" bib-file)
+;;         (with-temp-file bib-file
+;;           (insert "% Bibliography for " (file-name-nondirectory (directory-file-name root)) "\n")
+;;           (insert "% Created: " (format-time-string "%Y-%m-%d") "\n")
+;;           (insert "% This file can be used with both LaTeX and Org documents\n\n"))
+;;         (message "Created project bibliography: %s" bib-file))
+;;     (message "Not currently visiting a project.")))
 
 #+end_src
 
@@ -6210,8 +5752,8 @@ This bibliography file can be used with both LaTeX and Org documents."
   :init (setq-default adaptive-wrap-extra-indent 0))
 #+end_src
 
-** TODO Core AUCTeX
-*add preview-auto.el from https://github.com/ultronozm/preview-auto.el*
+** Core AUCTeX
+TODO: =add preview-auto.el from https://github.com/ultronozm/preview-auto.el=
 #+begin_src emacs-lisp
 (use-package tex
   :defer t
@@ -6288,8 +5830,8 @@ This bibliography file can be used with both LaTeX and Org documents."
                             (cons #'texmathp fill-nobreak-predicate))))))
 #+end_src
 
-** TODO Flymake Integration
-*Replace with flycheck*
+** Flymake Integration
+TODO: =Replace with flycheck=
 #+begin_src emacs-lisp
 ;; (with-eval-after-load 'tex
 ;;   (with-eval-after-load 'flymake
@@ -6357,7 +5899,7 @@ This bibliography file can be used with both LaTeX and Org documents."
 #+end_src
 
 ** TeX Folding
-*add preview-auto.el from https://github.com/ultronozm/preview-auto.el*
+
 #+begin_src emacs-lisp
 (use-package tex-fold
   :ensure nil
@@ -6425,67 +5967,68 @@ This bibliography file can be used with both LaTeX and Org documents."
 #+end_src
 
 ** Bibliography Management
+TODO: Uncomment when Project Management is setup
 #+begin_src emacs-lisp
-(use-package citeproc :defer t)
-
-(use-package citar
-  :defer t
-  :init
-  (setq citar-bibliography '("~/references.bib")
-        citar-library-paths '("~/Zotero/storage")
-        citar-symbols
-        `((file ,(nerd-icons-mdicon "nf-md-file_document") . " ")
-          (note ,(nerd-icons-mdicon "nf-md-note_text") . " ")
-          (link ,(nerd-icons-mdicon "nf-md-link") . " ")))
-
-  (defun ar/citar-set-local-bibliography ()
-    "Set buffer-local bibliography from project."
-    (when-let ((bibs (ar/get-project-bibliographies)))
-      (setq-local citar-bibliography bibs)
-      (setq-local org-cite-global-bibliography bibs)))
-
-  (add-hook 'LaTeX-mode-hook #'ar/citar-set-local-bibliography)
-  (add-hook 'org-mode-hook #'ar/citar-set-local-bibliography)
-
-  :config
-  (with-eval-after-load 'oc
-    (setq org-cite-insert-processor 'citar
-          org-cite-follow-processor 'citar
-          org-cite-activate-processor 'citar)))
-
-(use-package citar-embark
-  :defer t
-  :after (citar embark)
-  :config
-  (citar-embark-mode)
-  (with-eval-after-load 'embark
-    (add-to-list 'embark-keymap-alist '(citar-reference . citar-embark-map))))
-
-(with-eval-after-load 'oc
-  (setq org-cite-global-bibliography
-        (ensure-list
-         (or (bound-and-true-p citar-bibliography)
-             (bound-and-true-p bibtex-completion-bibliography)))
-        org-cite-export-processors '((latex natbib) (t csl))
-        org-support-shift-select t)
-  (require 'oc-natbib))
-
-(with-eval-after-load 'org
-  (require 'oc-csl))
-
-(use-package reftex
-  :ensure nil
-  :after tex
-  :hook (LaTeX-mode . reftex-mode)
-  :custom
-  (reftex-plug-into-AUCTeX t)
-  (reftex-default-bibliography nil)
-  (reftex-toc-split-windows-horizontally t)
-  (reftex-toc-split-windows-fraction 0.2))
+; (use-package citeproc :defer t)
+;
+; (use-package citar
+;   :defer t
+;   :init
+;   (setq citar-bibliography '("~/references.bib")
+;         citar-library-paths '("~/Zotero/storage")
+;         citar-symbols
+;         `((file ,(nerd-icons-mdicon "nf-md-file_document") . " ")
+;           (note ,(nerd-icons-mdicon "nf-md-note_text") . " ")
+;           (link ,(nerd-icons-mdicon "nf-md-link") . " ")))
+;
+;   (defun ar/citar-set-local-bibliography ()
+;     "Set buffer-local bibliography from project."
+;     (when-let ((bibs (ar/get-project-bibliographies)))
+;       (setq-local citar-bibliography bibs)
+;       (setq-local org-cite-global-bibliography bibs)))
+;
+;   (add-hook 'LaTeX-mode-hook #'ar/citar-set-local-bibliography)
+;   (add-hook 'org-mode-hook #'ar/citar-set-local-bibliography)
+;
+;   :config
+;   (with-eval-after-load 'oc
+;     (setq org-cite-insert-processor 'citar
+;           org-cite-follow-processor 'citar
+;           org-cite-activate-processor 'citar)))
+;
+; (use-package citar-embark
+;   :defer t
+;   :after (citar embark)
+;   :config
+;   (citar-embark-mode)
+;   (with-eval-after-load 'embark
+;     (add-to-list 'embark-keymap-alist '(citar-reference . citar-embark-map))))
+;
+; (with-eval-after-load 'oc
+;   (setq org-cite-global-bibliography
+;         (ensure-list
+;          (or (bound-and-true-p citar-bibliography)
+;              (bound-and-true-p bibtex-completion-bibliography)))
+;         org-cite-export-processors '((latex natbib) (t csl))
+;         org-support-shift-select t)
+;   (require 'oc-natbib))
+;
+; (with-eval-after-load 'org
+;   (require 'oc-csl))
+;
+; (use-package reftex
+;   :ensure nil
+;   :after tex
+;   :hook (LaTeX-mode . reftex-mode)
+;   :custom
+;   (reftex-plug-into-AUCTeX t)
+;   (reftex-default-bibliography nil)
+;   (reftex-toc-split-windows-horizontally t)
+;   (reftex-toc-split-windows-fraction 0.2))
 #+end_src
 
-** TODO Fast LaTeX Input
-*Use doom emacs configuration*
+** Fast LaTeX Input
+TODO: =Use doom emacs configuration=
 #+begin_src emacs-lisp
 ;; (use-package cdlatex
 ;;   :defer t
@@ -6539,8 +6082,8 @@ This bibliography file can be used with both LaTeX and Org documents."
 ;;   (define-key cdlatex-mode-map [(control return)] nil))
 #+end_src
 
-** TODO Preview LaTeX
-*Determine the difference between this preview package and preview-auto from https://github.com/ultronozm/preview-auto.el*
+** Preview LaTeX
+TODO: =Determine the difference between this preview package and preview-auto from https://github.com/ultronozm/preview-auto.el=
 #+begin_src emacs-lisp
 (use-package preview
   :ensure nil
@@ -6612,7 +6155,7 @@ This bibliography file can be used with both LaTeX and Org documents."
 #+end_src
 
 ** TODO Completions: LSP + AUCTeX + Company Integration
-*Determine if still needed*
+=Determine=
 #+begin_src emacs-lisp
 ;; (use-package company :defer t)
 ;; (use-package company-math :defer t)
@@ -7177,6 +6720,7 @@ This bibliography file can be used with both LaTeX and Org documents."
 
 * Languages
 ** Nix
+TODO: =Deal with later=
 #+begin_src emacs-lisp
 (use-package nix-mode
   :defer t
@@ -7192,19 +6736,20 @@ This bibliography file can be used with both LaTeX and Org documents."
   :defer t
   :commands nix-update-fetch)
 
+;; TODO: Replace eglot with lsp-mode
 (with-eval-after-load 'eglot
   (add-to-list 'eglot-server-programs
                '((nix-mode nix-ts-mode) . ("nixd"))))
 
-
+;; TODO: Add flycheck
 (with-eval-after-load 'apheleia
   (add-to-list 'apheleia-formatters '(alejandra . ("alejandra" "-q" "-")))
   (setf (alist-get 'nix-mode apheleia-mode-alist) '(alejandra))
   (setf (alist-get 'nix-ts-mode apheleia-mode-alist) '(alejandra)))
 #+end_src
 
-** TODO Bash
-*Replace with lsp-mode*
+** Bash
+TODO: =Replace eglot with lsp-mode=
 #+begin_src emacs-lisp
 ;; (with-eval-after-load 'eglot
 ;;   (add-to-list 'eglot-server-programs
@@ -7214,8 +6759,8 @@ This bibliography file can be used with both LaTeX and Org documents."
 ;; (add-hook 'bash-ts-mode-hook #'eglot-ensure)
 #+end_src
 
-** TODO PlantUML
-*Deal with later*
+** PlantUML
+TODO: =Deal with later=
 #+begin_src emacs-lisp
 ;; (use-package plantuml-mode
 ;;   :defer t
@@ -7467,8 +7012,8 @@ This bibliography file can be used with both LaTeX and Org documents."
 
 #+end_src
 
-** TODO C/C++
-*Deal with later*
+** C/C++
+TODO: =Deal with later=
 #+begin_src emacs-lisp
 ;; (with-eval-after-load 'eglot
 ;;   (add-to-list 'eglot-server-programs
@@ -7491,8 +7036,8 @@ This bibliography file can be used with both LaTeX and Org documents."
 ;;   (add-to-list 'auto-mode-alist '("\\.cmake\\'"         . cmake-ts-mode)))
 #+end_src
 
-** TODO Python
-*Replace with lsp-mode and flycheck*
+** Python
+TODO: =Add flycheck=
 #+begin_src emacs-lisp
 (use-package lsp-pyrefly
   :vc (:url "https://github.com/indigoviolet/lsp-pyrefly")
@@ -7511,20 +7056,22 @@ This bibliography file can be used with both LaTeX and Org documents."
   (setf (alist-get 'python-ts-mode apheleia-mode-alist)
         '(ruff-isort ruff)))
 
+;; TODO: Add flycheck
 (with-eval-after-load 'dap-mode
   (require 'dap-python)
   (setq dap-python-debugger 'debugpy))
 #+end_src
 
 ** kdl
+TODO: =Deal with later=
 #+begin_src emacs-lisp
 ;; (use-package kdl-mode
 ;;   :straight (:host github :repo "taquangtrung/emacs-kdl-mode")
 ;;   :mode "\\.kdl\\'")
 #+end_src
 
-** TODO yaml
-*Deal with later*
+** yaml
+TODO: =Replace eglot with lsp-mode=
 #+begin_src emacs-lisp
 ;; (use-package yaml-pro
 ;;   :hook ((yaml-ts-mode . yaml-pro-ts-mode)))
@@ -7540,7 +7087,7 @@ This bibliography file can be used with both LaTeX and Org documents."
 ;;   (setf (alist-get 'yaml-ts-mode apheleia-mode-alist) '(prettier)))
 #+end_src
 
-** TODO KBD
+** KBD
 *Deal with later*
 #+begin_src emacs-lisp
 ;; (use-package kbd-mode
@@ -7616,34 +7163,35 @@ We map all Markdown files to =gfm-mode= and configure native rendering features.
     (setf (alist-get 'gfm-mode apheleia-mode-alist) '(prettierd))
     (setf (alist-get 'markdown-mode apheleia-mode-alist) '(prettierd)))
 
-  ;; ==========================================
-  ;; FLYCHECK (Linting via Markdownlint-CLI2 + LSP)
-  ;; ==========================================
-  (with-eval-after-load 'flycheck
-    (flycheck-define-checker markdown-markdownlint-cli2
-      "A Markdown syntax and style checker using markdownlint-cli2."
-      :command ("markdownlint-cli2" source-original)
-      :error-patterns
-      ((warning line-start
-                (file-name) ":" line ":" column " "
-                (id (one-or-more (not (any " ")))) " "
-                (message (one-or-more (not (any "\n"))))
-                line-end))
-      :modes (markdown-mode gfm-mode))
+  ;; TODO Renable when setting up flycheck
+  ;; ;; ==========================================
+  ;; ;; FLYCHECK (Linting via Markdownlint-CLI2 + LSP)
+  ;; ;; ==========================================
+  ;; (with-eval-after-load 'flycheck
+  ;;   (flycheck-define-checker markdown-markdownlint-cli2
+  ;;     "A Markdown syntax and style checker using markdownlint-cli2."
+  ;;     :command ("markdownlint-cli2" source-original)
+  ;;     :error-patterns
+  ;;     ((warning line-start
+  ;;               (file-name) ":" line ":" column " "
+  ;;               (id (one-or-more (not (any " ")))) " "
+  ;;               (message (one-or-more (not (any "\n"))))
+  ;;               line-end))
+  ;;     :modes (markdown-mode gfm-mode))
 
-    (add-to-list 'flycheck-checkers 'markdown-markdownlint-cli2)
+  ;;   (add-to-list 'flycheck-checkers 'markdown-markdownlint-cli2)
 
-    ;; THE DEFINITIVE FIX FOR "lsp is not a valid syntax checker":
-    ;; lsp-mode registers the `lsp` checker dynamically via `lsp-diagnostics-flycheck-enable`
-    ;; ONLY when an LSP server connects to a buffer. If we try to chain `lsp` globally
-    ;; before that happens, Flycheck throws an error because `lsp` isn't in its registry yet.
-    ;; By explicitly requiring `lsp-diagnostics` and calling the enable function here,
-    ;; we force the `lsp` checker to register immediately, making it safe to chain.
-    ;; (This exact same logic fixes Python/Ruff/Mypy chaining issues).
-    (with-eval-after-load 'lsp-mode
-      (require 'lsp-diagnostics)
-      (lsp-diagnostics-flycheck-enable)
-      (flycheck-add-next-checker 'lsp 'markdown-markdownlint-cli2)))
+  ;;   ;; THE DEFINITIVE FIX FOR "lsp is not a valid syntax checker":
+  ;;   ;; lsp-mode registers the `lsp` checker dynamically via `lsp-diagnostics-flycheck-enable`
+  ;;   ;; ONLY when an LSP server connects to a buffer. If we try to chain `lsp` globally
+  ;;   ;; before that happens, Flycheck throws an error because `lsp` isn't in its registry yet.
+  ;;   ;; By explicitly requiring `lsp-diagnostics` and calling the enable function here,
+  ;;   ;; we force the `lsp` checker to register immediately, making it safe to chain.
+  ;;   ;; (This exact same logic fixes Python/Ruff/Mypy chaining issues).
+  ;;   (with-eval-after-load 'lsp-mode
+  ;;     (require 'lsp-diagnostics)
+  ;;     (lsp-diagnostics-flycheck-enable)
+  ;;     (flycheck-add-next-checker 'lsp 'markdown-markdownlint-cli2)))
 
   ;; ==========================================
   ;; O(1) MARKDOWN APPEAR ENGINE
@@ -8238,7 +7786,7 @@ Automatically generates and updates a Table of Contents based on headings.
     "f r" '(consult-recent-file :wk "Recent files")
     "f s" '(save-buffer :wk "Save file")
     "f S" '(write-file :wk "Save as")
-    "f p" '(ar/open-emacs-config-project :wk "Config project")
+    ;; "f p" '(ar/open-emacs-config-project :wk "Config project")
     "f E" '(sudo-edit :wk "Sudo edit")
     "f l" '(reload-init-file :wk "Reload config")
     "f e" '(:ignore t :wk "emacs")
@@ -8308,23 +7856,24 @@ Automatically generates and updates a Table of Contents based on headings.
     "w _" '(split-window-vertically-instead :wk "Split vertically instead")
     "w |" '(split-window-horizontally-instead :wk "Split horizontally instead"))
 
+  ;; TODO: Replace with Projectile alternative
   ;; Project operations (SPC p)
-  (ar/global-leader
-    "p" '(:ignore t :wk "project")
-    "p p" '(ar/project-switch-to-file :wk "Switch project → find file")
-    "p P" '(ar/project-switch-with-menu :wk "Switch project (menu)")
-    "p f" '(projectile-find-file :wk "Find file in project")
-    "p s" '(consult-ripgrep :wk "Search project")
-    "p b" '(projectile-switch-to-buffer :wk "Project buffers")
-    "p k" '(projectile-kill-buffers :wk "Kill project buffers")
-    "p c" '(projectile-compile-project :wk "Compile project")
-    "p d" '(projectile-dired :wk "Dired project root")
-    "p e" '(projectile-run-eshell :wk "Eshell in project")
-    "p t" '(ar/treemacs-toggle :wk "Toggle treemacs (current project)")
-    "p i" '(projectile-invalidate-cache :wk "Invalidate cache")
-    "p r" '(projectile-replace :wk "Replace in project")
-    "p R" '(projectile-replace-regexp :wk "Replace regexp in project")
-    "p a" '(projectile-add-known-project :wk "Add known project"))
+  ;; (ar/global-leader
+  ;;   "p" '(:ignore t :wk "project")
+  ;;   "p p" '(ar/project-switch-to-file :wk "Switch project → find file")
+  ;;   "p P" '(ar/project-switch-with-menu :wk "Switch project (menu)")
+  ;;   "p f" '(projectile-find-file :wk "Find file in project")
+  ;;   "p s" '(consult-ripgrep :wk "Search project")
+  ;;   "p b" '(projectile-switch-to-buffer :wk "Project buffers")
+  ;;   "p k" '(projectile-kill-buffers :wk "Kill project buffers")
+  ;;   "p c" '(projectile-compile-project :wk "Compile project")
+  ;;   "p d" '(projectile-dired :wk "Dired project root")
+  ;;   "p e" '(projectile-run-eshell :wk "Eshell in project")
+  ;;   "p t" '(ar/treemacs-toggle :wk "Toggle treemacs (current project)")
+  ;;   "p i" '(projectile-invalidate-cache :wk "Invalidate cache")
+  ;;   "p r" '(projectile-replace :wk "Replace in project")
+  ;;   "p R" '(projectile-replace-regexp :wk "Replace regexp in project")
+  ;;   "p a" '(projectile-add-known-project :wk "Add known project"))
 
 
   ;; Toggle operations (SPC t)
@@ -8512,42 +8061,43 @@ Automatically generates and updates a Table of Contents based on headings.
    "C-=" 'text-scale-increase
    "C--" 'text-scale-decrease)
 
-  (ar/global-leader
-    ;; Core perspective management (SPC TAB)
-    "TAB"     '(:ignore t :wk "perspective")
-    "TAB TAB" '(persp-switch :wk "Switch/create perspective")
-    "TAB n"   '(persp-next :wk "Next perspective")
-    "TAB p"   '(persp-prev :wk "Previous perspective")
-    "TAB `"   '(ar/persp-switch-last :wk "Last perspective")
-    "TAB r"   '(persp-rename :wk "Rename perspective")
-    "TAB k"   '(persp-kill :wk "Kill perspective")
-    "TAB K"   '(ar/persp-kill-others :wk "Kill other perspectives")
+  ;; TODO Replace with persp-mode alternative
+  ;; (ar/global-leader
+  ;;   ;; Core perspective management (SPC TAB)
+  ;;   "TAB"     '(:ignore t :wk "perspective")
+  ;;   "TAB TAB" '(persp-switch :wk "Switch/create perspective")
+  ;;   "TAB n"   '(persp-next :wk "Next perspective")
+  ;;   "TAB p"   '(persp-prev :wk "Previous perspective")
+  ;;   "TAB `"   '(ar/persp-switch-last :wk "Last perspective")
+  ;;   "TAB r"   '(persp-rename :wk "Rename perspective")
+  ;;   "TAB k"   '(persp-kill :wk "Kill perspective")
+  ;;   "TAB K"   '(ar/persp-kill-others :wk "Kill other perspectives")
 
-    ;; Buffer management within perspectives
-    "TAB b"   '(persp-switch-to-buffer :wk "Switch to buffer")
-    "TAB B"   '(switch-to-buffer :wk "Switch buffer (all persp)")
-    "TAB a"   '(persp-add-buffer :wk "Add buffer")
-    "TAB A"   '(ar/persp-set-buffer :wk "Set buffer (remove from others)")
-    "TAB i"   '(persp-import-buffers :wk "Import buffer from perspective")
-    "TAB x"   '(persp-remove-buffer :wk "Remove buffer")
-    "TAB X"   '(ar/persp-kill-other-buffers :wk "Kill other buffers")
+  ;;   ;; Buffer management within perspectives
+  ;;   "TAB b"   '(persp-switch-to-buffer :wk "Switch to buffer")
+  ;;   "TAB B"   '(switch-to-buffer :wk "Switch buffer (all persp)")
+  ;;   "TAB a"   '(persp-add-buffer :wk "Add buffer")
+  ;;   "TAB A"   '(ar/persp-set-buffer :wk "Set buffer (remove from others)")
+  ;;   "TAB i"   '(persp-import-buffers :wk "Import buffer from perspective")
+  ;;   "TAB x"   '(persp-remove-buffer :wk "Remove buffer")
+  ;;   "TAB X"   '(ar/persp-kill-other-buffers :wk "Kill other buffers")
 
-    ;; IBuffer integration
-    "TAB m"   '(ar/persp-ibuffer :wk "IBuffer (perspective-filtered)")
+  ;;   ;; IBuffer integration
+  ;;   "TAB m"   '(ar/persp-ibuffer :wk "IBuffer (perspective-filtered)")
 
-    ;; State management
-    "TAB s"   '(:ignore t :wk "state")
-    "TAB s s" '(persp-save-state-to-file :wk "Save state")
-    "TAB s l" '(persp-load-state-from-file :wk "Load/restore state")
+  ;;   ;; State management
+  ;;   "TAB s"   '(:ignore t :wk "state")
+  ;;   "TAB s s" '(persp-save-state-to-file :wk "Save state")
+  ;;   "TAB s l" '(persp-load-state-from-file :wk "Load/restore state")
 
-    ;; Project integration
-    "TAB P"   '(:ignore t :wk "project")
-    "TAB P s" '(ar/persp-project-switch :wk "Switch project + perspective")
-    "TAB P p" '(ar/persp-project-perspective :wk "Perspective for project")
-    "TAB P k" '(ar/persp-project-kill :wk "Kill project + perspective")
+  ;;   ;; Project integration
+  ;;   "TAB P"   '(:ignore t :wk "project")
+  ;;   "TAB P s" '(ar/persp-project-switch :wk "Switch project + perspective")
+  ;;   "TAB P p" '(ar/persp-project-perspective :wk "Perspective for project")
+  ;;   "TAB P k" '(ar/persp-project-kill :wk "Kill project + perspective")
 
-    ;; Utilities
-    "TAB l"   '(ar/persp-list-all-buffers :wk "List all buffers/perspectives"))
+  ;;   ;; Utilities
+  ;;   "TAB l"   '(ar/persp-list-all-buffers :wk "List all buffers/perspectives"))
 
   ;; Macro operations (SPC @)
   (ar/global-leader
@@ -8761,3 +8311,16 @@ Automatically generates and updates a Table of Contents based on headings.
     "x p" '(org-set-property :wk "Set property")
     "x t" '(org-set-tags-command :wk "Set tags")))
 #+end_src
+
+* Remaining Work
+This section just contains checkboxes with stuff that still needs to be done for the whole emacs configuration
+
+- [ ] add a doom emacs style keybinding with SPC as leader in general.el for =org-babel-remove-result-one-or-many=
+- [ ] remove flycheck for now since messing with org-mode editing
+- [ ] customize org-agenda-finalize to customize org-agenda buffer
+- [ ] Setup automatic pair generation for '**', '==', etc and make sure the cursor in insert mode is placed in the middle
+
+* Questions
+This section raises questions if some features, capabilities, etc can be achieved in emacs in general.
+
+- [ ] Can org-level variation can only work for certain file and/or org buffers?

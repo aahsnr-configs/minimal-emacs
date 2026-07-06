@@ -17,8 +17,11 @@
 - [ ] orderless only matches letters next to each other; I dont want that
 - [ ] add keybindings for embark
 - [ ] add lsp-ltex-plus
+- [ ] `Important`: Write a test org-mode file to practice all the writing practices in org buffers. Then determine what and how to optimize the writing workflow.
 - [ ] lsp-mode ideas: 1. how would code lens be useful in python programming
 - [ ] I also need interactive custom functions for .dir-locals.el
 - [ ] `Important`: When working on development tools, after finalizing development tools main section, ask qwen to review the completion framework again to make sure if there are any overlapping configurations that need to be integrated with each other like vertico, cape and corfu.
 - [ ] `Important`: For both Completion Framework and Development Tools sections, use doom emacs keybindings whereever possible.
 - [ ] `Important`: Determine all the related packages that are integrated together in the whole emacs config.
+- [ ] `Urgent`: Update project-state.md file with the following additions: 1. Keep track of TODO, NOTE, etc. keywords in the source code block itself; 2. Keep track of all the NOTE keywords anywhere they appear. 3. Also keep track of tasks that still needs to be done from the Remaining Work section near the end of file. This section just contains checkboxes. 4. Also keep track of questions from the Questions sections near end of file. 5. Keep track of TODO, NOTE, etc. keywords in areas other than org headers and org source code blocks, in other words, in general org text
+- [ ] `Important`: add denote-explore package

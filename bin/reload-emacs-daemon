@@ -1,5 +1,5 @@
 #!/bin/bash
 emacs --batch --eval "(require 'org)" --eval '(org-babel-tangle-file "~/.config/emacs/config.org")'
-killall emacs
+emacsclient -e "(kill-emacs)"
 killall emacs
 emacs --daemon
