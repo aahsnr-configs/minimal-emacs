@@ -9,10 +9,6 @@
 Foundational layer of the config: bootstrap sequence, package management, performance tuning, session persistence, and cross-platform env normalization. Tuned for Emacs 30/31 — responsive, OS-safe, and stutter-free under heavy IDE workloads (LSP, Tree-sitter).
 
 ** DONE Lexical Binding
-** Emacs Lisp Configuration Notes
-
-** Emacs Lisp Configuration Notes
-
 Lexical binding is a strict requirement for modern Emacs Lisp. Unlike dynamic binding, it scopes variables to their enclosing block, enabling closures, preventing variable-bleeding bugs, and letting the byte-compiler generate faster, optimized code.
 
 The =no-byte-compile: t= header directive stops Emacs from prematurely compiling this tangled file before =compile-angel= registers its exclusion rules.
@@ -50,6 +46,8 @@ This section initializes the built-in *package.el* system. It configures the sta
 ;; this step and preventing network latency from blocking Emacs startup.
 (unless package-archive-contents
   (package-refresh-contents))
+
+(setq package-quickstart t)
 
 ;; Bootstrap `no-littering` to manage Emacs file paths cleanly.
 ;; This must happen before any other packages are loaded so they respect
@@ -648,6 +646,7 @@ Configures the window title bar to display the current buffer name cleanly. The 
       icon-title-format frame-title-format)
 #+end_src
 
+
 * Vim Emulation
 ** Undo Fu
 #+begin_src emacs-lisp
@@ -927,6 +926,7 @@ Configures the window title bar to display the current buffer name cleanly. The 
   (define-key evil-normal-state-map "o" #'ar/evil-open-below-smart)
   (define-key evil-normal-state-map "O" #'ar/evil-open-above-smart))
 #+end_src
+
 
 * Editor Behaviour
 ** Child Frame
@@ -1691,6 +1691,7 @@ and sets up vim-style navigation."
       ("?" "Dispatch" magit-dispatch)
       ("<escape>" "" transient-quit-one :format " ")]]))
 #+end_src
+
 
 * Org Mode
 ** Dynamic Directory Structure
@@ -2582,6 +2583,7 @@ If the file does not exist, creates it. Returns the full path."
 
 ;; (add-hook 'org-mode-hook 'org-appear-mode)
 #+end_src
+
 
 * Second Brain & Productivity
 ** Denote Directory
@@ -3626,10 +3628,7 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
   )
 #+end_src
 
-
-
 ** TODO Project Management
-
 ** DONE iBuffer
 Ibuffer is the advanced buffer list manager. We configure it to hide empty filter groups (keeping the UI clean) and redefine the size column to display human-readable sizes (e.g., =1.2M=). It is integrated with =nerd-icons= for visual flair and =ibuffer-projectile= to automatically group all open buffers by their respective Projectile projects.
 
@@ -3756,6 +3755,7 @@ Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. W
     [drag-mouse-1] #'treemacs-dragleftclick-action))
 #+end_src
 
+** TODO Workspaces
 
 
 * Completion Framework
@@ -4696,18 +4696,225 @@ buffer killing or garbage collection cycles."
 #+end_src
 
 * Development Tools
-** DONE Direnv
-=envrc= integrates =direnv= into Emacs, applying project-specific environment variables on a strict per-buffer basis. This guarantees environment isolation across multiple simultaneously open projects, preventing variable leakage that occurs with global environment mutation.
-
-To ensure mathematical safety and seamless integration with modern IDE workflows (specifically =lsp-mode= and =org-babel= with Jupyter kernels), several architectural gaps in the default =envrc= behavior are patched:
-
-1. *Hook Timing (The LSP Race Condition):* By default, =envrc= hooks into =after-change-major-mode-hook=, which runs *after* major mode hooks. If an LSP client initializes inside a major mode hook, it spawns with the global Emacs environment rather than the project-specific =.envrc= environment. Initialization is moved to =change-major-mode-after-body-hook= to guarantee the environment is fully resolved before LSP servers spawn. The teardown logic is patched to safely remove the hook from both locations when the mode is disabled.
-2. *Org Babel Environment Propagation (Jupyter Support):* Org Babel subprocesses natively inherit the global Emacs environment, ignoring buffer-local =envrc= variables. While upstream =envrc= advises the low-level =org-babel-eval= function, Jupyter kernel initialization occurs *before* that shell evaluation step. An =:around= advice is applied to the higher-level =org-babel-execute-src-block= using =envrc-propagate-environment=, ensuring that Jupyter kernels and persistent sessions inherit the exact project environment (e.g., =VIRTUAL_ENV=, =PATH=) of the buffer they reside in.
-3. *Graceful Degradation (Missing Executable Guard):* If Emacs is opened in an environment where the =direnv= binary is missing (e.g., minimal Docker containers or remote TRAMP connections), =envrc-global-mode= will spam the =*Messages*= buffer and cause UI micro-stutters. A =:before-while= advice silently aborts mode activation if =executable-find= fails to locate the binary.
-4. *Internal Buffer Debouncing:* When =envrc= encounters an error, it outputs logs to the =*envrc*= buffer. Switching focus to this log buffer can trigger redundant =envrc--update= evaluations. A string-prefix guard prevents =envrc= from evaluating its own internal log buffers, avoiding feedback loops.
-5. *LSP Server Restart on Reload:* Modifying and reloading a =.envrc= file updates the buffer's environment variables, but leaves running LSP servers attached to the stale environment. An =:after= advice on the internal =envrc--update-env= function intercepts standard reloads. Additionally, because the bulk =envrc-reload-all= command bypasses this internal function and clears the cache directly, a secondary =:after= advice is applied to =envrc-reload-all= to catch this vector and restart all unique =lsp-mode= workspaces.
+** Language Server Protocol
 
 #+begin_src emacs-lisp
+(use-package lsp-mode
+  :defer t
+  :hook (prog-mode . lsp-deferred)
+  :init
+  ;; TODO Use a doom emacs prefix and use all lsp keybindings under that prefix. Use all the same keybindings in doom emacs for lsp-mode.
+  (setq lsp-keymap-prefix "C-c l")
+  :custom
+  ;; --- UI & Functionality Enhancements ---
+  (lsp-semantic-tokens-enable t)
+  (lsp-headerline-breadcrumb-enable t)
+  (lsp-lens-enable t)
+  (lsp-modeline-diagnostics-enable t)
+
+  ;; --- Diagnostics & Completion Integration ---
+  ;; TODO Uncomment this when setting up flycheck
+  ;;(lsp-diagnostics-provider :flycheck)
+  (lsp-completion-provider :none)
+
+  ;; --- Performance & Behavior ---
+  (lsp-eldoc-render-all nil)
+  (lsp-idle-delay 0.2)
+  (lsp-log-io nil)
+  (lsp-signature-render-documentation nil))
+
+(use-package lsp-ui
+  :defer t
+  :after lsp-mode
+  :commands lsp-ui-mode
+  :hook (lsp-mode . lsp-ui-mode)
+  :custom
+  (lsp-ui-doc-position 'at-point)
+  (lsp-ui-doc-show-with-mouse nil)
+  (lsp-ui-sideline-show-diagnostics t)
+  (lsp-ui-sideline-show-hover t)
+  (lsp-ui-sideline-show-code-actions t)
+  (lsp-ui-sideline-delay 0.2)
+  :custom-face
+  (lsp-ui-doc-background ((t (:background "#1e2030"))))
+  (lsp-ui-doc-header ((t (:foreground "#7aa2f7" :weight bold))))
+  (lsp-ui-sideline-background ((t (:background "#1e2030")))))
+#+end_src
+
+
+
+** Transient Menu
+#+begin_src emacs-lisp
+(with-eval-after-load 'transient
+  (defun ar/devtools-title ()
+    (concat
+     (if (fboundp 'nerd-icons-faicon)
+         (nerd-icons-faicon "nf-fa-laptop_code" :face 'transient-heading :v-adjust 0.02)
+       "")
+     (propertize " Development Tools" 'face 'transient-heading)))
+
+  (transient-define-prefix ar/toggles-devtools ()
+    "Development Tools Dashboard"
+    [:description ar/devtools-title
+
+     ;; Group 1: LSP Code Actions
+     ["Actions"
+      ("a" "Code Action" eglot-code-actions)
+      ("r" "Rename Symb" eglot-rename)
+      ("f" "Frmt Buf" apheleia-format-buffer)
+      ("i" "Org Imports" eglot-code-action-organize-imports)
+      ("h" "Toggle Hint" eglot-inlay-hints-mode :transient t :if (lambda () (fboundp 'eglot-inlay-hints-mode)))
+      ("R" "Reconn LSP" eglot-reconnect)]
+
+     ;; Group 2: Navigation & Lookup
+     ["Navigate"
+      ("d" "Define" xref-find-definitions)
+      ("D" "Refer" xref-find-references)
+      ("t" "Type Def" eglot-find-typeDefinition)
+      ("I" "Implem" eglot-find-implementation)
+      ("A" "Apropos" xref-find-apropos)
+      ("." "Go Back" xref-go-back)]
+
+     ;; Group 3: Search & Outline
+     ["Search"
+      ("s" "LSP Symbols" consult-eglot-symbols)
+      ("o" "Outline" consult-outline)
+      ("m" "Imenu" consult-imenu)
+      ("M" "Imenu Multi" consult-imenu-multi)
+      ("l" "Search Line" consult-line)]
+
+     ;; Group 4: Error Management
+     ["Diagn"
+      ("n" "Next Err" ar/flymake-next-error :transient t)
+      ("p" "Prev Err" ar/flymake-prev-error :transient t)
+      ("e" "Buf Err" flymake-show-buffer-diagnostics)
+      ("E" "Proj Err" consult-flymake)
+      ("!" "Check" flymake-start :transient t)]
+
+     ;; Group 5: Code Folding
+     ["Folding"
+      ("TAB" "Toggle" treesit-fold-toggle :transient t)
+      ("O" "Open All" treesit-fold-open-all :transient t)
+      ("C" "Close All" treesit-fold-close-all :transient t)
+      ("v" "Vim Toggle" vimish-fold-toggle :transient t)]
+
+     ;; Group 6: Documentation
+     ["Docs"
+      ("k" "Hover Box" eldoc-box-help-at-point :transient t)
+      ("K" "Echo Doc" eldoc)
+      ("?" "Info Man" consult-info)
+      ("M" "Man Page" woman)
+      ("<escape>" "" transient-quit-one :format " ")]]))
+#+end_src
+
+
+** Formatting
+#+begin_src emacs-lisp
+(use-package apheleia
+  :hook (after-init . apheleia-global-mode)
+  :custom
+  (apheleia-log-only-errors t))
+#+end_src
+
+** Debug Adapter Protocol
+TODO: =Replace Dape with dap-mode=
+
+#+begin_src emacs-lisp
+;; (use-package dape
+;;   :defer t
+;;   :hook
+;;   ;; Save breakpoints on quit
+;;   (kill-emacs . dape-breakpoint-save)
+;;   ;; Load breakpoints on startup
+;;   (after-init . dape-breakpoint-load)
+
+;;   :custom
+;;   (dape-breakpoint-global-mode +1)
+;;   (dape-buffer-window-arrangement 'right)
+
+;;   :config
+
+;;   (add-hook 'dape-display-source-hook #'pulse-momentary-highlight-one-line)
+;;   (add-hook 'dape-start-hook (lambda () (save-some-buffers t t)))
+;;   (add-hook 'dape-repl-mode-hook #'hide-mode-line-mode)
+;;   (add-hook 'dape-compile-hook #'kill-buffer)
+
+;;   (with-eval-after-load 'transient
+;;     (defun ar/dape-title ()
+;;       (concat
+;;        (if (fboundp 'nerd-icons-codicon)
+;;            (nerd-icons-codicon "nf-cod-debug" :face 'transient-heading :v-adjust 0.02)
+;;          "")
+;;        (propertize " Debug" 'face 'transient-heading)))
+
+;;     (transient-define-prefix ar/toggles-dape ()
+;;       "Debugger"
+;;       [:description ar/dape-title
+;;                     ["Stepping"
+;;                      ("n" "next" dape-next :transient t)
+;;                      ("s" "step in" dape-step-in :transient t)
+;;                      ("o" "step out" dape-step-out :transient t)
+;;                      ("c" "continue" dape-continue :transient t)
+;;                      ("p" "pause" dape-pause :transient t)
+;;                      ("r" "restart" dape-restart :transient t)]
+
+;;                     ["Switch"
+;;                      ("m" "memory" dape-memory :transient t)
+;;                      ("t" "thread" dape-select-thread :transient t)
+;;                      ("w" "watch" dape-watch-dwim :transient t)
+;;                      ("s" "stack" dape-select-stack :transient t)
+;;                      ("i" "info" dape-info :transient t)
+;;                      ("r" "repl" dape-repl :transient t)]
+
+;;                     ["Breakpoints"
+;;                      ("b" "toggle" dape-breakpoint-toggle :transient t)
+;;                      ("l" "log" dape-breakpoint-log :transient t)
+;;                      ("e" "expression" dape-breakpoint-expression :transient t)
+;;                      ("B" "clear" dape-breakpoint-remove-all :transient t)]
+
+;;                     ["Debug"
+;;                      ("d" "dape" dape :transient t)
+;;                      ("D" "disconnect" dape-disconnect-quit)
+;;                      ("k" "kill" dape-kill)
+;;                      ("Q" "quit" dape-quit)
+;;                      ("<escape>" "" transient-quit-one :format " ")]]))
+;;   )
+#+end_src
+
+#+begin_src emacs-lisp
+(use-package dap-mode
+  :defer t
+  :config
+  (setq dap-auto-configure-features '(sessions locals controls tooltip)))
+#+end_src
+
+** Syntax Checking
+*Replace flymake with flycheck*
+=flycheck and lsp-mode diagnostics must work together=
+#+begin_src emacs-lisp
+;; (use-package flycheck
+;;   :config
+;;   (add-hook 'after-init-hook #'global-flycheck-mode))
+
+;; (with-eval-after-load 'flycheck
+;;   (setq flycheck-disabled-checkers (cons 'org-lint flycheck-disabled-checkers)))
+
+;; (use-package flycheck-posframe
+;;   :after flycheck
+;;   :config (add-hook 'flycheck-mode-hook #'flycheck-posframe-mode))
+#+end_src
+
+** DONE Direnv
+=envrc= enforces strict per-buffer =direnv= isolation. Upstream patches for IDE integration:
+
+- *LSP Race:* Shift init to =change-major-mode-after-body-hook= so LSPs spawn in project env, avoiding global fallback.
+- *Jupyter:* Advise =org-babel-execute-src-block= (bypassing late =org-babel-eval=) to inject buffer vars into kernels pre-init.
+- *Missing Binary:* =:before-while= on =envrc-global-mode= uses =executable-find= to silently abort in TRAMP/Docker, preventing log spam.
+- *Log Loop:* Prefix guard skips =envrc--update= on =*envrc*= buffers, breaking recursive eval feedback loops.
+- *LSP Sync:* =:after= advice on =envrc--update-env= and =envrc-reload-all= restarts =lsp-mode= workspaces on =.envrc= reloads to purge stale envs.
+
+   #+begin_src emacs-lisp
+
 (use-package envrc
   :hook (after-init . envrc-global-mode)
   :config
@@ -4806,211 +5013,7 @@ To ensure mathematical safety and seamless integration with modern IDE workflows
                      (length lsp-servers))))))))
 #+end_src
 
-** Language Server Protocol
 
-#+begin_src emacs-lisp
-(use-package lsp-mode
-  :defer t
-  :commands (lsp lsp-deferred)
-  :hook (prog-mode . lsp-deferred)
-  :init
-  ;; TODO Use a doom emacs prefix and use all lsp keybindings under that prefix. Use all the same keybindings in doom emacs for lsp-mode.
-  (setq lsp-keymap-prefix "C-c l")
-  :custom
-  ;; --- UI & Functionality Enhancements ---
-  (lsp-semantic-tokens-enable t)
-  (lsp-headerline-breadcrumb-enable t)
-  (lsp-lens-enable t)
-  (lsp-modeline-diagnostics-enable t)
-
-  ;; --- Diagnostics & Completion Integration ---
-  ;; TODO Uncomment this when setting up flycheck
-  ;;(lsp-diagnostics-provider :flycheck)
-  (lsp-completion-provider :none)
-
-  ;; --- Performance & Behavior ---
-  (lsp-eldoc-render-all nil)
-  (lsp-idle-delay 0.2)
-  (lsp-log-io nil)
-  (lsp-signature-render-documentation nil))
-
-(use-package lsp-ui
-  :defer t
-  :after lsp-mode
-  :commands lsp-ui-mode
-  :hook (lsp-mode . lsp-ui-mode)
-  :custom
-  (lsp-ui-doc-position 'at-point)
-  (lsp-ui-doc-show-with-mouse nil)
-  (lsp-ui-sideline-show-diagnostics t)
-  (lsp-ui-sideline-show-hover t)
-  (lsp-ui-sideline-show-code-actions t)
-  (lsp-ui-sideline-delay 0.2)
-  :custom-face
-  (lsp-ui-doc-background ((t (:background "#1e2030"))))
-  (lsp-ui-doc-header ((t (:foreground "#7aa2f7" :weight bold))))
-  (lsp-ui-sideline-background ((t (:background "#1e2030")))))
-#+end_src
-
-** TODO Syntax Checking
-*Replace flymake with flycheck*
-=flycheck and lsp-mode diagnostics must work together=
-#+begin_src emacs-lisp
-;; (use-package flycheck
-;;   :config
-;;   (add-hook 'after-init-hook #'global-flycheck-mode))
-
-;; (with-eval-after-load 'flycheck
-;;   (setq flycheck-disabled-checkers (cons 'org-lint flycheck-disabled-checkers)))
-
-;; (use-package flycheck-posframe
-;;   :after flycheck
-;;   :config (add-hook 'flycheck-mode-hook #'flycheck-posframe-mode))
-#+end_src
-
-** Formatting
-#+begin_src emacs-lisp
-(use-package apheleia
-  :hook (after-init . apheleia-global-mode)
-  :custom
-  (apheleia-log-only-errors t))
-#+end_src
-
-** Debug Adapter Protocol
-TODO: =Replace Dape with dap-mode=
-
-#+begin_src emacs-lisp
-;; (use-package dape
-;;   :defer t
-;;   :hook
-;;   ;; Save breakpoints on quit
-;;   (kill-emacs . dape-breakpoint-save)
-;;   ;; Load breakpoints on startup
-;;   (after-init . dape-breakpoint-load)
-
-;;   :custom
-;;   (dape-breakpoint-global-mode +1)
-;;   (dape-buffer-window-arrangement 'right)
-
-;;   :config
-
-;;   (add-hook 'dape-display-source-hook #'pulse-momentary-highlight-one-line)
-;;   (add-hook 'dape-start-hook (lambda () (save-some-buffers t t)))
-;;   (add-hook 'dape-repl-mode-hook #'hide-mode-line-mode)
-;;   (add-hook 'dape-compile-hook #'kill-buffer)
-
-;;   (with-eval-after-load 'transient
-;;     (defun ar/dape-title ()
-;;       (concat
-;;        (if (fboundp 'nerd-icons-codicon)
-;;            (nerd-icons-codicon "nf-cod-debug" :face 'transient-heading :v-adjust 0.02)
-;;          "")
-;;        (propertize " Debug" 'face 'transient-heading)))
-
-;;     (transient-define-prefix ar/toggles-dape ()
-;;       "Debugger"
-;;       [:description ar/dape-title
-;;                     ["Stepping"
-;;                      ("n" "next" dape-next :transient t)
-;;                      ("s" "step in" dape-step-in :transient t)
-;;                      ("o" "step out" dape-step-out :transient t)
-;;                      ("c" "continue" dape-continue :transient t)
-;;                      ("p" "pause" dape-pause :transient t)
-;;                      ("r" "restart" dape-restart :transient t)]
-
-;;                     ["Switch"
-;;                      ("m" "memory" dape-memory :transient t)
-;;                      ("t" "thread" dape-select-thread :transient t)
-;;                      ("w" "watch" dape-watch-dwim :transient t)
-;;                      ("s" "stack" dape-select-stack :transient t)
-;;                      ("i" "info" dape-info :transient t)
-;;                      ("r" "repl" dape-repl :transient t)]
-
-;;                     ["Breakpoints"
-;;                      ("b" "toggle" dape-breakpoint-toggle :transient t)
-;;                      ("l" "log" dape-breakpoint-log :transient t)
-;;                      ("e" "expression" dape-breakpoint-expression :transient t)
-;;                      ("B" "clear" dape-breakpoint-remove-all :transient t)]
-
-;;                     ["Debug"
-;;                      ("d" "dape" dape :transient t)
-;;                      ("D" "disconnect" dape-disconnect-quit)
-;;                      ("k" "kill" dape-kill)
-;;                      ("Q" "quit" dape-quit)
-;;                      ("<escape>" "" transient-quit-one :format " ")]]))
-;;   )
-#+end_src
-
-#+begin_src emacs-lisp
-(use-package dap-mode
-  :defer t
-  :config
-  (setq dap-auto-configure-features '(sessions locals controls tooltip)))
-#+end_src
-
-** Transient Menu
-#+begin_src emacs-lisp
-(with-eval-after-load 'transient
-  (defun ar/devtools-title ()
-    (concat
-     (if (fboundp 'nerd-icons-faicon)
-         (nerd-icons-faicon "nf-fa-laptop_code" :face 'transient-heading :v-adjust 0.02)
-       "")
-     (propertize " Development Tools" 'face 'transient-heading)))
-
-  (transient-define-prefix ar/toggles-devtools ()
-    "Development Tools Dashboard"
-    [:description ar/devtools-title
-
-     ;; Group 1: LSP Code Actions
-     ["Actions"
-      ("a" "Code Action" eglot-code-actions)
-      ("r" "Rename Symb" eglot-rename)
-      ("f" "Frmt Buf" apheleia-format-buffer)
-      ("i" "Org Imports" eglot-code-action-organize-imports)
-      ("h" "Toggle Hint" eglot-inlay-hints-mode :transient t :if (lambda () (fboundp 'eglot-inlay-hints-mode)))
-      ("R" "Reconn LSP" eglot-reconnect)]
-
-     ;; Group 2: Navigation & Lookup
-     ["Navigate"
-      ("d" "Define" xref-find-definitions)
-      ("D" "Refer" xref-find-references)
-      ("t" "Type Def" eglot-find-typeDefinition)
-      ("I" "Implem" eglot-find-implementation)
-      ("A" "Apropos" xref-find-apropos)
-      ("." "Go Back" xref-go-back)]
-
-     ;; Group 3: Search & Outline
-     ["Search"
-      ("s" "LSP Symbols" consult-eglot-symbols)
-      ("o" "Outline" consult-outline)
-      ("m" "Imenu" consult-imenu)
-      ("M" "Imenu Multi" consult-imenu-multi)
-      ("l" "Search Line" consult-line)]
-
-     ;; Group 4: Error Management
-     ["Diagn"
-      ("n" "Next Err" ar/flymake-next-error :transient t)
-      ("p" "Prev Err" ar/flymake-prev-error :transient t)
-      ("e" "Buf Err" flymake-show-buffer-diagnostics)
-      ("E" "Proj Err" consult-flymake)
-      ("!" "Check" flymake-start :transient t)]
-
-     ;; Group 5: Code Folding
-     ["Folding"
-      ("TAB" "Toggle" treesit-fold-toggle :transient t)
-      ("O" "Open All" treesit-fold-open-all :transient t)
-      ("C" "Close All" treesit-fold-close-all :transient t)
-      ("v" "Vim Toggle" vimish-fold-toggle :transient t)]
-
-     ;; Group 6: Documentation
-     ["Docs"
-      ("k" "Hover Box" eldoc-box-help-at-point :transient t)
-      ("K" "Echo Doc" eldoc)
-      ("?" "Info Man" consult-info)
-      ("M" "Man Page" woman)
-      ("<escape>" "" transient-quit-one :format " ")]]))
-#+end_src
 
 * Treesitter/Folding
 ** Treesit
@@ -5089,6 +5092,7 @@ NOTE: =check with doom-emacs modules=
   :config (global-evil-vimish-fold-mode))
 #+end_src
 
+
 * Highlight TODOs
 ** hl-todo
 #+begin_src emacs-lisp
@@ -5142,7 +5146,7 @@ NOTE: =check with doom-emacs modules=
       (add-to-list 'consult-preview-allowed-hooks 'global-hl-todo-mode))))
 #+end_src
 
-**  flycheck-todo
+** flycheck-todo
 TODO: Uncomment when setting up flycheck
 #+begin_src emacs-lisp
 ;; (use-package flycheck-hl-todo
@@ -5252,6 +5256,7 @@ TODO: Uncomment when setting up flycheck
   (setq rainbow-latex-colors t))
 #+end_src
 
+
 * Delimiters
 ** show-paren-mode
 #+begin_src emacs-lisp
@@ -5354,6 +5359,8 @@ TODO: Uncomment when setting up flycheck
    '(rainbow-delimiters-depth-8-face ((t (:foreground "#f7768e"))))
    '(rainbow-delimiters-depth-9-face ((t (:foreground "#7aa2f7"))))))
 #+end_src
+
+
 
 * Indentations
 ** Indent Bars
@@ -5609,6 +5616,7 @@ PLIST keys:
 ;; Hook into file opening
 (add-hook 'find-file-hook #'ar/file-templates-check)
 #+end_src
+
 
 * LaTeX Writing Environment
 ** Utility Functions
@@ -6229,9 +6237,11 @@ TODO: =Determine the difference between this preview package and preview-auto fr
   (setf (alist-get 'bibtex-mode apheleia-mode-alist) '(bibtex-tidy)))
 #+end_src
 
+
 * Which Key
 #+begin_src emacs-lisp
 (use-package which-key
+  :ensure nil
   :defer t
   :hook (after-init . which-key-mode)
   :custom
@@ -6240,7 +6250,8 @@ TODO: =Determine the difference between this preview package and preview-auto fr
   (which-key-popup-type 'minibuffer))
 #+end_src
 
-* TODO Terminal
+
+* Terminal
 *Replace eshell-mode with term from doom emacs modules*
 
 * Prettify Symbols
@@ -6718,6 +6729,7 @@ TODO: =Determine the difference between this preview package and preview-auto fr
 (add-hook 'org-src-mode-hook #'my/org-babel-setup-prettify)
 #+end_src
 
+
 * Languages
 ** Nix
 TODO: =Deal with later=
@@ -6737,9 +6749,9 @@ TODO: =Deal with later=
   :commands nix-update-fetch)
 
 ;; TODO: Replace eglot with lsp-mode
-(with-eval-after-load 'eglot
-  (add-to-list 'eglot-server-programs
-               '((nix-mode nix-ts-mode) . ("nixd"))))
+;; (with-eval-after-load 'eglot
+;;   (add-to-list 'eglot-server-programs
+;;                '((nix-mode nix-ts-mode) . ("nixd"))))
 
 ;; TODO: Add flycheck
 (with-eval-after-load 'apheleia
@@ -7102,21 +7114,13 @@ TODO: =Replace eglot with lsp-mode=
 #+end_src
 
 ** Markdown
-
-This section configures Emacs as a modern, high-performance Markdown editor.
-Instead of relying on base =markdown-mode=, we exclusively use =gfm-mode= (GitHub Flavored Markdown) to ensure native support for modern syntax like intra-word underscores, strikethroughs, and task lists.
-
-We integrate three external tools to create a "batteries-included" IDE experience for writing:
-1. =marksman= (via =lsp-mode= and =lsp-marksman=): Provides structural diagnostics (broken links, missing headings) and completions.
-2. =markdownlint-cli2= (via =flycheck=): Enforces stylistic rules (line length, heading increments) alongside LSP diagnostics.
-3. =prettierd= (via =apheleia=): Provides lightning-fast, asynchronous formatting on save.
-
-*Architectural Note on Rendering:* This configuration relies on =markdown-mode='s native =markdown-hide-markup= combined with a custom, O(1) =ar/markdown-appear-mode=. This minor mode acts as a "smart interceptor" on the =post-command-hook=, using C-level text-property boundary scanning to instantly reveal raw markup when your cursor touches it, and delegating the re-hiding to =font-lock-flush= when you leave. This guarantees zero typing lag and mathematically prevents visual desyncs.
+Configures a high-perf Markdown IDE via =gfm-mode= for native GFM syntax (intra-word underscores, strikethroughs, task lists). Toolchain:
+- =marksman= (=lsp-mode=): Structural diagnostics (links/headings) + completions.
+- =markdownlint-cli2= (=flycheck=): Stylistic linting (line length, heading increments).
+- =prettierd= (=apheleia=): Async format-on-save.
 
 *** Core Configuration & Appear Mode
-
-We map all Markdown files to =gfm-mode= and configure native rendering features. The O(1) Appear engine is defined here and hooked into =gfm-mode=.
-
+Maps Markdown to =gfm-mode= with native rendering. Defines and hooks the O(1) Appear engine into =gfm-mode=.
 #+begin_src emacs-lisp
 (use-package markdown-mode
   :defer t
@@ -7250,9 +7254,7 @@ We map all Markdown files to =gfm-mode= and configure native rendering features.
 #+end_src
 
 *** Markdown TOC
-
-Automatically generates and updates a Table of Contents based on headings.
-
+Auto-generates and syncs heading-derived TOC.
 #+begin_src emacs-lisp
 (use-package markdown-toc
   :defer t
@@ -7262,6 +7264,7 @@ Automatically generates and updates a Table of Contents based on headings.
   (setq markdown-toc-header-toc-title "\n## Table of Contents"
         markdown-toc-user-toc-structure-manipulation-fn 'cdr))
 #+end_src
+
 
 * Study
 ** PDF Tools
@@ -7712,7 +7715,6 @@ Automatically generates and updates a Table of Contents based on headings.
 #+end_src
 
 * AI/LLM
-
 * General Keybindings
 #+begin_src emacs-lisp
 (use-package general

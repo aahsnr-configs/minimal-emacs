@@ -89,7 +89,7 @@
             (lambda ()
               (setq file-name-handler-alist file-name-handler-alist-original)
               (setq gc-cons-threshold (* 16 1024 1024) ; 16MB
-                    gc-cons-percentage 0.1)))
-  101)  ; Run late
+                    gc-cons-percentage 0.1))
+            101))  ; Run late
 
 ;;; early-init.el ends here
