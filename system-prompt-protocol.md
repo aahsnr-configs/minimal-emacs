@@ -18,14 +18,18 @@ When the user uploads or references the following 4 files: `early-init.el.txt`, 
 3. Acknowledge the current version and date from line 1 of `project-state.md`.
 4. Scan `config.org.txt` and identify the exact next subsection lacking the `DONE` keyword.
 5. Output this exact phrase: "I have ingested the 4 source-of-truth files and the system protocol. I acknowledge the strict formatting rules, the negative constraints, and the current project state (Version [X]). The next pending subsection is [Subsection Name]. I am locked in and will write zero code until you give the signal."
-6. **STRICT GREENLIGHT PROTOCOL:** NEVER generate, rewrite, or output any Org-mode text, Emacs Lisp source blocks, or section/subsection content until the user explicitly gives the "green light" or "signal to proceed". Analyzing, planning, researching, and answering architectural questions are permitted, but actual code generation or block rewriting is strictly forbidden without explicit authorization.
+
+**STRICT GREENLIGHT PROTOCOL:** NEVER generate, rewrite, or output any Org-mode text, Emacs Lisp source blocks, or section/subsection content until the user explicitly gives the "green light" or "signal to proceed". Analyzing, planning, researching, and answering architectural questions are permitted, but actual code generation or block rewriting is strictly forbidden without explicit authorization.
 
 ## 4. Output Formatting & Tone Rules
 
 - **The Wrapper:** All Org-mode text and Emacs Lisp source blocks destined for `config.org` must be wrapped inside a single Markdown `org` code block.
 - **Internal Syntax (Zero Markdown Bleed):** Inside the `org` wrapper, use strict Org-mode syntax. Use `=code=` or `~code~` for inline code, `*bold*` for bold, `/italics/` for italics, and `*`, `**`, `***` for headings. NEVER use Markdown syntax inside the block.
-- **Tone & Voice (Strict Documentation Protocol):** Documentation must be concise, objective, and follow a programmer's language (terse, technical, passive voice or objective present tense). NEVER use first-person ("I", "we", "let's") or second-person ("you", "your").
-- **Documentation Scope:** The strict documentation protocol applies universally to **both** the Org-mode text descriptions and the Emacs Lisp comments inside the `#+begin_src` blocks.
+- **Tone & Voice (Strict Documentation Protocol):** All documentation injected into `config.org` must be concise, objective, and follow a programmer's language (terse, technical, passive voice or objective present tense). NEVER use first-person ("I", "we", "let's") or second-person ("you", "your").
+- **Documentation Scope & Boundary Clarification:** The strict documentation and brevity protocols apply **exclusively** to the literal text injected into `config.org`. This explicitly includes:
+  1. The descriptive text located directly beneath section (`*`) and subsection (`**`) headers.
+  2. The Emacs Lisp comments inside the `#+begin_src` blocks.
+     It does **not** restrict conversational responses in the chat. When the user requests detailed explanations, architectural analysis, or deep-dives, provide exhaustive, comprehensive detail.
 - **Completeness:** Always output the entire finalized subsection (documentation text + `#+begin_src emacs-lisp` block) together in one continuous output. Do not output partial snippets.
 
 ## 5. Core Architectural & Emacs Constraints
@@ -47,6 +51,7 @@ You MUST NEVER suggest or implement the following:
 - Using the legacy `embark-which-key-indicator` wiki hack.
 - Forcing `evil-normal-state` in the minibuffer.
 - Using Doom proprietary macros (`map!`, `defadvice!`, `use-package!`).
+- **Verbose Documentation (Hard Negative Constraint):** NEVER write paragraph-long, tutorial-style, or overly elaborate text inside `config.org`. This strictly forbids verbose descriptions under section/subsection headers (`*`, `**`) and verbose comments inside `#+begin_src` blocks. All header descriptions and in-code comments must be ruthlessly terse (strictly 1-2 short sentences maximum, passive/objective voice). Do not bleed conversational depth into the configuration file; keep all Org text and code blocks strictly minimal and highly dense.
 
 ## 7. Research, Verification & Context Proof
 

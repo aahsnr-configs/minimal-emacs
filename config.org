@@ -535,6 +535,7 @@ Configures core =simple.el= behaviors, modeline indicators, whitespace managemen
         word-wrap-by-category t))
 #+end_src
 
+
 ** DONE Setup User
 Centralizes user identity variables for Git commits, Org-mode exports, and automated tooling.
 
@@ -542,6 +543,7 @@ Centralizes user identity variables for Git commits, Org-mode exports, and autom
 (setq user-full-name "Ahsanur Rahman"
       user-mail-address "ahsanur041@proton.me")
 #+end_src
+
 
 ** DONE Title
 Configures the window and icon title bars to display the current buffer name using the =%b= format specifier.
@@ -554,43 +556,63 @@ Configures the window and icon title bars to display the current buffer name usi
 
 * TODO Vim Emulation
 
-** TODO Undo Fu
+** DONE Undo Fu
+Linear undo/redo engine with persistent session history. Replaces branching undo to prevent history corruption. Routes state to =var/undo-fu-session/= via =no-littering=, excludes encrypted and transient files to prevent metadata leakage, hashes deep paths to bypass 255-character OS limits, and applies conditional =zstd=/=gzip= compression.
 #+begin_src emacs-lisp
-(use-package undo-fu :defer t)
+(use-package undo-fu
+  :defer t)
 
 (use-package undo-fu-session
-  :commands undo-fu-session-global-mode
-  :hook (after-init . undo-fu-session-global-mode))
+  :hook (elpaca-after-init . undo-fu-session-global-mode)
+  :custom
+  ;; Route persistent undo history to the no-littering var directory.
+  (undo-fu-session-directory (no-littering-expand-var-directory-name "undo-fu-session/"))
+  ;; Exclude encrypted and transient Git files to prevent metadata leakage and I/O errors.
+  ;; Strict \\' regex anchors prevent false positives on directory names.
+  (undo-fu-session-incompatible-files '("\\.gpg\\'" "/COMMIT_EDITMSG\\'" "/git-rebase-todo\\'"))
+  :config
+  ;; Conditional compression: prefer zstd for near-instantaneous I/O, fallback to gzip.
+  (setq undo-fu-session-compression
+        (cond ((executable-find "zstd") 'zst)
+              ((executable-find "gzip") 'gz)
+              (t nil)))
+  ;; Hash long filenames to prevent OS 255-character path limit crashes.
+  ;; Official API: `undo-fu-session-make-file-name-function` (introduced in v0.7).
+  (defun ar/undo-fu-session-hash-path (file ext)
+    "Safely hash FILE to bypass OS 255-char limits, appending EXT."
+    (let ((backup-directory-alist `((".*" . ,undo-fu-session-directory))))
+      (concat (make-backup-file-name-1 file) ext)))
+  (setq undo-fu-session-make-file-name-function #'ar/undo-fu-session-hash-path))
 #+end_src
 
 
-** TODO Goto Chg
+** DONE Goto Chg
+Tracks text mutations (Changelist) orthogonal to the Jump List. Powers Evil's native =COUNT=-aware =g;= and =g,= temporal navigation.
 #+begin_src emacs-lisp
 (use-package goto-chg
   :defer t
-  :after evil
   :commands (goto-last-change goto-last-change-reverse)
-  :config
-  (evil-define-key 'normal 'global (kbd "g;") 'goto-last-change)
-  (evil-define-key 'normal 'global (kbd "g,") 'goto-last-change-reverse))
+  :custom
+  ;; Spatial threshold to group micro-edits into logical navigation blocks.
+  (glc-default-span 16))
 #+end_src
 
 
-** TODO Evil
-TODO =How do I get history evil commands in the echo area like doom emacs?=
+** DONE Evil
+Core Vim emulation engine. Provides modal editing, operator-pending motions, and ex commands. Configured for strict Vim parity, state-dependent cursor shapes, and native minibuffer history cycling. Foundational dependency; loaded synchronously to prevent downstream keybinding voids.
 #+begin_src emacs-lisp
 (use-package evil
+  :ensure (:wait t)
   :demand t
   :init
-  ;; Core Settings
+  ;; Core Settings (Must be set before load)
   (setq evil-want-integration t
         evil-want-keybinding nil
         evil-want-minibuffer t
-        evil-mode-line-format nil ; COMMENT Don't turn this on
+        evil-mode-line-format nil
         evil-kbd-macro-suppress-motion-error t
         evil-symbol-word-search t
         evil-kill-on-visual-paste nil)
-
   ;; Extended Keybindings Configuration
   (setq evil-want-C-g-bindings t
         evil-want-C-i-jump nil
@@ -599,8 +621,14 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
         evil-want-C-w-delete t
         evil-want-Y-yank-to-eol t
         evil-want-abbrev-expand-on-insert-exit nil
-        evil-respect-visual-line-mode nil)
-
+        evil-respect-visual-line-mode nil
+        ;; Load-order fix: Must be in :init to register before keymap generation.
+        evil-want-C-h-delete t)
+  ;; State-Dependent Cursor Shapes
+  (setq evil-normal-state-cursor '(box)
+        evil-insert-state-cursor '(bar)
+        evil-visual-state-cursor '(hollow)
+        evil-replace-state-cursor '(underline))
   :custom
   (evil-ex-visual-char-range t)
   (evil-ex-search-vim-style-regexp t)
@@ -609,73 +637,84 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
   (evil-echo-state nil)
   (evil-move-cursor-back nil)
   (evil-v$-excludes-newline t)
-  (evil-want-C-h-delete t)
-  (evil-want-C-u-delete t)
   (evil-want-fine-undo t)
-  (evil-move-beyond-eol t)
+  ;; Vim Parity: Prevent cursor from moving past EOL.
+  (evil-move-beyond-eol nil)
   (evil-search-wrap t)
   (select-enable-clipboard t)
   (evil-visual-update-x-selection-p nil)
-
   ;; Search Improvements
   (evil-ex-search-case 'smart)
   (evil-ex-search-incremental t)
   (evil-ex-search-highlight-all t)
-
   :config
   (evil-mode 1)
-
-  ;; Correctly select the search module and the search engine
   (evil-select-search-module 'evil-search-module 'evil-search)
-
   (setq-default evil-shift-width tab-width)
-
-  ;; Smart Visual Line Navigation
-  (define-key evil-motion-state-map "j" 'evil-next-visual-line)
-  (define-key evil-motion-state-map "k" 'evil-previous-visual-line)
-  (define-key evil-motion-state-map "gj" 'evil-next-line)
-  (define-key evil-motion-state-map "gk" 'evil-previous-line)
-
-  ;; === Robust Minibuffer Escape Logic =====
-  (defun ar/minibuffer-escape-quit ()
-    "Abort recursive edit (minibuffer) on Escape, overriding Evil states."
-    (interactive)
-    (abort-recursive-edit))
-
-  (defun ar/setup-minibuffer-escape ()
-    "Setup Escape to quit in the minibuffer."
-    ;; Bind in the standard local map
-    (local-set-key [escape] #'ar/minibuffer-escape-quit)
-    ;; Forcefully override Evil's local state maps if Evil is active.
-    ;; This ensures ESC quits instead of switching to Normal state.
-  (when (bound-and-true-p evil-local-mode)
-    (evil-local-set-key 'insert [escape] #'ar/minibuffer-escape-quit)
-    (evil-local-set-key 'normal [escape] #'ar/minibuffer-escape-quit)
-    (evil-local-set-key 'visual [escape] #'ar/minibuffer-escape-quit)
-    (evil-local-set-key 'replace [escape] #'ar/minibuffer-escape-quit)))
-
-;; Apply via hook to ensure it catches every minibuffer instance
-(add-hook 'minibuffer-setup-hook #'ar/setup-minibuffer-escape)
-
-;; Also handle Evil's Ex command line (:)
-(when (boundp 'evil-ex-completion-map)
-  (define-key evil-ex-completion-map [escape] #'ar/minibuffer-escape-quit))
-
-;; Better Initial States
-(evil-set-initial-state 'messages-buffer-mode 'normal)
-(evil-set-initial-state 'dashboard-mode 'normal))
+  ;; Ex & Search History Cycling (Arrow Keys & Emacs bindings)
+  (dolist (keymap (list evil-ex-completion-map evil-ex-search-keymap))
+    (define-key keymap (kbd "<up>") #'previous-history-element)
+    (define-key keymap (kbd "<down>") #'next-history-element)
+    (define-key keymap (kbd "C-p") #'previous-history-element)
+    (define-key keymap (kbd "C-n") #'next-history-element))
+  ;; Better Initial States
+  (evil-set-initial-state 'messages-buffer-mode 'normal)
+  (evil-set-initial-state 'dashboard-mode 'normal))
 #+end_src
 
 
-** TODO Evil Collection
+** DONE Evil Collection
+Injects standardized Vim bindings into non-text buffers. Enables Unimpaired bracket navigation and unified LSP reference jumping. Minibuffer integration is strictly omitted to protect the Vertico type-to-filter paradigm.
 #+begin_src emacs-lisp
 (use-package evil-collection
   :after evil
   :init
-  ;; It has to be defined before evil-colllection
-  (setq evil-collection-setup-minibuffer t)
+  ;; Enable Unimpaired bracket navigation (e.g., [e/]e for errors).
+  (setq evil-collection-want-unimpaired-p t)
+  ;; Standardize LSP/xref find-references bindings across all modes.
+  (setq evil-collection-want-find-usages-bindings-p t)
   :config
+  ;; Exclude `ediff` to prevent keymap collisions with the custom Transient Ediff block.
+  (setq evil-collection-mode-list (delete 'ediff evil-collection-mode-list))
+  ;; Initialize bindings. Minibuffer integration defaults to `nil`,
+  ;; protecting the Vertico type-to-filter paradigm.
   (evil-collection-init))
+#+end_src
+
+
+** DONE Evil Matchit
+Extends =%= motion to jump across semantic blocks (LaTeX, HTML, code).
+#+begin_src emacs-lisp
+(use-package evil-matchit
+  :after evil
+  :config
+  ;; Enable semantic block jumping.
+  (global-evil-matchit-mode 1))
+#+end_src
+
+
+** DONE Evil Commentary
+Provides =gc= and =gcc= operators via native APIs. Supersedes custom commenting logic.
+#+begin_src emacs-lisp
+(use-package evil-commentary
+  :after evil
+  :config
+  ;; Register gc/gcc operators.
+  (evil-commentary-mode 1))
+#+end_src
+
+
+** DONE Evil Multiedit
+Wraps =iedit= in a dedicated Evil state for localized multi-cursor refactoring.
+#+begin_src emacs-lisp
+(use-package evil-multiedit
+  :defer t
+  :commands (evil-multiedit-match-symbol-and-next
+             evil-multiedit-match-all
+             evil-multiedit-toggle-or-restrict-region)
+  :config
+  ;; Configure internal state navigation. Global bindings managed via general.el.
+  (evil-multiedit-default-keybinds))
 #+end_src
 
 
@@ -794,18 +833,6 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
 #+end_src
 
 
-** TODO Native Commenting Operator
-#+begin_src emacs-lisp
-;; The following code enables commenting and uncommenting by pressing gcc in normal mode and gc in visual mode.
-(with-eval-after-load "evil"
-  (evil-define-operator my-evil-comment-or-uncomment (beg end)
-    "Toggle comment for the region between BEG and END."
-    (interactive "<r>")
-    (comment-or-uncomment-region beg end))
-  (evil-define-key 'normal 'global (kbd "gc") 'my-evil-comment-or-uncomment))
-#+end_src
-
-
 ** TODO Smart Comment Continuation
 #+begin_src emacs-lisp
 (defcustom ar/evil-want-o/O-to-continue-comments t
@@ -849,6 +876,7 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
 
 
 * TODO Editor Behaviour
+- [ ] Determine if the order of the all these org blocks are correct.
 ** TODO Child Frame
 #+begin_src emacs-lisp
 (use-package posframe
@@ -875,6 +903,7 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
                2)))))
 #+end_src
 
+
 ** TODO Nerd Icons
 #+begin_src emacs-lisp
 (use-package nerd-icons
@@ -882,6 +911,62 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
   (nerd-icons-font-family "Symbols Nerd Font Mono")
   (nerd-icons-color-icons t))
 #+end_src
+
+
+** TODO Fonts
+#+begin_src emacs-lisp
+(defun ar/set-fonts ()
+  "Set the default, fixed-pitch, and variable-pitch fonts for the current frame."
+  (set-face-attribute 'default nil :font "JetBrains Mono" :height 125 :weight 'medium)
+  (set-face-attribute 'fixed-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
+  (set-face-attribute 'variable-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
+  ;; Apply italic slant to comments
+  (set-face-attribute 'font-lock-comment-face nil :slant 'italic)
+
+  ;; Apply BOTH Bold and Italic to keywords
+  (set-face-attribute 'font-lock-keyword-face nil :weight 'bold :slant 'italic))
+
+(if (daemonp)
+    (add-hook 'emacs-startup-hook
+              (lambda ()
+                (add-hook 'after-make-frame-functions
+                          (lambda (frame)
+                            (with-selected-frame frame (ar/set-fonts))))))
+  ;; For non-daemon mode, set fonts immediately (but skip in background batch mode)
+  (unless noninteractive
+    (ar/set-fonts)))
+
+;; Line spacing
+(setq-default line-spacing 0.02)
+
+;; Font settings
+(setq font-lock-maximum-decoration t
+      inhibit-compacting-font-caches t)
+#+end_src
+
+
+** TODO Doom Themes
+#+begin_src emacs-lisp
+(use-package doom-themes
+  :custom
+  (doom-themes-enable-bold t)
+  (doom-themes-enable-italic t)
+  (doom-themes-treemacs-theme "doom-atom")
+  :config
+  (load-theme 'doom-tokyo-night t)
+  (doom-themes-neotree-config)
+  (doom-themes-treemacs-config)
+  (doom-themes-org-config))
+#+end_src
+
+
+** TODO Solaire Mode
+#+begin_src emacs-lisp
+(use-package solaire-mode
+  :init
+  (solaire-global-mode +1))
+#+end_src
+
 
 ** TODO Transient
 #+begin_src emacs-lisp
@@ -975,7 +1060,15 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
       ("<escape>" "" transient-quit-one :format " ")]]))
 #+end_src
 
+
+** TODO Avy
+Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy is inherently mode-agnostic, its entry points are mapped to Vim-style mnemonic prefixes (e.g., =s= for character jumps, =g s= for two-character jumps, =g w= for word jumps) within Evil's motion state. This preserves strict Vim muscle memory and operator-pending compatibility (e.g., =d g s= to delete up to a jumped character) while bypassing the linear scanning overhead of native Vim motions.
+#+begin_src emacs-lisp
+#+end_src
+
+
 ** TODO Autorevert
+- [ ] What does autorevert do exactly
 #+begin_src emacs-lisp
 (use-package autorevert
   :defer t
@@ -983,7 +1076,9 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
   :hook (after-init . global-auto-revert-mode))
 #+end_src
 
+
 ** TODO Anzu
+- [ ] Do I need to anything with other isearch functionalities in the rest of the emacs config to work with anzu?
 #+begin_src emacs-lisp
 (use-package anzu
   :bind (([remap query-replace] . anzu-query-replace)
@@ -996,7 +1091,9 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
 (use-package evil-anzu :after evil)
 #+end_src
 
+
 ** TODO Automatic parenthesis pairing
+=Look at doom emacs module=
 #+begin_src emacs-lisp
 (use-package elec-pair
   :ensure nil
@@ -1004,15 +1101,108 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
   :init (setq electric-pair-inhibit-predicate 'electric-pair-conservative-inhibit))
 #+end_src
 
+
+** TODO show-paren-mode
+#+begin_src emacs-lisp
+(use-package paren
+  :ensure nil
+  :hook (after-init . show-paren-mode)
+  :custom
+  (show-paren-delay 0.05)
+  (show-paren-highlight-openparen t)
+  (show-paren-when-point-inside-paren t)
+  (show-paren-when-point-in-periphery t)
+  (show-paren-style 'parenthesis)
+  (show-paren-context-when-offscreen nil)
+
+  :config
+  ;; === CUSTOM ELDOC BACKEND FOR PARENTHESIS ===
+  (defun ar/paren-eldoc-offscreen-context (callback &rest _)
+    "Show off-screen parenthesis context in Echo Area via ElDoc."
+    (let* ((pos (point))
+           (match-pos nil)
+           (label nil)
+           (line-content nil)
+           (syntax-at (when (char-after pos) (char-syntax (char-after pos))))
+           (syntax-before (when (char-before pos) (char-syntax (char-before pos))))
+           ;; Default bounds are the whole buffer
+           (scan-beg (point-min))
+           (scan-end (point-max)))
+
+      ;; 0. ORG MODE FIX: Constrain search to current source block
+      (when (and (derived-mode-p 'org-mode)
+                 (org-in-src-block-p))
+        (let ((elem (org-element-at-point)))
+          (when elem
+            (setq scan-beg (org-element-property :begin elem))
+            (setq scan-end (org-element-property :end elem)))))
+
+      (save-restriction
+        ;; Safety check: Ensure bounds are valid numbers before narrowing
+        (when (and (numberp scan-beg) (numberp scan-end) (< scan-beg scan-end))
+          (narrow-to-region scan-beg scan-end))
+
+        ;; 1. FIND MATCHING POSITION
+        ;; Note: Comments below must not contain raw parens to avoid Org syntax issues
+        (cond
+         ;; Case A: At Opening Bracket
+         ((eq syntax-at ?\()
+          (setq match-pos (ignore-errors (scan-sexps pos 1)))
+          (when match-pos
+            (setq match-pos (1- match-pos))
+            (setq label "Closing: ")))
+
+         ;; Case B: At Closing Bracket (Evil/Block cursor)
+         ((eq syntax-at ?\))
+          (setq match-pos (ignore-errors (scan-sexps (1+ pos) -1)))
+          (setq label "Opening: "))
+
+         ;; Case C: After Closing Bracket (Standard Emacs)
+         ((eq syntax-before ?\))
+          (setq match-pos (ignore-errors (scan-sexps pos -1)))
+          (setq label "Opening: ")))
+
+        ;; 2. RETRIEVE CONTENT IF OFF-SCREEN
+        (when (and match-pos
+                   label
+                   (not (pos-visible-in-window-p match-pos)))
+          (with-current-buffer (current-buffer)
+            (save-excursion
+              (goto-char match-pos)
+              (setq line-content (string-trim (substring-no-properties (thing-at-point 'line t)))))))
+
+        ;; 3. DISPLAY
+        (when line-content
+          (funcall callback
+                   (concat
+                    (propertize label 'face '(:inherit shadow :weight bold))
+                    (propertize line-content 'face '(:inherit font-lock-keyword-face :weight bold))))))))
+
+  ;; Register with ElDoc (Priority -45) to avoid conflict with org-eldoc-drawer (-50)
+  ;; Positioned between drawer (-50) and heading-info (-40)
+  (add-hook 'eldoc-mode-hook
+            (lambda ()
+              (add-hook 'eldoc-documentation-functions #'ar/paren-eldoc-offscreen-context -45 t))))
+#+end_src
+
+
+** TODO Puni
+
+- [ ] Will this package be useful in the presence of evil-matchit or other evil packages?
+
+
 ** TODO Edit multiple regions simultaneously
+- [ ] Is there an existing evil related package that conflicts with iedit?
 #+begin_src emacs-lisp
 (use-package iedit :defer t)
 #+end_src
+
 
 ** TODO Sudo edit
 #+begin_src emacs-lisp
 (use-package sudo-edit :defer t)
 #+end_src
+
 
 ** TODO Subword: Handling capitalized subwords in a nomenclature
 #+begin_src emacs-lisp
@@ -1024,6 +1214,7 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
 #+end_src
 
 ** TODO Buffer Terminator
+- [ ] Will buffer-terminator be useful for my whole emacs configuration?
 #+begin_src emacs-lisp
 (use-package buffer-terminator
   :hook (after-init . buffer-terminator-mode)
@@ -1033,7 +1224,9 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
   (buffer-terminator-interval (* 10 60)))
 #+end_src
 
+
 ** TODO Helpful
+- [ ] How does doom emacs configure the helpful package and what keybinding does doom emacs have?
 #+begin_src emacs-lisp
 (use-package helpful
   :defer t
@@ -1052,6 +1245,7 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
   :custom
   (helpful-max-buffers 7))
 #+end_src
+
 
 ** TODO Jinx
 #+begin_src emacs-lisp
@@ -1086,8 +1280,10 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
       (write-region "" nil dict-file))))
 #+end_src
 
+
 ** TODO Stripspace
-*Look at doom emacs modules for inspiration*
+=Look at doom emacs modules for inspiration=
+- [ ] Do you think it is better to use any of the configuration settings for whitespace, dirt-indent and ws-bulter from =https://raw.githubusercontent.com/doomemacs/modules/refs/heads/main/modules/editor/whitespace/config.el= instead of using stripspace from below. I already have dirt-indent configured in under Indentation main section. You might as well review that dirt-indent config with stripspace subsection. You will review indent-bars subsection right after review dirt-indent config block
 #+begin_src emacs-lisp
 (use-package stripspace
   :commands stripspace-local-mode
@@ -1099,57 +1295,94 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
   (stripspace-restore-column t))
 #+end_src
 
-** TODO Fonts
+
+** TODO Dirt Indent
 #+begin_src emacs-lisp
-(defun ar/set-fonts ()
-  "Set the default, fixed-pitch, and variable-pitch fonts for the current frame."
-  (set-face-attribute 'default nil :font "JetBrains Mono" :height 125 :weight 'medium)
-  (set-face-attribute 'fixed-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
-  (set-face-attribute 'variable-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
-  ;; Apply italic slant to comments
-  (set-face-attribute 'font-lock-comment-face nil :slant 'italic)
-
-  ;; Apply BOTH Bold and Italic to keywords
-  (set-face-attribute 'font-lock-keyword-face nil :weight 'bold :slant 'italic))
-
-(if (daemonp)
-    (add-hook 'emacs-startup-hook
-              (lambda ()
-                (add-hook 'after-make-frame-functions
-                          (lambda (frame)
-                            (with-selected-frame frame (ar/set-fonts))))))
-  ;; For non-daemon mode, set fonts immediately (but skip in background batch mode)
-  (unless noninteractive
-    (ar/set-fonts)))
-
-;; Line spacing
-(setq-default line-spacing 0.02)
-
-;; Font settings
-(setq font-lock-maximum-decoration t
-      inhibit-compacting-font-caches t)
-#+end_src
-
-** TODO Doom Themes
-#+begin_src emacs-lisp
-(use-package doom-themes
-  :custom
-  (doom-themes-enable-bold t)
-  (doom-themes-enable-italic t)
-  (doom-themes-treemacs-theme "doom-atom")
+(use-package dtrt-indent
+  :defer t
   :config
-  (load-theme 'doom-tokyo-night t)
-  (doom-themes-neotree-config)
-  (doom-themes-treemacs-config)
-  (doom-themes-org-config))
+  (dtrt-indent-global-mode 1)
+  ;; Optional: Adjust verbosity
+  ;; 0 = silent, 1 = notify on change (default), 2 = explain why not changed, 3 = debug
+  (setq dtrt-indent-verbosity 1)
+  ;; Optional: Set minimum confidence threshold
+  ;; Only adjust if dtrt-indent is confident in its detection
+  (setq dtrt-indent-min-quality 80.0)
+
+  ;; Optional: Exclude certain modes where you want manual control
+  (setq dtrt-indent-mode-exclude-list '(org-mode)))
 #+end_src
 
-** TODO Solaire Mode
+
+** TODO Indent Bars
 #+begin_src emacs-lisp
-(use-package solaire-mode
-  :init
-  (solaire-global-mode +1))
+(use-package indent-bars
+  :defer t
+  :config
+  (require 'seq)
+
+  (setq indent-bars-treesit-support t
+        indent-bars-starting-column 0
+        indent-bars-no-descend-lists 'skip
+        indent-bars-color '(highlight :face-bg t :blend 0.185)
+        indent-bars-no-descend-string 'all
+        indent-bars-highlight-current-depth '(:face default :blend 0.85)
+        indent-bars-prefer-character t)
+
+  (defun ar/indent-bars-should-enable-p ()
+    "Return non-nil if indent-bars should be enabled in current buffer.
+Returns nil to block activation if any inhibiting condition is met."
+    (not (or
+          (frame-parameter nil 'parent-frame)
+          (bound-and-true-p org-indent-mode)
+          (string-prefix-p " *org-src-fontification:" (buffer-name))
+          (and (derived-mode-p 'org-mode)
+               (not (bound-and-true-p org-src-mode))))))
+
+  (defun ar/indent-bars-maybe-enable ()
+    "Enable indent-bars-mode if conditions are met."
+    (when (ar/indent-bars-should-enable-p)
+      (indent-bars-mode 1)))
+
+  (defun ar/indent-bars-fix-move-to-column (original-fn col &rest args)
+    "Prevent move-to-column from incorrectly handling display property newlines.
+When indent-bars uses display properties containing newlines on blank lines,
+move-to-column can incorrectly move past the visual line end, breaking Evil
+operators and other column-based navigation."
+    (if-let* (((bound-and-true-p indent-bars-mode))
+              ((bound-and-true-p indent-bars-display-on-blank-lines))
+              (line-end (line-end-position))
+              (display-prop (get-text-property line-end 'display))
+              ((seq-contains-p display-prop ?\n))
+              ((> col (- line-end (point)))))
+        (goto-char line-end)
+      (apply original-fn col args)))
+
+  (advice-add 'move-to-column :around #'ar/indent-bars-fix-move-to-column)
+
+  (with-eval-after-load 'magit-blame
+    (add-to-list 'magit-blame-disable-modes 'indent-bars-mode))
+
+  :hook ((prog-mode text-mode conf-mode yaml-mode) . ar/indent-bars-maybe-enable))
 #+end_src
+
+
+** TODO Rainbow Mode
+#+begin_src emacs-lisp
+(use-package rainbow-mode
+  :defer t
+  :hook ((prog-mode . rainbow-mode)
+         (LaTeX-mode . rainbow-mode)
+         (org-mode . rainbow-mode))
+  :config
+  (setq rainbow-html-colors t)
+  (setq rainbow-x-colors t)
+  (setq rainbow-latex-colors t))
+#+end_src
+
+#+RESULTS:
+
+
 
 ** TODO Modeline
 #+begin_src emacs-lisp
@@ -1181,6 +1414,7 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
         doom-modeline-vcs-max-length 0))
 #+end_src
 
+
 ** TODO Hide Modeline
 #+begin_src emacs-lisp
 (use-package hide-mode-line
@@ -1192,7 +1426,9 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
            pdf-annot-list-mode) . turn-on-hide-mode-line-mode)))
 #+end_src
 
+
 ** TODO Line Numbers
+- [ ] Does this conflict with any of my other configurations by any chance? Look at the whole configuration.
 #+begin_src emacs-lisp
 (use-package display-line-numbers
   :ensure nil
@@ -1203,6 +1439,7 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
   :init (setq display-line-numbers-width-start t))
 #+end_src
 
+
 ** TODO Display dividers between windows
 #+begin_src emacs-lisp
 (setq window-divider-default-places t
@@ -1211,13 +1448,17 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
 (add-hook 'window-setup-hook #'window-divider-mode)
 #+end_src
 
+
 ** TODO Text Scaling
+- [ ] Use a built-in text scaling feature if it is better
 #+begin_src emacs-lisp
 (use-package default-text-scale
   :hook (after-init . default-text-scale-mode))
 #+end_src
 
+
 ** TODO Scrolling
+- [ ] Use doom emacs module for smoother scrolling
 #+begin_src emacs-lisp
 ;; Scroll one line at a time (less "jumpy" than defaults)
 (setq hscroll-step 1
@@ -1242,6 +1483,7 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
 
 #+end_src
 
+
 ** TODO Highlight the current line
 #+begin_src emacs-lisp
 (use-package hl-line
@@ -1263,6 +1505,7 @@ TODO =How do I get history evil commands in the echo area like doom emacs?=
   (add-hook 'evil-visual-state-entry-hook #'ar/disable-hl-line-in-visual)
   (add-hook 'evil-visual-state-exit-hook #'ar/enable-hl-line-after-visual))
 #+end_src
+
 
 ** TODO Ediff
 #+begin_src emacs-lisp
@@ -1391,6 +1634,29 @@ and sets up vim-style navigation."
             (lambda ()
               (select-window (get-buffer-window ediff-control-buffer)))))
 #+end_src
+
+
+
+** TODO rainbow-delimiters
+#+begin_src emacs-lisp
+(use-package rainbow-delimiters
+  :defer t
+  :hook ((LaTeX-mode . rainbow-delimiters-mode)
+         (prog-mode . rainbow-delimiters-mode))
+  :config
+  (custom-set-faces
+   '(rainbow-delimiters-depth-1-face ((t (:foreground "#7aa2f7"))))
+   '(rainbow-delimiters-depth-2-face ((t (:foreground "#e0af68"))))
+   '(rainbow-delimiters-depth-3-face ((t (:foreground "#9ece6a"))))
+   '(rainbow-delimiters-depth-4-face ((t (:foreground "#1abc9c"))))
+   '(rainbow-delimiters-depth-5-face ((t (:foreground "#bb9af7"))))
+   '(rainbow-delimiters-depth-6-face ((t (:foreground "#9d7cd8"))))
+   '(rainbow-delimiters-depth-7-face ((t (:foreground "#ff9e64"))))
+   '(rainbow-delimiters-depth-8-face ((t (:foreground "#f7768e"))))
+   '(rainbow-delimiters-depth-9-face ((t (:foreground "#7aa2f7"))))))
+#+end_src
+
+
 
 
 * TODO Version Control
@@ -4674,71 +4940,6 @@ buffer killing or garbage collection cycles."
 
 
 
-** TODO Transient Menu
-#+begin_src emacs-lisp
-(with-eval-after-load 'transient
-  (defun ar/devtools-title ()
-    (concat
-     (if (fboundp 'nerd-icons-faicon)
-         (nerd-icons-faicon "nf-fa-laptop_code" :face 'transient-heading :v-adjust 0.02)
-       "")
-     (propertize " Development Tools" 'face 'transient-heading)))
-
-  (transient-define-prefix ar/toggles-devtools ()
-    "Development Tools Dashboard"
-    [:description ar/devtools-title
-
-     ;; Group 1: LSP Code Actions
-     ["Actions"
-      ("a" "Code Action" eglot-code-actions)
-      ("r" "Rename Symb" eglot-rename)
-      ("f" "Frmt Buf" apheleia-format-buffer)
-      ("i" "Org Imports" eglot-code-action-organize-imports)
-      ("h" "Toggle Hint" eglot-inlay-hints-mode :transient t :if (lambda () (fboundp 'eglot-inlay-hints-mode)))
-      ("R" "Reconn LSP" eglot-reconnect)]
-
-     ;; Group 2: Navigation & Lookup
-     ["Navigate"
-      ("d" "Define" xref-find-definitions)
-      ("D" "Refer" xref-find-references)
-      ("t" "Type Def" eglot-find-typeDefinition)
-      ("I" "Implem" eglot-find-implementation)
-      ("A" "Apropos" xref-find-apropos)
-      ("." "Go Back" xref-go-back)]
-
-     ;; Group 3: Search & Outline
-     ["Search"
-      ("s" "LSP Symbols" consult-eglot-symbols)
-      ("o" "Outline" consult-outline)
-      ("m" "Imenu" consult-imenu)
-      ("M" "Imenu Multi" consult-imenu-multi)
-      ("l" "Search Line" consult-line)]
-
-     ;; Group 4: Error Management
-     ["Diagn"
-      ("n" "Next Err" ar/flymake-next-error :transient t)
-      ("p" "Prev Err" ar/flymake-prev-error :transient t)
-      ("e" "Buf Err" flymake-show-buffer-diagnostics)
-      ("E" "Proj Err" consult-flymake)
-      ("!" "Check" flymake-start :transient t)]
-
-     ;; Group 5: Code Folding
-     ["Folding"
-      ("TAB" "Toggle" treesit-fold-toggle :transient t)
-      ("O" "Open All" treesit-fold-open-all :transient t)
-      ("C" "Close All" treesit-fold-close-all :transient t)
-      ("v" "Vim Toggle" vimish-fold-toggle :transient t)]
-
-     ;; Group 6: Documentation
-     ["Docs"
-      ("k" "Hover Box" eldoc-box-help-at-point :transient t)
-      ("K" "Echo Doc" eldoc)
-      ("?" "Info Man" consult-info)
-      ("M" "Man Page" woman)
-      ("<escape>" "" transient-quit-one :format " ")]]))
-#+end_src
-
-
 ** TODO Formatting
 #+begin_src emacs-lisp
 (use-package apheleia
@@ -4746,6 +4947,7 @@ buffer killing or garbage collection cycles."
   :custom
   (apheleia-log-only-errors t))
 #+end_src
+
 
 ** TODO Debug Adapter Protocol
 TODO: =Replace Dape with dap-mode=
@@ -4819,6 +5021,7 @@ TODO: =Replace Dape with dap-mode=
   (setq dap-auto-configure-features '(sessions locals controls tooltip)))
 #+end_src
 
+
 ** TODO Syntax Checking
 *Replace flymake with flycheck*
 =flycheck and lsp-mode diagnostics must work together=
@@ -4834,6 +5037,7 @@ TODO: =Replace Dape with dap-mode=
 ;;   :after flycheck
 ;;   :config (add-hook 'flycheck-mode-hook #'flycheck-posframe-mode))
 #+end_src
+
 
 ** TODO Direnv
 =envrc= enforces strict per-buffer =direnv= isolation. Upstream patches for IDE integration:
@@ -4946,7 +5150,10 @@ TODO: =Replace Dape with dap-mode=
 
 
 
-* TODO Treesitter/Folding
+** TODO Eldoc
+- [ ] What scenarios does the doom emacs project use eldoc for? And how does it do them? Search the web thoroughly.
+
+
 ** TODO Treesit
 NOTE: =Wait for Emacs 31 to be released as they will introduce automatic tree-sitter grammar installation when any specific prog-mode buffer is opened. The grammars should not be in the main emacs config folder.=
 #+begin_src emacs-lisp
@@ -4993,6 +5200,7 @@ NOTE: =Wait for Emacs 31 to be released as they will introduce automatic tree-si
           (c++-mode . c++-ts-mode))))
 #+end_src
 
+
 ** TODO Treesit-Fold
 NOTE: =check with doom-emacs modules=
 #+begin_src emacs-lisp
@@ -5005,6 +5213,7 @@ NOTE: =check with doom-emacs modules=
 ;;   (global-treesit-fold-mode 1)
 ;;   (global-treesit-fold-indicators-mode 1))
 #+end_src
+
 
 ** TODO Vimish Fold
 NOTE: =check with doom-emacs modules=
@@ -5022,6 +5231,73 @@ NOTE: =check with doom-emacs modules=
   (setq evil-vimish-fold-target-modes '(prog-mode conf-mode text-mode))
   :config (global-evil-vimish-fold-mode))
 #+end_src
+
+
+** TODO Transient Menu
+#+begin_src emacs-lisp
+(with-eval-after-load 'transient
+  (defun ar/devtools-title ()
+    (concat
+     (if (fboundp 'nerd-icons-faicon)
+         (nerd-icons-faicon "nf-fa-laptop_code" :face 'transient-heading :v-adjust 0.02)
+       "")
+     (propertize " Development Tools" 'face 'transient-heading)))
+
+  (transient-define-prefix ar/toggles-devtools ()
+    "Development Tools Dashboard"
+    [:description ar/devtools-title
+
+     ;; Group 1: LSP Code Actions
+     ["Actions"
+      ("a" "Code Action" eglot-code-actions)
+      ("r" "Rename Symb" eglot-rename)
+      ("f" "Frmt Buf" apheleia-format-buffer)
+      ("i" "Org Imports" eglot-code-action-organize-imports)
+      ("h" "Toggle Hint" eglot-inlay-hints-mode :transient t :if (lambda () (fboundp 'eglot-inlay-hints-mode)))
+      ("R" "Reconn LSP" eglot-reconnect)]
+
+     ;; Group 2: Navigation & Lookup
+     ["Navigate"
+      ("d" "Define" xref-find-definitions)
+      ("D" "Refer" xref-find-references)
+      ("t" "Type Def" eglot-find-typeDefinition)
+      ("I" "Implem" eglot-find-implementation)
+      ("A" "Apropos" xref-find-apropos)
+      ("." "Go Back" xref-go-back)]
+
+     ;; Group 3: Search & Outline
+     ["Search"
+      ("s" "LSP Symbols" consult-eglot-symbols)
+      ("o" "Outline" consult-outline)
+      ("m" "Imenu" consult-imenu)
+      ("M" "Imenu Multi" consult-imenu-multi)
+      ("l" "Search Line" consult-line)]
+
+     ;; Group 4: Error Management
+     ["Diagn"
+      ("n" "Next Err" ar/flymake-next-error :transient t)
+      ("p" "Prev Err" ar/flymake-prev-error :transient t)
+      ("e" "Buf Err" flymake-show-buffer-diagnostics)
+      ("E" "Proj Err" consult-flymake)
+      ("!" "Check" flymake-start :transient t)]
+
+     ;; Group 5: Code Folding
+     ["Folding"
+      ("TAB" "Toggle" treesit-fold-toggle :transient t)
+      ("O" "Open All" treesit-fold-open-all :transient t)
+      ("C" "Close All" treesit-fold-close-all :transient t)
+      ("v" "Vim Toggle" vimish-fold-toggle :transient t)]
+
+     ;; Group 6: Documentation
+     ["Docs"
+      ("k" "Hover Box" eldoc-box-help-at-point :transient t)
+      ("K" "Echo Doc" eldoc)
+      ("?" "Info Man" consult-info)
+      ("M" "Man Page" woman)
+      ("<escape>" "" transient-quit-one :format " ")]]))
+#+end_src
+
+
 
 
 * TODO Highlight TODOs
@@ -5174,194 +5450,7 @@ TODO: Uncomment when setting up flycheck
    '(hl-todo-STUB ((t (:foreground "#e0af68" :weight bold))))))
 #+end_src
 
-* TODO Rainbow Mode
-#+begin_src emacs-lisp
-(use-package rainbow-mode
-  :defer t
-  :hook ((prog-mode . rainbow-mode)
-         (LaTeX-mode . rainbow-mode)
-         (org-mode . rainbow-mode))
-  :config
-  (setq rainbow-html-colors t)
-  (setq rainbow-x-colors t)
-  (setq rainbow-latex-colors t))
-#+end_src
 
-
-* TODO Delimiters
-** TODO show-paren-mode
-#+begin_src emacs-lisp
-(use-package paren
-  :ensure nil
-  :hook (after-init . show-paren-mode)
-  :custom
-  (show-paren-delay 0.05)
-  (show-paren-highlight-openparen t)
-  (show-paren-when-point-inside-paren t)
-  (show-paren-when-point-in-periphery t)
-  (show-paren-style 'parenthesis)
-  (show-paren-context-when-offscreen nil)
-
-  :config
-  ;; === CUSTOM ELDOC BACKEND FOR PARENTHESIS ===
-  (defun ar/paren-eldoc-offscreen-context (callback &rest _)
-    "Show off-screen parenthesis context in Echo Area via ElDoc."
-    (let* ((pos (point))
-           (match-pos nil)
-           (label nil)
-           (line-content nil)
-           (syntax-at (when (char-after pos) (char-syntax (char-after pos))))
-           (syntax-before (when (char-before pos) (char-syntax (char-before pos))))
-           ;; Default bounds are the whole buffer
-           (scan-beg (point-min))
-           (scan-end (point-max)))
-
-      ;; 0. ORG MODE FIX: Constrain search to current source block
-      (when (and (derived-mode-p 'org-mode)
-                 (org-in-src-block-p))
-        (let ((elem (org-element-at-point)))
-          (when elem
-            (setq scan-beg (org-element-property :begin elem))
-            (setq scan-end (org-element-property :end elem)))))
-
-      (save-restriction
-        ;; Safety check: Ensure bounds are valid numbers before narrowing
-        (when (and (numberp scan-beg) (numberp scan-end) (< scan-beg scan-end))
-          (narrow-to-region scan-beg scan-end))
-
-        ;; 1. FIND MATCHING POSITION
-        ;; Note: Comments below must not contain raw parens to avoid Org syntax issues
-        (cond
-         ;; Case A: At Opening Bracket
-         ((eq syntax-at ?\()
-          (setq match-pos (ignore-errors (scan-sexps pos 1)))
-          (when match-pos
-            (setq match-pos (1- match-pos))
-            (setq label "Closing: ")))
-
-         ;; Case B: At Closing Bracket (Evil/Block cursor)
-         ((eq syntax-at ?\))
-          (setq match-pos (ignore-errors (scan-sexps (1+ pos) -1)))
-          (setq label "Opening: "))
-
-         ;; Case C: After Closing Bracket (Standard Emacs)
-         ((eq syntax-before ?\))
-          (setq match-pos (ignore-errors (scan-sexps pos -1)))
-          (setq label "Opening: ")))
-
-        ;; 2. RETRIEVE CONTENT IF OFF-SCREEN
-        (when (and match-pos
-                   label
-                   (not (pos-visible-in-window-p match-pos)))
-          (with-current-buffer (current-buffer)
-            (save-excursion
-              (goto-char match-pos)
-              (setq line-content (string-trim (substring-no-properties (thing-at-point 'line t)))))))
-
-        ;; 3. DISPLAY
-        (when line-content
-          (funcall callback
-                   (concat
-                    (propertize label 'face '(:inherit shadow :weight bold))
-                    (propertize line-content 'face '(:inherit font-lock-keyword-face :weight bold))))))))
-
-  ;; Register with ElDoc (Priority -45) to avoid conflict with org-eldoc-drawer (-50)
-  ;; Positioned between drawer (-50) and heading-info (-40)
-  (add-hook 'eldoc-mode-hook
-            (lambda ()
-              (add-hook 'eldoc-documentation-functions #'ar/paren-eldoc-offscreen-context -45 t))))
-#+end_src
-
-** TODO rainbow-delimiters
-#+begin_src emacs-lisp
-(use-package rainbow-delimiters
-  :defer t
-  :hook ((LaTeX-mode . rainbow-delimiters-mode)
-         (prog-mode . rainbow-delimiters-mode))
-  :config
-  (custom-set-faces
-   '(rainbow-delimiters-depth-1-face ((t (:foreground "#7aa2f7"))))
-   '(rainbow-delimiters-depth-2-face ((t (:foreground "#e0af68"))))
-   '(rainbow-delimiters-depth-3-face ((t (:foreground "#9ece6a"))))
-   '(rainbow-delimiters-depth-4-face ((t (:foreground "#1abc9c"))))
-   '(rainbow-delimiters-depth-5-face ((t (:foreground "#bb9af7"))))
-   '(rainbow-delimiters-depth-6-face ((t (:foreground "#9d7cd8"))))
-   '(rainbow-delimiters-depth-7-face ((t (:foreground "#ff9e64"))))
-   '(rainbow-delimiters-depth-8-face ((t (:foreground "#f7768e"))))
-   '(rainbow-delimiters-depth-9-face ((t (:foreground "#7aa2f7"))))))
-#+end_src
-
-
-
-* TODO Indentations
-** TODO Indent Bars
-#+begin_src emacs-lisp
-(use-package indent-bars
-  :defer t
-  :config
-  (require 'seq)
-
-  (setq indent-bars-treesit-support t
-        indent-bars-starting-column 0
-        indent-bars-no-descend-lists 'skip
-        indent-bars-color '(highlight :face-bg t :blend 0.185)
-        indent-bars-no-descend-string 'all
-        indent-bars-highlight-current-depth '(:face default :blend 0.85)
-        indent-bars-prefer-character t)
-
-  (defun ar/indent-bars-should-enable-p ()
-    "Return non-nil if indent-bars should be enabled in current buffer.
-Returns nil to block activation if any inhibiting condition is met."
-    (not (or
-          (frame-parameter nil 'parent-frame)
-          (bound-and-true-p org-indent-mode)
-          (string-prefix-p " *org-src-fontification:" (buffer-name))
-          (and (derived-mode-p 'org-mode)
-               (not (bound-and-true-p org-src-mode))))))
-
-  (defun ar/indent-bars-maybe-enable ()
-    "Enable indent-bars-mode if conditions are met."
-    (when (ar/indent-bars-should-enable-p)
-      (indent-bars-mode 1)))
-
-  (defun ar/indent-bars-fix-move-to-column (original-fn col &rest args)
-    "Prevent move-to-column from incorrectly handling display property newlines.
-When indent-bars uses display properties containing newlines on blank lines,
-move-to-column can incorrectly move past the visual line end, breaking Evil
-operators and other column-based navigation."
-    (if-let* (((bound-and-true-p indent-bars-mode))
-              ((bound-and-true-p indent-bars-display-on-blank-lines))
-              (line-end (line-end-position))
-              (display-prop (get-text-property line-end 'display))
-              ((seq-contains-p display-prop ?\n))
-              ((> col (- line-end (point)))))
-        (goto-char line-end)
-      (apply original-fn col args)))
-
-  (advice-add 'move-to-column :around #'ar/indent-bars-fix-move-to-column)
-
-  (with-eval-after-load 'magit-blame
-    (add-to-list 'magit-blame-disable-modes 'indent-bars-mode))
-
-  :hook ((prog-mode text-mode conf-mode yaml-mode) . ar/indent-bars-maybe-enable))
-#+end_src
-
-** TODO Dirt Indent
-#+begin_src emacs-lisp
-(use-package dtrt-indent
-  :defer t
-  :config
-  (dtrt-indent-global-mode 1)
-  ;; Optional: Adjust verbosity
-  ;; 0 = silent, 1 = notify on change (default), 2 = explain why not changed, 3 = debug
-  (setq dtrt-indent-verbosity 1)
-  ;; Optional: Set minimum confidence threshold
-  ;; Only adjust if dtrt-indent is confident in its detection
-  (setq dtrt-indent-min-quality 80.0)
-
-  ;; Optional: Exclude certain modes where you want manual control
-  (setq dtrt-indent-mode-exclude-list '(org-mode)))
-#+end_src
 
 * TODO Snippet Engine
 ** TODO Yasnippet
@@ -6183,9 +6272,13 @@ TODO: =Determine the difference between this preview package and preview-auto fr
 
 
 * TODO Terminal
-*Replace eshell-mode with term from doom emacs modules*
+TODO: =Add ghostel package from https://github.com/dakra/ghostel=
+
 
 * TODO Prettify Symbols
+- [ ] Add from (ligatures +extra) module in doom emacs. Look at the following links:
+   1. https://raw.githubusercontent.com/doomemacs/modules/refs/heads/main/modules/ui/ligatures/config.el
+   2.
 ** Common Prettify Symbols
 #+begin_src emacs-lisp
 ;; Common prettify symbols for general programming modes
@@ -8076,11 +8169,14 @@ Auto-generates and syncs heading-derived TOC.
    "g t" 'lsp-find-type-definition
    "g ," 'xref-go-back)
 
-  (general-define-key
-   :states '(normal visual)
-   ;; Avy zap
-   "z" 'avy-zap-to-char-dwim
-   "Z" 'avy-zap-up-to-char-dwim)
+(general-define-key
+:states '(normal visual)
+;; Avy zap
+"z" 'avy-zap-to-char-dwim
+"Z" 'avy-zap-up-to-char-dwim
+;; Evil Multiedit
+"M-d" #'evil-multiedit-match-symbol-and-next
+"M-D" #'evil-multiedit-match-all)
 
   (general-define-key
    :states 'normal
@@ -8252,11 +8348,13 @@ This section just contains checkboxes with stuff that still needs to be done for
 - [ ] remove flycheck for now since messing with org-mode editing
 - [ ] customize org-agenda-finalize to customize org-agenda buffer
 - [ ] Setup automatic pair generation for '**', '==', etc and make sure the cursor in insert mode is placed in the middle
+- [ ] Determine if compile-angel is needed for elpaca?
+- [ ] Determine if elpaca byte-compiles and native-compiles all packages. And is it okay to leave these settings to elpaca's default.
 
 * TODO Questions
 This section raises questions if some features, capabilities, etc can be achieved in emacs in general.
 
 - [ ] Can org-level variation can only work for certain file and/or org buffers?
 - [ ] Are there any other evil related packages that can useful for my workflow?
-
+- [ ] Is there a way to execute nerd-icons-install-fonts during intial emacs setup using elpaca?
 - [ ] How do I get history evil commands in the echo area like doom emacs?
