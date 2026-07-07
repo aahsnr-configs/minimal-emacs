@@ -1,11 +1,11 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.1
+#+VERSION: 0.2
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
-* TODO Core Emacs
+* DONE Core Emacs
 Foundational layer of the config: bootstrap sequence, package management, performance tuning, session persistence, and cross-platform env normalization. Tuned for Emacs 30/31 — responsive, OS-safe, and stutter-free under heavy IDE workloads (LSP, Tree-sitter).
 
 ** DONE Lexical Binding
@@ -94,6 +94,7 @@ Initializes =elpaca=, an asynchronous package manager replacing =package.el=. Di
 ;; USE-PACKAGE CONFIGURATION
 ;; ==========================================
 (setq use-package-verbose nil
+      use-package-always-ensure t
       use-package-expand-minimally t
       use-package-compute-statistics nil
       use-package-enable-imenu-support t)
@@ -116,389 +117,334 @@ Initializes =elpaca=, an asynchronous package manager replacing =package.el=. Di
 #+end_src
 
 
-** TODO Custom Functions
-TODO: Modify for elpaca
-A collection of utility functions used throughout the configuration. These include robust checks for childframe and icon support (essential for UI packages like *corfu* and *nerd-icons*), a comprehensive configuration reloader that calculates load times, and an auto-tangler that seamlessly compiles the literate *config.org* upon saving.
+
+** DONE Custom Functions
+Utility functions for environment validation, performance guards, and configuration reloading. Includes childframe and icon rendering checks for UI dependencies, a buffer-size threshold to suspend expensive minor modes, an Elpaca-aware configuration reloader, and a region/symbol fallback for text operations.
 
 #+begin_src emacs-lisp
 (defun childframe-workable-p ()
-  "Whether childframe is workable.
-Childframes are floating windows used by packages like `corfu` and `posframe`.
-They require a graphical display or a terminal emulator that supports them."
+  "Return non-nil if childframes are supported.
+Requires a graphical display or terminal with childframe capabilities.
+Utilized by UI packages such as `corfu' and `posframe'."
   (and (not noninteractive)
        (or (display-graphic-p)
            (featurep 'tty-child-frames))
        (eq (frame-parameter (selected-frame) 'minibuffer) 't)))
 
 (defun childframe-completion-workable-p ()
-  "Whether childframe completion is workable."
+  "Return non-nil if childframe completion is supported."
   (childframe-workable-p))
 
 (defun icons-displayable-p ()
-  "Return non-nil if icons are displayable.
-Checks if nerd-icons is loaded or can be loaded, ensuring we don't
-attempt to render icon fonts in environments that lack them."
+  "Return non-nil if icon fonts are displayable.
+Prevents rendering attempts in environments lacking `nerd-icons' support."
   (or (featurep 'nerd-icons)
       (require 'nerd-icons nil t)))
 
 (defun too-long-file-p ()
-  "Check whether the file is too long.
-Used to disable expensive minor modes (like `flycheck` or `lsp-mode`)
-in massive files (e.g., minified JSON or large log files) to prevent freezing."
+  "Return non-nil if the current buffer exceeds size thresholds.
+Disables expensive minor modes in massive buffers to prevent main-thread freezing."
   (or (> (buffer-size) 500000)
       (and (fboundp 'buffer-line-statistics)
            (> (car (buffer-line-statistics)) 10000))))
 
 (defun reload-init-file ()
-  "Tangle and reload the Emacs configuration from config.org.
-This function is designed for use with package.el.
-IMPORTANT: This does NOT fully restart Emacs. Some changes (especially
-removed keybindings, hooks, or modes) will persist until you restart Emacs."
+  "Tangle and reload the Emacs configuration from `config.org'.
+Processes Elpaca's asynchronous queues post-reload. Emacs cannot natively
+unload packages or clear modified hooks; a full restart is required for
+structural teardown."
   (interactive)
   (let* ((config-org (expand-file-name "config.org" user-emacs-directory))
          (init-el (expand-file-name "init.el" user-emacs-directory))
-         (start-time (current-time)))
-    ;; Check if config.org exists
+         (start-time (current-time))
+         (divider (propertize "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" 'face 'shadow)))
+
     (unless (file-exists-p config-org)
-      (user-error "Configuration file %s not found!" config-org))
-    ;; Confirm before reloading
-    (when (yes-or-no-p "Reload configuration? (This won't reset removed keybindings/hooks) ")
-      (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-      (message "Tangling configuration from config.org...")
-      ;; Ensure Org is loaded before tangling
+      (user-error "Configuration file %s not found" config-org))
+
+    (when (y-or-n-p "Reload configuration? (Teardown requires restart) ")
+      (message "%s" divider)
+      (message "%s" (propertize "Tangling config.org..." 'face 'bold))
       (require 'org)
-      ;; Tangle the org file
+
       (condition-case err
           (org-babel-tangle-file config-org init-el "emacs-lisp")
         (error
-         (user-error "Failed to tangle config.org: %s" (error-message-string err))))
-      (message "✓ Tangling complete")
-      (message "Loading init.el...")
-      ;; Load the tangled init file
+         (user-error "Tangle failed: %s" (error-message-string err))))
+
+      (message "%s %s" (propertize "✓" 'face 'success) "Tangled")
+      (message "%s" (propertize "Loading init.el..." 'face 'bold))
+
       (condition-case err
           (load-file init-el)
         (error
-         (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-         (user-error "Failed to load init.el: %s" (error-message-string err))))
-      ;; Calculate load time
-      (let ((elapsed-time (float-time (time-subtract (current-time) start-time))))
-        (message "✓ Configuration loaded successfully")
-        (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        (message "Reload completed in %.2f seconds" elapsed-time)
-        (message "")
-        (message "NOTE: Some changes require a full Emacs restart:")
-        (message "  • Removed keybindings, hooks, or modes")
-        (message "  • Package installations/removals")
-        (message "  • Major structural changes")
-        (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")))))
+         (user-error "Load failed: %s" (error-message-string err))))
 
+      ;; Process Elpaca queues to resolve newly added dependencies.
+      (when (fboundp 'elpaca-process-queues)
+        (message "%s" (propertize "Processing Elpaca queues..." 'face 'bold))
+        (elpaca-process-queues))
+
+      ;; Reclaim orphaned Lisp objects generated by re-evaluation.
+      (garbage-collect)
+
+      (let ((elapsed-time (float-time (time-subtract (current-time) start-time))))
+        (message "%s %s" (propertize "✓" 'face 'success) "Loaded")
+        (message "%s" divider)
+        (message "Completed in %s seconds"
+                 (propertize (format "%.2f" elapsed-time) 'face 'warning))
+        (message "")
+        (message "%s" (propertize "RESTART MANDATE:" 'face 'error))
+        (message "  %s Additions applied: variables, packages, keybindings."
+                 (propertize "•" 'face 'font-lock-builtin-face))
+        (message "  %s Deletions persist: packages and hooks remain in memory."
+                 (propertize "•" 'face 'font-lock-builtin-face))
+        (message "  %s Removed packages persist in var/elpaca/."
+                 (propertize "•" 'face 'font-lock-builtin-face))
+        (message "  %s Full restart required for structural teardown."
+                 (propertize "•" 'face 'font-lock-builtin-face))
+        (message "%s" divider)))))
 
 (defun selected-region-or-symbol-at-point ()
-  "Return the selected region, otherwise return the symbol at point.
-Highly useful for commands that operate on text, allowing them to seamlessly
-fall back to the word under the cursor if no region is highlighted."
+  "Return the active region, or the symbol at point if inactive.
+Provides a fallback for text operations lacking an explicit region."
   (if (region-active-p)
       (buffer-substring-no-properties (region-beginning) (region-end))
     (thing-at-point 'symbol t)))
 #+end_src
 
-
-** TODO Constants
-System and Emacs version constants. These use robust, POSIX-compliant checks (like *user-uid* for root detection, which works reliably in Docker/sudo environments where *$USER* fails) and semantic versioning (*version<=*) to ensure compatibility across Emacs 29, 30, and 31.
+** DONE Constants
+System and Emacs version constants. Utilizes =user-uid= for reliable root privilege detection in containerized and sudo environments, and =version<= for semantic version compatibility across Emacs 29, 30, and 31.
 
 #+begin_src emacs-lisp
 (defconst sys/linuxp
   (eq system-type 'gnu/linux)
-  "Are we running on a GNU/Linux system?")
+  "Non-nil if running on a GNU/Linux system.")
 
-;; Uses (user-uid) instead of $USER, which is unreliable in Docker/sudo.
-;; If the effective User ID is 0, we have root privileges.
+;; Utilizes `user-uid` instead of environment variables for reliable
+;; root privilege detection in containerized and sudo environments.
 (defconst sys/rootp
   (zerop (user-uid))
-  "Are you using ROOT user?")
+  "Non-nil if executing with root privileges.")
 
-;; Robust semantic version checking using `version<='.
-;; This correctly handles edge cases like Emacs 30.1, where a naive
-;; `(>= emacs-minor-version 2)` check would incorrectly evaluate to nil.
+;; Semantic version checking via `version<=`. Prevents evaluation
+;; failures on edge-case minor versions (e.g., Emacs 30.1).
 (defconst emacs/>=29p
   (version<= "29" emacs-version)
-  "Emacs is 29 or above.")
+  "Non-nil if Emacs version is 29.0 or above.")
 
 (defconst emacs/>=29.2p
   (version<= "29.2" emacs-version)
-  "Emacs is 29.2 or above.")
+  "Non-nil if Emacs version is 29.2 or above.")
 
 (defconst emacs/>=30p
   (version<= "30" emacs-version)
-  "Emacs is 30 or above.")
+  "Non-nil if Emacs version is 30.0 or above.")
 
 (defconst emacs/>=31p
   (version<= "31" emacs-version)
-  "Emacs is 31 or above.")
+  "Non-nil if Emacs version is 31.0 or above.")
 #+end_src
 
 
-** TODO Performance Tuning
-This section applies critical rendering, scrolling, and input-latency optimizations. It removes obsolete Emacs 24 hacks (like `bidi-display-reordering nil`, which causes rendering glitches in modern Emacs), applies Doom Emacs-inspired tweaks to prevent clipboard and file-opening spam, and defers JIT syntax highlighting to guarantee 60fps typing fluidity even with heavy LSP semantic tokens.
+** DONE Performance Tuning
+Rendering, scrolling, and input-latency optimizations. Excludes obsolete Emacs 24 =bidi= variables to prevent rendering glitches. Mitigates clipboard I/O spam, GTK tooltip hangs, and main-thread blocking during rapid input or large file traversal.
 
 #+begin_src emacs-lisp
-;; Bidi optimizations (Safe for Emacs 27+)
-;; Note: `bidi-display-reordering` is omitted as it is an obsolete Emacs 24 hack
-;; that causes rendering glitches in modern Emacs. Setting paragraph direction
-;; to LTR and inhibiting the Bidirectional Parentheses Algorithm (BPA) provides
-;; the exact same performance boost safely.
+;; Safe for Emacs 27+. Omits obsolete `bidi-display-reordering` to prevent rendering glitches.
+;; LTR direction and BPA inhibition provide equivalent performance.
 (setq-default bidi-paragraph-direction 'left-to-right
               bidi-inhibit-bpa t)
 
-;; Mitigate Input Lag by disabling GTK input methods (PGTK builds only).
-;; PGTK builds on Wayland can suffer from severe input latency if the GTK
-;; IM context is active. We disable it immediately after frame creation.
+;; Disables GTK input methods on PGTK/Wayland builds to mitigate severe input latency.
+;; Applied post-frame creation.
 (when (fboundp 'pgtk-use-im-context)
   (add-hook 'after-make-frame-functions
             (lambda (frame)
               (with-selected-frame frame
                 (pgtk-use-im-context nil)))))
 
-;; Apply bidi optimizations to common modes locally
-(defun my/bidi-optimizations ()
-  "Apply bidi optimizations for current buffer."
-  (setq-local bidi-paragraph-direction 'left-to-right
-              bidi-inhibit-bpa t))
-
-(add-hook 'org-mode-hook #'my/bidi-optimizations)
-(add-hook 'text-mode-hook #'my/bidi-optimizations)
-(add-hook 'prog-mode-hook #'my/bidi-optimizations)
-
-;; Emacs 29+ Long Line Optimizations
-;; Prevents Emacs from freezing when opening minified JSON or large log files.
-;; If a line exceeds these thresholds, Emacs disables expensive redisplay
-;; features like bidirectional text and syntax highlighting for that line.
+;; Emacs 29+ long line optimizations. Prevents main-thread freezing on minified JSON
+;; or large logs by disabling expensive redisplay features.
 (setq-default long-line-threshold 1000
               large-hscroll-threshold 1000
               syntax-wholeline-max 1000)
 
-;; Undo limits (Generous limits for modern systems with ample RAM)
-;; Default limits are too small for large refactoring operations.
+;; Expanded undo limits for large refactoring operations on modern hardware.
 (setq undo-limit 800000
       undo-strong-limit 1200000
       undo-outer-limit 120000000)
 
-;; ==========================================
-;; SCROLLING & REDISPLAY
-;; ==========================================
-;; Note: `fast-but-imprecise-scrolling`, `redisplay-skip-fontification-on-input`,
-;; `inhibit-compacting-font-caches`, and `frame-resize-pixelwise` are already
-;; set in early-init.el. We do not duplicate them here.
-(setq auto-window-vscroll nil            ;; Prevents scrolling jitter
-      highlight-nonselected-windows nil  ;; Reduces redisplay overhead
+;; Scrolling and redisplay. Core variables initialized in early-init.el to prevent duplication.
+(setq auto-window-vscroll nil
+      highlight-nonselected-windows nil
       window-resize-pixelwise nil
       byte-compile-warnings '(not obsolete)
       native-comp-async-report-warnings-errors 'silent)
 
-;; Disable blink-cursor-mode properly.
-;; Using `setq` only changes the variable; calling the minor mode function
-;; with -1 actually stops the timer and prevents the redisplay overhead.
+;; Halts the blink timer and prevents redisplay overhead.
+;; `setq` merely alters variable state without stopping the timer.
 (blink-cursor-mode -1)
 
-;; ==========================================
-;; DOOM-INSPIRED OPTIMIZATIONS
-;; (Crucial for lsp-mode + flycheck)
-;; ==========================================
-
-;; 1. Clipboard Spam Prevention (CRITICAL for Wayland/X11)
-;; Prevents Emacs from making OS-level DBus/X11 API calls every time
-;; you highlight text with the mouse/keyboard, eliminating micro-stutters.
+;; Prevents OS-level DBus/X11 API calls on text highlight, eliminating selection micro-stutters.
 (setq select-active-regions nil)
 
-;; 2. Faster File Opening
-;; Skips expensive case-insensitive regex matching when checking
-;; `auto-mode-alist` to determine a file's major mode.
+;; Skips expensive case-insensitive regex matching during `auto-mode-alist` evaluation.
 (setq auto-mode-case-fold nil)
 
-;; 3. Typing Fluidity (JIT Lock Deferral)
-;; Defers syntax highlighting by 50ms. This prevents font-lock and
-;; lsp-mode semantic tokens from blocking the main thread during rapid typing.
+;; Defers syntax highlighting by 50ms to prevent font-lock and LSP tokens from blocking the main thread.
 (setq jit-lock-defer-time 0.05)
 
-;; 4. Prevent GTK Tooltip Hangs (PGTK/GTK builds)
-;; Forces Emacs to use its own internal tooltips instead of calling out
-;; to the GTK DBus tooltip API, which can hang the UI on hover.
+;; Forces internal Emacs tooltips over the GTK DBus API to prevent UI hangs on hover.
 (when (boundp 'x-gtk-use-system-tooltips)
   (setq x-gtk-use-system-tooltips nil))
 #+end_src
 
 
-** TODO Small Configs
-A collection of quality-of-life settings, safety guards, and minor mode configurations. This includes disabling unused VC backends to prevent TRAMP I/O stutter, suppressing native OS dialog boxes to prevent daemon freezes, and protecting the system clipboard from being accidentally overwritten by Emacs kill operations.
+** DONE Small Configs
+Quality-of-life settings, safety guards, and core minor modes. Disables unused VC backends to prevent TRAMP I/O stutter, suppresses native OS dialog boxes to prevent daemon freezes, and protects the system clipboard from accidental overwrite during kill operations.
 
 #+begin_src emacs-lisp
-;; Explicitly disable bzr, svn, hg to prevent TRAMP errors and I/O stutter.
-;; By default, Emacs probes for all VCS backends when opening files, which
-;; causes massive delays over SSH or on slow network mounts.
-(setq vc-handled-backends '(Git))
+;; Restrict VCS backends to Git. Prevents TRAMP I/O stutter and SSH timeouts
+;; caused by Emacs probing for bzr, svn, and hg on remote files.
+(setq vc-handled-backends '(Git)
+      vc-follow-symlinks t)
 
-;; Automatically follow symlinks to version-controlled files (suppress prompt)
-(setq vc-follow-symlinks t)
-
-;; Confirmation settings
-(setq confirm-kill-processes nil)  ;; Auto-kill processes on exit without asking
-
-;; Faster echo of keystrokes in the minibuffer (default is 1.0s, which feels sluggish)
-(setq echo-keystrokes 0.1)
-
-;; Don't create lockfiles (.#filename).
-;; These cause issues with modern file watchers like Webpack, Vite, and Git.
-(setq-default create-lockfiles nil)
-
-;; Compilation settings
-(setq-default compilation-always-kill t       ;; Kill running compilation without asking
-              compilation-ask-about-save nil  ;; Auto-save buffers before compiling
-              compilation-scroll-output t)    ;; Auto-scroll the compilation buffer
-
-;; Suppress advice redefinition warnings (common when reloading config)
-(setq ad-redefinition-action 'accept)
-
-;; Require final newline (POSIX standard)
-(setq require-final-newline t)
-
-;; Enable potentially dangerous commands without prompting
-(put 'erase-buffer 'disabled nil)
-
-;; Quality of Life Modes
-(delete-selection-mode 1) ;; Typing overwrites selected text (standard modern editor behavior)
-(setq window-sides-vertical t)
-
-;; File associations for specific extensions that Emacs might not recognize natively
-(add-to-list 'auto-mode-alist '("\\.in\\'" . text-mode))
-(add-to-list 'auto-mode-alist '("\\.out\\'" . text-mode))
-(add-to-list 'auto-mode-alist '("\\.args\\'" . text-mode))
-(add-to-list 'auto-mode-alist '("\\.bb\\'" . shell-script-mode))
-(add-to-list 'auto-mode-alist '("\\.bbclass\\'" . shell-script-mode))
-(add-to-list 'auto-mode-alist '("\\.Rmd\\'" . markdown-mode))
-
-;; Force minibuffer prompts instead of native OS dialogs.
-;; Native GTK/X11 dialogs can completely freeze the Emacs daemon if triggered
-;; from an emacsclient terminal session.
+;; Suppress native OS dialog boxes. GTK/X11 dialogs freeze the Emacs daemon
+;; when triggered from an emacsclient terminal session.
 (setq use-dialog-box nil
       use-file-dialog nil)
 
-;; Save system clipboard to kill-ring before Emacs overwrites it.
-;; Prevents losing text copied from a web browser when you kill (cut) text in Emacs.
+;; Process and compilation safeguards.
+(setq confirm-kill-processes nil
+      compilation-always-kill t
+      compilation-ask-about-save nil
+      compilation-scroll-output t)
+
+;; UI and input latency reductions.
+(setq echo-keystrokes 0.1
+      ad-redefinition-action 'accept)
+
+;; Filesystem and buffer safety.
+;; Disables lockfiles to prevent conflicts with modern file watchers (Webpack, Vite).
+(setq-default create-lockfiles nil
+              require-final-newline t)
+
+;; Enable potentially dangerous commands without prompting.
+(put 'erase-buffer 'disabled nil)
+
+;; Core minor modes.
+(delete-selection-mode 1)
+(setq window-sides-vertical t)
+
+;; Protect system clipboard. Saves external clipboard contents to the kill-ring
+;; before Emacs overwrites them via kill/cut operations.
 (setq save-interprogram-paste-before-kill t)
+
+;; Fallback major-mode associations for extensions lacking native Emacs support.
+(dolist (pair '(("\\.in\\'" . text-mode)
+                ("\\.out\\'" . text-mode)
+                ("\\.args\\'" . text-mode)
+                ("\\.bb\\'" . shell-script-mode)
+                ("\\.bbclass\\'" . shell-script-mode)
+                ("\\.Rmd\\'" . markdown-mode)))
+  (add-to-list 'auto-mode-alist pair))
 #+end_src
 
 
-** TODO Auto Save
-Configures modern, seamless auto-saving. By disabling the legacy *auto-save-default* (which creates annoying *#filename#* recovery files in your working directories) and enabling *auto-save-visited-mode*, Emacs silently writes changes directly to the actual visited file on disk after a short idle period, mimicking the seamless auto-save behavior found in VSCode or Sublime Text.
+
+** DONE Auto Save
+Configures seamless auto-saving via =auto-save-visited-mode=. Bypasses the legacy =#filename#= recovery mechanism by writing buffer changes directly to the visited file on disk after a defined idle interval.
 
 #+begin_src emacs-lisp
-;; Save visited files automatically after 5 seconds of idle time.
-;; This bypasses the legacy `#file#` auto-save mechanism entirely.
+;; Interval in seconds before visited files are auto-saved.
 (setq auto-save-visited-interval 5)
+
+;; Enable direct-to-file auto-saving.
 (auto-save-visited-mode 1)
 #+end_src
 
 
-** TODO Garbage Collector
-*gcmh* (Garbage Collector Magic Hack) manages garbage collection based on idle timers. It raises the GC threshold while you are typing to prevent stutter, and drops it when you stop typing to clean up memory in the background. The *:unless (fboundp 'igc-info)* guard ensures compatibility with Emacs 31's upcoming MPS Incremental GC.
+** DONE Garbage Collector
+Manages garbage collection via =gcmh= idle timers. Elevates the GC threshold during active input and triggers background collection during idle periods. Disables =gcmh= on experimental MPS Incremental GC (=igc=) builds and utilizes =after-focus-change-function= for focus-out memory reclamation.
 
 #+begin_src emacs-lisp
 (use-package gcmh
-  ;; Disable gcmh if Emacs is built with the new MPS Incremental GC (igc).
-  ;; gcmh is designed for the old "stop-the-world" GC and will conflict with igc.
+  ;; Disabled on experimental MPS Incremental GC (igc) builds.
+  ;; gcmh targets the legacy stop-the-world GC and conflicts with igc.
   :unless (fboundp 'igc-info)
-  :hook (after-init . gcmh-mode)
+  :hook (elpaca-after-init . gcmh-mode)
   :init
-  (setq gcmh-idle-delay 'auto            ;; Automatically calculate idle delay
-        gcmh-auto-idle-delay-factor 10   ;; Multiplier for the auto delay
-        ;; 128MB baseline threshold. High enough to prevent LSP-induced GC stutters
-        ;; on modern machines with 16GB+ RAM.
+  (setq gcmh-idle-delay 'auto
+        gcmh-auto-idle-delay-factor 10
+        ;; 128MB baseline threshold to prevent LSP-induced GC stutters.
         gcmh-high-cons-threshold (* 128 1024 1024)))
 
-;; Legacy focus-out hook. Triggers GC when the frame loses focus.
-;; NOTE: `focus-out-hook` is obsolete since Emacs 27.1, but remains functional
-;; in many environments as a brute-force memory cleanup mechanism.
-(add-hook 'focus-out-hook #'garbage-collect)
+;; Triggers GC on frame focus loss. Replaces obsolete `focus-out-hook`.
+(add-function :after after-focus-change-function
+              (lambda ()
+                (unless (frame-focus-state)
+                  (garbage-collect))))
 #+end_src
 
 
-** TODO UTF-8 Coding System
-Enforces UTF-8 across all I/O boundaries. Includes a critical cross-platform safeguard that avoids forcing *utf-8* on the selection coding system in Windows, which natively requires *utf-16-le* for proper clipboard integration with other Win32 applications.
+** DONE UTF-8 Coding System
+Enforces UTF-8 across all I/O boundaries. Excludes the selection coding system on Windows to preserve native =utf-16-le= clipboard integration.
 
 #+begin_src emacs-lisp
-;; Set the core language environment to UTF-8.
-;; This automatically configures most internal coding systems.
+;; Core language environment and internal boundaries.
 (set-language-environment "UTF-8")
-
-;; Explicitly set fallback and default boundaries to UTF-8.
 (set-default-coding-systems 'utf-8)
 (set-terminal-coding-system 'utf-8)
 (set-keyboard-coding-system 'utf-8)
 (setq locale-coding-system 'utf-8)
 
-;; Windows requires utf-16-le for native clipboard operations; forcing
-;; utf-8 breaks copy/paste of non-ASCII characters on Windows.
-;; On Linux/macOS, utf-8 is the native clipboard standard.
+;; Preserves native utf-16-le clipboard integration on Windows.
+;; Forcing utf-8 breaks non-ASCII copy/paste on Win32.
 (unless (eq system-type 'windows-nt)
   (set-selection-coding-system 'utf-8))
 
-;; Prioritize UTF-8 for file detection when opening files with unknown encodings.
+;; Prioritizes UTF-8 for unknown file encodings.
 (prefer-coding-system 'utf-8)
 #+end_src
 
 
-** TODO Session Management
-Handles persistence across Emacs sessions.
-1. **saveplace**: Remembers cursor position, with a safeguard to forget unreadable/network files to prevent startup hangs.
-2. **recentf**: Tracks recent files. It explicitly excludes TRAMP/remote paths (`file-remote-p`) to prevent SSH timeouts on startup, removes `file-truename` from handlers to prevent I/O hangs on unmounted drives, and uses a **lazy cache** for `org-agenda-files` to prevent filesystem thrashing.
-3. **savehist**: Persists minibuffer history, explicitly excluding the buffer-local `mark-ring` to prevent serialization bloat.
+** DONE Session Management
+Persists cursor positions, recent files, and minibuffer history across sessions. Excludes TRAMP paths and unmounted symlinks to prevent I/O hangs. Utilizes a lazy cache for =org-agenda-files= to prevent filesystem thrashing, and injects a background timer to flush the =recentf= cache periodically, mitigating data loss in daemon environments.
 
 #+begin_src emacs-lisp
-;; Save place
 (use-package saveplace
   :ensure nil
-  :hook (after-init . save-place-mode)
+  :hook (elpaca-after-init . save-place-mode)
   :custom
-  ;; Prevents Emacs from hanging on startup if it tries to restore
-  ;; point in a file on an offline network drive or unmounted volume.
+  ;; Prevents startup hangs from restoring point in offline/unmounted volumes.
   (save-place-forget-unreadable-files t))
 
-;; History with symlink resolution
 (use-package recentf
   :ensure nil
-  :hook (after-init . recentf-mode)
+  :hook (elpaca-after-init . recentf-mode)
   :init
   (setq recentf-max-saved-items 300
         recentf-exclude
         '("\\.?cache" ".cask" "url" "COMMIT_EDITMSG\\'" "bookmarks"
           "\\.\\(?:gz\\|gif\\|svg\\|png\\|jpe?g\\|bmp\\|xpm\\)$"
           "\\.?ido\\.last$" "\\.revive$" "/G?TAGS$" "/.elfeed/"
-          "^/tmp/" "^/var/folders/.+$" "/persp-confs/"
-          (lambda (file) (file-in-directory-p file package-user-dir))))
+          "^/tmp/" "^/var/folders/.+$" "/persp-confs/"))
   :config
   (push (expand-file-name recentf-save-file) recentf-exclude)
-
-  ;; Keep recentf from listing no-littering's own housekeeping files.
-  (add-to-list 'recentf-exclude
-               (recentf-expand-file-name no-littering-var-directory))
-  (add-to-list 'recentf-exclude
-               (recentf-expand-file-name no-littering-etc-directory))
-
-  ;; Exclude ALL TRAMP/remote paths to prevent recentf-cleanup from
-  ;; pinging offline servers and hanging Emacs on exit.
+  ;; Exclude no-littering housekeeping files.
+  (add-to-list 'recentf-exclude (recentf-expand-file-name no-littering-var-directory))
+  (add-to-list 'recentf-exclude (recentf-expand-file-name no-littering-etc-directory))
+  ;; Exclude TRAMP/remote paths to prevent SSH timeouts during cleanup.
   (add-to-list 'recentf-exclude #'file-remote-p)
-
-  ;; Doom Emacs explicitly removes `file-truename` from this list.
-  ;; Running `file-truename` on every file during `recentf-cleanup` causes
-  ;; massive I/O hangs if a symlink points to an unmounted network drive.
+  ;; Remove `file-truename` to prevent I/O hangs on unmounted symlink targets.
   (setq recentf-filename-handlers '(abbreviate-file-name))
 
-  ;; ==========================================
-  ;; ORG-AGENDA LAZY CACHE
-  ;; ==========================================
-  ;; The original implementation called `file-truename` and `org-agenda-files t`
-  ;; synchronously on EVERY file check, causing severe filesystem thrashing.
-  ;; We now use a cached approach that only triggers expensive I/O periodically.
+  ;; Daemon-safe periodic flush (every 5 minutes) to prevent data loss
+  ;; when Emacs daemon crashes or receives SIGKILL without triggering `kill-emacs-hook`.
+  (run-at-time 300 300 #'recentf-save-list)
+
+  ;; Lazy cache for org-agenda files to prevent synchronous filesystem thrashing.
   (defvar ar/recentf-org-agenda-cache nil
     "Cached list of resolved org-agenda file paths.")
 
@@ -517,14 +463,12 @@ Handles persistence across Emacs sessions.
            (member (file-truename file) ar/recentf-org-agenda-cache))))
 
   (add-to-list 'recentf-exclude #'ar/exclude-org-agenda-files-p)
-
-  ;; Update cache lazily when org files are opened or on idle timer
   (add-hook 'org-mode-hook #'ar/update-recentf-org-agenda-cache)
   (run-with-idle-timer 30 t #'ar/update-recentf-org-agenda-cache))
 
 (use-package savehist
   :ensure nil
-  :hook (after-init . savehist-mode)
+  :hook (elpaca-after-init . savehist-mode)
   :init
   (setq enable-recursive-minibuffers t
         history-length 1000
@@ -536,98 +480,71 @@ Handles persistence across Emacs sessions.
 #+end_src
 
 
-** TODO Misc
-Configures core *simple.el* behaviors, modeline indicators, whitespace management, and text navigation.
+** DONE Misc
+Configures core =simple.el= behaviors, modeline indicators, whitespace management, and text navigation.
+
 #+begin_src emacs-lisp
 (use-package simple
   :ensure nil
   :hook ((text-mode . visual-line-mode))
   :init
-  ;; These are minor modes, not variables. `setq` does not enable them.
-  ;; They must be called as functions to actually update the modeline.
+  ;; Enables column number display in the modeline.
   (column-number-mode 1)
-  (line-number-mode 1)
 
-  (setq kill-whole-line t               ;; C-k kills the newline character too
-        line-move-visual nil            ;; Move by logical lines, not visual wrapped lines
-        track-eol t                     ;; Stay at end-of-line when moving down
-        set-mark-command-repeat-pop t)  ;; Allow repeating C-u C-SPC to pop mark ring
+  ;; Core editing behaviors: logical line movement, EOL tracking, and mark ring repetition.
+  (setq kill-whole-line t
+        line-move-visual nil
+        track-eol t
+        set-mark-command-repeat-pop t)
 
+  ;; Hides trailing whitespace by default.
   (setq-default show-trailing-whitespace nil)
 
-  ;; Prettify the process list (M-x list-processes) with color-coded statuses
-  (with-no-warnings
-    (defun my-list-processes--prettify ()
-      (when-let* ((entries tabulated-list-entries))
-        (setq tabulated-list-entries nil)
-        (dolist (p (process-list))
-          (when-let* ((val (cadr (assoc p entries)))
-                      (name (aref val 0))
-                      (pid (aref val 1))
-                      (status (aref val 2))
-                      (status (list status 'face
-                                    (if (memq status '(stop exit closed failed)) 'error 'success)))
-                      (buf-label (aref val 3))
-                      (tty (list (aref val 4) 'face 'font-lock-doc-face))
-                      (thread (list (aref val 5) 'face 'font-lock-doc-face))
-                      (cmd (list (aref val 6) 'face 'completions-annotations)))
-            (push (list p (vector name pid status buf-label tty thread cmd))
-                  tabulated-list-entries)))))
-    (advice-add #'list-processes--refresh :after #'my-list-processes--prettify)))
+  ;; Replaces verbose yes/no prompts with single-character y/n inputs (Emacs 28+).
+  (setq use-short-answers t)
 
-;; Misc Settings
-;; Use short answers (y/n) instead of full (yes/no)
-(if (boundp 'use-short-answers)
-    (setq use-short-answers t)
-  (fset 'yes-or-no-p 'y-or-n-p))
+  ;; Default buffer states: text mode, 80-column fill, 4-space indentation.
+  (setq-default major-mode 'text-mode
+                fill-column 80
+                tab-width 4
+                indent-tabs-mode nil)
 
-(setq-default major-mode 'text-mode
-              fill-column 80
-              tab-width 4
-              indent-tabs-mode nil) ;; Use spaces, not tabs
+  ;; Silences audible and visual bells.
+  (setq visible-bell nil
+        ring-bell-function #'ignore)
 
-;; Silence the audible and visual bell
-(setq visible-bell nil)
-(setq ring-bell-function #'ignore)
+  ;; Suppresses echo-area warnings for buffer boundaries.
+  (setq command-error-function
+        (lambda (data context caller)
+          (when (not (memq (car data) '(beginning-of-buffer end-of-buffer)))
+            (command-error-default-function data context caller))))
 
-;; Suppress annoying "End/Beginning of buffer" Messages in the echo area
-(setq command-error-function
-      (lambda (data context caller)
-        (when (not (memq (car data) '(beginning-of-buffer end-of-buffer)))
-          (command-error-default-function data context caller))))
+  ;; Resolves duplicate buffer names using full directory paths.
+  (setq uniquify-buffer-name-style 'forward)
 
-;; Removes <dir> style from duplicate buffer names, using full paths instead
-(setq uniquify-buffer-name-style 'forward)
-
-;; Other Misc
-(setq delete-by-moving-to-trash t
-      make-backup-files nil       ;; Disable #file# and file~ backups
-      auto-save-default nil       ;; Handled by auto-save-visited-mode
-      ;; Robust Doom/Emacs standard regex for auto-filling lists and quotes.
-      ;; Correctly handles Markdown/Org blockquotes (>), bullets (-, *, •),
-      ;; and numbered lists (1., 2)).
-      adaptive-fill-regexp "[ \t]*\\(>[ \t]*\\|[-–—]\\|[•‣*]\\|[0-9]+[.)]\\)[ \t]*"
-      adaptive-fill-first-line-regexp "^* *$"
-      ;; Regex to determine the end of a sentence for `forward-sentence`.
-      ;; Note: Contains a literal newline character in the character class.
-      sentence-end "\\([。！？]\\|……\\|[.?!][]\"')}]*\\($\\|[ \t]\\)\\)[ \t
-]*"
-      sentence-end-double-space nil
-      word-wrap-by-category t)
+  ;; Filesystem and auto-fill safeguards. Disables legacy backups and auto-save.
+  (setq delete-by-moving-to-trash t
+        make-backup-files nil
+        auto-save-default nil
+        ;; Regex for auto-filling blockquotes, bullets, and numbered lists.
+        adaptive-fill-regexp "[ \t]*\\(>[ \t]*\\|[-–—]\\|[•‣*]\\|[0-9]+[.)]\\)[ \t]*"
+        adaptive-fill-first-line-regexp "^* *$"
+        ;; Sentence boundary regex. Utilizes explicit newline escape to prevent tangling corruption.
+        sentence-end "\\([。！？]\\|……\\|[.?!][]\"')}]*\\($\\|[ \t]\\)\\)[ \t\n]*"
+        sentence-end-double-space nil
+        word-wrap-by-category t))
 #+end_src
 
-
-** TODO Setup User
-Sets the user identity for Git commits, Org-mode exports, and email integrations. This ensures that any automated tooling that requires an author name or email address pulls from a single, centralized source.
+** DONE Setup User
+Centralizes user identity variables for Git commits, Org-mode exports, and automated tooling.
 
 #+begin_src emacs-lisp
 (setq user-full-name "Ahsanur Rahman"
       user-mail-address "ahsanur041@proton.me")
 #+end_src
 
-
-** TODO Title
-Configures the window title bar to display the current buffer name cleanly. The *%b* format specifier inserts the buffer name, providing immediate context when switching between multiple OS-level windows or workspaces.
+** DONE Title
+Configures the window and icon title bars to display the current buffer name using the =%b= format specifier.
 
 #+begin_src emacs-lisp
 (setq frame-title-format '("Emacs - %b")
@@ -636,6 +553,7 @@ Configures the window title bar to display the current buffer name cleanly. The 
 
 
 * TODO Vim Emulation
+
 ** TODO Undo Fu
 #+begin_src emacs-lisp
 (use-package undo-fu :defer t)
@@ -644,6 +562,7 @@ Configures the window title bar to display the current buffer name cleanly. The 
   :commands undo-fu-session-global-mode
   :hook (after-init . undo-fu-session-global-mode))
 #+end_src
+
 
 ** TODO Goto Chg
 #+begin_src emacs-lisp
@@ -656,7 +575,9 @@ Configures the window title bar to display the current buffer name cleanly. The 
   (evil-define-key 'normal 'global (kbd "g,") 'goto-last-change-reverse))
 #+end_src
 
+
 ** TODO Evil
+TODO =How do I get history evil commands in the echo area like doom emacs?=
 #+begin_src emacs-lisp
 (use-package evil
   :demand t
@@ -745,6 +666,7 @@ Configures the window title bar to display the current buffer name cleanly. The 
 (evil-set-initial-state 'dashboard-mode 'normal))
 #+end_src
 
+
 ** TODO Evil Collection
 #+begin_src emacs-lisp
 (use-package evil-collection
@@ -755,6 +677,7 @@ Configures the window title bar to display the current buffer name cleanly. The 
   :config
   (evil-collection-init))
 #+end_src
+
 
 ** TODO Evil Surround
 #+begin_src emacs-lisp
@@ -776,6 +699,7 @@ Configures the window title bar to display the current buffer name cleanly. The 
   :config (global-evil-surround-mode 1))
 #+end_src
 
+
 ** TODO Evil Args
 #+begin_src emacs-lisp
 (use-package evil-args
@@ -785,6 +709,7 @@ Configures the window title bar to display the current buffer name cleanly. The 
   (define-key evil-inner-text-objects-map "a" 'evil-inner-arg)
   (define-key evil-outer-text-objects-map "a" 'evil-outer-arg))
 #+end_src
+
 
 ** TODO Evil Numbers
 #+begin_src emacs-lisp
@@ -796,6 +721,7 @@ Configures the window title bar to display the current buffer name cleanly. The 
   (define-key evil-normal-state-map (kbd "C-x") 'evil-numbers/dec-at-pt))
 #+end_src
 
+
 ** TODO Evil Exchange
 #+begin_src emacs-lisp
 ;; Swap two regions of text with 'gx'
@@ -804,6 +730,7 @@ Configures the window title bar to display the current buffer name cleanly. The 
   :config
   (evil-exchange-install))
 #+end_src
+
 
 ** TODO Evil Goggles
 #+begin_src emacs-lisp
@@ -815,6 +742,7 @@ Configures the window title bar to display the current buffer name cleanly. The 
   (setq evil-goggles-duration 0.1))
 #+end_src
 
+
 ** TODO Evil Lion
 #+begin_src emacs-lisp
 ;; Align text with 'gl' (e.g., 'glip=' aligns paragraph on = signs)
@@ -823,6 +751,7 @@ Configures the window title bar to display the current buffer name cleanly. The 
   :config
   (evil-lion-mode))
 #+end_src
+
 
 ** TODO Evil Window Movement Enhancements
 #+begin_src emacs-lisp
@@ -864,6 +793,7 @@ Configures the window title bar to display the current buffer name cleanly. The 
     (windmove-down)))
 #+end_src
 
+
 ** TODO Native Commenting Operator
 #+begin_src emacs-lisp
 ;; The following code enables commenting and uncommenting by pressing gcc in normal mode and gc in visual mode.
@@ -874,6 +804,7 @@ Configures the window title bar to display the current buffer name cleanly. The 
     (comment-or-uncomment-region beg end))
   (evil-define-key 'normal 'global (kbd "gc") 'my-evil-comment-or-uncomment))
 #+end_src
+
 
 ** TODO Smart Comment Continuation
 #+begin_src emacs-lisp
@@ -914,6 +845,7 @@ Configures the window title bar to display the current buffer name cleanly. The 
   (define-key evil-normal-state-map "o" #'ar/evil-open-below-smart)
   (define-key evil-normal-state-map "O" #'ar/evil-open-above-smart))
 #+end_src
+
 
 
 * TODO Editor Behaviour
@@ -2573,7 +2505,7 @@ If the file does not exist, creates it. Returns the full path."
 #+end_src
 
 
-* Second Brain & Productivity
+* TODO Second Brain & Productivity
 ** TODO Denote Directory
 #+begin_src emacs-lisp
 (defvar my/denote-directory
@@ -4682,6 +4614,7 @@ buffer killing or garbage collection cycles."
                   special-mode))
     (add-to-list 'dabbrev-ignored-buffer-modes mode)))
 #+end_src
+
 
 * TODO Development Tools
 ** TODO Language Server Protocol
@@ -8324,3 +8257,6 @@ This section just contains checkboxes with stuff that still needs to be done for
 This section raises questions if some features, capabilities, etc can be achieved in emacs in general.
 
 - [ ] Can org-level variation can only work for certain file and/or org buffers?
+- [ ] Are there any other evil related packages that can useful for my workflow?
+
+- [ ] How do I get history evil commands in the echo area like doom emacs?
