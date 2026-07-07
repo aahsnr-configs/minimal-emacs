@@ -106,16 +106,6 @@ This section contains critical shields for known Emacs core bugs that trigger du
 ;;
 ;; This advice temporarily neutralizes org-mode hooks during init.el
 ;; evaluation and byte-compilation, guaranteeing a sterile environment.
-(define-advice org-mode (:around (orig-fn &rest args) shield-during-init)
-  "Prevent org-mode from running custom hooks during init/compilation."
-  (if (or (bound-and-true-p byte-compile-current-file)
-          (not after-init-time))
-      (let ((org-mode-hook nil)
-            (org-agenda-mode-hook nil)
-            (org-capture-mode-hook nil)
-            (org-src-mode-hook nil))
-        (apply orig-fn args))
-    (apply orig-fn args)))
 #+end_src
 
 ** DONE Compile Angel
