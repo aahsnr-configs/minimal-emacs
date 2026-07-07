@@ -27,7 +27,7 @@ This section initializes the built-in *package.el* system. It configures the sta
 ;; Prefer newer versions of files when loading (e.g., .el over .elc if edited).
 ;; This prevents Emacs from silently loading stale byte-compiled artifacts
 ;; when you are actively debugging or modifying Elisp source files.
-;;(setq load-prefer-newer t)
+(setq load-prefer-newer t)
 
 ;; Redirect ELPA packages to a subdirectory to keep the root directory clean.
 (setq package-user-dir (expand-file-name "var/elpa/" user-emacs-directory))
@@ -39,8 +39,9 @@ This section initializes the built-in *package.el* system. It configures the sta
 (setq package-archives '(("gnu" . "https://elpa.gnu.org/packages/")
                          ("nongnu" . "https://elpa.nongnu.org/nongnu/")
                          ("melpa" . "https://melpa.org/packages/")))
+(package-activate-all)
 
-(package-initialize)
+;;(package-initialize)
 
 ;; Refresh archive contents if they are missing (e.g., on a fresh install).
 ;; Note: This forces a synchronous network request. On subsequent startups,
@@ -55,7 +56,6 @@ This section initializes the built-in *package.el* system. It configures the sta
 ;; `package-enable-at-startup nil`, we must manually activate them here.
 ;; `package-activate-all` respects `package-quickstart` and completely bypasses 
 ;; the "Unnecessary call" deprecation warning triggered by `package-initialize`.
-;;(package-activate-all)
 
 ;; Bootstrap `no-littering` to manage Emacs file paths cleanly.
 ;; This must happen before any other packages are loaded so they respect
@@ -89,24 +89,6 @@ This section initializes the built-in *package.el* system. It configures the sta
       use-package-enable-imenu-support t) ; Allow imenu to jump to use-package blocks
 #+end_src
 
-** DONE Bug Workarounds
-This section contains critical shields for known Emacs core bugs that trigger during batch package installation on fresh clones.
-#+begin_src emacs-lisp
-;; ==========================================
-;; CRITICAL BUG WORKAROUND (Bug#77464 / lsp-mode#4898)
-;; ==========================================
-;; During a fresh clone batch-install, `lsp-mode` spins up a temporary
-;; `(org-mode)` buffer to check for Element API compatibility. If your
-;; `org-mode-hook` contains packages that haven't been installed yet
-;; (e.g., org-modern, rainbow-mode), the hook throws a void-function error.
-;; This specific error triggers Emacs Bug#77464, which permanently corrupts
-;; the `cl-generic` dispatch system for the rest of the session, causing
-;; all subsequent package installations to crash with "already defined as
-;; something else than a generic function".
-;;
-;; This advice temporarily neutralizes org-mode hooks during init.el
-;; evaluation and byte-compilation, guaranteeing a sterile environment.
-#+end_src
 
 ** DONE Compile Angel
 *compile-angel* automatically byte-compiles and native-compiles Emacs Lisp files in the background, ensuring that your configuration and installed packages always run at maximum C-level speed. Crucially, this section configures explicit exclusions for frequently written state files *(savehist, recentf, custom-file)*. Compiling these files would cause severe I/O locks, async compilation warnings, and unnecessary CPU cycles, as they contain serialized data structures, not executable code.
@@ -235,20 +217,6 @@ removed keybindings, hooks, or modes) will persist until you restart Emacs."
         (message "  • Major structural changes")
         (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")))))
 
-(defun my/auto-tangle-config-org ()
-  "Automatically tangle config.org when saved.
-This ensures that the executable init.el is always in sync with the
-literate configuration document without requiring manual intervention."
-  (when (string-equal (buffer-file-name)
-                      (expand-file-name "config.org" user-emacs-directory))
-    ;; Dynamic scoping to avoid confirmation prompts during tangling
-    (let ((org-confirm-babel-evaluate nil))
-      (org-babel-tangle))))
-
-;; Attach the auto-tangler to the `after-save-hook` locally for org-mode buffers.
-(add-hook 'org-mode-hook
-          (lambda ()
-            (add-hook 'after-save-hook #'my/auto-tangle-config-org nil t)))
 
 (defun selected-region-or-symbol-at-point ()
   "Return the selected region, otherwise return the symbol at point.
