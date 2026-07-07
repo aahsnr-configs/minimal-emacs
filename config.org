@@ -27,18 +27,10 @@ This section initializes the built-in *package.el* system. It configures the sta
 ;; Prefer newer versions of files when loading (e.g., .el over .elc if edited).
 ;; This prevents Emacs from silently loading stale byte-compiled artifacts
 ;; when you are actively debugging or modifying Elisp source files.
-(setq load-prefer-newer t)
+;;(setq load-prefer-newer t)
 
 ;; Redirect ELPA packages to a subdirectory to keep the root directory clean.
 (setq package-user-dir (expand-file-name "var/elpa/" user-emacs-directory))
-
-;; PERFORMANCE: Enable package-quickstart.
-;; This tells Emacs to generate and use a cached `package-quickstart.el` file
-;; containing pre-computed load-paths and autoloads. This prevents Emacs from
-;; scanning hundreds of folders in `var/elpa/` on every startup.
-;; Note: On a fresh clone, this file won't exist yet, so the first boot will
-;; be slow while Emacs generates it. All subsequent boots will be blazing fast.
-(setq package-quickstart t)
 
 (require 'package)
 
@@ -47,6 +39,8 @@ This section initializes the built-in *package.el* system. It configures the sta
 (setq package-archives '(("gnu" . "https://elpa.gnu.org/packages/")
                          ("nongnu" . "https://elpa.nongnu.org/nongnu/")
                          ("melpa" . "https://melpa.org/packages/")))
+
+(package-initialize)
 
 ;; Refresh archive contents if they are missing (e.g., on a fresh install).
 ;; Note: This forces a synchronous network request. On subsequent startups,
@@ -61,7 +55,7 @@ This section initializes the built-in *package.el* system. It configures the sta
 ;; `package-enable-at-startup nil`, we must manually activate them here.
 ;; `package-activate-all` respects `package-quickstart` and completely bypasses 
 ;; the "Unnecessary call" deprecation warning triggered by `package-initialize`.
-(package-activate-all)
+;;(package-activate-all)
 
 ;; Bootstrap `no-littering` to manage Emacs file paths cleanly.
 ;; This must happen before any other packages are loaded so they respect
@@ -123,7 +117,6 @@ This section contains critical shields for known Emacs core bugs that trigger du
         (apply orig-fn args))
     (apply orig-fn args)))
 #+end_src
-
 
 ** DONE Compile Angel
 *compile-angel* automatically byte-compiles and native-compiles Emacs Lisp files in the background, ensuring that your configuration and installed packages always run at maximum C-level speed. Crucially, this section configures explicit exclusions for frequently written state files *(savehist, recentf, custom-file)*. Compiling these files would cause severe I/O locks, async compilation warnings, and unnecessary CPU cycles, as they contain serialized data structures, not executable code.
