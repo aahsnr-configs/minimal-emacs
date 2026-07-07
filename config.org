@@ -90,58 +90,6 @@ This section initializes the built-in *package.el* system. It configures the sta
 #+end_src
 
 
-** DONE Compile Angel
-*compile-angel* automatically byte-compiles and native-compiles Emacs Lisp files in the background, ensuring that your configuration and installed packages always run at maximum C-level speed. Crucially, this section configures explicit exclusions for frequently written state files *(savehist, recentf, custom-file)*. Compiling these files would cause severe I/O locks, async compilation warnings, and unnecessary CPU cycles, as they contain serialized data structures, not executable code.
-
-*Architectural Note:* 
-Because we have implemented the =org-mode= shield (Bug#77464 workaround) earlier in the configuration, it is completely safe to activate =compile-angel= synchronously here. The shield prevents the =cl-generic= corruption during =lsp-mode= installation, allowing =compile-angel= to safely intercept =load= calls and native-compile packages in the background without triggering race conditions.
-#+begin_src emacs-lisp
-;; Exclude anything you don't want silently compiled (adjust to taste)
-;; (setq compile-angel-excluded-files-regexps '("/\\.dir-config\\.el$"))
-
-(use-package compile-angel
-  :demand t  ;; Load the package and variables immediately so exclusions can be registered.
-  :config
-  (setq compile-angel-verbose t)
-  
-  ;; Prevent compile-angel from compiling the core init files.
-  ;; Tangling and compiling these simultaneously can cause race conditions.
-  (push "/init.el" compile-angel-excluded-path-suffixes)
-  (push "/early-init.el" compile-angel-excluded-path-suffixes)
-  
-  ;; Automatically compile elisp files on save
-  (add-hook 'emacs-lisp-mode-hook #'compile-angel-on-save-local-mode)
-
-  ;; Exclude state files that are frequently written to prevent I/O locks
-  ;; and native-comp warnings on non-code data structures.
-  ;; We use `with-eval-after-load` to ensure the variables are defined
-  ;; before we attempt to read their file paths.
-  (with-eval-after-load "savehist"
-    (push (concat "/" (file-name-nondirectory savehist-file))
-          compile-angel-excluded-path-suffixes))
-  (with-eval-after-load "recentf"
-    (push (concat "/" (file-name-nondirectory recentf-save-file))
-          compile-angel-excluded-path-suffixes))
-  (with-eval-after-load "cus-edit"
-    (when (stringp custom-file)
-      (push (concat "/" (file-name-nondirectory custom-file))
-            compile-angel-excluded-path-suffixes)))
-
-  ;; SYNCHRONOUS ACTIVATION:
-  ;; Now that exclusions are registered, turn on the interception itself.
-  ;; This globally monitors `load` and `require` calls and compiles missing 
-  ;; .elc/.eln files in the background as packages are loaded by use-package.
-  (compile-angel-on-load-mode 1))
-
-(setq compile-angel-enable-byte-compile t)
-(setq compile-angel-enable-native-compile t)
-
-;; Don't leave half-finished .eln files in /tmp if you quit mid-compile.
-;; This forces Emacs to wait for the native-comp worker to finish or abort cleanly.
-(setq native-comp-async-query-on-exit t)
-(setq confirm-kill-processes t)
-#+end_src
-
 ** DONE Custom Functions
 A collection of utility functions used throughout the configuration. These include robust checks for childframe and icon support (essential for UI packages like *corfu* and *nerd-icons*), a comprehensive configuration reloader that calculates load times, and an auto-tangler that seamlessly compiles the literate *config.org* upon saving.
 
