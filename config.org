@@ -4648,26 +4648,36 @@ buffer killing or garbage collection cycles."
 
 * Development Tools
 ** Language Server Protocol
-
 #+begin_src emacs-lisp
 (use-package lsp-mode
   :defer t
-  :hook (prog-mode . lsp-deferred)
   :init
-  ;; TODO Use a doom emacs prefix and use all lsp keybindings under that prefix. Use all the same keybindings in doom emacs for lsp-mode.
+  ;; ==========================================
+  ;; UPSTREAM FIX (lsp-mode Issue #4898 / PR #4889)
+  ;; ==========================================
+  ;; lsp-mode spins up a hidden temp `org-mode` buffer to check the Org Element API.
+  ;; If any `org-mode-hook` throws an error in that temp buffer, it corrupts Emacs'
+  ;; `cl-generic` system (Bug#77464), causing the fatal "lsp-execute-command is already
+  ;; defined as something else than a generic function" error.
+  ;;
+  ;; We pre-define the function and attach an :around advice here in `:init`.
+  ;; Emacs' `nadvice` system guarantees that when `lsp-mode` later executes its own
+  ;; `defun` for this function, the advice will survive and wrap the new definition,
+  ;; forcing it to return `t` immediately without spinning up the dangerous temp buffer.
+  (defun lsp--detect-org-element-api () t)
+  (defun lsp--detect-org-element-api--always-true (orig-fun &rest args) t)
+  (advice-add 'lsp--detect-org-element-api :around #'lsp--detect-org-element-api--always-true)
+  
   (setq lsp-keymap-prefix "C-c l")
+  :hook (prog-mode . lsp-deferred)
   :custom
   ;; --- UI & Functionality Enhancements ---
   (lsp-semantic-tokens-enable t)
   (lsp-headerline-breadcrumb-enable t)
   (lsp-lens-enable t)
   (lsp-modeline-diagnostics-enable t)
-
   ;; --- Diagnostics & Completion Integration ---
-  ;; TODO Uncomment this when setting up flycheck
-  ;;(lsp-diagnostics-provider :flycheck)
   (lsp-completion-provider :none)
-
   ;; --- Performance & Behavior ---
   (lsp-eldoc-render-all nil)
   (lsp-idle-delay 0.2)
