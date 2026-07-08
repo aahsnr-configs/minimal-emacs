@@ -718,26 +718,6 @@ Wraps =iedit= in a dedicated Evil state for localized multi-cursor refactoring.
 #+end_src
 
 
-** TODO Evil Surround
-#+begin_src emacs-lisp
-(use-package evil-surround
-  :after evil
-  :commands global-evil-surround-mode
-  :custom
-  (evil-surround-pairs-alist
-   '((?\( . ("(" . ")"))
-     (?\[ . ("[" . "]"))
-     (?\{ . ("{" . "}"))
-
-     (?\) . ("(" . ")"))
-     (?\] . ("[" . "]"))
-     (?\} . ("{" . "}"))
-
-     (?< . ("<" . ">"))
-     (?> . ("<" . ">"))))
-  :config (global-evil-surround-mode 1))
-#+end_src
-
 
 ** DONE Evil Args
 Provides =a= text objects for function arguments.
@@ -843,197 +823,170 @@ Intercepts Evil's =o= and =O= operators to continue comment lines natively. Util
 
 
 
-* TODO Editor Behaviour
+* DONE Visual Chrome & UI Overlays
+Establishes the visual baseline, typography, and foundational UI overlays. Manages theme rendering, glyph substitution, and childframe APIs required by downstream packages.
 
-** TODO Child Frame
+** DONE Child Frame
+Establishes the foundational child frame API and global border theming. Configures native Emacs 28+ border faces and applies fringe isolation for downstream UI packages.
 #+begin_src emacs-lisp
 (use-package posframe
   :defer t
-  :init
-  (defface posframe-border
-    `((t (:inherit region)))
-    "Face used by the `posframe' border."
-    :group 'posframe)
-  (defvar posframe-border-width 1
-    "Default posframe border width.")
+  :custom-face
+  ;; Themes the native Emacs 28+ child frame border to inherit the active region face.
+  (child-frame-border ((t (:inherit region))))
   :config
+  ;; Prevents the parent frame's fringe background from bleeding into the child frame.
+  ;; Guarded by `frame-live-p` to prevent redisplay crashes during daemon teardown.
   (with-no-warnings
-    (defun my-posframe--prettify-frame (&rest _)
-      (set-face-background 'fringe nil posframe--frame))
-    (advice-add #'posframe--create-posframe :after #'my-posframe--prettify-frame)
-
-    (defun posframe-poshandler-frame-center-near-bottom (info)
-      (cons (/ (- (plist-get info :parent-frame-width)
-                  (plist-get info :posframe-width))
-               2)
-            (/ (+ (plist-get info :parent-frame-height)
-                  (* 2 (plist-get info :font-height)))
-               2)))))
+    (defun ar/posframe--isolate-fringe (&rest _)
+      (when (and (boundp 'posframe--frame)
+                 (frame-live-p posframe--frame))
+        (set-face-background 'fringe nil posframe--frame)))
+    (advice-add #'posframe--create-posframe :after #'ar/posframe--isolate-fringe))
+  ;; Mathematically corrected poshandler for near-bottom centering.
+  ;; Subtracts the child frame's height to prevent bottom-edge clipping.
+  (defun ar/posframe-poshandler-frame-center-near-bottom (info)
+    (let ((parent-width (plist-get info :parent-frame-width))
+          (parent-height (plist-get info :parent-frame-height))
+          (posframe-width (plist-get info :posframe-width))
+          (posframe-height (plist-get info :posframe-height))
+          (font-height (plist-get info :font-height)))
+      (cons (/ (- parent-width posframe-width) 2)
+            (- parent-height posframe-height (* 2 font-height))))))
 #+end_src
 
 
-** TODO Nerd Icons
+** DONE Nerd Icons
+Foundational glyph substitution and icon API. Eagerly loaded to prevent void-function errors in downstream UI packages lacking strict dependency declarations.
 #+begin_src emacs-lisp
 (use-package nerd-icons
+  :demand t
   :custom
+  ;; Enforces the dedicated Nerd Font symbol family for consistent glyph rendering.
   (nerd-icons-font-family "Symbols Nerd Font Mono")
+  ;; Enables colorized glyphs; upstream fallbacks handle terminal degradation.
   (nerd-icons-color-icons t))
 #+end_src
 
 
-** TODO Fonts
+** DONE Fonts
+Configures global typography and baseline monospaced faces. Utilizes server-frame hooks for daemon-safe inheritance and integer line-spacing to prevent sub-pixel artifacts.
 #+begin_src emacs-lisp
-(defun ar/set-fonts ()
-  "Set the default, fixed-pitch, and variable-pitch fonts for the current frame."
+(defun ar/setup-fonts ()
+  "Apply global typography and baseline monospaced faces to the current frame."
   (set-face-attribute 'default nil :font "JetBrains Mono" :height 125 :weight 'medium)
   (set-face-attribute 'fixed-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
-  (set-face-attribute 'variable-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
-  ;; Apply italic slant to comments
-  (set-face-attribute 'font-lock-comment-face nil :slant 'italic)
+  ;; Maps variable-pitch to the monospaced font to preserve Org-mode table alignment.
+  (set-face-attribute 'variable-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium))
 
-  ;; Apply BOTH Bold and Italic to keywords
-  (set-face-attribute 'font-lock-keyword-face nil :weight 'bold :slant 'italic))
+;; Applies fonts immediately for standard GUI sessions.
+(unless noninteractive
+  (ar/setup-fonts))
 
-(if (daemonp)
-    (add-hook 'emacs-startup-hook
-              (lambda ()
-                (add-hook 'after-make-frame-functions
-                          (lambda (frame)
-                            (with-selected-frame frame (ar/set-fonts))))))
-  ;; For non-daemon mode, set fonts immediately (but skip in background batch mode)
-  (unless noninteractive
-    (ar/set-fonts)))
+;; Daemon-safe hook: applies fonts to GUI frames spawned by emacsclient.
+(add-hook 'server-after-make-frame-hook #'ar/setup-fonts)
 
-;; Line spacing
-(setq-default line-spacing 0.02)
+;; Integer pixel spacing prevents sub-pixel rendering artifacts while providing vertical breathing room.
+(setq-default line-spacing 2)
 
-;; Font settings
-(setq font-lock-maximum-decoration t
-      inhibit-compacting-font-caches t)
+;; Maximizes syntax highlighting decoration across all programming buffers.
+(setq font-lock-maximum-decoration t)
 #+end_src
 
 
-** TODO Doom Themes
+** DONE Doom Themes
+Applies the Tokyo Night palette and integrates downstream UI enhancements. Synchronously loaded to prevent initial frame Flash of Unstyled Content (FOUC).
 #+begin_src emacs-lisp
 (use-package doom-themes
+  :demand t
   :custom
   (doom-themes-enable-bold t)
   (doom-themes-enable-italic t)
   (doom-themes-treemacs-theme "doom-atom")
   :config
   (load-theme 'doom-tokyo-night t)
-  (doom-themes-neotree-config)
-  (doom-themes-treemacs-config)
-  (doom-themes-org-config))
+  ;; Defers injection until Treemacs is lazily loaded.
+  (with-eval-after-load 'treemacs
+    (doom-themes-treemacs-config))
+  ;; Defers Org font-lock patches until the AST engine loads.
+  (with-eval-after-load 'org
+    (doom-themes-org-config)))
 #+end_src
 
 
-** TODO Solaire Mode
+** DONE Solaire Mode
+Swaps background faces to distinguish side-windows and popups. Deferred until the theme engine finalizes to prevent mapping race conditions.
 #+begin_src emacs-lisp
 (use-package solaire-mode
-  :init
+  :after doom-themes
+  :hook ((change-major-mode after-revert ediff-prepare-buffer org-capture-mode) . turn-on-solaire-mode)
+  :config
   (solaire-global-mode +1))
 #+end_src
 
 
-** TODO Transient
+** DONE Transient
+Foundational API for ephemeral keybinding menus. Strictly deferred to respect downstream evaluation wrappers and configured for variable-pitch grid alignment.
 #+begin_src emacs-lisp
 (use-package transient
-  :init
-  (setq resize-mini-windows t)
-
-  :config
-  (require 'nerd-icons)
-  (defun ar/transient-title ()
-    (concat
-     (if (fboundp 'nerd-icons-faicon)
-         (nerd-icons-faicon "nf-fa-toggle_on" :face 'transient-heading :v-adjust 0.02)
-       "")
-     (propertize " Emacs Toggles" 'face 'transient-heading)))
-
-  (defun ar/toggle-whitespace ()
-    (interactive)
-    (setq show-trailing-whitespace (not show-trailing-whitespace))
-    (redraw-display)
-    (message "Trailing whitespace %s" (if show-trailing-whitespace "ON" "OFF")))
-
-  (defun ar/toggle-line-numbers ()
-    "Toggle line numbers (Relative -> Absolute -> Off)."
-    (interactive)
-    (cond
-     ((bound-and-true-p display-line-numbers-mode)
-      (if (eq display-line-numbers 'relative)
-          (setq display-line-numbers t)
-        (display-line-numbers-mode -1)))
-     (t
-      (display-line-numbers-mode 1)
-      (setq display-line-numbers 'relative))))
-
-  (transient-define-prefix ar/toggles-transient ()
-    "Global Toggles and Actions"
-    [:description ar/transient-title
-
-     ["Basic"
-      ("n" "Line numbers" ar/toggle-line-numbers :transient t)
-      ("a" "Aggressive indent" global-aggressive-indent-mode :transient t
-       :if (lambda () (fboundp 'global-aggressive-indent-mode)))
-      ("d" "Hungry delete" global-hungry-delete-mode :transient t
-       :if (lambda () (fboundp 'global-hungry-delete-mode)))
-      ("e" "Electric pair" electric-pair-mode :transient t)
-      ("c" "Spell check" flyspell-mode :transient t
-       :if (lambda () (fboundp 'flyspell-mode)))
-      ("s" "Pretty symbol" prettify-symbols-mode :transient t)
-      ("l" "Page break lines" global-page-break-lines-mode :transient t
-       :if (lambda () (fboundp 'global-page-break-lines-mode)))
-      ("b" "Battery" display-battery-mode :transient t)
-      ("i" "Time" display-time-mode :transient t)
-      ("m" "Modeline" (lambda () (interactive)
-                        (if (bound-and-true-p doom-modeline-mode)
-                            (doom-modeline-mode -1)
-                          (doom-modeline-mode 1)))
-       :transient t :if (lambda () (fboundp 'doom-modeline-mode)))]
-
-     ["Highlight"
-      ("h l" "Line" global-hl-line-mode :transient t)
-      ("h p" "Paren" show-paren-mode :transient t)
-      ("h s" "Symbol" symbol-overlay-mode :transient t
-       :if (lambda () (fboundp 'symbol-overlay-mode)))
-      ("h r" "Rainbow" rainbow-mode :transient t
-       :if (lambda () (fboundp 'rainbow-mode)))
-      ("h w" "Whitespace" ar/toggle-whitespace :transient t)
-      ("h d" "Delimiters" rainbow-delimiters-mode :transient t
-       :if (lambda () (fboundp 'rainbow-delimiters-mode)))
-      ("h i" "Indent guides" indent-bars-mode :transient t
-       :if (lambda () (fboundp 'indent-bars-mode)))
-      ("h t" "Todo" global-hl-todo-mode :transient t
-       :if (lambda () (fboundp 'global-hl-todo-mode)))]
-
-     ["Program"
-      ("f" "Flymake" flymake-mode :transient t)
-      ("O" "Hideshow" hs-minor-mode :transient t)
-      ("u" "Subword" subword-mode :transient t)
-      ("W" "Which func" which-function-mode :transient t)
-      ("E" "Debug on error" toggle-debug-on-error :transient t)
-      ("Q" "Debug on quit" toggle-debug-on-quit :transient t)
-      ("v" "Gutter" diff-hl-mode :transient t
-       :if (lambda () (fboundp 'diff-hl-mode)))]
-
-     ["Package"
-      ("p r" "Refresh archives" package-refresh-contents)
-      ("p l" "List packages" package-list-packages)
-      ("p i" "Install package" package-install)
-      ("p d" "Delete package" package-delete)
-      ("p a" "Autoremove" package-autoremove)
-      ;; Hidden Toggle
-      ("<escape>" "" transient-quit-one :format " ")]]))
+  :defer t
+  :custom
+  ;; Guarantees rectangular grid alignment when invoked inside proportional Org buffers.
+  (transient-align-variable-pitch t))
 #+end_src
 
 
-** TODO Avy
-Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy is inherently mode-agnostic, its entry points are mapped to Vim-style mnemonic prefixes (e.g., =s= for character jumps, =g s= for two-character jumps, =g w= for word jumps) within Evil's motion state. This preserves strict Vim muscle memory and operator-pending compatibility (e.g., =d g s= to delete up to a jumped character) while bypassing the linear scanning overhead of native Vim motions.
+** DONE Which Key
+Keystroke discovery UI overlay. Renders prefix bindings in the echo area with alphabetical sorting and optimized pagination.
 #+begin_src emacs-lisp
+(use-package which-key
+  :ensure nil
+  :demand t
+  :custom
+  (which-key-idle-delay 0.7) ; Initial delay
+  (which-key-idle-secondary-delay 0.05) ; Secondary delay
+  (which-key-popup-type 'minibuffer) ; Echo area rendering
+  (which-key-separator " → ") ; Separator
+  (which-key-sort-order 'which-key-key-order-alpha) ; Alphabetical sort
+  (which-key-sort-uppercase-first nil) ; Case-insensitive sort
+  (which-key-add-column-padding 1) ; Column padding
+  (which-key-max-description-length 30) ; Truncate descriptions
+  (which-key-min-display-lines 6) ; Minimum height
+  (which-key-allow-multiple-replacements t) ; Multiple replacements
+  (which-key-show-operator-state-maps t) ; Operator-pending maps
+  :config
+  (which-key-mode 1))
 #+end_src
 
+
+** DONE Prettify Symbols & Ligatures
+Delegates operator ligatures to HarfBuzz via ligature.el and reserves Elisp substitution strictly for semantic keywords.
+#+begin_src emacs-lisp
+(use-package ligature
+  :demand t
+  :config
+  ;; Maps ASCII sequences to JetBrains Mono's native OpenType GSUB ligatures.
+  ;; Excludes equality/inequality operators and ellipses to prevent visual ambiguity.
+  (ligature-set-ligatures 'prog-mode
+                          '("=>" "->" "->>" "-->" "<-" "<--" "<=" ">=" ">>" "<<"
+                            "&&" "||" "::" ":=" "~~" "**" "www" "##" "###" "####"
+                            "<!--" "|>" "<|" "</" "/>" ">>=" "<<="))
+  (global-ligature-mode t))
+
+;; Establishes the baseline alist for keywords lacking native OpenType ligatures.
+(setq-default prettify-symbols-alist '(("lambda" . ?λ)))
+
+;; Reveals raw text when the cursor touches the symbol boundary for precise editing.
+(setq prettify-symbols-unprettify-at-point 'right-edge)
+
+;; Activates globally across prog-mode, text-mode, and conf-mode derivatives.
+(global-prettify-symbols-mode 1)
+#+end_src
+
+
+
+* TODO Interactive Buffers & Redisplay Physics
+Governs fundamental buffer I/O, terminal emulation, and scroll rendering. Dictates how Emacs processes asynchronous input and refreshes the display matrix.
 
 ** TODO Autorevert
 - [ ] What does autorevert do exactly
@@ -1045,22 +998,119 @@ Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy
 #+end_src
 
 
-** TODO Anzu
-- [ ] Do I need to anything with other isearch functionalities in the rest of the emacs config to work with anzu?
+** TODO Subword
 #+begin_src emacs-lisp
-(use-package anzu
-  :bind (([remap query-replace] . anzu-query-replace)
-         ([remap query-replace-regexp] . anzu-query-replace-regexp)
-         :map isearch-mode-map
-         ([remap isearch-query-replace] . anzu-isearch-query-replace)
-         ([remap isearch-query-replace-regexp] . anzu-isearch-query-replace-regexp))
-  :hook (after-init . global-anzu-mode))
-
-(use-package evil-anzu :after evil)
+(use-package subword
+  :defer t
+  :ensure nil
+  :hook ((prog-mode . subword-mode)
+         (minibuffer-setup . subword-mode)))
 #+end_src
 
 
-** TODO elec-pair
+** TODO Sudo edit
+#+begin_src emacs-lisp
+(use-package sudo-edit :defer t)
+#+end_src
+
+
+
+** TODO Buffer Terminator
+- [ ] Will buffer-terminator be useful for my whole emacs configuration?
+#+begin_src emacs-lisp
+(use-package buffer-terminator
+  :hook (after-init . buffer-terminator-mode)
+  :custom
+  (buffer-terminator-verbose nil)
+  (buffer-terminator-inactivity-timeout (* 30 60))
+  (buffer-terminator-interval (* 10 60)))
+#+end_src
+
+
+** TODO Terminal
+TODO: =Add ghostel package from https://github.com/dakra/ghostel=
+
+
+
+** TODO Scrolling
+- [ ] Use doom emacs module for smoother scrolling
+#+begin_src emacs-lisp
+;; Scroll one line at a time (less "jumpy" than defaults)
+(setq hscroll-step 1
+      hscroll-margin 2
+      scroll-step 1
+      scroll-margin 0
+      scroll-conservatively 100000
+      scroll-preserve-screen-position t
+      auto-window-vscroll nil
+      ;; mouse
+      mouse-wheel-scroll-amount-horizontal 1
+      mouse-wheel-progressive-speed nil)
+
+;; Smooth scrolling
+(use-package ultra-scroll
+  :functions (hl-todo-mode diff-hl-flydiff-mode)
+  :hook (after-init . ultra-scroll-mode)
+  :config
+  (add-hook 'ultra-scroll-hide-functions #'diff-hl-flydiff-mode)
+  (add-hook 'ultra-scroll-hide-functions #'hl-todo-mode)
+  (add-hook 'ultra-scroll-hide-functions #'jit-lock-mode))
+
+#+end_src
+
+
+* TODO AST Parsing & Structural Typing
+Establishes the C-level parsing foundation and non-Lisp typing layer. Provides AST-aware text objects, boundary wrapping, and deep node refactoring.
+
+** TODO Treesit
+NOTE: =Wait for Emacs 31 to be released as they will introduce automatic tree-sitter grammar installation when any specific prog-mode buffer is opened. The grammars should not be in the main emacs config folder.=
+=Ready it for Emacs 31 features as well keep Emacs 30 features=
+#+begin_src emacs-lisp
+(use-package treesit
+  :ensure nil
+  :mode (("\\.tsx\\'" . tsx-ts-mode))
+  :init
+  (defvar ar/treesit-grammar-dir
+    (file-truename (expand-file-name "tree-sitter/" user-emacs-directory))
+    "Target directory for installing tree-sitter grammars.")
+
+  (unless (file-exists-p ar/treesit-grammar-dir)
+    (make-directory ar/treesit-grammar-dir t))
+
+  (add-to-list 'treesit-extra-load-path ar/treesit-grammar-dir)
+
+  :config
+  (setq treesit-font-lock-level 4)
+
+  (setq treesit-language-source-alist
+        '((python "https://github.com/tree-sitter/tree-sitter-python")
+          (bash "https://github.com/tree-sitter/tree-sitter-bash")
+          (c "https://github.com/tree-sitter/tree-sitter-c")
+          (cpp "https://github.com/tree-sitter/tree-sitter-cpp")
+          (dockerfile "https://github.com/camdencheek/tree-sitter-dockerfile.git")
+          (json "https://github.com/tree-sitter/tree-sitter-json")
+          (latex "https://github.com/latex-lsp/tree-sitter-latex")
+          (bibtex "https://github.com/latex-lsp/tree-sitter-bibtex")
+          (nix "https://github.com/nix-community/tree-sitter-nix")
+          (yaml "https://github.com/tree-sitter-grammars/tree-sitter-yaml")
+          (typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
+          (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")))
+
+  ;; NOTE: Will no longer be needed for emacs 31
+  (setq major-mode-remap-alist
+        '((python-mode . python-ts-mode)
+          (json-mode . json-ts-mode)
+          (js-mode . js-ts-mode)
+          (bash-mode . bash-ts-mode)
+          (sh-mode . bash-ts-mode)
+          (typescript-mode . typescript-ts-mode)
+          (conf-toml-mode . toml-ts-mode)
+          (c-mode . c-ts-mode)
+          (c++-mode . c++-ts-mode))))
+#+end_src
+
+
+** TODO Electric Pair
 =Look at doom emacs module=
 #+begin_src emacs-lisp
 (use-package elec-pair
@@ -1070,7 +1120,30 @@ Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy
 #+end_src
 
 
-** TODO show-paren-mode
+** TODO Evil Surround
+#+begin_src emacs-lisp
+(use-package evil-surround
+  :after evil
+  :commands global-evil-surround-mode
+  :custom
+  (evil-surround-pairs-alist
+   '((?\( . ("(" . ")"))
+     (?\[ . ("[" . "]"))
+     (?\{ . ("{" . "}"))
+
+     (?\) . ("(" . ")"))
+     (?\] . ("[" . "]"))
+     (?\} . ("{" . "}"))
+
+     (?< . ("<" . ">"))
+     (?> . ("<" . ">"))))
+  :config (global-evil-surround-mode 1))
+#+end_src
+
+
+** TODO Delete Pair
+
+** TODO Show Paren Mode
 #+begin_src emacs-lisp
 (use-package paren
   :ensure nil
@@ -1154,89 +1227,80 @@ Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy
 #+end_src
 
 
-** TODO Sudo edit
-#+begin_src emacs-lisp
-(use-package sudo-edit :defer t)
-#+end_src
+** TODO Blink Matching Paren
 
+** TODO Rainbow Delimiters
 
-** TODO Subword
 #+begin_src emacs-lisp
-(use-package subword
+(use-package rainbow-delimiters
   :defer t
-  :ensure nil
-  :hook ((prog-mode . subword-mode)
-         (minibuffer-setup . subword-mode)))
+  :hook ((LaTeX-mode . rainbow-delimiters-mode)
+         (prog-mode . rainbow-delimiters-mode))
+  :config
+  (custom-set-faces
+   '(rainbow-delimiters-depth-1-face ((t (:foreground "#7aa2f7"))))
+   '(rainbow-delimiters-depth-2-face ((t (:foreground "#e0af68"))))
+   '(rainbow-delimiters-depth-3-face ((t (:foreground "#9ece6a"))))
+   '(rainbow-delimiters-depth-4-face ((t (:foreground "#1abc9c"))))
+   '(rainbow-delimiters-depth-5-face ((t (:foreground "#bb9af7"))))
+   '(rainbow-delimiters-depth-6-face ((t (:foreground "#9d7cd8"))))
+   '(rainbow-delimiters-depth-7-face ((t (:foreground "#ff9e64"))))
+   '(rainbow-delimiters-depth-8-face ((t (:foreground "#f7768e"))))
+   '(rainbow-delimiters-depth-9-face ((t (:foreground "#7aa2f7"))))))
 #+end_src
 
 
-** TODO Buffer Terminator
-- [ ] Will buffer-terminator be useful for my whole emacs configuration?
+
+
+** TODO Evil Matchit
+
+** TODO Evil Textobj Tree-Sitter
+
+** TODO Treesit Navigate Thing
+
+** TODO Expreg
+
+** TODO Tree Edit
+
+
+* TODO Code Folding & Region Concealment
+Manages structural and textual collapsing mechanisms. Hides implementation details via AST-aware blocks and regex-based visual folds.
+
+** TODO Treesit Fold
+NOTE: =check with doom-emacs modules=
 #+begin_src emacs-lisp
-(use-package buffer-terminator
-  :hook (after-init . buffer-terminator-mode)
-  :custom
-  (buffer-terminator-verbose nil)
-  (buffer-terminator-inactivity-timeout (* 30 60))
-  (buffer-terminator-interval (* 10 60)))
+;; (use-package treesit-fold
+;;   :defer t
+;;   :straight (:host github :repo "emacs-tree-sitter/treesit-fold")
+;;   ;; :custom
+;;   ;; (treesit-fold-indicators-priority -1)
+;;   :config
+;;   (global-treesit-fold-mode 1)
+;;   (global-treesit-fold-indicators-mode 1))
 #+end_src
 
 
-** TODO Helpful
-- [ ] How does doom emacs configure the helpful package and what keybinding does doom emacs have?
+** TODO Vimish Fold
+NOTE: =check with doom-emacs modules=
 #+begin_src emacs-lisp
-(use-package helpful
+(use-package vimish-fold
   :defer t
-  :commands (helpful-callable
-             helpful-variable
-             helpful-key
-             helpful-command
-             helpful-at-point
-             helpful-function)
-  :bind
-  ([remap describe-command] . helpful-command)
-  ([remap describe-function] . helpful-callable)
-  ([remap describe-key] . helpful-key)
-  ([remap describe-symbol] . helpful-symbol)
-  ([remap describe-variable] . helpful-variable)
-  :custom
-  (helpful-max-buffers 7))
+  :after evil
+  :config (vimish-fold-global-mode 1))
+
+(use-package evil-vimish-fold
+  :defer t
+  :after vimish-fold
+  :init
+  (setq evil-vimish-fold-mode-lighter " ⮒")
+  (setq evil-vimish-fold-target-modes '(prog-mode conf-mode text-mode))
+  :config (global-evil-vimish-fold-mode))
 #+end_src
 
 
-** TODO Jinx
-#+begin_src emacs-lisp
-(use-package jinx
-  :hook (after-init . jinx-mode)
-  :custom
-  (jinx-disabled-modes
-   '(prog-mode
-     conf-mode
-     emacs-lisp-mode
-     dired-mode
-     ibuffer-mode
-     neotree-mode
-     treemacs-mode
-     magit-status-mode
-     magit-log-mode
-     magit-diff-mode
-     magit-branch-mode
-     org-agenda-mode
-     org-src-mode
-     dashboard-mode
-     which-key-mode
-     help-mode
-     Info-mode
-     embark-collect-mode
-     vterm-mode
-     term-mode
-     pdf-view-mode))
 
-  (let ((dict-file (expand-file-name "dict.txt" user-emacs-directory)))
-    (unless (file-exists-p dict-file)
-      (write-region "" nil dict-file))))
-#+end_src
-
+* TODO Spatial Alignment & Whitespace Hygiene
+Enforces spatial alignment, trailing character cleanup, and indentation guides. Maintains visual grid consistency across diverse programming languages.
 
 ** TODO Stripspace
 =Look at doom emacs modules for inspiration=
@@ -1324,6 +1388,58 @@ operators and other column-based navigation."
 #+end_src
 
 
+
+* TODO Frame Chrome & Status Indicators
+Renders visual feedback, window dividers, and modeline components. Provides spatial orientation and contextual metadata within the editing frame.
+
+** TODO Line Numbers
+- [ ] Does this conflict with any of my other configurations by any chance? Look at the whole configuration.
+#+begin_src emacs-lisp
+(use-package display-line-numbers
+  :ensure nil
+  :hook ((prog-mode
+          conf-mode toml-ts-mode
+          yaml-mode yaml-ts-mode)
+         . display-line-numbers-mode)
+  :init (setq display-line-numbers-width-start t))
+#+end_src
+
+
+** TODO Display dividers
+#+begin_src emacs-lisp
+(setq window-divider-default-places t
+      window-divider-default-bottom-width 1
+      window-divider-default-right-width 1)
+(add-hook 'window-setup-hook #'window-divider-mode)
+#+end_src
+
+
+** TODO hl-line
+#+begin_src emacs-lisp
+(use-package hl-line
+  :ensure nil
+  :hook ((after-init . global-hl-line-mode)
+         ((dashboard-mode eshell-mode shell-mode term-mode vterm-mode) .
+          (lambda () (setq-local global-hl-line-mode nil))))
+  :config
+  (defun ar/disable-hl-line-in-visual ()
+    (when (bound-and-true-p hl-line-mode)
+      (hl-line-mode -1)
+      (setq-local ar/hl-line-was-on t)))
+
+  (defun ar/enable-hl-line-after-visual ()
+    (when (bound-and-true-p ar/hl-line-was-on)
+      (hl-line-mode 1)
+      (kill-local-variable 'ar/hl-line-was-on)))
+
+  (add-hook 'evil-visual-state-entry-hook #'ar/disable-hl-line-in-visual)
+  (add-hook 'evil-visual-state-exit-hook #'ar/enable-hl-line-after-visual))
+#+end_src
+
+
+
+
+
 ** TODO Rainbow Mode
 #+begin_src emacs-lisp
 (use-package rainbow-mode
@@ -1336,9 +1452,6 @@ operators and other column-based navigation."
   (setq rainbow-x-colors t)
   (setq rainbow-latex-colors t))
 #+end_src
-
-#+RESULTS:
-
 
 
 ** TODO Modeline
@@ -1384,28 +1497,6 @@ operators and other column-based navigation."
 #+end_src
 
 
-** TODO Line Numbers
-- [ ] Does this conflict with any of my other configurations by any chance? Look at the whole configuration.
-#+begin_src emacs-lisp
-(use-package display-line-numbers
-  :ensure nil
-  :hook ((prog-mode
-          conf-mode toml-ts-mode
-          yaml-mode yaml-ts-mode)
-         . display-line-numbers-mode)
-  :init (setq display-line-numbers-width-start t))
-#+end_src
-
-
-** TODO Display dividers between windows
-#+begin_src emacs-lisp
-(setq window-divider-default-places t
-      window-divider-default-bottom-width 1
-      window-divider-default-right-width 1)
-(add-hook 'window-setup-hook #'window-divider-mode)
-#+end_src
-
-
 ** TODO Text Scaling
 - [ ] Use a built-in text scaling feature if it is better
 #+begin_src emacs-lisp
@@ -1414,57 +1505,95 @@ operators and other column-based navigation."
 #+end_src
 
 
-** TODO Scrolling
-- [ ] Use doom emacs module for smoother scrolling
+* TODO Spatial Traversal & Inline Mutations
+Provides O(1) spatial traversal, in-buffer search tracking, and localized multi-cursor refactoring. Accelerates cursor movement and targeted text mutations.
+
+** TODO Avy
+Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy is inherently mode-agnostic, its entry points are mapped to Vim-style mnemonic prefixes (e.g., =s= for character jumps, =g s= for two-character jumps, =g w= for word jumps) within Evil's motion state. This preserves strict Vim muscle memory and operator-pending compatibility (e.g., =d g s= to delete up to a jumped character) while bypassing the linear scanning overhead of native Vim motions.
 #+begin_src emacs-lisp
-;; Scroll one line at a time (less "jumpy" than defaults)
-(setq hscroll-step 1
-      hscroll-margin 2
-      scroll-step 1
-      scroll-margin 0
-      scroll-conservatively 100000
-      scroll-preserve-screen-position t
-      auto-window-vscroll nil
-      ;; mouse
-      mouse-wheel-scroll-amount-horizontal 1
-      mouse-wheel-progressive-speed nil)
-
-;; Smooth scrolling
-(use-package ultra-scroll
-  :functions (hl-todo-mode diff-hl-flydiff-mode)
-  :hook (after-init . ultra-scroll-mode)
-  :config
-  (add-hook 'ultra-scroll-hide-functions #'diff-hl-flydiff-mode)
-  (add-hook 'ultra-scroll-hide-functions #'hl-todo-mode)
-  (add-hook 'ultra-scroll-hide-functions #'jit-lock-mode))
-
 #+end_src
 
 
-** TODO hl-line
+** TODO Anzu
+- [ ] Do I need to anything with other isearch functionalities in the rest of the emacs config to work with anzu?
 #+begin_src emacs-lisp
-(use-package hl-line
-  :ensure nil
-  :hook ((after-init . global-hl-line-mode)
-         ((dashboard-mode eshell-mode shell-mode term-mode vterm-mode) .
-          (lambda () (setq-local global-hl-line-mode nil))))
-  :config
-  (defun ar/disable-hl-line-in-visual ()
-    (when (bound-and-true-p hl-line-mode)
-      (hl-line-mode -1)
-      (setq-local ar/hl-line-was-on t)))
+(use-package anzu
+  :bind (([remap query-replace] . anzu-query-replace)
+         ([remap query-replace-regexp] . anzu-query-replace-regexp)
+         :map isearch-mode-map
+         ([remap isearch-query-replace] . anzu-isearch-query-replace)
+         ([remap isearch-query-replace-regexp] . anzu-isearch-query-replace-regexp))
+  :hook (after-init . global-anzu-mode))
 
-  (defun ar/enable-hl-line-after-visual ()
-    (when (bound-and-true-p ar/hl-line-was-on)
-      (hl-line-mode 1)
-      (kill-local-variable 'ar/hl-line-was-on)))
-
-  (add-hook 'evil-visual-state-entry-hook #'ar/disable-hl-line-in-visual)
-  (add-hook 'evil-visual-state-exit-hook #'ar/enable-hl-line-after-visual))
+(use-package evil-anzu :after evil)
 #+end_src
 
 
-** TODO ediff
+** TODO Iedit
+- [ ] Is the current evil-multiedit need to be configured together with iedit?
+
+
+
+* TODO Lexical Validation & Comparative Workflows
+Manages spellchecking, contextual help systems, and heavy multi-buffer comparison tools. Supports complex review workflows and text validation.
+
+** TODO Jinx
+#+begin_src emacs-lisp
+(use-package jinx
+  :hook (after-init . jinx-mode)
+  :custom
+  (jinx-disabled-modes
+   '(prog-mode
+     conf-mode
+     emacs-lisp-mode
+     dired-mode
+     ibuffer-mode
+     neotree-mode
+     treemacs-mode
+     magit-status-mode
+     magit-log-mode
+     magit-diff-mode
+     magit-branch-mode
+     org-agenda-mode
+     org-src-mode
+     dashboard-mode
+     which-key-mode
+     help-mode
+     Info-mode
+     embark-collect-mode
+     vterm-mode
+     term-mode
+     pdf-view-mode))
+
+  (let ((dict-file (expand-file-name "dict.txt" user-emacs-directory)))
+    (unless (file-exists-p dict-file)
+      (write-region "" nil dict-file))))
+#+end_src
+
+
+** TODO Helpful
+- [ ] How does doom emacs configure the helpful package and what keybinding does doom emacs have?
+#+begin_src emacs-lisp
+(use-package helpful
+  :defer t
+  :commands (helpful-callable
+             helpful-variable
+             helpful-key
+             helpful-command
+             helpful-at-point
+             helpful-function)
+  :bind
+  ([remap describe-command] . helpful-command)
+  ([remap describe-function] . helpful-callable)
+  ([remap describe-key] . helpful-key)
+  ([remap describe-symbol] . helpful-symbol)
+  ([remap describe-variable] . helpful-variable)
+  :custom
+  (helpful-max-buffers 7))
+#+end_src
+
+
+** TODO Ediff
 #+begin_src emacs-lisp
 (use-package ediff
   :ensure nil
@@ -1594,29 +1723,359 @@ and sets up vim-style navigation."
 
 
 
-** TODO iedit
-- [ ] Is the current evil-multiedit need to be configured together with iedit?
 
 
-** TODO rainbow-delimiters
+
+
+
+
+
+
+
+
+
+* TODO Workflow Management
+** TODO Dired
+Dired is the native Emacs file manager. By default, it is fragile across different operating systems and network connections. This configuration applies Doom Emacs-inspired safeguards: it dynamically strips unsupported GNU =ls= flags when running on macOS/BSD or over TRAMP, and it uses a stale-predicate to prevent massive I/O hangs when revisiting large or remote directories.
+
 #+begin_src emacs-lisp
-(use-package rainbow-delimiters
+(use-package dired
+  :ensure nil
   :defer t
-  :hook ((LaTeX-mode . rainbow-delimiters-mode)
-         (prog-mode . rainbow-delimiters-mode))
+  :commands (dired dired-jump)
+  ;; Automatically hide verbose file details (permissions, owners) for a cleaner
+  ;; UI, and highlight the current line for better visual tracking.
+  :hook ((dired-mode . dired-hide-details-mode)
+         (dired-mode . hl-line-mode))
+  :custom
+  ;; Doom-like cleanup: Don't confirm simple recursive deletes.
+  ;; By default, Emacs prompts for every single recursive copy or delete,
+  ;; which is incredibly tedious. 'always and 'top suppress these prompts
+  ;; while maintaining a baseline of safety.
+  (dired-recursive-copies 'always)
+  (dired-recursive-deletes 'top)
+  ;; Move deleted files to the system trash instead of permanently deleting them.
+  (delete-by-moving-to-trash t)
+  ;; Do What I Mean: When copying/moving files between two split Dired windows,
+  ;; automatically suggest the other window's directory as the target.
+  (dired-dwim-target t)
+
+  ;; Performance & UX
+  ;; DOOM FIX: Use stale predicate instead of `t` to prevent I/O hangs on large/remote dirs.
+  ;; Setting this to `t` forces Emacs to synchronously re-read the directory over TRAMP
+  ;; every time you switch back to the buffer, which can freeze the UI for seconds.
+  ;; `dired-buffer-stale-p` only reverts if the directory has actually changed on disk.
+  (dired-auto-revert-buffer #'dired-buffer-stale-p)
+  ;; Kill the old Dired buffer when opening a new one in the same directory
+  ;; to prevent massive buffer bloat during deep filesystem navigation.
+  (dired-kill-when-opening-new-dired-buffer t)
+
   :config
-  (custom-set-faces
-   '(rainbow-delimiters-depth-1-face ((t (:foreground "#7aa2f7"))))
-   '(rainbow-delimiters-depth-2-face ((t (:foreground "#e0af68"))))
-   '(rainbow-delimiters-depth-3-face ((t (:foreground "#9ece6a"))))
-   '(rainbow-delimiters-depth-4-face ((t (:foreground "#1abc9c"))))
-   '(rainbow-delimiters-depth-5-face ((t (:foreground "#bb9af7"))))
-   '(rainbow-delimiters-depth-6-face ((t (:foreground "#9d7cd8"))))
-   '(rainbow-delimiters-depth-7-face ((t (:foreground "#ff9e64"))))
-   '(rainbow-delimiters-depth-8-face ((t (:foreground "#f7768e"))))
-   '(rainbow-delimiters-depth-9-face ((t (:foreground "#7aa2f7"))))))
+  ;; DOOM FIX: Cross-platform ls switches.
+  ;; macOS/BSD requires `gls` from coreutils for advanced flags like `--group-directories-first`.
+  ;; If `gls` is missing, or if we are over TRAMP, we strip the unsupported flags
+  ;; to prevent Dired from crashing or rendering blank screens.
+  (let ((args (list "-ahl" "-v" "--group-directories-first")))
+    (when (or (eq system-type 'darwin) (eq system-type 'berkeley-unix))
+      (if (executable-find "gls")
+          (setq insert-directory-program "gls")
+        (setq args (list (car args))))) ; Strip -v and --group-directories-first
+    (setq dired-listing-switches (string-join args " ")))
+
+  ;; TRAMP Safety Hook: Remove extraneous GNU-specific switches when it's
+  ;; uncertain they are supported (e.g., over an SSH connection to a minimal
+  ;; Linux container or a BSD server).
+  (add-hook 'dired-mode-hook
+            (defun +dired-disable-gnu-ls-flags-maybe-h ()
+              (when (file-remote-p default-directory)
+                (setq-local dired-actual-switches "-ahl")))))
 #+end_src
 
+** TODO Dired Extensions
+These packages extend Dired's capabilities. =dired-x= provides advanced omitting and OS-integration, =diredfl= adds modern syntax highlighting (font-lock) to the directory listings, and =wdired= allows you to edit the Dired buffer like a text file to rename/move files in bulk.
+
+#+begin_src emacs-lisp
+(use-package dired-x
+  :ensure nil
+  :defer t
+  ;; Enable omit mode to hide "uninteresting" files (compiled artifacts, VCS dirs).
+  :hook (dired-mode . dired-omit-mode)
+  :config
+  (setq dired-omit-verbose nil
+        ;; Regex defining which files to hide when `dired-omit-mode` is active.
+        ;; Hides lockfiles, flycheck temp files, VCS directories, and compiled binaries.
+        dired-omit-files
+        (concat "^\\.?#\\|^\\.$\\|^\\.\\.$"
+                "\\|^\\.DS_Store\\'"
+                "\\|^flycheck_.*"
+                "\\|^\\.project\\(?:ile\\)?\\'"
+                "\\|^\\.\\(?:svn\\|git\\)\\'"
+                "\\|^\\.ccls-cache\\'"
+                "\\|\\(?:\\.js\\)?\\.meta\\'"
+                "\\|\\.\\(?:elc\\|o\\|pyo\\|swp\\|class\\)\\'"))
+  ;; Don't prompt for confirmation when killing buffers associated with deleted files.
+  (setq dired-clean-confirm-killing-deleted-buffers nil))
+
+(use-package diredfl
+  ;; Apply syntax highlighting to both standard Dired and Dirvish's directory views.
+  :hook
+  ((dired-mode . diredfl-mode)
+   (dirvish-directory-view-mode . diredfl-mode))
+  :config
+  ;; Make directory names bold for better visual distinction.
+  (set-face-attribute 'diredfl-dir-name nil :bold t))
+
+(use-package wdired
+  :ensure nil
+  :after dired
+  :custom
+  ;; Allow changing file permissions directly in the WDired buffer.
+  (wdired-allow-to-change-permissions t)
+  ;; Automatically create parent directories if you rename a file to a non-existent subfolder.
+  (wdired-create-parent-directories t))
+#+end_src
+
+** TODO Dirvish
+Dirvish transforms Dired into a modern, Ranger-like file manager with live previews, emerge groups, and a dedicated sidebar.
+*Architectural Note:* Dirvish in 2025/2026 suffers from a known multi-frame feedback loop (Issue #353) that causes severe UI flickering when =emacsclient= opens new frames. We apply a Doom Emacs =define-advice= patch to debounce the redisplay hook. Additionally, we hook into =persp-before-switch-functions= to cleanly quit Dirvish side-windows before switching workspaces, preventing Emacs from throwing errors when trying to delete dedicated windows.
+
+#+begin_src emacs-lisp
+(use-package dirvish
+  :defer t
+  :after dired
+  :init
+  ;; MAGIC: This makes ALL dired commands use Dirvish interfaces.
+  ;; You never have to call `dirvish` explicitly; `dired` just becomes Dirvish.
+  (dirvish-override-dired-mode)
+  :custom
+  ;; Store image/video preview caches in the Emacs directory to avoid polluting ~/.cache.
+  (dirvish-cache-dir (expand-file-name "dirvish/" user-emacs-directory))
+
+  ;; Layout configuration: (parent-depth preview-width file-list-width)
+  (dirvish-default-layout '(1 0.11 0.55))
+  (dirvish-layout-recipes
+   '((0 0   0.4)   ; No parent, smaller preview
+     (1 0.1 0.5)   ; Balanced layout
+     (1 0.15 0.6))) ; More preview space
+
+  ;; Quick access shortcuts for commonly visited directories.
+  (dirvish-quick-access-entries
+   `(("h" "~/" "Home")
+     ("e" ,user-emacs-directory "Emacs")
+     ("d" "~/Downloads/" "Downloads")
+     ("D" "~/Documents/" "Documents")
+     ("p" "~/projects/" "Projects")
+     ("o" ,my/org-directory "Org")
+     ("c" "~/.config/" "Config")
+     ("t" "~/.local/share/Trash/files/" "Trash")))
+
+  ;; Visual attributes rendered in the file list.
+  (dirvish-attributes
+   '(subtree-state nerd-icons collapse vc-state))
+
+  ;; Doom-like UI: Enable custom headers and mode lines for Dirvish buffers.
+  (dirvish-use-header-line t)
+  (dirvish-use-mode-line t)
+  (dirvish-header-line-height '(25 . 35))
+  (dirvish-mode-line-height 25)
+  (dirvish-header-line-format '(:left (path) :right (free-space)))
+  (dirvish-mode-line-format
+   '(:left (sort file-time " " file-size symlink)
+           :right (omit yank index)))
+
+  ;; Session behavior.
+  ;; DOOM FIX: Set to 'open to prevent broken leftover buffers on errors.
+  ;; If Dirvish crashes or is forcefully killed, setting this to `nil` leaves
+  ;; ghost buffers in the background. `'open` ensures clean recovery.
+  (dirvish-reuse-session 'open)
+  (dirvish-hide-cursor t)
+  (dirvish-hide-details '(dirvish dirvish-side))
+
+  ;; Emerge groups: Automatically group files by type or recency.
+  (dirvish-emerge-groups
+   '(("Recent files" (predicate . recent-files-2h))
+     ("Documents" (extensions "pdf" "tex" "bib" "epub"))
+     ("Video" (extensions "mp4" "mkv" "webm"))
+     ("Pictures" (extensions "jpg" "png" "svg" "gif"))
+     ("Audio" (extensions "mp3" "flac" "wav" "ape"))
+     ("Archives" (extensions "gz" "rar" "zip"))))
+
+  ;; Preview dispatchers: Define how different file types are previewed.
+  (dirvish-preview-dispatchers
+   '(image gif video audio epub archive pdf dired))
+
+  :config
+  ;; Override the default mode-line format for the side-bar specifically.
+  (setq dirvish-mode-line-format
+        '(:left (sort symlink) :right (omit yank index)))
+
+  ;; Open large directories (over 20000 files) asynchronously using the `fd` command
+  ;; to prevent Emacs from freezing during directory read.
+  (setq dirvish-large-directory-threshold 20000)
+  (require 'dirvish-fd)
+  (require 'dirvish-emerge)
+  (require 'dirvish-side)
+
+  ;; Side window configuration.
+  ;; FIX: Syntax error corrected from original config. Set to left side to match width variable.
+  (setq dirvish-side-width 30
+        dirvish-side-follow-buffer-file t
+        dirvish-side-display-alist '((side . left) (slot . -1) (window-width . 30)))
+
+  ;; DOOM HACK: Prevent multi-frame feedback loop flickering (dirvish#353).
+  ;; In Emacs 30+, opening multiple frames with Dirvish active causes a redisplay
+  ;; feedback loop. This advice ensures the hook only fires for the selected window.
+  (define-advice dirvish-pre-redisplay-h (:around (fn window) debounce-redisplay)
+    (when (eq (frame-selected-window) window)
+      (funcall fn window)))
+
+  ;; TODO: modify this to work with projectile alternative
+  ;; DOOM HACK: Clean up Dirvish before switching workspaces/projects.
+  ;; If Dirvish is open in a dedicated side-window and you switch `persp-mode`
+  ;; workspaces, Emacs will throw an error trying to delete the dedicated window.
+  ;; This hook gracefully quits Dirvish before the workspace transition occurs.
+  ;; (add-hook 'persp-before-switch-functions
+  ;;           (lambda (&rest _)
+  ;;             (when-let* ((dv (cl-loop for w in (window-list)
+  ;;                                      if (window-dedicated-p w)
+  ;;                                      if (with-current-buffer (window-buffer w) (dirvish-curr))
+  ;;                                      return it)))
+  ;;               (let (dirvish-reuse-session)
+  ;;                 (with-selected-window (dv-root-window dv)
+  ;;                   (dirvish-quit))))))
+
+
+  )
+#+end_src
+
+** TODO Project Management
+** TODO iBuffer
+Ibuffer is the advanced buffer list manager. We configure it to hide empty filter groups (keeping the UI clean) and redefine the size column to display human-readable sizes (e.g., =1.2M=). It is integrated with =nerd-icons= for visual flair and =ibuffer-projectile= to automatically group all open buffers by their respective Projectile projects.
+
+#+begin_src emacs-lisp
+(use-package ibuffer
+  :ensure nil
+  :defer t
+  :init (setq ibuffer-filter-group-name-face '(:inherit (font-lock-string-face bold)))
+  :config
+  ;; DOOM FIX: Hide empty filter groups to keep the UI clean.
+  ;; Without this, ibuffer-projectile will show empty headers for projects
+  ;; that currently have no open buffers.
+  (setq ibuffer-show-empty-filter-groups nil)
+
+  ;; DOOM OPTIMIZATION: Redefine size column to show human-readable sizes.
+  ;; The default byte count is hard to read; this converts it to K/M/G.
+  (define-ibuffer-column size
+    (:name "Size" :inline t :header-mouse-map ibuffer-size-header-map)
+    (file-size-human-readable (buffer-size))))
+
+;; Display icons for buffers based on their major mode or file extension.
+(use-package nerd-icons-ibuffer
+  :defer t
+  :hook (ibuffer-mode . nerd-icons-ibuffer-mode))
+
+;; ;; Group ibuffer's list by project (Projectile-backed).
+;; (use-package ibuffer-projectile
+;;   :defer t
+;;   :commands (ibuffer-projectile-generate-filter-groups)
+;;   :functions icons-displayable-p
+;;   :hook (ibuffer . (lambda ()
+;;                      "Group ibuffer's list by project."
+;;                      (setq ibuffer-filter-groups (ibuffer-projectile-generate-filter-groups))
+;;                      (unless (eq ibuffer-sorting-mode 'alphabetic)
+;;                        (ibuffer-do-sort-by-alphabetic))))
+;;   :config
+;;   ;; Custom group name formatter: prepends a Git repo icon if nerd-icons is available.
+;;   (defun ar/ibuffer-projectile-group-name (project-name _root-dir)
+;;     "Return group name for PROJECT-NAME, prefixed with a repo icon if available."
+;;     (if (icons-displayable-p)
+;;         (format "%s %s"
+;;                 (nerd-icons-octicon "nf-oct-repo" :height 1.2 :face ibuffer-filter-group-name-face)
+;;                 project-name)
+;;       (format "Project: %s" project-name)))
+;;   (setq ibuffer-projectile-group-name-function #'ar/ibuffer-projectile-group-name))
+#+end_src
+
+** TODO Treemacs
+Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. We configure it to silently refresh in the background, integrate with Magit to update on Git commits, and use =nerd-icons= for crisp directory/file icons. Evil bindings are added for seamless Vim-style navigation within the tree.
+
+#+begin_src emacs-lisp
+(use-package treemacs
+  :defer t
+  :custom-face
+  ;; Match the childframe border to the posframe border for visual consistency.
+  (cfrs-border-color ((t (:inherit posframe-border))))
+  ;; Make the root node stand out with a bold, constant-like face.
+  (treemacs-root-face ((t (:inherit font-lock-constant-face :height 1.1 :weight bold))))
+  :custom
+  (treemacs-width 33)
+  (treemacs-position 'left)
+  ;; Prevent Treemacs from being selected by `other-window` (C-x o), keeping
+  ;; the focus strictly on the editing and minibuffer windows.
+  (treemacs-is-never-other-window t)
+  (treemacs-space-between-root-nodes t)
+  ;; Silent background operations to prevent echo-area spam.
+  (treemacs-silent-refresh t)
+  (treemacs-silent-filewatch t)
+  ;; Delay before the sidebar follows the cursor to the current file.
+  (treemacs-file-follow-delay 0.2)
+  (treemacs-show-cursor nil)
+
+  :config
+  ;; Automatically follow the currently visited file in the tree.
+  (treemacs-follow-mode t)
+  ;; Watch the filesystem for external changes (e.g., git checkouts, file creation).
+  (treemacs-filewatch-mode t)
+  ;; Show a visual indicator in the fringe for the currently selected node.
+  (treemacs-fringe-indicator-mode 'always)
+
+  ;; DOOM FIX: Explicitly load the nerd-icons theme.
+  ;; Without this, treemacs falls back to missing or ugly default ASCII icons.
+  (use-package treemacs-nerd-icons
+    :after treemacs
+    :config (treemacs-load-theme "nerd-icons"))
+
+  ;; Git integration configuration.
+  ;; Deferred mode requires Python to parse git status asynchronously.
+  ;; If Python is missing, fall back to simple (synchronous) mode.
+  (when (and (executable-find "git")
+             (executable-find "python3"))
+    (treemacs-git-mode 'deferred)
+    (setq treemacs-collapse-dirs 3))
+  (when (and (executable-find "git")
+             (not (executable-find "python3")))
+    (treemacs-git-mode 'simple)
+    (setq treemacs-collapse-dirs 0)))
+
+;; Integrate Treemacs icons into standard Dired buffers.
+(use-package treemacs-icons-dired
+  :hook (dired-mode . treemacs-icons-dired-enable-once)
+  :ensure t)
+
+;; Magit integration: automatically refresh the sidebar after git operations.
+(use-package treemacs-magit
+  :after (treemacs magit)
+  :hook ((magit-post-commit
+          git-commit-post-finish
+          magit-post-stage
+          magit-post-unstage)
+         . treemacs-magit--schedule-update))
+
+;; Evil navigation in the sidebar with mouse interface.
+(use-package treemacs-evil
+  :after (treemacs evil)
+  :config
+  (evil-define-key 'normal treemacs-mode-map
+    (kbd "TAB") #'treemacs-TAB-action
+    (kbd "o")   #'treemacs-visit-node-ace
+    (kbd "q")   #'treemacs-quit
+    ;; Mouse interface for users who occasionally click the sidebar.
+    [mouse-1] #'treemacs-single-click-expand-action
+    [double-mouse-1] #'treemacs-doubleclick-action
+    [drag-mouse-1] #'treemacs-dragleftclick-action))
+#+end_src
+
+** TODO Workspaces
 
 
 
@@ -2322,6 +2781,7 @@ If the file does not exist, creates it. Returns the full path."
 #+end_src
 
 ** TODO Transient Template System
+- [ ] Review transient code beforehand
 #+begin_src emacs-lisp
 (with-eval-after-load 'org
   (defun ar/org-template-expand (str &optional mod)
@@ -2408,6 +2868,7 @@ If the file does not exist, creates it. Returns the full path."
 #+end_src
 
 ** TODO Org Modern
+- [ ] Use this updated org-modern config instead
 #+begin_src emacs-lisp
 (use-package org-modern
   :hook (org-mode          . org-modern-mode)
@@ -2415,6 +2876,7 @@ If the file does not exist, creates it. Returns the full path."
   :config
 
   (setq org-modern-hide-stars nil
+        ;; TODO Replace with numbers
         org-modern-star '("◉" "○" "✸" "✿" "✤" "✜" "◇" "▷"))
 
   (setq org-modern-checkbox t
@@ -2428,8 +2890,8 @@ If the file does not exist, creates it. Returns the full path."
         org-modern-block-fringe nil ; Remove fringe marker (cleaner look)
         org-modern-horizontal-rule t   ; Draw lines for '-----'
         org-modern-timestamp nil   ; Badges for timestamps
-        org-modern-statistics t   ; Badges for [3/5]
-        org-modern-progress t)  ; Progress bar in stats
+        org-modern-statistics nil   ; Badges for [3/5]
+        org-modern-progress nil)  ; Progress bar in stats
 
   ;; Tables & Lists  (43 = +, 45 = -, 42 = *)
   (setq org-modern-list '((43 . "➤") (45 . "–") (42 . "•"))
@@ -3560,349 +4022,6 @@ Top-level keys:
                          '((:auto-priority t))))))))))
 #+end_src
 
-
-* TODO Workflow Management
-** TODO Dired
-Dired is the native Emacs file manager. By default, it is fragile across different operating systems and network connections. This configuration applies Doom Emacs-inspired safeguards: it dynamically strips unsupported GNU =ls= flags when running on macOS/BSD or over TRAMP, and it uses a stale-predicate to prevent massive I/O hangs when revisiting large or remote directories.
-
-#+begin_src emacs-lisp
-(use-package dired
-  :ensure nil
-  :defer t
-  :commands (dired dired-jump)
-  ;; Automatically hide verbose file details (permissions, owners) for a cleaner
-  ;; UI, and highlight the current line for better visual tracking.
-  :hook ((dired-mode . dired-hide-details-mode)
-         (dired-mode . hl-line-mode))
-  :custom
-  ;; Doom-like cleanup: Don't confirm simple recursive deletes.
-  ;; By default, Emacs prompts for every single recursive copy or delete,
-  ;; which is incredibly tedious. 'always and 'top suppress these prompts
-  ;; while maintaining a baseline of safety.
-  (dired-recursive-copies 'always)
-  (dired-recursive-deletes 'top)
-  ;; Move deleted files to the system trash instead of permanently deleting them.
-  (delete-by-moving-to-trash t)
-  ;; Do What I Mean: When copying/moving files between two split Dired windows,
-  ;; automatically suggest the other window's directory as the target.
-  (dired-dwim-target t)
-
-  ;; Performance & UX
-  ;; DOOM FIX: Use stale predicate instead of `t` to prevent I/O hangs on large/remote dirs.
-  ;; Setting this to `t` forces Emacs to synchronously re-read the directory over TRAMP
-  ;; every time you switch back to the buffer, which can freeze the UI for seconds.
-  ;; `dired-buffer-stale-p` only reverts if the directory has actually changed on disk.
-  (dired-auto-revert-buffer #'dired-buffer-stale-p)
-  ;; Kill the old Dired buffer when opening a new one in the same directory
-  ;; to prevent massive buffer bloat during deep filesystem navigation.
-  (dired-kill-when-opening-new-dired-buffer t)
-
-  :config
-  ;; DOOM FIX: Cross-platform ls switches.
-  ;; macOS/BSD requires `gls` from coreutils for advanced flags like `--group-directories-first`.
-  ;; If `gls` is missing, or if we are over TRAMP, we strip the unsupported flags
-  ;; to prevent Dired from crashing or rendering blank screens.
-  (let ((args (list "-ahl" "-v" "--group-directories-first")))
-    (when (or (eq system-type 'darwin) (eq system-type 'berkeley-unix))
-      (if (executable-find "gls")
-          (setq insert-directory-program "gls")
-        (setq args (list (car args))))) ; Strip -v and --group-directories-first
-    (setq dired-listing-switches (string-join args " ")))
-
-  ;; TRAMP Safety Hook: Remove extraneous GNU-specific switches when it's
-  ;; uncertain they are supported (e.g., over an SSH connection to a minimal
-  ;; Linux container or a BSD server).
-  (add-hook 'dired-mode-hook
-            (defun +dired-disable-gnu-ls-flags-maybe-h ()
-              (when (file-remote-p default-directory)
-                (setq-local dired-actual-switches "-ahl")))))
-#+end_src
-
-** TODO Dired Extensions
-These packages extend Dired's capabilities. =dired-x= provides advanced omitting and OS-integration, =diredfl= adds modern syntax highlighting (font-lock) to the directory listings, and =wdired= allows you to edit the Dired buffer like a text file to rename/move files in bulk.
-
-#+begin_src emacs-lisp
-(use-package dired-x
-  :ensure nil
-  :defer t
-  ;; Enable omit mode to hide "uninteresting" files (compiled artifacts, VCS dirs).
-  :hook (dired-mode . dired-omit-mode)
-  :config
-  (setq dired-omit-verbose nil
-        ;; Regex defining which files to hide when `dired-omit-mode` is active.
-        ;; Hides lockfiles, flycheck temp files, VCS directories, and compiled binaries.
-        dired-omit-files
-        (concat "^\\.?#\\|^\\.$\\|^\\.\\.$"
-                "\\|^\\.DS_Store\\'"
-                "\\|^flycheck_.*"
-                "\\|^\\.project\\(?:ile\\)?\\'"
-                "\\|^\\.\\(?:svn\\|git\\)\\'"
-                "\\|^\\.ccls-cache\\'"
-                "\\|\\(?:\\.js\\)?\\.meta\\'"
-                "\\|\\.\\(?:elc\\|o\\|pyo\\|swp\\|class\\)\\'"))
-  ;; Don't prompt for confirmation when killing buffers associated with deleted files.
-  (setq dired-clean-confirm-killing-deleted-buffers nil))
-
-(use-package diredfl
-  ;; Apply syntax highlighting to both standard Dired and Dirvish's directory views.
-  :hook
-  ((dired-mode . diredfl-mode)
-   (dirvish-directory-view-mode . diredfl-mode))
-  :config
-  ;; Make directory names bold for better visual distinction.
-  (set-face-attribute 'diredfl-dir-name nil :bold t))
-
-(use-package wdired
-  :ensure nil
-  :after dired
-  :custom
-  ;; Allow changing file permissions directly in the WDired buffer.
-  (wdired-allow-to-change-permissions t)
-  ;; Automatically create parent directories if you rename a file to a non-existent subfolder.
-  (wdired-create-parent-directories t))
-#+end_src
-
-** TODO Dirvish
-Dirvish transforms Dired into a modern, Ranger-like file manager with live previews, emerge groups, and a dedicated sidebar.
-*Architectural Note:* Dirvish in 2025/2026 suffers from a known multi-frame feedback loop (Issue #353) that causes severe UI flickering when =emacsclient= opens new frames. We apply a Doom Emacs =define-advice= patch to debounce the redisplay hook. Additionally, we hook into =persp-before-switch-functions= to cleanly quit Dirvish side-windows before switching workspaces, preventing Emacs from throwing errors when trying to delete dedicated windows.
-
-#+begin_src emacs-lisp
-(use-package dirvish
-  :defer t
-  :after dired
-  :init
-  ;; MAGIC: This makes ALL dired commands use Dirvish interfaces.
-  ;; You never have to call `dirvish` explicitly; `dired` just becomes Dirvish.
-  (dirvish-override-dired-mode)
-  :custom
-  ;; Store image/video preview caches in the Emacs directory to avoid polluting ~/.cache.
-  (dirvish-cache-dir (expand-file-name "dirvish/" user-emacs-directory))
-
-  ;; Layout configuration: (parent-depth preview-width file-list-width)
-  (dirvish-default-layout '(1 0.11 0.55))
-  (dirvish-layout-recipes
-   '((0 0   0.4)   ; No parent, smaller preview
-     (1 0.1 0.5)   ; Balanced layout
-     (1 0.15 0.6))) ; More preview space
-
-  ;; Quick access shortcuts for commonly visited directories.
-  (dirvish-quick-access-entries
-   `(("h" "~/" "Home")
-     ("e" ,user-emacs-directory "Emacs")
-     ("d" "~/Downloads/" "Downloads")
-     ("D" "~/Documents/" "Documents")
-     ("p" "~/projects/" "Projects")
-     ("o" ,my/org-directory "Org")
-     ("c" "~/.config/" "Config")
-     ("t" "~/.local/share/Trash/files/" "Trash")))
-
-  ;; Visual attributes rendered in the file list.
-  (dirvish-attributes
-   '(subtree-state nerd-icons collapse vc-state))
-
-  ;; Doom-like UI: Enable custom headers and mode lines for Dirvish buffers.
-  (dirvish-use-header-line t)
-  (dirvish-use-mode-line t)
-  (dirvish-header-line-height '(25 . 35))
-  (dirvish-mode-line-height 25)
-  (dirvish-header-line-format '(:left (path) :right (free-space)))
-  (dirvish-mode-line-format
-   '(:left (sort file-time " " file-size symlink)
-           :right (omit yank index)))
-
-  ;; Session behavior.
-  ;; DOOM FIX: Set to 'open to prevent broken leftover buffers on errors.
-  ;; If Dirvish crashes or is forcefully killed, setting this to `nil` leaves
-  ;; ghost buffers in the background. `'open` ensures clean recovery.
-  (dirvish-reuse-session 'open)
-  (dirvish-hide-cursor t)
-  (dirvish-hide-details '(dirvish dirvish-side))
-
-  ;; Emerge groups: Automatically group files by type or recency.
-  (dirvish-emerge-groups
-   '(("Recent files" (predicate . recent-files-2h))
-     ("Documents" (extensions "pdf" "tex" "bib" "epub"))
-     ("Video" (extensions "mp4" "mkv" "webm"))
-     ("Pictures" (extensions "jpg" "png" "svg" "gif"))
-     ("Audio" (extensions "mp3" "flac" "wav" "ape"))
-     ("Archives" (extensions "gz" "rar" "zip"))))
-
-  ;; Preview dispatchers: Define how different file types are previewed.
-  (dirvish-preview-dispatchers
-   '(image gif video audio epub archive pdf dired))
-
-  :config
-  ;; Override the default mode-line format for the side-bar specifically.
-  (setq dirvish-mode-line-format
-        '(:left (sort symlink) :right (omit yank index)))
-
-  ;; Open large directories (over 20000 files) asynchronously using the `fd` command
-  ;; to prevent Emacs from freezing during directory read.
-  (setq dirvish-large-directory-threshold 20000)
-  (require 'dirvish-fd)
-  (require 'dirvish-emerge)
-  (require 'dirvish-side)
-
-  ;; Side window configuration.
-  ;; FIX: Syntax error corrected from original config. Set to left side to match width variable.
-  (setq dirvish-side-width 30
-        dirvish-side-follow-buffer-file t
-        dirvish-side-display-alist '((side . left) (slot . -1) (window-width . 30)))
-
-  ;; DOOM HACK: Prevent multi-frame feedback loop flickering (dirvish#353).
-  ;; In Emacs 30+, opening multiple frames with Dirvish active causes a redisplay
-  ;; feedback loop. This advice ensures the hook only fires for the selected window.
-  (define-advice dirvish-pre-redisplay-h (:around (fn window) debounce-redisplay)
-    (when (eq (frame-selected-window) window)
-      (funcall fn window)))
-
-  ;; TODO: modify this to work with projectile alternative
-  ;; DOOM HACK: Clean up Dirvish before switching workspaces/projects.
-  ;; If Dirvish is open in a dedicated side-window and you switch `persp-mode`
-  ;; workspaces, Emacs will throw an error trying to delete the dedicated window.
-  ;; This hook gracefully quits Dirvish before the workspace transition occurs.
-  ;; (add-hook 'persp-before-switch-functions
-  ;;           (lambda (&rest _)
-  ;;             (when-let* ((dv (cl-loop for w in (window-list)
-  ;;                                      if (window-dedicated-p w)
-  ;;                                      if (with-current-buffer (window-buffer w) (dirvish-curr))
-  ;;                                      return it)))
-  ;;               (let (dirvish-reuse-session)
-  ;;                 (with-selected-window (dv-root-window dv)
-  ;;                   (dirvish-quit))))))
-
-
-  )
-#+end_src
-
-** TODO Project Management
-** TODO iBuffer
-Ibuffer is the advanced buffer list manager. We configure it to hide empty filter groups (keeping the UI clean) and redefine the size column to display human-readable sizes (e.g., =1.2M=). It is integrated with =nerd-icons= for visual flair and =ibuffer-projectile= to automatically group all open buffers by their respective Projectile projects.
-
-#+begin_src emacs-lisp
-(use-package ibuffer
-  :ensure nil
-  :defer t
-  :init (setq ibuffer-filter-group-name-face '(:inherit (font-lock-string-face bold)))
-  :config
-  ;; DOOM FIX: Hide empty filter groups to keep the UI clean.
-  ;; Without this, ibuffer-projectile will show empty headers for projects
-  ;; that currently have no open buffers.
-  (setq ibuffer-show-empty-filter-groups nil)
-
-  ;; DOOM OPTIMIZATION: Redefine size column to show human-readable sizes.
-  ;; The default byte count is hard to read; this converts it to K/M/G.
-  (define-ibuffer-column size
-    (:name "Size" :inline t :header-mouse-map ibuffer-size-header-map)
-    (file-size-human-readable (buffer-size))))
-
-;; Display icons for buffers based on their major mode or file extension.
-(use-package nerd-icons-ibuffer
-  :defer t
-  :hook (ibuffer-mode . nerd-icons-ibuffer-mode))
-
-;; ;; Group ibuffer's list by project (Projectile-backed).
-;; (use-package ibuffer-projectile
-;;   :defer t
-;;   :commands (ibuffer-projectile-generate-filter-groups)
-;;   :functions icons-displayable-p
-;;   :hook (ibuffer . (lambda ()
-;;                      "Group ibuffer's list by project."
-;;                      (setq ibuffer-filter-groups (ibuffer-projectile-generate-filter-groups))
-;;                      (unless (eq ibuffer-sorting-mode 'alphabetic)
-;;                        (ibuffer-do-sort-by-alphabetic))))
-;;   :config
-;;   ;; Custom group name formatter: prepends a Git repo icon if nerd-icons is available.
-;;   (defun ar/ibuffer-projectile-group-name (project-name _root-dir)
-;;     "Return group name for PROJECT-NAME, prefixed with a repo icon if available."
-;;     (if (icons-displayable-p)
-;;         (format "%s %s"
-;;                 (nerd-icons-octicon "nf-oct-repo" :height 1.2 :face ibuffer-filter-group-name-face)
-;;                 project-name)
-;;       (format "Project: %s" project-name)))
-;;   (setq ibuffer-projectile-group-name-function #'ar/ibuffer-projectile-group-name))
-#+end_src
-
-** TODO Treemacs
-Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. We configure it to silently refresh in the background, integrate with Magit to update on Git commits, and use =nerd-icons= for crisp directory/file icons. Evil bindings are added for seamless Vim-style navigation within the tree.
-
-#+begin_src emacs-lisp
-(use-package treemacs
-  :defer t
-  :custom-face
-  ;; Match the childframe border to the posframe border for visual consistency.
-  (cfrs-border-color ((t (:inherit posframe-border))))
-  ;; Make the root node stand out with a bold, constant-like face.
-  (treemacs-root-face ((t (:inherit font-lock-constant-face :height 1.1 :weight bold))))
-  :custom
-  (treemacs-width 33)
-  (treemacs-position 'left)
-  ;; Prevent Treemacs from being selected by `other-window` (C-x o), keeping
-  ;; the focus strictly on the editing and minibuffer windows.
-  (treemacs-is-never-other-window t)
-  (treemacs-space-between-root-nodes t)
-  ;; Silent background operations to prevent echo-area spam.
-  (treemacs-silent-refresh t)
-  (treemacs-silent-filewatch t)
-  ;; Delay before the sidebar follows the cursor to the current file.
-  (treemacs-file-follow-delay 0.2)
-  (treemacs-show-cursor nil)
-
-  :config
-  ;; Automatically follow the currently visited file in the tree.
-  (treemacs-follow-mode t)
-  ;; Watch the filesystem for external changes (e.g., git checkouts, file creation).
-  (treemacs-filewatch-mode t)
-  ;; Show a visual indicator in the fringe for the currently selected node.
-  (treemacs-fringe-indicator-mode 'always)
-
-  ;; DOOM FIX: Explicitly load the nerd-icons theme.
-  ;; Without this, treemacs falls back to missing or ugly default ASCII icons.
-  (use-package treemacs-nerd-icons
-    :after treemacs
-    :config (treemacs-load-theme "nerd-icons"))
-
-  ;; Git integration configuration.
-  ;; Deferred mode requires Python to parse git status asynchronously.
-  ;; If Python is missing, fall back to simple (synchronous) mode.
-  (when (and (executable-find "git")
-             (executable-find "python3"))
-    (treemacs-git-mode 'deferred)
-    (setq treemacs-collapse-dirs 3))
-  (when (and (executable-find "git")
-             (not (executable-find "python3")))
-    (treemacs-git-mode 'simple)
-    (setq treemacs-collapse-dirs 0)))
-
-;; Integrate Treemacs icons into standard Dired buffers.
-(use-package treemacs-icons-dired
-  :hook (dired-mode . treemacs-icons-dired-enable-once)
-  :ensure t)
-
-;; Magit integration: automatically refresh the sidebar after git operations.
-(use-package treemacs-magit
-  :after (treemacs magit)
-  :hook ((magit-post-commit
-          git-commit-post-finish
-          magit-post-stage
-          magit-post-unstage)
-         . treemacs-magit--schedule-update))
-
-;; Evil navigation in the sidebar with mouse interface.
-(use-package treemacs-evil
-  :after (treemacs evil)
-  :config
-  (evil-define-key 'normal treemacs-mode-map
-    (kbd "TAB") #'treemacs-TAB-action
-    (kbd "o")   #'treemacs-visit-node-ace
-    (kbd "q")   #'treemacs-quit
-    ;; Mouse interface for users who occasionally click the sidebar.
-    [mouse-1] #'treemacs-single-click-expand-action
-    [double-mouse-1] #'treemacs-doubleclick-action
-    [drag-mouse-1] #'treemacs-dragleftclick-action))
-#+end_src
-
-** TODO Workspaces
 
 
 * TODO Completion Framework
@@ -5115,84 +5234,6 @@ TODO: =Replace Dape with dap-mode=
 - [ ] What scenarios does the doom emacs project use eldoc for? And how does it do them? Search the web thoroughly.
 
 
-** TODO Treesit
-NOTE: =Wait for Emacs 31 to be released as they will introduce automatic tree-sitter grammar installation when any specific prog-mode buffer is opened. The grammars should not be in the main emacs config folder.=
-#+begin_src emacs-lisp
-(use-package treesit
-  :ensure nil
-  :mode (("\\.tsx\\'" . tsx-ts-mode))
-  :init
-  (defvar ar/treesit-grammar-dir
-    (file-truename (expand-file-name "tree-sitter/" user-emacs-directory))
-    "Target directory for installing tree-sitter grammars.")
-
-  (unless (file-exists-p ar/treesit-grammar-dir)
-    (make-directory ar/treesit-grammar-dir t))
-
-  (add-to-list 'treesit-extra-load-path ar/treesit-grammar-dir)
-
-  :config
-  (setq treesit-font-lock-level 4)
-
-  (setq treesit-language-source-alist
-        '((python "https://github.com/tree-sitter/tree-sitter-python")
-          (bash "https://github.com/tree-sitter/tree-sitter-bash")
-          (c "https://github.com/tree-sitter/tree-sitter-c")
-          (cpp "https://github.com/tree-sitter/tree-sitter-cpp")
-          (dockerfile "https://github.com/camdencheek/tree-sitter-dockerfile.git")
-          (json "https://github.com/tree-sitter/tree-sitter-json")
-          (latex "https://github.com/latex-lsp/tree-sitter-latex")
-          (bibtex "https://github.com/latex-lsp/tree-sitter-bibtex")
-          (nix "https://github.com/nix-community/tree-sitter-nix")
-          (yaml "https://github.com/tree-sitter-grammars/tree-sitter-yaml")
-          (typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
-          (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")))
-
-  ;; NOTE: Will no longer be needed for emacs 31
-  (setq major-mode-remap-alist
-        '((python-mode . python-ts-mode)
-          (json-mode . json-ts-mode)
-          (js-mode . js-ts-mode)
-          (bash-mode . bash-ts-mode)
-          (sh-mode . bash-ts-mode)
-          (typescript-mode . typescript-ts-mode)
-          (conf-toml-mode . toml-ts-mode)
-          (c-mode . c-ts-mode)
-          (c++-mode . c++-ts-mode))))
-#+end_src
-
-
-** TODO Treesit-Fold
-NOTE: =check with doom-emacs modules=
-#+begin_src emacs-lisp
-;; (use-package treesit-fold
-;;   :defer t
-;;   :straight (:host github :repo "emacs-tree-sitter/treesit-fold")
-;;   ;; :custom
-;;   ;; (treesit-fold-indicators-priority -1)
-;;   :config
-;;   (global-treesit-fold-mode 1)
-;;   (global-treesit-fold-indicators-mode 1))
-#+end_src
-
-
-** TODO Vimish Fold
-NOTE: =check with doom-emacs modules=
-#+begin_src emacs-lisp
-(use-package vimish-fold
-  :defer t
-  :after evil
-  :config (vimish-fold-global-mode 1))
-
-(use-package evil-vimish-fold
-  :defer t
-  :after vimish-fold
-  :init
-  (setq evil-vimish-fold-mode-lighter " ⮒")
-  (setq evil-vimish-fold-target-modes '(prog-mode conf-mode text-mode))
-  :config (global-evil-vimish-fold-mode))
-#+end_src
-
 
 ** TODO Transient Menu
 #+begin_src emacs-lisp
@@ -5600,6 +5641,7 @@ PLIST keys:
 
 
 * TODO LaTeX Writing Environment
+- [ ] This section should have extra math ligatures for org-mode in source code blocks and latex environments
 ** TODO Utility Functions
 #+begin_src emacs-lisp
 (defun ar/latex-indent-item-fn ()
@@ -6219,500 +6261,6 @@ TODO: =Determine the difference between this preview package and preview-auto fr
 #+end_src
 
 
-* TODO Which Key
-#+begin_src emacs-lisp
-(use-package which-key
-  :ensure nil
-  :defer t
-  :hook (after-init . which-key-mode)
-  :custom
-  (which-key-idle-delay 1.5)
-  (which-key-separator " → ")
-  (which-key-popup-type 'minibuffer))
-#+end_src
-
-
-* TODO Terminal
-TODO: =Add ghostel package from https://github.com/dakra/ghostel=
-
-
-* TODO Prettify Symbols
-- [ ] Add from (ligatures +extra) module in doom emacs. Look at the following links:
-   1. https://raw.githubusercontent.com/doomemacs/modules/refs/heads/main/modules/ui/ligatures/config.el
-   2.
-** Common Prettify Symbols
-#+begin_src emacs-lisp
-;; Common prettify symbols for general programming modes
-(defun my/prog-mode/load-prettify-symbols ()
-  "Load common prettify symbols for programming modes."
-  (interactive)
-  (setq prettify-symbols-alist
-        `(;; Operators
-          ("!=" . ?≠)
-          ("/=" . ?≠)
-          ("==" . ?≡)
-          ("<=" . ?≤)
-          (">=" . ?≥)
-          ("&&" . ?∧)
-          ("||" . ?∨)
-          ;; Arrows
-          ("->" . ?→)
-          ("=>" . ?⇒)
-          ("<-" . ?←)
-          ;; Special symbols
-          ("sqrt" . ?√)
-          ("lambda" . ?λ)
-          ("..." . ?…)
-          ("sum" . ?∑)
-          ("product" . ?∏)
-          ("pi" . ?π)
-          ("infinity" . ?∞)))
-  (prettify-symbols-mode 1))
-#+end_src
-
-** Python
-#+begin_src emacs-lisp
-(defun my/python-mode/load-prettify-symbols ()
-  "Load prettify symbols for Python mode."
-  (interactive)
-  (setq prettify-symbols-alist
-        `(;; Keywords with nerd-icons-
-          ("def" . ,(nerd-icons-codicon "nf-cod-symbol_method"))
-          ("class" . ,(nerd-icons-codicon "nf-cod-symbol_class"))
-          ("return" . ,(nerd-icons-codicon "nf-cod-arrow_left"))
-          ("yield" . ,(nerd-icons-codicon "nf-cod-output"))
-          ("import" . ,(nerd-icons-codicon "nf-cod-package"))
-          ("from" . ,(nerd-icons-codicon "nf-cod-library"))
-          ;; Operators
-          ("!=" . ?≠)
-          ("==" . ?≡)
-          ("<=" . ?≤)
-          (">=" . ?≥)
-          ("->" . ?→)
-          ;; Logical operators
-          ("and" . ?∧)
-          ("or" . ?∨)
-          ("not" . ?¬)
-          ("in" . ?∈)
-          ("not in" . ?∉)
-          ;; Special keywords
-          ("lambda" . ?λ)
-          ("None" . ?∅)
-          ("True" . ?⊤)
-          ("False" . ?⊥)
-          ;; Type hints
-          ("int" . ?ℤ)
-          ("float" . ?ℝ)
-          ("bool" . ?𝔹)
-          ("str" . ?𝕊)
-          ("list" . ?ℒ)
-          ("dict" . ?𝔻)
-          ("set" . ?ℙ)
-          ("tuple" . ?𝕋)
-          ("..." . ?…)
-          ("sum" . ?∑)
-          ("sqrt" . ?√)
-          ("pi" . ?π)
-          ("inf" . ?∞)
-          ("for" . ?∀)
-          ("exists" . ?∃)))
-  (prettify-symbols-mode 1))
-#+end_src
-
-** JavaScript/TypeScript
-#+begin_src emacs-lisp
-(defun my/javascript-mode/load-prettify-symbols ()
-  "Load prettify symbols for JavaScript/TypeScript modes."
-  (interactive)
-  (setq prettify-symbols-alist
-        `(;; Keywords with nerd-icons
-          ("function" . ,(nerd-icons-codicon "nf-cod-symbol_method"))
-          ("class" . ,(nerd-icons-codicon "nf-cod-symbol_class"))
-          ("const" . ,(nerd-icons-codicon "nf-cod-symbol_constant"))
-          ("return" . ,(nerd-icons-codicon "nf-cod-arrow_left"))
-          ("import" . ,(nerd-icons-codicon "nf-cod-package"))
-          ("export" . ,(nerd-icons-codicon "nf-cod-export"))
-          ;; Operators
-          ("!=" . ?≠)
-          ("!==" . ?≢)
-          ("==" . ?≡)
-          ("===" . ?≣)
-          ("<=" . ?≤)
-          (">=" . ?≥)
-          ("=>" . ?⇒)
-          ("->" . ?→)
-          ;; Logical operators
-          ("&&" . ?∧)
-          ("||" . ?∨)
-          ("!" . ?¬)
-          ;; Special values
-          ("null" . ?∅)
-          ("undefined" . ?⊘)
-          ("true" . ?⊤)
-          ("false" . ?⊥)
-          ("..." . ?…)
-          ("Infinity" . ?∞)
-          ("Math.PI" . ?π)
-          ("Math.sqrt" . ?√)))
-  (prettify-symbols-mode 1))
-#+end_src
-
-** Emacs Lisp
-#+begin_src emacs-lisp
-(defun my/emacs-lisp-mode/load-prettify-symbols ()
-  "Load prettify symbols for Emacs Lisp mode."
-  (interactive)
-  (setq prettify-symbols-alist
-      '(;; Keywords
-        ("lambda" . ?λ)
-        ("defun" . ?ƒ)      ; Function (Florin/Script f)
-        ("defvar" . ?𝑣)     ; Variable (Math Italic v)
-        ("defconst" . ?ᴄ)   ; Constant (Small Capital C)
-        ("defmacro" . ?ℳ)   ; Macro (Script Capital M)
-        ("defclass" . ?ℂ)   ; Class (Double-struck C)
-        ;; Operators
-        ("!=" . ?≠)
-        ("/=" . ?≠)
-        ("==" . ?≡)
-        ("<=" . ?≤)
-        (">=" . ?≥)
-        ;; Common functions
-        ("->" . ?→)
-        ("->>" . ?↠)
-        ("<-" . ?←)
-        ("<<-" . ?↞)))
-  (prettify-symbols-mode 1))
-#+end_src
-
-** Common Lisp
-#+begin_src emacs-lisp
-;; Common Lisp mode
-(defun my/lisp-mode/load-prettify-symbols ()
-  "Load prettify symbols for Common Lisp mode."
-  (interactive)
-  (setq prettify-symbols-alist
-        `(;; Keywords
-          ("lambda" . ?λ)
-          ("defun" . ,(nerd-icons-codicon "nf-cod-symbol_method"))
-          ("defvar" . ,(nerd-icons-codicon "nf-cod-symbol_variable"))
-          ("defparameter" . ,(nerd-icons-codicon "nf-cod-symbol_parameter"))
-          ("defconstant" . ,(nerd-icons-codicon "nf-cod-symbol_constant"))
-          ("defmacro" . ,(nerd-icons-codicon "nf-cod-symbol_misc"))
-          ("defclass" . ,(nerd-icons-codicon "nf-cod-symbol_class"))
-          ;; Operators
-          ("/=" . ?≠)
-          ("=" . ?≡)
-          ("<=" . ?≤)
-          (">=" . ?≥)
-          ;; Special values
-          ("nil" . ?∅)
-          ("t" . ?⊤)
-          ;; Logic
-          ("and" . ?∧)
-          ("or" . ?∨)
-          ("not" . ?¬)))
-  (prettify-symbols-mode 1))
-#+end_src
-
-** C/C++ modes
-#+begin_src emacs-lisp
-(defun my/c-mode-common/load-prettify-symbols ()
-  "Load prettify symbols for C/C++ modes."
-  (interactive)
-  (setq prettify-symbols-alist
-        `(;; Keywords
-          ("return" . ,(nerd-icons-codicon "nf-cod-arrow_left"))
-          ("struct" . ,(nerd-icons-codicon "nf-cod-symbol_structure"))
-          ("class" . ,(nerd-icons-codicon "nf-cod-symbol_class"))
-          ("typedef" . ,(nerd-icons-codicon "nf-cod-symbol_type_parameter"))
-          ("enum" . ,(nerd-icons-codicon "nf-cod-symbol_enum"))
-          ;; Operators
-          ("!=" . ?≠)
-          ("==" . ?≡)
-          ("<=" . ?≤)
-          (">=" . ?≥)
-          ("->" . ?→)
-          ("&&" . ?∧)
-          ("||" . ?∨)
-          ("!" . ?¬)
-          ;; Special values
-          ("NULL" . ?∅)
-          ("nullptr" . ?∅)
-          ("true" . ?⊤)
-          ("false" . ?⊥)
-          ;; Common constants
-          ("M_PI" . ?π)
-          ("sqrt" . ?√)
-          ("INFINITY" . ?∞)))
-  (prettify-symbols-mode 1))
-#+end_src
-
-** TypeScript
-#+begin_src emacs-lisp
-(defun my/typescript-mode/load-prettify-symbols ()
-  "Load prettify symbols for TypeScript mode."
-  (interactive)
-  (setq prettify-symbols-alist
-        `(;; Keywords with nerd-icons
-          ("function" . ,(nerd-icons-codicon "nf-cod-symbol_method"))
-          ("class" . ,(nerd-icons-codicon "nf-cod-symbol_class"))
-          ("interface" . ,(nerd-icons-codicon "nf-cod-symbol_interface"))
-          ("type" . ,(nerd-icons-codicon "nf-cod-symbol_type_parameter"))
-          ("enum" . ,(nerd-icons-codicon "nf-cod-symbol_enum"))
-          ("const" . ,(nerd-icons-codicon "nf-cod-symbol_constant"))
-          ("return" . ,(nerd-icons-codicon "nf-cod-arrow_left"))
-          ("import" . ,(nerd-icons-codicon "nf-cod-package"))
-          ("export" . ,(nerd-icons-codicon "nf-cod-export"))
-          ;; Operators
-          ("!=" . ?≠)
-          ("!==" . ?≢)
-          ("==" . ?≡)
-          ("===" . ?≣)
-          ("<=" . ?≤)
-          (">=" . ?≥)
-          ("=>" . ?⇒)
-          ("->" . ?→)
-          ;; Logical operators
-          ("&&" . ?∧)
-          ("||" . ?∨)
-          ("!" . ?¬)
-          ;; Special values
-          ("null" . ?∅)
-          ("undefined" . ?⊘)
-          ("true" . ?⊤)
-          ("false" . ?⊥)
-          ("..." . ?…)
-          ("Infinity" . ?∞)
-          ("Math.PI" . ?π)
-          ("Math.sqrt" . ?√)))
-  (prettify-symbols-mode 1))
-#+end_src
-
-** Shell Script
-#+begin_src emacs-lisp
-(defun my/shell-script-mode/load-prettify-symbols ()
-  "Load prettify symbols for shell script modes."
-  (interactive)
-  (setq prettify-symbols-alist
-        `(;; Keywords with nerd-icons
-          ("function" . ,(nerd-icons-codicon "nf-cod-symbol_method"))
-          ;; Operators
-          ("!=" . ?≠)
-          ("-eq" . ?≡)
-          ("-ne" . ?≠)
-          ("-le" . ?≤)
-          ("-ge" . ?≥)
-          ("-lt" . ?<)
-          ("-gt" . ?>)
-          ;; Logical operators
-          ("&&" . ?∧)
-          ("||" . ?∨)
-          ;; Redirection with icons
-          (">&" . ,(nerd-icons-codicon "nf-cod-output"))
-          ("<&" . ,(nerd-icons-codicon "nf-cod-arrow_left"))))
-  (prettify-symbols-mode 1))
-#+end_src
-
-** Markdown Mode
-#+begin_src emacs-lisp
-;; Markdown mode
-(defun my/markdown-mode/load-prettify-symbols ()
-  "Load prettify symbols for Markdown mode."
-  (interactive)
-  (setq prettify-symbols-alist
-        `(;; Checkboxes
-          ("[ ]" . ,(nerd-icons-mdicon "nf-md-checkbox_blank_outline"))
-          ("[X]" . ,(nerd-icons-mdicon "nf-md-checkbox_marked"))
-          ("[x]" . ,(nerd-icons-mdicon "nf-md-checkbox_marked"))
-          ("[-]" . ,(nerd-icons-mdicon "nf-md-checkbox_intermediate"))
-          ;; Special symbols
-          ("..." . ?…)
-          ("->" . ?→)
-          ("<-" . ?←)
-          ("=>" . ?⇒)
-          ("<=" . ?⇐)
-          ;; Math-like
-          (">=" . ?≥)
-          ("<=" . ?≤)
-          ("!=" . ?≠)))
-  (prettify-symbols-mode 1))
-#+end_src
-
-** LaTeX
-#+begin_src emacs-lisp
-(defun my/latex-mode/load-prettify-symbols ()
-  "Load prettify symbols for LaTeX mode."
-  (interactive)
-  (setq prettify-symbols-alist
-        '(;; Greek letters
-          ("\\alpha" . ?α)
-          ("\\beta" . ?β)
-          ("\\gamma" . ?γ)
-          ("\\delta" . ?δ)
-          ("\\epsilon" . ?ε)
-          ("\\zeta" . ?ζ)
-          ("\\eta" . ?η)
-          ("\\theta" . ?θ)
-          ("\\iota" . ?ι)
-          ("\\kappa" . ?κ)
-          ("\\lambda" . ?λ)
-          ("\\mu" . ?μ)
-          ("\\nu" . ?ν)
-          ("\\xi" . ?ξ)
-          ("\\pi" . ?π)
-          ("\\rho" . ?ρ)
-          ("\\sigma" . ?σ)
-          ("\\tau" . ?τ)
-          ("\\phi" . ?φ)
-          ("\\chi" . ?χ)
-          ("\\psi" . ?ψ)
-          ("\\omega" . ?ω)
-          ;; Capital Greek
-          ("\\Gamma" . ?Γ)
-          ("\\Delta" . ?Δ)
-          ("\\Theta" . ?Θ)
-          ("\\Lambda" . ?Λ)
-          ("\\Xi" . ?Ξ)
-          ("\\Pi" . ?Π)
-          ("\\Sigma" . ?Σ)
-          ("\\Phi" . ?Φ)
-          ("\\Psi" . ?Ψ)
-          ("\\Omega" . ?Ω)
-          ;; Math operators
-          ("\\times" . ?×)
-          ("\\div" . ?÷)
-          ("\\pm" . ?±)
-          ("\\mp" . ?∓)
-          ("\\leq" . ?≤)
-          ("\\geq" . ?≥)
-          ("\\neq" . ?≠)
-          ("\\approx" . ?≈)
-          ("\\equiv" . ?≡)
-          ("\\subset" . ?⊂)
-          ("\\supset" . ?⊃)
-          ("\\subseteq" . ?⊆)
-          ("\\supseteq" . ?⊇)
-          ("\\in" . ?∈)
-          ("\\notin" . ?∉)
-          ("\\cup" . ?∪)
-          ("\\cap" . ?∩)
-          ("\\emptyset" . ?∅)
-          ("\\infty" . ?∞)
-          ("\\partial" . ?∂)
-          ("\\nabla" . ?∇)
-          ("\\int" . ?∫)
-          ("\\sum" . ?∑)
-          ("\\prod" . ?∏)
-          ("\\sqrt" . ?√)
-          ("\\forall" . ?∀)
-          ("\\exists" . ?∃)
-          ("\\wedge" . ?∧)
-          ("\\vee" . ?∨)
-          ("\\neg" . ?¬)
-          ("\\rightarrow" . ?→)
-          ("\\leftarrow" . ?←)
-          ("\\Rightarrow" . ?⇒)
-          ("\\Leftarrow" . ?⇐)
-          ("\\leftrightarrow" . ?↔)
-          ("\\Leftrightarrow" . ?⇔)
-          ("\\mapsto" . ?↦)
-          ;; Special symbols
-          ("\\dots" . ?…)
-          ("\\cdots" . ?⋯)
-          ("\\ldots" . ?…)
-          ("\\circ" . ?∘)
-          ("\\bullet" . ?•)
-          ("\\star" . ?⋆)))
-  (prettify-symbols-mode 1))
-#+end_src
-
-** YAML
-#+begin_src emacs-lisp
-(defun my/yaml-mode/load-prettify-symbols ()
-  "Load prettify symbols for YAML mode."
-  (interactive)
-  (setq prettify-symbols-alist
-        `(;; Boolean values
-          ("true" . ?⊤)
-          ("false" . ?⊥)
-          ("null" . ?∅)
-          ;; Special symbols
-          ("..." . ?…)))
-  (prettify-symbols-mode 1))
-#+end_src
-
-** JSON
-#+begin_src emacs-lisp
-(defun my/json-mode/load-prettify-symbols ()
-  "Load prettify symbols for JSON mode."
-  (interactive)
-  (setq prettify-symbols-alist
-        '(;; Boolean values
-          ("true" . ?⊤)
-          ("false" . ?⊥)
-          ("null" . ?∅)))
-  (prettify-symbols-mode 1))
-#+end_src
-
-** Hooks
-#+begin_src emacs-lisp
-(add-hook 'prog-mode-hook 'my/prog-mode/load-prettify-symbols)
-
-;; Python
-;; (add-hook 'python-mode-hook 'my/python-mode/load-prettify-symbols)
-;; (add-hook 'python-ts-mode-hook 'my/python-mode/load-prettify-symbols)
-
-;; JavaScript/TypeScript
-(add-hook 'js-mode-hook 'my/javascript-mode/load-prettify-symbols)
-(add-hook 'js-ts-mode-hook 'my/javascript-mode/load-prettify-symbols)
-(add-hook 'js2-mode-hook 'my/javascript-mode/load-prettify-symbols)
-(add-hook 'javascript-mode-hook 'my/javascript-mode/load-prettify-symbols)
-(add-hook 'typescript-mode-hook 'my/typescript-mode/load-prettify-symbols)
-(add-hook 'typescript-ts-mode-hook 'my/typescript-mode/load-prettify-symbols)
-(add-hook 'tsx-mode-hook 'my/typescript-mode/load-prettify-symbols)
-(add-hook 'tsx-ts-mode-hook 'my/typescript-mode/load-prettify-symbols)
-
-;; Lisp modes
-(add-hook 'emacs-lisp-mode-hook 'my/emacs-lisp-mode/load-prettify-symbols)
-(add-hook 'lisp-mode-hook 'my/lisp-mode/load-prettify-symbols)
-
-;; C/C++
-(add-hook 'c-mode-hook 'my/c-mode-common/load-prettify-symbols)
-(add-hook 'c-ts-mode-hook 'my/c-mode-common/load-prettify-symbols)
-(add-hook 'c++-mode-hook 'my/c-mode-common/load-prettify-symbols)
-(add-hook 'c++-ts-mode-hook 'my/c-mode-common/load-prettify-symbols)
-
-;; Shell scripts
-(add-hook 'sh-mode-hook 'my/shell-script-mode/load-prettify-symbols)
-(add-hook 'bash-ts-mode-hook 'my/shell-script-mode/load-prettify-symbols)
-
-;; Markdown
-;; (add-hook 'markdown-mode-hook 'my/markdown-mode/load-prettify-symbols)
-;; (add-hook 'gfm-mode-hook 'my/markdown-mode/load-prettify-symbols)
-
-;; LaTeX
-(add-hook 'latex-mode-hook 'my/latex-mode/load-prettify-symbols)
-(add-hook 'LaTeX-mode-hook 'my/latex-mode/load-prettify-symbols)
-
-;; YAML
-(add-hook 'yaml-mode-hook 'my/yaml-mode/load-prettify-symbols)
-(add-hook 'yaml-ts-mode-hook 'my/yaml-mode/load-prettify-symbols)
-
-;; JSON
-(add-hook 'json-mode-hook 'my/json-mode/load-prettify-symbols)
-(add-hook 'json-ts-mode-hook 'my/json-mode/load-prettify-symbols)
-
-;; Optional: Configure prettify-symbols behavior
-(setq prettify-symbols-unprettify-at-point 'right-edge)
-
-(defun my/org-babel-setup-prettify ()
-  "Enable prettify-symbols-mode in org-src edit buffers."
-  (when (derived-mode-p 'prog-mode)
-    (setq prettify-symbols-unprettify-at-point 'right-edge)
-    (prettify-symbols-mode 1)))
-
-(add-hook 'org-src-mode-hook #'my/org-babel-setup-prettify)
-#+end_src
 
 
 * TODO Languages

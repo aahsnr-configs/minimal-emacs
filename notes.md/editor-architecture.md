@@ -21,25 +21,68 @@ _Provides the visual baseline, glyph substitution, and UI APIs required by downs
 8. Prettify Symbols _(Migrated & Simplified: Global glyph substitution)_
 
 **Group 2: Core Buffer, Terminal & Editing Mechanics**
-_Fundamental behaviors that dictate how text, interactive buffers, and the display operate._ 9. Autorevert 10. Subword 11. Sudo edit 12. Buffer Terminator 13. Terminal _(Migrated: Eat/Vterm/Eshell core interactive buffer mechanics & ANSI rendering)_ 14. Scrolling
+_Fundamental behaviors that dictate how text, interactive buffers, and the display operate._
+
+1. Autorevert
+2. Subword
+3. Sudo edit
+4. Buffer Terminator
+5. Terminal _(Migrated: Eat/Vterm/Eshell core interactive buffer mechanics & ANSI rendering)_
+6. Scrolling
 
 **Group 3: The AST Engine & Non-Lisp Structural Stack**
-_The C-level parsing foundation and the typing/wrapping layer._ 15. Treesit _(Migrated: The foundational C-level AST engine. Must load before Group 3/4 dependents)_ 16. elec-pair 17. evil-surround 18. delete-pair 19. show-paren-mode 20. blink-matching-paren 21. rainbow-delimiters 22. evil-matchit 23. evil-textobj-tree-sitter / evil-ts-obj 24. Native treesit-navigate-thing 25. expreg / treesit-expreg 26. tree-edit
+_The C-level parsing foundation and the typing/wrapping layer._
+
+1. Treesit _(Migrated: The foundational C-level AST engine. Must load before Group 3/4 dependents)_
+2. elec-pair
+3. evil-surround
+4. delete-pair
+5. show-paren-mode
+6. blink-matching-paren
+7. rainbow-delimiters
+8. evil-matchit
+9. evil-textobj-tree-sitter / evil-ts-obj
+10. Native treesit-navigate-thing
+11. expreg / treesit-expreg
+12. tree-edit
 
 **Group 4: Code Folding (AST & Textual)**
-_Structural and textual collapsing mechanisms._ 27. Treesit-Fold _(Migrated: AST-aware folding powered by Group 3's Treesit engine)_ 28. Vimish-Fold _(Migrated: Evil-compatible textual/regex folding)_
+_Structural and textual collapsing mechanisms._
+
+1. Treesit-Fold _(Migrated: AST-aware folding powered by Group 3's Treesit engine)
+2. Vimish-Fold _(Migrated: Evil-compatible textual/regex folding)_
 
 **Group 5: Whitespace, Indentation & Formatting**
-_Packages that manage spatial alignment, trailing characters, and indentation guides._ 29. Stripspace 30. Dirt Indent 31. Indent Bars
+_Packages that manage spatial alignment, trailing characters, and indentation guides._
+
+1. Stripspace
+2. Dirt Indent
+3. Indent Bars
 
 **Group 6: Visual Indicators & Window Chrome**
-_Packages that render visual feedback, lines, and modelines._ 32. Line Numbers 33. Display dividers between windows 34. hl-line 35. Rainbow Mode 36. Modeline 37. Hide Modeline 38. Text Scaling
+_Packages that render visual feedback, lines, and modelines._
+
+1. Line Numbers
+2. Display dividers between windows
+3. hl-line
+4. Rainbow Mode
+5. Modeline
+6. Hide Modeline
+7. Text Scaling
 
 **Group 7: Navigation, Search & Multi-cursor**
-_Tools for moving through text, searching, and localized multi-cursor refactoring._ 39. Avy 40. Anzu 41. iedit
+_Tools for moving through text, searching, and localized multi-cursor refactoring._
+
+1. Avy
+2. Anzu
+3. iedit
 
 **Group 8: Text Correction, Help & Complex Workflows**
-_Spellchecking, documentation tools, and heavy multi-window tools._ 42. Jinx 43. Helpful 44. Ediff
+_Spellchecking, documentation tools, and heavy multi-window tools._
+
+1. Jinx
+2. Helpful
+3. Ediff
 
 ### Architectural Impact & Migrations
 
