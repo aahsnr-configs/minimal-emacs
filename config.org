@@ -799,7 +799,8 @@ Aligns text regions via the =gl= operator.
 #+end_src
 
 
-** TODO Smart Comment Continuation
+** DONE Smart Comment Continuation
+Intercepts Evil's =o= and =O= operators to continue comment lines natively. Utilizes bounded O(1) line searches to verify comment presence, ensure correct prefix propagation, and guarantee precise cursor placement.
 #+begin_src emacs-lisp
 (defcustom ar/evil-want-o/O-to-continue-comments t
   "If non-nil, o/O keys will continue comment lines."
@@ -807,42 +808,43 @@ Aligns text regions via the =gl= operator.
   :group 'evil)
 
 (defun ar/evil-open-below-smart ()
-  "Open line below. If in a comment, continue it using Emacs native logic."
+  "Open line below, continuing comments if applicable."
   (interactive)
   (if (and ar/evil-want-o/O-to-continue-comments
-           (save-excursion (comment-beginning)))
+           comment-start-skip
+           (save-excursion
+             (beginning-of-line)
+             (re-search-forward comment-start-skip (line-end-position) t)))
       (progn
         (end-of-line)
-        ;; Delegates to Emacs' native 'M-j' behavior, which handles
-        ;; every language's comment syntax (;;, //, #, *) perfectly.
         (comment-indent-new-line)
         (evil-insert-state))
-    (evil-open-below 1)))
+    (evil-open-below (prefix-numeric-value current-prefix-arg))))
 
 (defun ar/evil-open-above-smart ()
-  "Open line above. If in a comment, continue it using Emacs native logic."
+  "Open line above, continuing comments if applicable."
   (interactive)
   (if (and ar/evil-want-o/O-to-continue-comments
-           (save-excursion (comment-beginning)))
+           comment-start-skip
+           (save-excursion
+             (beginning-of-line)
+             (re-search-forward comment-start-skip (line-end-position) t)))
       (progn
         (beginning-of-line)
-        ;; Split the current comment line from above
+        (re-search-forward comment-start-skip (line-end-position) t)
         (comment-indent-new-line)
-        ;; Move to the upper line (the new one)
         (forward-line -1)
         (indent-according-to-mode)
+        ;; Push cursor past the delimiter on the newly created line.
+        (re-search-forward comment-start-skip (line-end-position) t)
         (evil-insert-state))
-    (evil-open-above 1)))
-
-(with-eval-after-load 'evil
-  (define-key evil-normal-state-map "o" #'ar/evil-open-below-smart)
-  (define-key evil-normal-state-map "O" #'ar/evil-open-above-smart))
+    (evil-open-above (prefix-numeric-value current-prefix-arg))))
 #+end_src
 
 
 
 * TODO Editor Behaviour
-- [ ] Determine if the order of the all these org blocks are correct.
+
 ** TODO Child Frame
 #+begin_src emacs-lisp
 (use-package posframe
@@ -1149,13 +1151,6 @@ Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy
   (add-hook 'eldoc-mode-hook
             (lambda ()
               (add-hook 'eldoc-documentation-functions #'ar/paren-eldoc-offscreen-context -45 t))))
-#+end_src
-
-
-** TODO Edit multiple regions simultaneously
-- [ ] Is there an existing evil related package that conflicts with iedit?
-#+begin_src emacs-lisp
-(use-package iedit :defer t)
 #+end_src
 
 
@@ -1597,6 +1592,10 @@ and sets up vim-style navigation."
               (select-window (get-buffer-window ediff-control-buffer)))))
 #+end_src
 
+
+
+** TODO iedit
+- [ ] Is the current evil-multiedit need to be configured together with iedit?
 
 
 ** TODO rainbow-delimiters
@@ -8144,17 +8143,22 @@ Native directional window navigation. Enables wrap-around physics for spatial tr
    "g t" 'lsp-find-type-definition
    "g ," 'xref-go-back)
 
-(general-define-key
- :states '(normal visual)
- ;; Avy zap
- "z" 'avy-zap-to-char-dwim
- "Z" 'avy-zap-up-to-char-dwim
- ;; Evil Numbers
- "C-a" #'evil-numbers/inc-at-pt
- "C-x" #'evil-numbers/dec-at-pt
- ;; Evil Multiedit
- "M-d" #'evil-multiedit-match-symbol-and-next
- "M-D" #'evil-multiedit-match-all)
+  (general-define-key
+   :states 'normal
+    "o" #'ar/evil-open-below-smart
+    "O" #'ar/evil-open-above-smart)
+
+  (general-define-key
+   :states '(normal visual)
+    ;; Avy zap
+    "z" 'avy-zap-to-char-dwim
+    "Z" 'avy-zap-up-to-char-dwim
+    ;; Evil Numbers
+    "C-a" #'evil-numbers/inc-at-pt
+    "C-x" #'evil-numbers/dec-at-pt
+    ;; Evil Multiedit
+    "M-d" #'evil-multiedit-match-symbol-and-next
+    "M-D" #'evil-multiedit-match-all)
 
   (general-define-key
    :states 'normal
