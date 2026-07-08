@@ -682,17 +682,6 @@ Injects standardized Vim bindings into non-text buffers. Enables Unimpaired brac
 #+end_src
 
 
-** DONE Evil Matchit
-Extends =%= motion to jump across semantic blocks (LaTeX, HTML, code).
-#+begin_src emacs-lisp
-(use-package evil-matchit
-  :after evil
-  :config
-  ;; Enable semantic block jumping.
-  (global-evil-matchit-mode 1))
-#+end_src
-
-
 ** DONE Evil Commentary
 Provides =gc= and =gcc= operators via native APIs. Supersedes custom commenting logic.
 #+begin_src emacs-lisp
@@ -823,7 +812,7 @@ Intercepts Evil's =o= and =O= operators to continue comment lines natively. Util
 
 
 
-* DONE Visual Chrome & UI Overlays
+* DONE Visual Overlays
 Establishes the visual baseline, typography, and foundational UI overlays. Manages theme rendering, glyph substitution, and childframe APIs required by downstream packages.
 
 ** DONE Child Frame
@@ -985,51 +974,318 @@ Delegates operator ligatures to HarfBuzz via ligature.el and reserves Elisp subs
 
 
 
-* TODO Interactive Buffers & Redisplay Physics
+* TODO Interactive Buffers
 Governs fundamental buffer I/O, terminal emulation, and scroll rendering. Dictates how Emacs processes asynchronous input and refreshes the display matrix.
 
-** TODO Autorevert
-- [ ] What does autorevert do exactly
+** DONE Autorevert
+Synchronizes buffers with external disk modifications via native OS file notifications. Suppresses echo-area logging and avoids interval polling to eliminate I/O overhead.
 #+begin_src emacs-lisp
 (use-package autorevert
-  :defer t
   :ensure nil
-  :hook (after-init . global-auto-revert-mode))
+  :hook (elpaca-after-init . global-auto-revert-mode)
+  :custom
+  (auto-revert-verbose nil)
+  (auto-revert-avoid-polling t))
 #+end_src
 
 
-** TODO Subword
+** DONE Subword
+Modifies word boundaries to recognize camelCase transitions. Globally enables native and Evil motions to traverse compound identifiers.
 #+begin_src emacs-lisp
 (use-package subword
-  :defer t
   :ensure nil
-  :hook ((prog-mode . subword-mode)
-         (minibuffer-setup . subword-mode)))
+  :hook (elpaca-after-init . global-subword-mode))
 #+end_src
 
 
-** TODO Sudo edit
+** DONE Sudo Edit
+Reopens the current buffer with elevated privileges via TRAMP's native sudo method.
 #+begin_src emacs-lisp
 (use-package sudo-edit :defer t)
 #+end_src
 
 
-
-** TODO Buffer Terminator
-- [ ] Will buffer-terminator be useful for my whole emacs configuration?
+** DONE Terminal
+Terminal emulation powered by =libghostty-vt=, rendering as a persistent 30% bottom drawer with strict Evil integration and automatic TRAMP support.
 #+begin_src emacs-lisp
-(use-package buffer-terminator
-  :hook (after-init . buffer-terminator-mode)
-  :custom
-  (buffer-terminator-verbose nil)
-  (buffer-terminator-inactivity-timeout (* 30 60))
-  (buffer-terminator-interval (* 10 60)))
+(use-package ghostel
+  :defer t
+  :commands (ghostel ghostel-project)
+  :bind (:map ghostel-semi-char-mode-map
+         ;; Map M-p/M-n to terminal history navigation.
+         ("M-p" . (lambda () (interactive) (ghostel-send-key "p" "ctrl")))
+         ("M-n" . (lambda () (interactive) (ghostel-send-key "n" "ctrl")))
+         ("M-<backspace>" . ghostel-backward-kill-word))
+  :config
+  (require 'seq)
+  ;; Route buffers to a dedicated 30% bottom side-window.
+  (add-to-list 'display-buffer-alist
+               '((derived-mode . ghostel-mode)
+                 (display-buffer-in-side-window)
+                 (side . bottom)
+                 (window-height . 0.3)
+                 (window-parameters (no-delete-other-windows . t))))
+  ;; Whitelist Magit for OSC 52;e shell evaluation.
+  (add-to-list 'ghostel-eval-cmds '("magit-status-setup-buffer" magit-status-setup-buffer))
+  ;; TODO: Integrate natively with projectile/persp-mode upon finalization.
+  (add-to-list 'project-switch-commands '(ghostel-project "Ghostel") t)
+  (add-to-list 'project-switch-commands '(ghostel-project-list-buffers "Ghostel buffers") t)
+  ;; Synchronize C-k kill-ring behavior with terminal line deletion.
+  (defun ar/ghostel-send-C-k-and-kill ()
+    "Send `C-k' to ghostel and save to kill-ring."
+    (interactive)
+    (copy-region-as-kill (point) (line-end-position))
+    (ghostel-send-key "k" "ctrl"))
+  (define-key ghostel-semi-char-mode-map (kbd "C-k") #'ar/ghostel-send-C-k-and-kill)
+  ;; Strip DIRENV_ variables to enforce local .envrc evaluation.
+  (add-hook 'ghostel-pre-spawn-hook
+            (lambda ()
+              (setq process-environment
+                    (seq-remove (lambda (env) (string-prefix-p "DIRENV_" env))
+                                process-environment))))
+  ;; Enable automatic TRAMP shell integration via temporary SCP transfers.
+  (setq ghostel-tramp-shell-integration t)
+  ;; TODO: Configure OS-level Zsh aliases for ghostel_cmd IDE synergy.
+  ;; TODO: Configure OS-level Tmux for xterm-ghostty true-color passthrough.
+  )
+
+;; State-aware toggle for the persistent bottom terminal drawer.
+(defun ar/ghostel-toggle ()
+  "Toggle the Ghostel terminal drawer at the bottom of the frame."
+  (interactive)
+  ;; TODO: Restrict buffer querying to persp-mode/projectile boundaries.
+  (let* ((buf (seq-find (lambda (b)
+                          (with-current-buffer b (derived-mode-p 'ghostel-mode)))
+                        (buffer-list)))
+         (win (and buf (get-buffer-window buf))))
+    (cond
+     ((and win (eq win (selected-window))) (delete-window win))
+     (win (select-window win))
+     (buf (pop-to-buffer buf))
+     (t (call-interactively #'ghostel)))))
+
+;; Synchronizes the terminal cursor with Emacs point during Evil state transitions.
+(use-package evil-ghostel
+  :after (ghostel evil)
+  :hook (ghostel-mode . evil-ghostel-mode))
+
+;; Routes Eshell visual commands to dedicated Ghostel buffers for proper TTY rendering.
+(use-package ghostel-eshell
+  :ensure nil
+  :after ghostel
+  :hook (eshell-load . ghostel-eshell-visual-command-mode))
+
+;; Replaces standard compilation buffers with live TTY-backed Ghostel sessions.
+(use-package ghostel-compile
+  :ensure nil
+  :after ghostel
+  :hook (elpaca-after-init . ghostel-compile-global-mode))
+
+;; Upgrades Comint and REPL output with libghostty-vt ANSI and OSC parsing fidelity.
+(use-package ghostel-comint
+  :ensure nil
+  :after ghostel
+  :hook (elpaca-after-init . ghostel-comint-global-mode))
 #+end_src
 
 
-** TODO Terminal
-TODO: =Add ghostel package from https://github.com/dakra/ghostel=
+** DONE Eshell
+Native Emacs shell with Lisp integration and AST-aware prompt navigation. Fortified with undo protection, read-only output enforcement, and modern syntax highlighting.
+#+begin_src emacs-lisp
+(use-package eshell
+  :ensure nil
+  :defer t
+  :commands (eshell ar/eshell-toggle ar/eshell-new)
+  :hook ((eshell-mode . (lambda ()
+                          (when (bound-and-true-p display-line-numbers-mode)
+                            (display-line-numbers-mode -1))
+                          (setq-local corfu-auto nil)
+                          (visual-line-mode 1)
+                          (setq-local hscroll-margin 0)))
+         (eshell-mode . electric-pair-local-mode))
+  :custom
+  (eshell-kill-processes-on-exit t)
+  (eshell-destroy-buffer-when-process-dies nil)
+  (eshell-banner-message "")
+  (eshell-scroll-to-bottom-on-input 'all)
+  (eshell-scroll-show-maximum-output t)
+  (eshell-scroll-to-bottom-on-output 'all)
+  (eshell-history-size 10000)
+  (eshell-hist-ignoredups t)
+  (eshell-save-history-on-exit t)
+  (eshell-input-filter-initial-space t)
+  (eshell-buffer-maximum-lines 20000)
+  (eshell-glob-case-insensitive t)
+  (eshell-error-if-no-glob t)
+  (eshell-visual-commands
+   '("top" "htop" "btop" "less" "more" "vim" "vi" "nvim" "nano" "emacs"
+     "ssh" "tail" "watch" "ncdu" "ranger" "tmux" "screen" "zellij"
+     "python" "ipython" "node" "ruby" "irb" "ncmpcpp" "lazygit"))
+  (eshell-visual-subcommands
+   '(("git" "log" "diff" "show" "help")
+     ("docker" "run" "exec" "logs" "attach")
+     ("podman" "run" "exec" "logs" "attach")))
+  (eshell-visual-options
+   '(("git" "--help" "--paginate")))
+  (eshell-prefer-lisp-functions t)
+  (eshell-prefer-lisp-variables t)
+  :config
+  (require 'seq)
+  (setenv "PAGER" "cat")
+  (add-to-list 'eshell-modules-list 'eshell-tramp)
+  ;; Prevent interactive alias editor from overwriting Elisp definitions.
+  (advice-add #'eshell-write-aliases-list :override #'ignore)
+  ;; Imenu prompt jumping for `consult-imenu` synergy.
+  (add-hook 'eshell-mode-hook
+            (lambda ()
+              (setq-local imenu-generic-expression
+                          `((,(propertize "λ" 'face 'eshell-prompt)
+                             ,(concat eshell-prompt-regexp "\\(.*\\)") 1)))))
+  ;; Undo history protection and read-only output enforcement.
+  (add-hook 'eshell-pre-command-hook #'buffer-disable-undo)
+  (add-hook 'eshell-post-command-hook
+            (lambda ()
+              (buffer-enable-undo (current-buffer))
+              (setq buffer-undo-list nil)))
+  (add-hook 'eshell-pre-command-hook
+            (lambda ()
+              (when (and eshell-last-input-start eshell-last-input-end)
+                (add-text-properties eshell-last-input-start
+                                     (1- eshell-last-input-end)
+                                     '(read-only t)))))
+  (add-hook 'eshell-post-command-hook
+            (lambda ()
+              (when (and eshell-last-input-end eshell-last-output-start)
+                (add-text-properties eshell-last-input-end
+                                     eshell-last-output-start
+                                     '(read-only t)))))
+  ;; Inject unwrapped cape-file for unquoted path completion.
+  (add-hook 'eshell-mode-hook
+            (lambda ()
+              (add-hook 'completion-at-point-functions #'cape-file nil t)))
+  ;; State-aware 33% bottom drawer toggle with sole-window guard.
+  (defun ar/eshell-toggle ()
+    "Toggle eshell popup window at the bottom of the frame."
+    (interactive)
+    (let* ((eshell-buffer-name "*eshell*")
+           (eshell-buffer (get-buffer eshell-buffer-name))
+           (eshell-window (and eshell-buffer (get-buffer-window eshell-buffer))))
+      (if eshell-window
+          (if (one-window-p) (bury-buffer) (delete-window eshell-window))
+        (let ((display-buffer-alist
+               '(("\\*eshell\\*"
+                  (display-buffer-in-side-window)
+                  (side . bottom)
+                  (window-height . 0.33)
+                  (window-parameters (no-delete-other-windows . t))))))
+          (if eshell-buffer
+              (pop-to-buffer eshell-buffer)
+            (eshell))))))
+  ;; Spawn fully initialized new eshell instance.
+  (defun ar/eshell-new ()
+    "Create a new eshell buffer."
+    (interactive)
+    (eshell t))
+  ;; Safe scrollback clearing without destroying prompt state.
+  (with-eval-after-load 'em-basic
+    (defalias 'eshell/clear #'eshell/clear-scrollback))
+  ;; Optimized Git branch helper using Magit/VC backends to prevent main-thread blocking.
+  (defun ar/eshell-git-branch ()
+    "Retrieve current git branch via Magit or VC backend."
+    (when (and (not (file-remote-p default-directory))
+               (vc-git-root default-directory))
+      (let ((branch (or (and (fboundp 'magit-get-current-branch)
+                             (magit-get-current-branch))
+                        (ignore-errors (vc-git--symbolic-ref default-directory)))))
+        (when branch
+          (concat " " (propertize (concat "(" branch ")")
+                                  'face '(:foreground "#7aa2f7")))))))
+  ;; Custom prompt with O(1) Git branch resolution.
+  (setq eshell-prompt-function
+        (lambda ()
+          (concat
+           (propertize (abbreviate-file-name (eshell/pwd))
+                       'face '(:foreground "#bb9af7"))
+           (ar/eshell-git-branch)
+           (propertize (if (zerop (user-uid)) " # " " $ ")
+                       'face '(:foreground "#9ece6a" :weight bold)))))
+  (setq eshell-prompt-regexp "^[^#$\n]* [#$] ")
+  ;; Aliases
+  (defalias 'eshell/ff #'find-file)
+  (defalias 'eshell/fo #'find-file-other-window)
+  (defalias 'eshell/d #'dired)
+  (defalias 'eshell/e #'find-file)
+  (defalias 'eshell/eh #'find-file-other-window)
+  (defalias 'eshell/v #'view-file)
+  (defalias 'eshell/l #'eshell/ls)
+  (defalias 'eshell/ll #'eshell/ls)
+  (defalias 'eshell/q #'eshell/exit)
+  (defalias 'eshell/gst #'magit-status))
 
+;; ==========================================
+;; EXTENSIONS
+;; ==========================================
+(use-package eshell-syntax-highlighting
+  :defer t
+  :hook (eshell-mode . eshell-syntax-highlighting-mode)
+  :config
+  ;; Inhibit highlighting during history navigation to show raw matches.
+  (defun ar/eshell-filter-history-from-highlighting-a (&rest _)
+    (memq this-command '(eshell-previous-matching-input-from-input
+                         eshell-next-matching-input-from-input)))
+  (advice-add #'eshell-syntax-highlighting--enable-highlighting
+              :before-until #'ar/eshell-filter-history-from-highlighting-a)
+  (add-hook 'eshell-syntax-highlighting-elisp-buffer-setup-hook
+            (lambda ()
+              (when eshell-syntax-highlighting-mode
+                (add-hook 'pre-command-hook
+                          (lambda ()
+                            (when (memq last-command '(eshell-previous-matching-input-from-input
+                                                       eshell-next-matching-input-from-input))
+                              (eshell-syntax-highlighting--enable-highlighting)))
+                          nil t)))))
+
+(use-package pcmpl-args
+  :defer t
+  :after eshell
+  :config
+  (dolist (cmd '("git" "rg" "fd" "curl" "docker" "npm" "yarn"))
+    (defalias (intern (concat "pcomplete/" cmd))
+      #'pcmpl-args-pcomplete-on-help)))
+
+(use-package esh-help
+  :defer t
+  :after eshell
+  :config (setup-esh-help-eldoc))
+
+(use-package eshell-up
+  :defer t
+  :commands (eshell-up eshell-up-peek)
+  :config
+  ;; Defer alias registration until eshell-up is fully loaded to prevent void-function errors.
+  (with-eval-after-load 'eshell
+    (defalias 'eshell/bd 'eshell-up)))
+
+(use-package eshell-z
+  :defer t
+  :after eshell
+  :config
+  (unless (file-exists-p eshell-z-freq-dir-hash-table-file-name)
+    (setq eshell-z-freq-dir-hash-table-file-name
+          (expand-file-name "z" eshell-directory-name))))
+
+(use-package eshell-did-you-mean
+  :defer t
+  :after eshell
+  :config
+  (eshell-did-you-mean-setup)
+  ;; Fix wrong-type-arg error when pcomplete returns a function.
+  (advice-add #'eshell-did-you-mean--get-all-commands :override
+              (lambda (&rest _)
+                (unless eshell-did-you-mean--all-commands
+                  (setq eshell-did-you-mean--all-commands
+                        (all-completions "" (pcomplete-completions)))))))
+#+end_src
 
 
 ** TODO Scrolling
@@ -1044,6 +1300,7 @@ TODO: =Add ghostel package from https://github.com/dakra/ghostel=
       scroll-preserve-screen-position t
       auto-window-vscroll nil
       ;; mouse
+
       mouse-wheel-scroll-amount-horizontal 1
       mouse-wheel-progressive-speed nil)
 
@@ -1059,11 +1316,11 @@ TODO: =Add ghostel package from https://github.com/dakra/ghostel=
 #+end_src
 
 
-* TODO AST Parsing & Structural Typing
+* TODO Structural Typing and Parsing
 Establishes the C-level parsing foundation and non-Lisp typing layer. Provides AST-aware text objects, boundary wrapping, and deep node refactoring.
 
 ** TODO Treesit
-NOTE: =Wait for Emacs 31 to be released as they will introduce automatic tree-sitter grammar installation when any specific prog-mode buffer is opened. The grammars should not be in the main emacs config folder.=
+NOTE: =Wait for Emacs 31 to be released as they will introduce automatic tree-sitter grammar installation when any specific prog-mode buffer is opened. The grammars should be installed in no-littering-var-directory the main emacs config folder.=
 =Ready it for Emacs 31 features as well keep Emacs 30 features=
 #+begin_src emacs-lisp
 (use-package treesit
@@ -1080,7 +1337,7 @@ NOTE: =Wait for Emacs 31 to be released as they will introduce automatic tree-si
   (add-to-list 'treesit-extra-load-path ar/treesit-grammar-dir)
 
   :config
-  (setq treesit-font-lock-level 4)
+  (setq treesit-font-lock-level 3)
 
   (setq treesit-language-source-alist
         '((python "https://github.com/tree-sitter/tree-sitter-python")
@@ -1108,6 +1365,9 @@ NOTE: =Wait for Emacs 31 to be released as they will introduce automatic tree-si
           (c-mode . c-ts-mode)
           (c++-mode . c++-ts-mode))))
 #+end_src
+
+#+RESULTS:
+: ((\.tsx\' . tsx-ts-mode) (/bspwmrc\' . sh-mode) (\.\(?:zunit\|env\)\' . sh-mode) (\.bats\' . sh-mode) (/README\(?:\.md\)?\' . gfm-mode) (/\.doom\(?:modules?\|profiles?\)?\' . lisp-data-mode) (/LICENSE\' . text-mode) (\.\(?:md\|markdown\|mkd\|mdown\|mkdn\|mdwn\|mdx\)\' . markdown-mode) (/git-rebase-todo\' . git-rebase-mode) (/git/ignore\' . gitignore-mode) (/info/exclude\' . gitignore-mode) (/\.gitignore\' . gitignore-mode) (/etc/gitconfig\' . gitconfig-mode) (/\.gitmodules\' . gitconfig-mode) (/git/config\' . gitconfig-mode) (/modules/.*/config\' . gitconfig-mode) (/\.git/config\' . gitconfig-mode) (/\.gitconfig\' . gitconfig-mode) (/git/attributes\' . gitattributes-mode) (/info/attributes\' . gitattributes-mode) (/\.gitattributes\' . gitattributes-mode) (\.gpg\(~\|\.~[0-9]+~\)?\' nil epa-file) (\.elc\' . elisp-byte-code-mode) (\.zst\' nil jka-compr) (\.dz\' nil jka-compr) (\.xz\' nil jka-compr) (\.lzma\' nil jka-compr) (\.lz\' nil jka-compr) (\.g?z\' nil jka-compr) (\.bz2\' nil jka-compr) (\.Z\' nil jka-compr) (\.vr[hi]?\' . vera-mode) (\(?:\.\(?:rbw?\|ru\|rake\|thor\|axlsx\|jbuilder\|rabl\|gemspec\|podspec\)\|/\(?:Gem\|Rake\|Cap\|Thor\|Puppet\|Berks\|Brew\|Fast\|Vagrant\|Guard\|Pod\)file\)\' . ruby-mode) (\.re?st\' . rst-mode) (/\(?:Pipfile\|\.?flake8\)\' . conf-mode) (\.py[iw]?\' . python-mode) (\.m\' . octave-maybe-mode) (\.less\' . less-css-mode) (\.editorconfig\' . editorconfig-conf-mode) (\.scss\' . scss-mode) (\.cs\' . csharp-mode) (\.awk\' . awk-mode) (\.\(u?lpc\|pike\|pmod\(\.in\)?\)\' . pike-mode) (\.idl\' . idl-mode) (\.java\' . java-mode) (\.m\' . objc-mode) (\.ii\' . c++-mode) (\.i\' . c-mode) (\.lex\' . c-mode) (\.y\(acc\)?\' . c-mode) (\.h\' . c-or-c++-mode) (\.c\' . c-mode) (\.\(CC?\|HH?\)\' . c++-mode) (\.[ch]\(pp\|xx\|\+\+\)\' . c++-mode) (\.\(cc\|hh\)\' . c++-mode) (\.\(bat\|cmd\)\' . bat-mode) (\.[sx]?html?\(\.[a-zA-Z_]+\)?\' . mhtml-mode) (\.svgz?\' . image-mode) (\.svgz?\' . xml-mode) (\.x[bp]m\' . image-mode) (\.x[bp]m\' . c-mode) (\.p[bpgn]m\' . image-mode) (\.tiff?\' . image-mode) (\.gif\' . image-mode) (\.png\' . image-mode) (\.jpe?g\' . image-mode) (\.webp\' . image-mode) (\.te?xt\' . text-mode) (\.[tT]e[xX]\' . tex-mode) (\.ins\' . tex-mode) (\.ltx\' . latex-mode) (\.dtx\' . doctex-mode) (\.org\' . org-mode) (\.dir-locals\(?:-2\)?\.el\' . lisp-data-mode) (\.eld\' . lisp-data-mode) (eww-bookmarks\' . lisp-data-mode) (tramp\' . lisp-data-mode) (/archive-contents\' . lisp-data-mode) (places\' . lisp-data-mode) (\.emacs-places\' . lisp-data-mode) (\.el\' . emacs-lisp-mode) (Project\.ede\' . emacs-lisp-mode) (\(?:\.\(?:scm\|sls\|sld\|stk\|ss\|sch\)\|/\.guile\)\' . scheme-mode) (\.l\' . lisp-mode) (\.li?sp\' . lisp-mode) (\.[fF]\' . fortran-mode) (\.for\' . fortran-mode) (\.p\' . pascal-mode) (\.pas\' . pascal-mode) (\.\(dpr\|DPR\)\' . delphi-mode) (\.\([pP]\([Llm]\|erl\|od\)\|al\)\' . perl-mode) (Imakefile\' . makefile-imake-mode) (Makeppfile\(?:\.mk\)?\' . makefile-makepp-mode) (\.makepp\' . makefile-makepp-mode) (\.mk\' . makefile-gmake-mode) (\.make\' . makefile-gmake-mode) ([Mm]akefile\' . makefile-gmake-mode) (\.am\' . makefile-automake-mode) (\.texinfo\' . texinfo-mode) (\.te?xi\' . texinfo-mode) (\.[sS]\' . asm-mode) (\.asm\' . asm-mode) (\.css\' . css-mode) (\.mixal\' . mixal-mode) (\.gcov\' . compilation-mode) (/\.[a-z0-9-]*gdbinit . gdb-script-mode) (-gdb\.gdb . gdb-script-mode) ([cC]hange\.?[lL]og?\' . change-log-mode) ([cC]hange[lL]og[-.][0-9]+\' . change-log-mode) (\$CHANGE_LOG\$\.TXT . change-log-mode) (\.scm\.[0-9]*\' . scheme-mode) (\.[ckz]?sh\'\|\.shar\'\|/\.z?profile\' . sh-mode) (\.bash\' . sh-mode) (/PKGBUILD\' . sh-mode) (\(/\|\`\)\.\(bash_\(profile\|history\|log\(in\|out\)\)\|z?log\(in\|out\)\)\' . sh-mode) (\(/\|\`\)\.\(shrc\|zshrc\|m?kshrc\|bashrc\|t?cshrc\|esrc\)\' . sh-mode) (\(/\|\`\)\.\([kz]shenv\|xinitrc\|startxrc\|xsession\)\' . sh-mode) (\.m?spec\' . sh-mode) (\.m[mes]\' . nroff-mode) (\.man\' . nroff-mode) (\.sty\' . latex-mode) (\.cl[so]\' . latex-mode) (\.bbl\' . latex-mode) (\.bib\' . bibtex-mode) (\.bst\' . bibtex-style-mode) (\.sql\' . sql-mode) (\(acinclude\|aclocal\|acsite\)\.m4\' . autoconf-mode) (\.m[4c]\' . m4-mode) (\.mf\' . metafont-mode) (\.mp\' . metapost-mode) (\.vhdl?\' . vhdl-mode) (\.article\' . text-mode) (\.letter\' . text-mode) (\.i?tcl\' . tcl-mode) (\.exp\' . tcl-mode) (\.itk\' . tcl-mode) (\.icn\' . icon-mode) (\.sim\' . simula-mode) (\.mss\' . scribe-mode) (\.f9[05]\' . f90-mode) (\.f0[38]\' . f90-mode) (\.indent\.pro\' . fundamental-mode) (\.\(pro\|PRO\)\' . idlwave-mode) (\.srt\' . srecode-template-mode) (\.prolog\' . prolog-mode) (\.tar\' . tar-mode) (\.\(arc\|zip\|lzh\|lha\|zoo\|[jew]ar\|xpi\|rar\|cbr\|7z\|squashfs\|ARC\|ZIP\|LZH\|LHA\|ZOO\|[JEW]AR\|XPI\|RAR\|CBR\|7Z\|SQUASHFS\)\' . archive-mode) (\.oxt\' . archive-mode) (\.\(deb\|[oi]pk\)\' . archive-mode) (\`/tmp/Re . text-mode) (/Message[0-9]*\' . text-mode) (\`/tmp/fol/ . text-mode) (\.oak\' . scheme-mode) (\.sgml?\' . sgml-mode) (\.x[ms]l\' . xml-mode) (\.dbk\' . xml-mode) (\.dtd\' . sgml-mode) (\.ds\(ss\)?l\' . dsssl-mode) (\.js[mx]?\' . javascript-mode) (\.har\' . javascript-mode) (\.json\' . js-json-mode) (\.[ds]?va?h?\' . verilog-mode) (\.by\' . bovine-grammar-mode) (\.wy\' . wisent-grammar-mode) (\.erts\' . erts-mode) ([:/\]\..*\(emacs\|gnus\|viper\)\' . emacs-lisp-mode) (\`\..*emacs\' . emacs-lisp-mode) ([:/]_emacs\' . emacs-lisp-mode) (/crontab\.X*[0-9]+\' . shell-script-mode) (\.ml\' . lisp-mode) (\.ld[si]?\' . ld-script-mode) (ld\.?script\' . ld-script-mode) (\.xs\' . c-mode) (\.x[abdsru]?[cnw]?\' . ld-script-mode) (\.zone\' . dns-mode) (\.soa\' . dns-mode) (\.asd\' . lisp-mode) (\.\(asn\|mib\|smi\)\' . snmp-mode) (\.\(as\|mi\|sm\)2\' . snmpv2-mode) (\.\(diffs?\|patch\|rej\)\' . diff-mode) (\.\(dif\|pat\)\' . diff-mode) (\.[eE]?[pP][sS]\' . ps-mode) (\.\(?:PDF\|EPUB\|CBZ\|FB2\|O?XPS\|DVI\|OD[FGPST]\|DOCX\|XLSX?\|PPTX?\|pdf\|epub\|cbz\|fb2\|o?xps\|djvu\|dvi\|od[fgpst]\|docx\|xlsx?\|pptx?\)\' . doc-view-mode-maybe) (configure\.\(ac\|in\)\' . autoconf-mode) (\.s\(v\|iv\|ieve\)\' . sieve-mode) (BROWSE\' . ebrowse-tree-mode) (\.ebrowse\' . ebrowse-tree-mode) (#\*mail\* . mail-mode) (\.g\' . antlr-mode) (\.mod\' . m2-mode) (\.ses\' . ses-mode) (\.docbook\' . sgml-mode) (\.com\' . dcl-mode) (/config\.\(?:bat\|log\)\' . fundamental-mode) (/\.?\(authinfo\|netrc\)\' . authinfo-mode) (\.\(?:[iI][nN][iI]\|[lL][sS][tT]\|[rR][eE][gG]\|[sS][yY][sS]\)\' . conf-mode) (\.la\' . conf-unix-mode) (\.ppd\' . conf-ppd-mode) (java.+\.conf\' . conf-javaprop-mode) (\.properties\(?:\.[a-zA-Z0-9._-]+\)?\' . conf-javaprop-mode) (\.toml\' . conf-toml-mode) (\.desktop\' . conf-desktop-mode) (/\.redshift\.conf\' . conf-windows-mode) (\`/etc/\(?:DIR_COLORS\|ethers\|.?fstab\|.*hosts\|lesskey\|login\.?de\(?:fs\|vperm\)\|magic\|mtab\|pam\.d/.*\|permissions\(?:\.d/.+\)?\|protocols\|rpc\|services\)\' . conf-space-mode) (\`/etc/\(?:acpid?/.+\|aliases\(?:\.d/.+\)?\|default/.+\|group-?\|hosts\..+\|inittab\|ksysguarddrc\|opera6rc\|passwd-?\|shadow-?\|sysconfig/.+\)\' . conf-mode) ([cC]hange[lL]og[-.][-0-9a-z]+\' . change-log-mode) (/\.?\(?:gitconfig\|gnokiirc\|hgrc\|kde.*rc\|mime\.types\|wgetrc\)\' . conf-mode) (/\.mailmap\' . conf-unix-mode) (/\.\(?:asound\|enigma\|fetchmail\|gltron\|gtk\|hxplayer\|mairix\|mbsync\|msmtp\|net\|neverball\|nvidia-settings-\|offlineimap\|qt/.+\|realplayer\|reportbug\|rtorrent\.\|screen\|scummvm\|sversion\|sylpheed/.+\|xmp\)rc\' . conf-mode) (/\.\(?:gdbtkinit\|grip\|mpdconf\|notmuch-config\|orbital/.+txt\|rhosts\|tuxracer/options\)\' . conf-mode) (/\.?X\(?:default\|resource\|re\)s\> . conf-xdefaults-mode) (/X11.+app-defaults/\|\.ad\' . conf-xdefaults-mode) (/X11.+locale/.+/Compose\' . conf-colon-mode) (/X11.+locale/compose\.dir\' . conf-javaprop-mode) (\.~?[0-9]+\.[0-9][-.0-9]*~?\' nil t) (\.\(?:orig\|in\|[bB][aA][kK]\)\' nil t) ([/.]c\(?:on\)?f\(?:i?g\)?\(?:\.[a-zA-Z0-9._-]+\)?\' . conf-mode-maybe) (\.[1-9]\' . nroff-mode) (\.art\' . image-mode) (\.avs\' . image-mode) (\.bmp\' . image-mode) (\.cmyk\' . image-mode) (\.cmyka\' . image-mode) (\.crw\' . image-mode) (\.dcr\' . image-mode) (\.dcx\' . image-mode) (\.dng\' . image-mode) (\.dpx\' . image-mode) (\.fax\' . image-mode) (\.heic\' . image-mode) (\.hrz\' . image-mode) (\.icb\' . image-mode) (\.icc\' . image-mode) (\.icm\' . image-mode) (\.ico\' . image-mode) (\.icon\' . image-mode) (\.jbg\' . image-mode) (\.jbig\' . image-mode) (\.jng\' . image-mode) (\.jnx\' . image-mode) (\.miff\' . image-mode) (\.mng\' . image-mode) (\.mvg\' . image-mode) (\.otb\' . image-mode) (\.p7\' . image-mode) (\.pcx\' . image-mode) (\.pdb\' . image-mode) (\.pfa\' . image-mode) (\.pfb\' . image-mode) (\.picon\' . image-mode) (\.pict\' . image-mode) (\.rgb\' . image-mode) (\.rgba\' . image-mode) (\.tga\' . image-mode) (\.wbmp\' . image-mode) (\.webp\' . image-mode) (\.wmf\' . image-mode) (\.wpg\' . image-mode) (\.xcf\' . image-mode) (\.xmp\' . image-mode) (\.xwd\' . image-mode) (\.yuv\' . image-mode) (\.tgz\' . tar-mode) (\.tbz2?\' . tar-mode) (\.txz\' . tar-mode) (\.tzst\' . tar-mode) (rc\' . conf-mode))
 
 
 ** TODO Electric Pair
@@ -1252,7 +1512,16 @@ NOTE: =Wait for Emacs 31 to be released as they will introduce automatic tree-si
 
 
 
-** TODO Evil Matchit
+** DONE Evil Matchit
+Extends =%= motion to jump across semantic blocks (LaTeX, HTML, code).
+#+begin_src emacs-lisp
+(use-package evil-matchit
+  :after evil
+  :config
+  ;; Enable semantic block jumping.
+  (global-evil-matchit-mode 1))
+#+end_src
+
 
 ** TODO Evil Textobj Tree-Sitter
 
@@ -1263,7 +1532,7 @@ NOTE: =Wait for Emacs 31 to be released as they will introduce automatic tree-si
 ** TODO Tree Edit
 
 
-* TODO Code Folding & Region Concealment
+* TODO Folding
 Manages structural and textual collapsing mechanisms. Hides implementation details via AST-aware blocks and regex-based visual folds.
 
 ** TODO Treesit Fold
@@ -1419,7 +1688,7 @@ Renders visual feedback, window dividers, and modeline components. Provides spat
 (use-package hl-line
   :ensure nil
   :hook ((after-init . global-hl-line-mode)
-         ((dashboard-mode eshell-mode shell-mode term-mode vterm-mode) .
+         ((dashboard-mode eshell-mode shell-mode ghostel-compile-view-mode term-mode vterm-mode) .
           (lambda () (setq-local global-hl-line-mode nil))))
   :config
   (defun ar/disable-hl-line-in-visual ()
@@ -1435,9 +1704,6 @@ Renders visual feedback, window dividers, and modeline components. Provides spat
   (add-hook 'evil-visual-state-entry-hook #'ar/disable-hl-line-in-visual)
   (add-hook 'evil-visual-state-exit-hook #'ar/enable-hl-line-after-visual))
 #+end_src
-
-
-
 
 
 ** TODO Rainbow Mode
@@ -1486,6 +1752,7 @@ Renders visual feedback, window dividers, and modeline components. Provides spat
 
 
 ** TODO Hide Modeline
+- [ ] Is the code here formatted correctly?
 #+begin_src emacs-lisp
 (use-package hide-mode-line
   :autoload turn-off-hide-mode-line-mode
@@ -1493,6 +1760,7 @@ Renders visual feedback, window dividers, and modeline components. Provides spat
            eshell-mode shell-mode
            term-mode vterm-mode
            embark-collect-mode lsp-ui-imenu-mode
+           ghostel-mode ghostel-compile-view-mode
            pdf-annot-list-mode) . turn-on-hide-mode-line-mode)))
 #+end_src
 
@@ -4676,7 +4944,9 @@ The =read-extended-command-predicate= variable is an Emacs core setting that bel
                              circe-mode
                              help-mode
                              gud-mode
-                             vterm-mode)
+                             vterm-mode
+                             ghostel-mode
+                             ghostel-compile-view-mode)
                         t))
   :custom-face
   (corfu-border ((t (:inherit region :background unspecified))))
@@ -4952,6 +5222,8 @@ buffer killing or garbage collection cycles."
                   vterm-mode
                   term-mode
                   eshell-mode
+                  ghostel-mode
+                  ghostel-compile-view-mode
                   tags-table-mode
                   authinfo-mode
                   compilation-mode
@@ -7440,14 +7712,13 @@ Native directional window navigation. Enables wrap-around physics for spatial tr
 
   ;; Open operations (SPC o)
   (ar/global-leader
-    "o" '(:ignore t :wk "open")
-    "o e" '(ar/eshell-toggle :wk "Toggle eshell")
-    "o E" '(ar/eshell-new :wk "Eshell (new)")
-    "o t" '(vterm :wk "Vterm")
-    "o s" '(shell :wk "Shell")
-    "o d" '(dired :wk "Dired")
-    "o D" '((lambda () (interactive) (switch-to-buffer "*dashboard*")) :wk "Dashboard")
-    "o P" '(popper-toggle :wk "Toggle popup"))
+   "o" '(:ignore t :wk "open")
+   "o t" '(ar/ghostel-toggle :wk "toggle ghostel")
+   "o T" '(ghostel-project :wk "Ghostel project")
+   "o s" '(shell :wk "Shell")
+   "o d" '(dired :wk "Dired")
+   "o D" '((lambda () (interactive) (switch-to-buffer "*dashboard*")) :wk "Dashboard")
+   "o P" '(popper-toggle :wk "Toggle popup"))
 
   ;; Help operations (SPC h)
   (ar/global-leader
@@ -7831,9 +8102,32 @@ Native directional window navigation. Enables wrap-around physics for spatial tr
     "=" '(plantuml-indent-buffer :wk "Indent buffer")
     "TAB" '(plantuml-complete-symbol :wk "Complete symbol"))
 
+  ;; eshell keybindings
+  (general-define-key
+   :keymaps 'eshell-mode-map
+   :states '(insert normal)
+   "C-r" #'consult-history
+   "M-r" #'consult-history)
+
+  (general-define-key
+   :keymaps 'eshell-mode-map
+   :states 'insert
+   "C-d" #'eshell-delchar-or-maybe-eof
+   "C-a" #'eshell-bol
+   "C-e" #'end-of-line
+   "C-u" #'eshell-kill-input)
+
+  (general-define-key
+   :keymaps 'eshell-mode-map
+   :states 'normal
+   "C-d" #'eshell-life-is-too-much
+   "C-l" (lambda () (interactive) (eshell/clear-scrollback) (eshell-emit-prompt))
+   "RET" (lambda () (interactive) (goto-char (point-max)))
+   "[[" #'eshell-previous-prompt
+   "]]" #'eshell-next-prompt)
 
   (ar/local-leader
-    :keymaps 'org-mode-map
+   :keymaps 'org-mode-map
     "," '(org-ctrl-c-ctrl-c :wk "Ctrl-c Ctrl-c")
     "." '(org-time-stamp :wk "Timestamp")
     "*" '(org-ctrl-c-star :wk "Heading")
