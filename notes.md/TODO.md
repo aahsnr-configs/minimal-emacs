@@ -1,10 +1,8 @@
 - [ ] Move onto the following sections: 1. Workflow Management 2. Completion Framework 3. Development Tools 4. Treesitter/Folding
 - [ ] implement the email setup
-- [ ] move customs.el to var
+- [x] move customs.el to var
 - [ ] add more padding to emacs buffer
-- [ ] move perspective-state to var/ or etc/
 - [ ] move tree-sitter grammars to var/ or etc/
-- [ ] don't add ~/.config/emacs or ~/.config/emacs/var/elpa/flycheck-hl-todo/ to projects
 - [ ] add eval +overlay module packages from doom emacs into my vanilla emacs config
 - [ ] go back to openrouter.ai for my corfu configuration.
 - [ ] make sure there are no modelines for popper and winne

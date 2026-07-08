@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.2
+#+VERSION: 0.3
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -739,97 +739,63 @@ Wraps =iedit= in a dedicated Evil state for localized multi-cursor refactoring.
 #+end_src
 
 
-** TODO Evil Args
+** DONE Evil Args
+Provides =a= text objects for function arguments.
 #+begin_src emacs-lisp
 (use-package evil-args
   :after evil
   :config
-  ;; Bind text objects to 'a' (argument)
+  ;; Bind argument text objects to 'a'.
   (define-key evil-inner-text-objects-map "a" 'evil-inner-arg)
   (define-key evil-outer-text-objects-map "a" 'evil-outer-arg))
 #+end_src
 
 
-** TODO Evil Numbers
+** DONE Evil Numbers
+Increments and decrements numbers at point. Global bindings delegated to =general.el=.
 #+begin_src emacs-lisp
-;; Increment/Decrement numbers with C-a/C-x
 (use-package evil-numbers
-  :after evil
-  :config
-  (define-key evil-normal-state-map (kbd "C-a") 'evil-numbers/inc-at-pt)
-  (define-key evil-normal-state-map (kbd "C-x") 'evil-numbers/dec-at-pt))
+  :defer t
+  :commands (evil-numbers/inc-at-pt evil-numbers/dec-at-pt))
 #+end_src
 
 
-** TODO Evil Exchange
+** DONE Evil Exchange
+Swaps two regions of text via the =gx= motion.
 #+begin_src emacs-lisp
-;; Swap two regions of text with 'gx'
 (use-package evil-exchange
   :after evil
   :config
+  ;; Register the gx motion and gX cancel motion.
   (evil-exchange-install))
 #+end_src
 
 
-** TODO Evil Goggles
+** DONE Evil Goggles
+Provides visual feedback pulses for editing operations. Inherits theme faces for visual consistency.
 #+begin_src emacs-lisp
-;; Visual feedback when editing (pulsing regions on yank/paste)
 (use-package evil-goggles
   :after evil
+  :custom
+  ;; Pulse duration.
+  (evil-goggles-duration 0.1)
+  :custom-face
+  ;; Inherit theme highlight face for Tokyo Night synergy.
+  (evil-goggles-default-face ((t (:inherit highlight))))
   :config
-  (evil-goggles-mode)
-  (setq evil-goggles-duration 0.1))
+  ;; Enable visual feedback pulses.
+  (evil-goggles-mode 1))
 #+end_src
 
 
-** TODO Evil Lion
+** DONE Evil Lion
+Aligns text regions via the =gl= operator.
 #+begin_src emacs-lisp
-;; Align text with 'gl' (e.g., 'glip=' aligns paragraph on = signs)
 (use-package evil-lion
   :after evil
   :config
-  (evil-lion-mode))
-#+end_src
-
-
-** TODO Evil Window Movement Enhancements
-#+begin_src emacs-lisp
-(defcustom ar/evil-want-move-window-to-wrap-around nil
-  "If non-nil, window movement commands wrap around."
-  :type 'boolean
-  :group 'evil)
-
-(defun ar/evil-window-move-left ()
-  "Move to window on the left, wrapping if needed."
-  (interactive)
-  (if (and ar/evil-want-move-window-to-wrap-around
-           (not (ignore-errors (windmove-left))))
-      (evil-window-bottom-right)
-    (windmove-left)))
-
-(defun ar/evil-window-move-right ()
-  "Move to window on the right, wrapping if needed."
-  (interactive)
-  (if (and ar/evil-want-move-window-to-wrap-around
-           (not (ignore-errors (windmove-right))))
-      (evil-window-top-left)
-    (windmove-right)))
-
-(defun ar/evil-window-move-up ()
-  "Move to window above, wrapping if needed."
-  (interactive)
-  (if (and ar/evil-want-move-window-to-wrap-around
-           (not (ignore-errors (windmove-up))))
-      (evil-window-bottom-right)
-    (windmove-up)))
-
-(defun ar/evil-window-move-down ()
-  "Move to window below, wrapping if needed."
-  (interactive)
-  (if (and ar/evil-want-move-window-to-wrap-around
-           (not (ignore-errors (windmove-down))))
-      (evil-window-top-left)
-    (windmove-down)))
+  ;; Register the gl alignment operator.
+  (evil-lion-mode 1))
 #+end_src
 
 
@@ -1092,7 +1058,7 @@ Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy
 #+end_src
 
 
-** TODO Automatic parenthesis pairing
+** TODO elec-pair
 =Look at doom emacs module=
 #+begin_src emacs-lisp
 (use-package elec-pair
@@ -1186,11 +1152,6 @@ Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy
 #+end_src
 
 
-** TODO Puni
-
-- [ ] Will this package be useful in the presence of evil-matchit or other evil packages?
-
-
 ** TODO Edit multiple regions simultaneously
 - [ ] Is there an existing evil related package that conflicts with iedit?
 #+begin_src emacs-lisp
@@ -1204,7 +1165,7 @@ Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy
 #+end_src
 
 
-** TODO Subword: Handling capitalized subwords in a nomenclature
+** TODO Subword
 #+begin_src emacs-lisp
 (use-package subword
   :defer t
@@ -1212,6 +1173,7 @@ Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy
   :hook ((prog-mode . subword-mode)
          (minibuffer-setup . subword-mode)))
 #+end_src
+
 
 ** TODO Buffer Terminator
 - [ ] Will buffer-terminator be useful for my whole emacs configuration?
@@ -1484,7 +1446,7 @@ operators and other column-based navigation."
 #+end_src
 
 
-** TODO Highlight the current line
+** TODO hl-line
 #+begin_src emacs-lisp
 (use-package hl-line
   :ensure nil
@@ -1507,7 +1469,7 @@ operators and other column-based navigation."
 #+end_src
 
 
-** TODO Ediff
+** TODO ediff
 #+begin_src emacs-lisp
 (use-package ediff
   :ensure nil
@@ -7738,6 +7700,17 @@ Auto-generates and syncs heading-derived TOC.
     (advice-add #'keyboard-quit :before #'popper-close-window-hack)))
 #+end_src
 
+
+** DONE Windmove
+Native directional window navigation. Enables wrap-around physics for spatial traversal across frame edges.
+#+begin_src emacs-lisp
+;; Enable wrap-around for directional window navigation.
+;; Evil's `evil-window-left/right/up/down` commands natively delegate
+;; to `windmove`, automatically inheriting this wrap-around behavior
+;; for both `C-w h/j/k/l` and `SPC w h/j/k/l` leader bindings.
+(setq windmove-wrap-around t)
+#+end_src
+
 * TODO AI/LLM
 * TODO General Keybindings
 #+begin_src emacs-lisp
@@ -7859,28 +7832,30 @@ Auto-generates and syncs heading-derived TOC.
 
   ;; Window operations (SPC w)
   (ar/global-leader
-    "w" '(:ignore t :wk "window")
-    "w w" '(other-window :wk "Other window")
-    "w d" '(delete-window :wk "Delete window")
-    "w D" '(delete-other-windows :wk "Delete other windows")
-    "w s" '(split-window-below :wk "Split below")
-    "w v" '(split-window-right :wk "Split right")
-    "w h" '(evil-window-left :wk "Window left")
-    "w j" '(evil-window-down :wk "Window down")
-    "w k" '(evil-window-up :wk "Window up")
-    "w l" '(evil-window-right :wk "Window right")
-    "w H" '(evil-window-move-far-left :wk "Move far left")
-    "w J" '(evil-window-move-very-bottom :wk "Move bottom")
-    "w K" '(evil-window-move-very-top :wk "Move top")
-    "w L" '(evil-window-move-far-right :wk "Move far right")
-    "w =" '(balance-windows :wk "Balance windows")
-    "w m" '(delete-other-windows :wk "Maximize")
-    "w o" '(other-window :wk "Other window")
-    "w u" '(winner-undo :wk "Winner undo")
-    "w r" '(winner-redo :wk "Winner redo")
-    "w t" '(toggle-window-split :wk "Toggle split")
-    "w _" '(split-window-vertically-instead :wk "Split vertically instead")
-    "w |" '(split-window-horizontally-instead :wk "Split horizontally instead"))
+    "w"           '(:ignore t :wk "window")
+    "w w"         '(other-window :wk "Other window")
+    "w d"         '(delete-window :wk "Delete window")
+    "w D"         '(delete-other-windows :wk "Delete other windows")
+    "w s"         '(split-window-below :wk "Split below")
+    "w v"         '(split-window-right :wk "Split right")
+    ;; Navigation (Arrow Keys)
+    "w <left>"    '(evil-window-left :wk "Window left")
+    "w <down>"    '(evil-window-down :wk "Window down")
+    "w <up>"      '(evil-window-up :wk "Window up")
+    "w <right>"   '(evil-window-right :wk "Window right")
+    ;; Moving Windows (Shift + Arrow Keys)
+    "w S-<left>"  '(evil-window-move-far-left :wk "Move far left")
+    "w S-<down>"  '(evil-window-move-very-bottom :wk "Move bottom")
+    "w S-<up>"    '(evil-window-move-very-top :wk "Move top")
+    "w S-<right>" '(evil-window-move-far-right :wk "Move far right")
+    "w ="         '(balance-windows :wk "Balance windows")
+    "w m"         '(delete-other-windows :wk "Maximize")
+    "w o"         '(other-window :wk "Other window")
+    "w u"         '(winner-undo :wk "Winner undo")
+    "w r"         '(winner-redo :wk "Winner redo")
+    "w t"         '(toggle-window-split :wk "Toggle split")
+    "w _"         '(split-window-vertically-instead :wk "Split vertically instead")
+    "w |"         '(split-window-horizontally-instead :wk "Split horizontally instead"))
 
   ;; TODO: Replace with Projectile alternative
   ;; Project operations (SPC p)
@@ -8170,13 +8145,16 @@ Auto-generates and syncs heading-derived TOC.
    "g ," 'xref-go-back)
 
 (general-define-key
-:states '(normal visual)
-;; Avy zap
-"z" 'avy-zap-to-char-dwim
-"Z" 'avy-zap-up-to-char-dwim
-;; Evil Multiedit
-"M-d" #'evil-multiedit-match-symbol-and-next
-"M-D" #'evil-multiedit-match-all)
+ :states '(normal visual)
+ ;; Avy zap
+ "z" 'avy-zap-to-char-dwim
+ "Z" 'avy-zap-up-to-char-dwim
+ ;; Evil Numbers
+ "C-a" #'evil-numbers/inc-at-pt
+ "C-x" #'evil-numbers/dec-at-pt
+ ;; Evil Multiedit
+ "M-d" #'evil-multiedit-match-symbol-and-next
+ "M-D" #'evil-multiedit-match-all)
 
   (general-define-key
    :states 'normal
