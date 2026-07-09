@@ -411,18 +411,17 @@ Enforces UTF-8 across all I/O boundaries. Excludes the selection coding system o
 
 ** DONE Session Management
 Persists cursor positions, recent files, and minibuffer history across sessions. Excludes TRAMP paths and unmounted symlinks to prevent I/O hangs. Utilizes a lazy cache for =org-agenda-files= to prevent filesystem thrashing, and injects a background timer to flush the =recentf= cache periodically, mitigating data loss in daemon environments.
-
 #+begin_src emacs-lisp
 (use-package saveplace
   :ensure nil
-  :hook (elpaca-after-init . save-place-mode)
   :custom
   ;; Prevents startup hangs from restoring point in offline/unmounted volumes.
-  (save-place-forget-unreadable-files t))
+  (save-place-forget-unreadable-files t)
+  :config
+  (save-place-mode 1))
 
 (use-package recentf
   :ensure nil
-  :hook (elpaca-after-init . recentf-mode)
   :init
   (setq recentf-max-saved-items 300
         recentf-exclude
@@ -430,7 +429,23 @@ Persists cursor positions, recent files, and minibuffer history across sessions.
           "\\.\\(?:gz\\|gif\\|svg\\|png\\|jpe?g\\|bmp\\|xpm\\)$"
           "\\.?ido\\.last$" "\\.revive$" "/G?TAGS$" "/.elfeed/"
           "^/tmp/" "^/var/folders/.+$" "/persp-confs/"))
+  ;; Custom predicate functions must exist in memory before mode activation.
+  (defvar ar/recentf-org-agenda-cache nil
+    "Cached list of resolved org-agenda file paths.")
+  (defun ar/update-recentf-org-agenda-cache ()
+    "Update the recentf exclusion cache for org-agenda files."
+    (when (bound-and-true-p org-agenda-files)
+      (setq ar/recentf-org-agenda-cache
+            (mapcar #'file-truename
+                    (seq-filter #'file-exists-p (org-agenda-files t))))))
+  (defun ar/exclude-org-agenda-files-p (file)
+    "Return t if FILE is an org-agenda file, using the cached list."
+    (and (not (file-remote-p file))
+         (string-suffix-p ".org" file t)
+         (when ar/recentf-org-agenda-cache
+           (member (file-truename file) ar/recentf-org-agenda-cache))))
   :config
+  (recentf-mode 1)
   (push (expand-file-name recentf-save-file) recentf-exclude)
   ;; Exclude no-littering housekeeping files.
   (add-to-list 'recentf-exclude (recentf-expand-file-name no-littering-var-directory))
@@ -439,36 +454,15 @@ Persists cursor positions, recent files, and minibuffer history across sessions.
   (add-to-list 'recentf-exclude #'file-remote-p)
   ;; Remove `file-truename` to prevent I/O hangs on unmounted symlink targets.
   (setq recentf-filename-handlers '(abbreviate-file-name))
-
   ;; Daemon-safe periodic flush (every 5 minutes) to prevent data loss
   ;; when Emacs daemon crashes or receives SIGKILL without triggering `kill-emacs-hook`.
   (run-at-time 300 300 #'recentf-save-list)
-
-  ;; Lazy cache for org-agenda files to prevent synchronous filesystem thrashing.
-  (defvar ar/recentf-org-agenda-cache nil
-    "Cached list of resolved org-agenda file paths.")
-
-  (defun ar/update-recentf-org-agenda-cache ()
-    "Update the recentf exclusion cache for org-agenda files."
-    (when (bound-and-true-p org-agenda-files)
-      (setq ar/recentf-org-agenda-cache
-            (mapcar #'file-truename
-                    (seq-filter #'file-exists-p (org-agenda-files t))))))
-
-  (defun ar/exclude-org-agenda-files-p (file)
-    "Return t if FILE is an org-agenda file, using the cached list."
-    (and (not (file-remote-p file))
-         (string-suffix-p ".org" file t)
-         (when ar/recentf-org-agenda-cache
-           (member (file-truename file) ar/recentf-org-agenda-cache))))
-
   (add-to-list 'recentf-exclude #'ar/exclude-org-agenda-files-p)
   (add-hook 'org-mode-hook #'ar/update-recentf-org-agenda-cache)
   (run-with-idle-timer 30 t #'ar/update-recentf-org-agenda-cache))
 
 (use-package savehist
   :ensure nil
-  :hook (elpaca-after-init . savehist-mode)
   :init
   (setq enable-recursive-minibuffers t
         history-length 1000
@@ -476,8 +470,11 @@ Persists cursor positions, recent files, and minibuffer history across sessions.
                                         search-ring
                                         regexp-search-ring
                                         extended-command-history)
-        savehist-autosave-interval 300))
+        savehist-autosave-interval 300)
+  :config
+  (savehist-mode 1))
 #+end_src
+
 
 
 ** DONE Misc
@@ -554,7 +551,7 @@ Configures the window and icon title bars to display the current buffer name usi
 #+end_src
 
 
-* TODO Vim Emulation
+* DONE Vim Emulation
 
 ** DONE Undo Fu
 Linear undo/redo engine with persistent session history. Replaces branching undo to prevent history corruption. Routes state to =var/undo-fu-session/= via =no-littering=, excludes encrypted and transient files to prevent metadata leakage, hashes deep paths to bypass 255-character OS limits, and applies conditional =zstd=/=gzip= compression.
@@ -974,18 +971,20 @@ Delegates operator ligatures to HarfBuzz via ligature.el and reserves Elisp subs
 
 
 
-* TODO Interactive Buffers
+* DONE Interactive Buffers
 Governs fundamental buffer I/O, terminal emulation, and scroll rendering. Dictates how Emacs processes asynchronous input and refreshes the display matrix.
+
 
 ** DONE Autorevert
 Synchronizes buffers with external disk modifications via native OS file notifications. Suppresses echo-area logging and avoids interval polling to eliminate I/O overhead.
 #+begin_src emacs-lisp
 (use-package autorevert
   :ensure nil
-  :hook (elpaca-after-init . global-auto-revert-mode)
   :custom
   (auto-revert-verbose nil)
-  (auto-revert-avoid-polling t))
+  (auto-revert-avoid-polling t)
+  :config
+  (global-auto-revert-mode 1))
 #+end_src
 
 
@@ -994,8 +993,10 @@ Modifies word boundaries to recognize camelCase transitions. Globally enables na
 #+begin_src emacs-lisp
 (use-package subword
   :ensure nil
-  :hook (elpaca-after-init . global-subword-mode))
+  :config
+  (global-subword-mode 1))
 #+end_src
+
 
 
 ** DONE Sudo Edit
@@ -1288,206 +1289,335 @@ Native Emacs shell with Lisp integration and AST-aware prompt navigation. Fortif
 #+end_src
 
 
-** TODO Scrolling
-- [ ] Use doom emacs module for smoother scrolling
+** DONE Smooth Scrolling
+Delegates hardware input to =ultra-scroll= and keyboard interpolation to =good-scroll=. Utilizes defensive safeguards to prevent boundary crashes and input hijacking.
 #+begin_src emacs-lisp
-;; Scroll one line at a time (less "jumpy" than defaults)
+;; Core viewport stability and input latency variables.
 (setq hscroll-step 1
       hscroll-margin 2
       scroll-step 1
       scroll-margin 0
       scroll-conservatively 100000
       scroll-preserve-screen-position t
-      auto-window-vscroll nil
-      ;; mouse
-
       mouse-wheel-scroll-amount-horizontal 1
       mouse-wheel-progressive-speed nil)
 
-;; Smooth scrolling
+;; Pixel-precision engine for hardware input devices.
 (use-package ultra-scroll
-  :functions (hl-todo-mode diff-hl-flydiff-mode)
-  :hook (after-init . ultra-scroll-mode)
+  :if (fboundp 'pixel-scroll-precision-mode)
+  :hook (elpaca-after-init . ultra-scroll-mode)
   :config
-  (add-hook 'ultra-scroll-hide-functions #'diff-hl-flydiff-mode)
+  ;; Suspend expensive minor modes during high-speed scrolling to prevent redisplay stutter.
   (add-hook 'ultra-scroll-hide-functions #'hl-todo-mode)
-  (add-hook 'ultra-scroll-hide-functions #'jit-lock-mode))
+  (add-hook 'ultra-scroll-hide-functions #'diff-hl-flydiff-mode)
+  (add-hook 'ultra-scroll-hide-functions #'jit-lock-mode)
+  (add-hook 'ultra-scroll-hide-functions #'good-scroll-mode))
 
+;; Interpolation engine for keyboard-driven viewport movements.
+(use-package good-scroll
+  :if (fboundp 'pixel-scroll-precision-mode)
+  :hook (elpaca-after-init . good-scroll-mode)
+  :config
+  ;; Neuter mouse-wheel interception to prevent conflict with ultra-scroll.
+  (add-hook 'good-scroll-mode-hook
+            (lambda ()
+              (when good-scroll-mode
+                (setq mwheel-scroll-up-function #'scroll-up
+                      mwheel-scroll-down-function #'scroll-down))))
+
+  ;; Clamp boundary calculations to prevent args-out-of-range errors in narrowed buffers.
+  (defun ar/good-scroll--point-at-top-p-safe ()
+    (save-restriction
+      (widen)
+      (<= (line-number-at-pos (max (point) (point-min)) t)
+          (1+ (line-number-at-pos (min (window-start) (point-max)) t)))))
+  (advice-add #'good-scroll--point-at-top-p :override #'ar/good-scroll--point-at-top-p-safe)
+
+  ;; Translate line counts to exact pixel heights for page scrolling.
+  (defun ar/good-scroll--convert-line-to-step (line)
+    (cond ((integerp line) (* line (line-pixel-height)))
+          ((or (null line) (memq '- line))
+           (- (good-scroll--window-usable-height)
+              (* next-screen-context-lines (line-pixel-height))))
+          ((line-pixel-height))))
+
+  ;; Route scroll-up commands through the interpolation engine.
+  (defun ar/good-scroll--scroll-up-around (fn &optional arg)
+    (if good-scroll-mode
+        (good-scroll-move (ar/good-scroll--convert-line-to-step arg))
+      (funcall fn arg)))
+  (advice-add #'scroll-up :around #'ar/good-scroll--scroll-up-around)
+
+  ;; Route scroll-down commands through the interpolation engine.
+  (defun ar/good-scroll--scroll-down-around (fn &optional arg)
+    (if good-scroll-mode
+        (good-scroll-move (- (ar/good-scroll--convert-line-to-step arg)))
+      (funcall fn arg)))
+  (advice-add #'scroll-down :around #'ar/good-scroll--scroll-down-around))
 #+end_src
 
 
 * TODO Structural Typing and Parsing
 Establishes the C-level parsing foundation and non-Lisp typing layer. Provides AST-aware text objects, boundary wrapping, and deep node refactoring.
 
-** TODO Treesit
-NOTE: =Wait for Emacs 31 to be released as they will introduce automatic tree-sitter grammar installation when any specific prog-mode buffer is opened. The grammars should be installed in no-littering-var-directory the main emacs config folder.=
-=Ready it for Emacs 31 features as well keep Emacs 30 features=
+
+
+** DONE Treesit
+Configures the native C-level AST engine and routes grammar binaries to the =no-littering= var directory. Implements defensive version-forking to support Emacs 30 manual remapping and Emacs 31 native auto-installation.
 #+begin_src emacs-lisp
 (use-package treesit
   :ensure nil
+  :if (treesit-available-p)
   :mode (("\\.tsx\\'" . tsx-ts-mode))
   :init
+  ;; Route grammar binaries to the no-littering var directory.
   (defvar ar/treesit-grammar-dir
-    (file-truename (expand-file-name "tree-sitter/" user-emacs-directory))
-    "Target directory for installing tree-sitter grammars.")
-
+    (no-littering-expand-var-directory-name "tree-sitter/")
+    "Target directory for compiled tree-sitter grammars.")
   (unless (file-exists-p ar/treesit-grammar-dir)
     (make-directory ar/treesit-grammar-dir t))
-
   (add-to-list 'treesit-extra-load-path ar/treesit-grammar-dir)
-
   :config
-  (setq treesit-font-lock-level 3)
+  ;; Maximize syntax highlighting decoration across all AST buffers.
+  (setq treesit-font-lock-level 4)
 
-  (setq treesit-language-source-alist
-        '((python "https://github.com/tree-sitter/tree-sitter-python")
-          (bash "https://github.com/tree-sitter/tree-sitter-bash")
-          (c "https://github.com/tree-sitter/tree-sitter-c")
-          (cpp "https://github.com/tree-sitter/tree-sitter-cpp")
-          (dockerfile "https://github.com/camdencheek/tree-sitter-dockerfile.git")
-          (json "https://github.com/tree-sitter/tree-sitter-json")
-          (latex "https://github.com/latex-lsp/tree-sitter-latex")
-          (bibtex "https://github.com/latex-lsp/tree-sitter-bibtex")
-          (nix "https://github.com/nix-community/tree-sitter-nix")
-          (yaml "https://github.com/tree-sitter-grammars/tree-sitter-yaml")
-          (typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
-          (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")))
+  ;; Additive merging of upstream C-source repositories.
+  (dolist (source '((python "https://github.com/tree-sitter/tree-sitter-python")
+                    (bash "https://github.com/tree-sitter/tree-sitter-bash")
+                    (c "https://github.com/tree-sitter/tree-sitter-c")
+                    (cpp "https://github.com/tree-sitter/tree-sitter-cpp")
+                    (css "https://github.com/tree-sitter/tree-sitter-css")
+                    (dockerfile "https://github.com/camdencheek/tree-sitter-dockerfile")
+                    (html "https://github.com/tree-sitter/tree-sitter-html")
+                    (json "https://github.com/tree-sitter/tree-sitter-json")
+                    (latex "https://github.com/latex-lsp/tree-sitter-latex")
+                    (bibtex "https://github.com/latex-lsp/tree-sitter-bibtex")
+                    (nix "https://github.com/nix-community/tree-sitter-nix")
+                    (yaml "https://github.com/tree-sitter-grammars/tree-sitter-yaml")
+                    (toml "https://github.com/tree-sitter-grammars/tree-sitter-toml")
+                    (java "https://github.com/tree-sitter/tree-sitter-java")
+                    (make "https://github.com/tree-sitter-grammars/tree-sitter-make")
+                    (awk "https://github.com/Beaglefoot/tree-sitter-awk")
+                    (org "https://github.com/milisims/tree-sitter-org")
+                    (typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
+                    (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")))
+    (setf (alist-get (car source) treesit-language-source-alist) (cdr source)))
 
-  ;; NOTE: Will no longer be needed for emacs 31
-  (setq major-mode-remap-alist
-        '((python-mode . python-ts-mode)
-          (json-mode . json-ts-mode)
-          (js-mode . js-ts-mode)
-          (bash-mode . bash-ts-mode)
-          (sh-mode . bash-ts-mode)
-          (typescript-mode . typescript-ts-mode)
-          (conf-toml-mode . toml-ts-mode)
-          (c-mode . c-ts-mode)
-          (c++-mode . c++-ts-mode))))
+  ;; Emacs 31+ native auto-installation and mode routing.
+  (when emacs/>=31p
+    (when (boundp 'treesit-auto-install-grammar)
+      (setq treesit-auto-install-grammar t))
+    (when (boundp 'treesit-enabled-modes)
+      (setq treesit-enabled-modes t)))
+
+  ;; Emacs 30 manual major mode remapping and install path enforcement.
+  (unless emacs/>=31p
+    (dolist (remap '((python-mode . python-ts-mode)
+                     (json-mode . json-ts-mode)
+                     (js-mode . js-ts-mode)
+                     (bash-mode . bash-ts-mode)
+                     (sh-mode . bash-ts-mode)
+                     (typescript-mode . typescript-ts-mode)
+                     (css-mode . css-ts-mode)
+                     (dockerfile-mode . dockerfile-ts-mode)
+                     (yaml-mode . yaml-ts-mode)
+                     (toml-mode . toml-ts-mode)
+                     (conf-toml-mode . toml-ts-mode)
+                     (c-mode . c-ts-mode)
+                     (c++-mode . c++-ts-mode)
+                     (java-mode . java-ts-mode)))
+      (setf (alist-get (car remap) major-mode-remap-alist) (cdr remap)))
+
+    ;; Force manual grammar installations to the no-littering directory.
+    (defun ar/treesit--install-to-var-dir (fn lang &optional out-dir &rest args)
+      "Force tree-sitter grammar installation to `ar/treesit-grammar-dir'."
+      (apply fn lang (or out-dir ar/treesit-grammar-dir) args))
+    (when (>= emacs-major-version 30)
+      (advice-add #'treesit-install-language-grammar :around #'ar/treesit--install-to-var-dir)
+      (advice-add #'treesit--build-grammar :around #'ar/treesit--install-to-var-dir))))
+
+  ;; Prevent specific ts-modes from clobbering global file associations.
+  (dolist (mode '(python-ts-mode csharp-ts-mode))
+    (advice-add mode :around
+                (lambda (fn &rest args)
+                  (let (auto-mode-alist interpreter-mode-alist)
+                    (apply fn args))))))
 #+end_src
 
-#+RESULTS:
-: ((\.tsx\' . tsx-ts-mode) (/bspwmrc\' . sh-mode) (\.\(?:zunit\|env\)\' . sh-mode) (\.bats\' . sh-mode) (/README\(?:\.md\)?\' . gfm-mode) (/\.doom\(?:modules?\|profiles?\)?\' . lisp-data-mode) (/LICENSE\' . text-mode) (\.\(?:md\|markdown\|mkd\|mdown\|mkdn\|mdwn\|mdx\)\' . markdown-mode) (/git-rebase-todo\' . git-rebase-mode) (/git/ignore\' . gitignore-mode) (/info/exclude\' . gitignore-mode) (/\.gitignore\' . gitignore-mode) (/etc/gitconfig\' . gitconfig-mode) (/\.gitmodules\' . gitconfig-mode) (/git/config\' . gitconfig-mode) (/modules/.*/config\' . gitconfig-mode) (/\.git/config\' . gitconfig-mode) (/\.gitconfig\' . gitconfig-mode) (/git/attributes\' . gitattributes-mode) (/info/attributes\' . gitattributes-mode) (/\.gitattributes\' . gitattributes-mode) (\.gpg\(~\|\.~[0-9]+~\)?\' nil epa-file) (\.elc\' . elisp-byte-code-mode) (\.zst\' nil jka-compr) (\.dz\' nil jka-compr) (\.xz\' nil jka-compr) (\.lzma\' nil jka-compr) (\.lz\' nil jka-compr) (\.g?z\' nil jka-compr) (\.bz2\' nil jka-compr) (\.Z\' nil jka-compr) (\.vr[hi]?\' . vera-mode) (\(?:\.\(?:rbw?\|ru\|rake\|thor\|axlsx\|jbuilder\|rabl\|gemspec\|podspec\)\|/\(?:Gem\|Rake\|Cap\|Thor\|Puppet\|Berks\|Brew\|Fast\|Vagrant\|Guard\|Pod\)file\)\' . ruby-mode) (\.re?st\' . rst-mode) (/\(?:Pipfile\|\.?flake8\)\' . conf-mode) (\.py[iw]?\' . python-mode) (\.m\' . octave-maybe-mode) (\.less\' . less-css-mode) (\.editorconfig\' . editorconfig-conf-mode) (\.scss\' . scss-mode) (\.cs\' . csharp-mode) (\.awk\' . awk-mode) (\.\(u?lpc\|pike\|pmod\(\.in\)?\)\' . pike-mode) (\.idl\' . idl-mode) (\.java\' . java-mode) (\.m\' . objc-mode) (\.ii\' . c++-mode) (\.i\' . c-mode) (\.lex\' . c-mode) (\.y\(acc\)?\' . c-mode) (\.h\' . c-or-c++-mode) (\.c\' . c-mode) (\.\(CC?\|HH?\)\' . c++-mode) (\.[ch]\(pp\|xx\|\+\+\)\' . c++-mode) (\.\(cc\|hh\)\' . c++-mode) (\.\(bat\|cmd\)\' . bat-mode) (\.[sx]?html?\(\.[a-zA-Z_]+\)?\' . mhtml-mode) (\.svgz?\' . image-mode) (\.svgz?\' . xml-mode) (\.x[bp]m\' . image-mode) (\.x[bp]m\' . c-mode) (\.p[bpgn]m\' . image-mode) (\.tiff?\' . image-mode) (\.gif\' . image-mode) (\.png\' . image-mode) (\.jpe?g\' . image-mode) (\.webp\' . image-mode) (\.te?xt\' . text-mode) (\.[tT]e[xX]\' . tex-mode) (\.ins\' . tex-mode) (\.ltx\' . latex-mode) (\.dtx\' . doctex-mode) (\.org\' . org-mode) (\.dir-locals\(?:-2\)?\.el\' . lisp-data-mode) (\.eld\' . lisp-data-mode) (eww-bookmarks\' . lisp-data-mode) (tramp\' . lisp-data-mode) (/archive-contents\' . lisp-data-mode) (places\' . lisp-data-mode) (\.emacs-places\' . lisp-data-mode) (\.el\' . emacs-lisp-mode) (Project\.ede\' . emacs-lisp-mode) (\(?:\.\(?:scm\|sls\|sld\|stk\|ss\|sch\)\|/\.guile\)\' . scheme-mode) (\.l\' . lisp-mode) (\.li?sp\' . lisp-mode) (\.[fF]\' . fortran-mode) (\.for\' . fortran-mode) (\.p\' . pascal-mode) (\.pas\' . pascal-mode) (\.\(dpr\|DPR\)\' . delphi-mode) (\.\([pP]\([Llm]\|erl\|od\)\|al\)\' . perl-mode) (Imakefile\' . makefile-imake-mode) (Makeppfile\(?:\.mk\)?\' . makefile-makepp-mode) (\.makepp\' . makefile-makepp-mode) (\.mk\' . makefile-gmake-mode) (\.make\' . makefile-gmake-mode) ([Mm]akefile\' . makefile-gmake-mode) (\.am\' . makefile-automake-mode) (\.texinfo\' . texinfo-mode) (\.te?xi\' . texinfo-mode) (\.[sS]\' . asm-mode) (\.asm\' . asm-mode) (\.css\' . css-mode) (\.mixal\' . mixal-mode) (\.gcov\' . compilation-mode) (/\.[a-z0-9-]*gdbinit . gdb-script-mode) (-gdb\.gdb . gdb-script-mode) ([cC]hange\.?[lL]og?\' . change-log-mode) ([cC]hange[lL]og[-.][0-9]+\' . change-log-mode) (\$CHANGE_LOG\$\.TXT . change-log-mode) (\.scm\.[0-9]*\' . scheme-mode) (\.[ckz]?sh\'\|\.shar\'\|/\.z?profile\' . sh-mode) (\.bash\' . sh-mode) (/PKGBUILD\' . sh-mode) (\(/\|\`\)\.\(bash_\(profile\|history\|log\(in\|out\)\)\|z?log\(in\|out\)\)\' . sh-mode) (\(/\|\`\)\.\(shrc\|zshrc\|m?kshrc\|bashrc\|t?cshrc\|esrc\)\' . sh-mode) (\(/\|\`\)\.\([kz]shenv\|xinitrc\|startxrc\|xsession\)\' . sh-mode) (\.m?spec\' . sh-mode) (\.m[mes]\' . nroff-mode) (\.man\' . nroff-mode) (\.sty\' . latex-mode) (\.cl[so]\' . latex-mode) (\.bbl\' . latex-mode) (\.bib\' . bibtex-mode) (\.bst\' . bibtex-style-mode) (\.sql\' . sql-mode) (\(acinclude\|aclocal\|acsite\)\.m4\' . autoconf-mode) (\.m[4c]\' . m4-mode) (\.mf\' . metafont-mode) (\.mp\' . metapost-mode) (\.vhdl?\' . vhdl-mode) (\.article\' . text-mode) (\.letter\' . text-mode) (\.i?tcl\' . tcl-mode) (\.exp\' . tcl-mode) (\.itk\' . tcl-mode) (\.icn\' . icon-mode) (\.sim\' . simula-mode) (\.mss\' . scribe-mode) (\.f9[05]\' . f90-mode) (\.f0[38]\' . f90-mode) (\.indent\.pro\' . fundamental-mode) (\.\(pro\|PRO\)\' . idlwave-mode) (\.srt\' . srecode-template-mode) (\.prolog\' . prolog-mode) (\.tar\' . tar-mode) (\.\(arc\|zip\|lzh\|lha\|zoo\|[jew]ar\|xpi\|rar\|cbr\|7z\|squashfs\|ARC\|ZIP\|LZH\|LHA\|ZOO\|[JEW]AR\|XPI\|RAR\|CBR\|7Z\|SQUASHFS\)\' . archive-mode) (\.oxt\' . archive-mode) (\.\(deb\|[oi]pk\)\' . archive-mode) (\`/tmp/Re . text-mode) (/Message[0-9]*\' . text-mode) (\`/tmp/fol/ . text-mode) (\.oak\' . scheme-mode) (\.sgml?\' . sgml-mode) (\.x[ms]l\' . xml-mode) (\.dbk\' . xml-mode) (\.dtd\' . sgml-mode) (\.ds\(ss\)?l\' . dsssl-mode) (\.js[mx]?\' . javascript-mode) (\.har\' . javascript-mode) (\.json\' . js-json-mode) (\.[ds]?va?h?\' . verilog-mode) (\.by\' . bovine-grammar-mode) (\.wy\' . wisent-grammar-mode) (\.erts\' . erts-mode) ([:/\]\..*\(emacs\|gnus\|viper\)\' . emacs-lisp-mode) (\`\..*emacs\' . emacs-lisp-mode) ([:/]_emacs\' . emacs-lisp-mode) (/crontab\.X*[0-9]+\' . shell-script-mode) (\.ml\' . lisp-mode) (\.ld[si]?\' . ld-script-mode) (ld\.?script\' . ld-script-mode) (\.xs\' . c-mode) (\.x[abdsru]?[cnw]?\' . ld-script-mode) (\.zone\' . dns-mode) (\.soa\' . dns-mode) (\.asd\' . lisp-mode) (\.\(asn\|mib\|smi\)\' . snmp-mode) (\.\(as\|mi\|sm\)2\' . snmpv2-mode) (\.\(diffs?\|patch\|rej\)\' . diff-mode) (\.\(dif\|pat\)\' . diff-mode) (\.[eE]?[pP][sS]\' . ps-mode) (\.\(?:PDF\|EPUB\|CBZ\|FB2\|O?XPS\|DVI\|OD[FGPST]\|DOCX\|XLSX?\|PPTX?\|pdf\|epub\|cbz\|fb2\|o?xps\|djvu\|dvi\|od[fgpst]\|docx\|xlsx?\|pptx?\)\' . doc-view-mode-maybe) (configure\.\(ac\|in\)\' . autoconf-mode) (\.s\(v\|iv\|ieve\)\' . sieve-mode) (BROWSE\' . ebrowse-tree-mode) (\.ebrowse\' . ebrowse-tree-mode) (#\*mail\* . mail-mode) (\.g\' . antlr-mode) (\.mod\' . m2-mode) (\.ses\' . ses-mode) (\.docbook\' . sgml-mode) (\.com\' . dcl-mode) (/config\.\(?:bat\|log\)\' . fundamental-mode) (/\.?\(authinfo\|netrc\)\' . authinfo-mode) (\.\(?:[iI][nN][iI]\|[lL][sS][tT]\|[rR][eE][gG]\|[sS][yY][sS]\)\' . conf-mode) (\.la\' . conf-unix-mode) (\.ppd\' . conf-ppd-mode) (java.+\.conf\' . conf-javaprop-mode) (\.properties\(?:\.[a-zA-Z0-9._-]+\)?\' . conf-javaprop-mode) (\.toml\' . conf-toml-mode) (\.desktop\' . conf-desktop-mode) (/\.redshift\.conf\' . conf-windows-mode) (\`/etc/\(?:DIR_COLORS\|ethers\|.?fstab\|.*hosts\|lesskey\|login\.?de\(?:fs\|vperm\)\|magic\|mtab\|pam\.d/.*\|permissions\(?:\.d/.+\)?\|protocols\|rpc\|services\)\' . conf-space-mode) (\`/etc/\(?:acpid?/.+\|aliases\(?:\.d/.+\)?\|default/.+\|group-?\|hosts\..+\|inittab\|ksysguarddrc\|opera6rc\|passwd-?\|shadow-?\|sysconfig/.+\)\' . conf-mode) ([cC]hange[lL]og[-.][-0-9a-z]+\' . change-log-mode) (/\.?\(?:gitconfig\|gnokiirc\|hgrc\|kde.*rc\|mime\.types\|wgetrc\)\' . conf-mode) (/\.mailmap\' . conf-unix-mode) (/\.\(?:asound\|enigma\|fetchmail\|gltron\|gtk\|hxplayer\|mairix\|mbsync\|msmtp\|net\|neverball\|nvidia-settings-\|offlineimap\|qt/.+\|realplayer\|reportbug\|rtorrent\.\|screen\|scummvm\|sversion\|sylpheed/.+\|xmp\)rc\' . conf-mode) (/\.\(?:gdbtkinit\|grip\|mpdconf\|notmuch-config\|orbital/.+txt\|rhosts\|tuxracer/options\)\' . conf-mode) (/\.?X\(?:default\|resource\|re\)s\> . conf-xdefaults-mode) (/X11.+app-defaults/\|\.ad\' . conf-xdefaults-mode) (/X11.+locale/.+/Compose\' . conf-colon-mode) (/X11.+locale/compose\.dir\' . conf-javaprop-mode) (\.~?[0-9]+\.[0-9][-.0-9]*~?\' nil t) (\.\(?:orig\|in\|[bB][aA][kK]\)\' nil t) ([/.]c\(?:on\)?f\(?:i?g\)?\(?:\.[a-zA-Z0-9._-]+\)?\' . conf-mode-maybe) (\.[1-9]\' . nroff-mode) (\.art\' . image-mode) (\.avs\' . image-mode) (\.bmp\' . image-mode) (\.cmyk\' . image-mode) (\.cmyka\' . image-mode) (\.crw\' . image-mode) (\.dcr\' . image-mode) (\.dcx\' . image-mode) (\.dng\' . image-mode) (\.dpx\' . image-mode) (\.fax\' . image-mode) (\.heic\' . image-mode) (\.hrz\' . image-mode) (\.icb\' . image-mode) (\.icc\' . image-mode) (\.icm\' . image-mode) (\.ico\' . image-mode) (\.icon\' . image-mode) (\.jbg\' . image-mode) (\.jbig\' . image-mode) (\.jng\' . image-mode) (\.jnx\' . image-mode) (\.miff\' . image-mode) (\.mng\' . image-mode) (\.mvg\' . image-mode) (\.otb\' . image-mode) (\.p7\' . image-mode) (\.pcx\' . image-mode) (\.pdb\' . image-mode) (\.pfa\' . image-mode) (\.pfb\' . image-mode) (\.picon\' . image-mode) (\.pict\' . image-mode) (\.rgb\' . image-mode) (\.rgba\' . image-mode) (\.tga\' . image-mode) (\.wbmp\' . image-mode) (\.webp\' . image-mode) (\.wmf\' . image-mode) (\.wpg\' . image-mode) (\.xcf\' . image-mode) (\.xmp\' . image-mode) (\.xwd\' . image-mode) (\.yuv\' . image-mode) (\.tgz\' . tar-mode) (\.tbz2?\' . tar-mode) (\.txz\' . tar-mode) (\.tzst\' . tar-mode) (rc\' . conf-mode))
 
 
-** TODO Electric Pair
-=Look at doom emacs module=
+
+** DONE Electric Pair
+Native auto-pairing, O(1) prose formatting, and AST-aware re-indentation.
 #+begin_src emacs-lisp
 (use-package elec-pair
   :ensure nil
-  :hook (after-init . electric-pair-mode)
-  :init (setq electric-pair-inhibit-predicate 'electric-pair-conservative-inhibit))
+  :init
+  ;; Conservative inhibition prevents pairing in unbalanced buffers and complex strings.
+  (setq electric-pair-inhibit-predicate #'electric-pair-conservative-inhibit
+        electric-pair-skip-whitespace t
+        electric-pair-delete-adjacent-pairs t)
+  :config
+  (electric-pair-mode 1)
+  ;; O(1) multi-character pair injection for prose formatting.
+  ;; Strictly inhibited inside source blocks and inline code.
+  (defun ar/elec-pair-multi-char-prose ()
+    (when (and (derived-mode-p 'text-mode 'org-mode 'markdown-mode)
+               (not (and (derived-mode-p 'org-mode) (org-in-src-block-p)))
+               (not (and (derived-mode-p 'markdown-mode)
+                         (or (and (fboundp 'markdown-code-block-at-point-p)
+                                  (markdown-code-block-at-point-p))
+                             (and (fboundp 'markdown-inline-code-at-point-p)
+                                  (markdown-inline-code-at-point-p))))))
+      (let* ((c1 (char-before))
+             (c2 (char-before (1- (point))))
+             (before-pair (char-before (- (point) 2)))
+             (after-pair (char-after)))
+        (when (and c1 c2 (eq c1 c2)
+                   (memq c1 '(?* ?= ?_ ?~))
+                   ;; Prevent triggering if appending to existing identical punctuation (e.g. ***)
+                   (not (eq before-pair c1))
+                   (not (eq after-pair c1))
+                   ;; Only trigger in "empty" space or before words, not after words
+                   (or (null before-pair) (not (memq (char-syntax before-pair) '(?w ?_)))))
+          (insert (string c1 c1))
+          (backward-char 2)))))
+  (add-hook 'post-self-insert-hook #'ar/elec-pair-multi-char-prose))
+
+;; Native electric indentation and "Electric Words" engine.
+(use-package electric
+  :ensure nil
+  :init
+  ;; Force newline and backspace to trigger electric indentation.
+  ;; ?\^? enables "Smart Backspace" (dedenting by full indentation level)
+  ;; in modes like Python and C when pressing backspace in leading whitespace.
+  (setq-default electric-indent-chars (append '(?\n ?\^?) electric-indent-chars))
+  :config
+  (defcustom ar/electric-indent-words '("else" "elif" "elseif" "catch" "finally" "except")
+    "Words that trigger immediate re-indentation when typed at EOL."
+    :type '(repeat string)
+    :group 'electric)
+
+  (defun ar/electric-indent-words-fn (_char)
+    "Force re-indentation if an electric word is typed at the end of the line.
+Strictly confined to `prog-mode' derivatives to prevent prose collision."
+    (when (and (derived-mode-p 'prog-mode)
+               (eolp)
+               ar/electric-indent-words)
+      (save-excursion
+        (backward-word)
+        (looking-at-p (concat "\\<" (regexp-opt ar/electric-indent-words) "\\>")))))
+
+  (add-hook 'electric-indent-functions #'ar/electric-indent-words-fn))
 #+end_src
 
 
-** TODO Evil Surround
+** DONE Evil Surround
+Provides retro-active Vim-style wrapping via =ys=, =cs=, and =ds= operators. Integrates =evil-embrace= to extend the base alist with regex-aware, multi-character, and asymmetric structural pairs for prose and LaTeX environments.
 #+begin_src emacs-lisp
 (use-package evil-surround
   :after evil
-  :commands global-evil-surround-mode
-  :custom
-  (evil-surround-pairs-alist
-   '((?\( . ("(" . ")"))
-     (?\[ . ("[" . "]"))
-     (?\{ . ("{" . "}"))
+  :config
+  ;; Enable global Vim-style surround operators.
+  (global-evil-surround-mode 1))
 
-     (?\) . ("(" . ")"))
-     (?\] . ("[" . "]"))
-     (?\} . ("{" . "}"))
+(use-package evil-embrace
+  :after evil-surround
+  :config
+  ;; Merge regex-aware structural engine into evil-surround operators.
+  (evil-embrace-enable-evil-surround-integration)
 
-     (?< . ("<" . ">"))
-     (?> . ("<" . ">"))))
-  :config (global-evil-surround-mode 1))
+  ;; Native Org-mode emphasis pairs (*, /, _, =, ~) with regex boundaries.
+  (add-hook 'org-mode-hook #'embrace-org-mode-hook)
+
+  ;; Native LaTeX pairs ($, \verb). Deep environments handled downstream by evil-tex.
+  (add-hook 'LaTeX-mode-hook #'embrace-LaTeX-mode-hook)
+
+  ;; Markdown/GFM pair injection (embrace.el lacks a native markdown hook).
+  (defun ar/embrace-markdown-setup ()
+    "Inject markdown emphasis and code pairs into embrace."
+    (embrace-add-pair ?* "*" "*")
+    (embrace-add-pair ?_ "_" "_")
+    (embrace-add-pair ?` "`" "`"))
+  (add-hook 'markdown-mode-hook #'ar/embrace-markdown-setup)
+  (add-hook 'gfm-mode-hook #'ar/embrace-markdown-setup))
 #+end_src
 
 
-** TODO Delete Pair
 
-** TODO Show Paren Mode
+** DONE Delete Pair
+Configures the native =delete-pair= engine and provides an O(1) DWIM wrapper for adjacent, string, and nested pair deletion, strictly confined to programming modes.
+#+begin_src emacs-lisp
+;; Emacs 28+: Visual blink delay before deletion.
+(setq delete-pair-blink-delay 0.1)
+
+;; Emacs 31+: Push mark before deletion for inner-text recovery.
+(when (boundp 'delete-pair-push-mark)
+  (setq delete-pair-push-mark t))
+
+(defun ar/delete-pair-dwim ()
+  "Intelligently delete the pair surrounding or preceding the cursor.
+Strictly confined to `prog-mode' to prevent structural destruction in prose."
+  (interactive)
+  (unless (derived-mode-p 'prog-mode)
+    (user-error "Delete Pair DWIM restricted to prog-mode; use `ds` in prose"))
+  (let ((prev (char-before))
+        (next (char-after))
+        (ppss (syntax-ppss)))
+    (cond
+     ;; Delete preceding closing delimiter or quote.
+     ((and prev (memq (char-syntax prev) '(?\) ?\" ?\|)))
+      (delete-pair -1))
+     ;; Delete following opening delimiter or quote.
+     ((and next (memq (char-syntax next) '(?\( ?\" ?\|)))
+      (delete-pair 1))
+     ;; Inside a string: jump to start, handle prefixes, and delete.
+     ((nth 3 ppss)
+      (let ((start (nth 8 ppss)))
+        (goto-char start)
+        ;; Handle string prefixes (e.g., f"..." in Python).
+        (unless (memq (char-after) '(?\" ?\|))
+          (forward-char 1))
+        (delete-pair 1)))
+     ;; Fallback: jump out of current list and delete enclosing pair.
+     (t
+      (condition-case nil
+          (progn
+            (backward-up-list)
+            (delete-pair 1))
+        (scan-error (user-error "Not inside a deletable pair")))))))
+#+end_src
+
+
+
+** DONE Show Paren Mode
+Native delimiter highlighting and Emacs 29+ overlay context rendering.
 #+begin_src emacs-lisp
 (use-package paren
   :ensure nil
-  :hook (after-init . show-paren-mode)
   :custom
+  ;; Delay before highlighting matching delimiters.
   (show-paren-delay 0.05)
+  ;; Highlight the opening delimiter when point is on the closing one.
   (show-paren-highlight-openparen t)
+  ;; Highlight pairs when point is inside or in the periphery of the parens.
   (show-paren-when-point-inside-paren t)
   (show-paren-when-point-in-periphery t)
+  ;; Highlight only the exact parenthesis characters, not the whole expression.
   (show-paren-style 'parenthesis)
-  (show-paren-context-when-offscreen nil)
-
+  ;; Emacs 29+: Render off-screen context as a window overlay.
+  ;; Bypasses the echo area to prevent clobbering ElDoc and Which-Key.
+  (show-paren-context-when-offscreen 'overlay)
   :config
-  ;; === CUSTOM ELDOC BACKEND FOR PARENTHESIS ===
-  (defun ar/paren-eldoc-offscreen-context (callback &rest _)
-    "Show off-screen parenthesis context in Echo Area via ElDoc."
-    (let* ((pos (point))
-           (match-pos nil)
-           (label nil)
-           (line-content nil)
-           (syntax-at (when (char-after pos) (char-syntax (char-after pos))))
-           (syntax-before (when (char-before pos) (char-syntax (char-before pos))))
-           ;; Default bounds are the whole buffer
-           (scan-beg (point-min))
-           (scan-end (point-max)))
-
-      ;; 0. ORG MODE FIX: Constrain search to current source block
-      (when (and (derived-mode-p 'org-mode)
-                 (org-in-src-block-p))
-        (let ((elem (org-element-at-point)))
-          (when elem
-            (setq scan-beg (org-element-property :begin elem))
-            (setq scan-end (org-element-property :end elem)))))
-
-      (save-restriction
-        ;; Safety check: Ensure bounds are valid numbers before narrowing
-        (when (and (numberp scan-beg) (numberp scan-end) (< scan-beg scan-end))
-          (narrow-to-region scan-beg scan-end))
-
-        ;; 1. FIND MATCHING POSITION
-        ;; Note: Comments below must not contain raw parens to avoid Org syntax issues
-        (cond
-         ;; Case A: At Opening Bracket
-         ((eq syntax-at ?\()
-          (setq match-pos (ignore-errors (scan-sexps pos 1)))
-          (when match-pos
-            (setq match-pos (1- match-pos))
-            (setq label "Closing: ")))
-
-         ;; Case B: At Closing Bracket (Evil/Block cursor)
-         ((eq syntax-at ?\))
-          (setq match-pos (ignore-errors (scan-sexps (1+ pos) -1)))
-          (setq label "Opening: "))
-
-         ;; Case C: After Closing Bracket (Standard Emacs)
-         ((eq syntax-before ?\))
-          (setq match-pos (ignore-errors (scan-sexps pos -1)))
-          (setq label "Opening: ")))
-
-        ;; 2. RETRIEVE CONTENT IF OFF-SCREEN
-        (when (and match-pos
-                   label
-                   (not (pos-visible-in-window-p match-pos)))
-          (with-current-buffer (current-buffer)
-            (save-excursion
-              (goto-char match-pos)
-              (setq line-content (string-trim (substring-no-properties (thing-at-point 'line t)))))))
-
-        ;; 3. DISPLAY
-        (when line-content
-          (funcall callback
-                   (concat
-                    (propertize label 'face '(:inherit shadow :weight bold))
-                    (propertize line-content 'face '(:inherit font-lock-keyword-face :weight bold))))))))
-
-  ;; Register with ElDoc (Priority -45) to avoid conflict with org-eldoc-drawer (-50)
-  ;; Positioned between drawer (-50) and heading-info (-40)
-  (add-hook 'eldoc-mode-hook
-            (lambda ()
-              (add-hook 'eldoc-documentation-functions #'ar/paren-eldoc-offscreen-context -45 t))))
+  (show-paren-mode 1)
+  ;; Emacs 31+: Prevent phantom bracket highlighting inside strings and comments.
+  (when (boundp 'show-paren-not-in-comments-or-strings)
+    (setq show-paren-not-in-comments-or-strings t)))
 #+end_src
 
+** TODO Blink Matching Paren [built-in]
 
-** TODO Blink Matching Paren
+
 
 ** TODO Rainbow Delimiters
 
@@ -1534,6 +1664,7 @@ Extends =%= motion to jump across semantic blocks (LaTeX, HTML, code).
 
 * TODO Folding
 Manages structural and textual collapsing mechanisms. Hides implementation details via AST-aware blocks and regex-based visual folds.
+- [ ] =https://raw.githubusercontent.com/doomemacs/modules/refs/heads/main/modules/editor/fold/config.el=
 
 ** TODO Treesit Fold
 NOTE: =check with doom-emacs modules=
@@ -1806,6 +1937,7 @@ Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy
 Manages spellchecking, contextual help systems, and heavy multi-buffer comparison tools. Supports complex review workflows and text validation.
 
 ** TODO Jinx
+- [ ] Instead of a dict.txt file, I prefer to have every exclusion written here and it should be case-insensitive
 #+begin_src emacs-lisp
 (use-package jinx
   :hook (after-init . jinx-mode)
@@ -1841,6 +1973,8 @@ Manages spellchecking, contextual help systems, and heavy multi-buffer compariso
 
 ** TODO Helpful
 - [ ] How does doom emacs configure the helpful package and what keybinding does doom emacs have?
+- [ ] It must integrate with the main development tools sections
+- [ ] Revisit it again after writing development tools
 #+begin_src emacs-lisp
 (use-package helpful
   :defer t
@@ -1862,6 +1996,7 @@ Manages spellchecking, contextual help systems, and heavy multi-buffer compariso
 
 
 ** TODO Ediff
+- [ ] List all the features and functionalities of ediff
 #+begin_src emacs-lisp
 (use-package ediff
   :ensure nil
@@ -6242,23 +6377,6 @@ TODO: =Replace with flycheck=
         (TeX-fold-region yas-snippet-beg yas-snippet-end)))
 
     (add-hook 'yas-after-exit-snippet-hook #'ar/latex-fold-snippet-contents)))
-#+end_src
-
-** TODO Electric Pair Disabling
-#+begin_src emacs-lisp
-(add-hook 'LaTeX-mode-hook
-          (lambda ()
-            (setq-local electric-pair-inhibit-predicate
-                        (lambda (c)
-                          (or
-                           ;; Inhibit $ (let CDLaTeX handle it)
-                           (char-equal c ?\$)
-                           ;; Inhibit ` (backticks in LaTeX)
-                           (char-equal c ?\`)
-                           ;; Inhibit ' (quotes handled by AUCTeX)
-                           (char-equal c ?\')
-                           ;; Call default predicate for other characters
-                           (funcall (default-value 'electric-pair-inhibit-predicate) c))))))
 #+end_src
 
 ** TODO Evil Integration

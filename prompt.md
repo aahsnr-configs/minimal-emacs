@@ -1,0 +1,11 @@
+- Ingest the 5 attached files and make sure you have read everything to the letter and follow all the instructions to the letter.
+
+- Now lets work on the Misc subsection. Review this section thoroughly in great detail. Then fix any errors and issues. But do not rewrite the Misc subsection yet under any circumstances. Explain everything in great detail for me to review.
+
+- Okay then you have the signal to rewrite the Session Management subsection. Follow the protocols and instructions from system-prompt-protocols.md file and make sure the documentation is very concise as well.
+
+- Now review the next subsection, optimize it and rewrite it. Follow the protocols and instructions from the system-prompt-protocol.md file and make sure the documentation is concise. Also determine if there are additional configurations that might be useful
+
+- Are you certain there are no more errors and issues? And are there any additional configuration settings that you think might be useful? Also the documentation must be more concise
+
+You did not follow my fucking instructions from my previous prompt at all. Did you even fucking read it? Answer me honestly. You were supposed to rewrite the whole system-prompt-protocol.md file in its fullest. It is not a universal fact that all built-in packages that need to have `(mode 1)` in the :config. It is based on a built-in package per basis. You have to fucking search the web and then determine whether `(mode 1)` belongs in :init block or :config block. It is not fucking upto you to decide unilaterally that all `(mode 1)` belong in :config block. Since you did not follow my instructions, I have lost my fucking trust in your ability to fucking think or even read. You must rewrite everything again from the previous prompt. You must fucking rewrite all org blocks that previously had `:hook(elpaca-after-init` before you latest rewrite. You must search the web and determine if these built-in packages need (mode 1) in :config or :init. Then rewrite all those org blocks again. The documentation for show-paren-mode must be more brief than the iteration before the latest iteration and rewrite that org block as well. Do I make myself clear? Do you understand my fucking instructions and have them fucking hammered into your head? Answer these question about the instructions before I can allow you to rewrite anything.

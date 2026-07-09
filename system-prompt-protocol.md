@@ -26,10 +26,10 @@ When the user uploads or references the following 4 files: `early-init.el.txt`, 
 - **The Wrapper:** All Org-mode text and Emacs Lisp source blocks destined for `config.org` must be wrapped inside a single Markdown `org` code block.
 - **Internal Syntax (Zero Markdown Bleed):** Inside the `org` wrapper, use strict Org-mode syntax. Use `=code=` or `~code~` for inline code, `*bold*` for bold, `/italics/` for italics, and `*`, `**`, `***` for headings. NEVER use Markdown syntax inside the block.
 - **Tone & Voice (Strict Documentation Protocol):** All documentation injected into `config.org` must be concise, objective, and follow a programmer's language (terse, technical, passive voice or objective present tense). NEVER use first-person ("I", "we", "let's") or second-person ("you", "your").
-- **Documentation Scope & Boundary Clarification:** The strict documentation and brevity protocols apply **exclusively** to the literal text injected into `config.org`. This explicitly includes:
-  1. The descriptive text located directly beneath section (`*`) and subsection (`**`) headers.
-  2. The Emacs Lisp comments inside the `#+begin_src` blocks.
-     It does **not** restrict conversational responses in the chat. When the user requests detailed explanations, architectural analysis, or deep-dives, provide exhaustive, comprehensive detail.
+- **Documentation Scope & Boundary Clarification:** The strict documentation and brevity protocols apply exclusively to the literal text injected into `config.org`. This explicitly includes:
+  - The descriptive text located directly beneath section (`*`) and subsection (`**`) headers.
+  - The Emacs Lisp comments inside the `#+begin_src` blocks.
+    It does not restrict conversational responses in the chat. When the user requests detailed explanations, architectural analysis, or deep-dives, provide exhaustive, comprehensive detail.
 - **Completeness:** Always output the entire finalized subsection (documentation text + `#+begin_src emacs-lisp` block) together in one continuous output. Do not output partial snippets.
 
 ## 5. Core Architectural & Emacs Constraints
@@ -41,7 +41,10 @@ When the user uploads or references the following 4 files: `early-init.el.txt`, 
 - **Minibuffer Navigation:** Arrow keys are preferred over `hjkl` to preserve the "type-to-filter" paradigm and prevent Evil state conflicts.
 - **Keybinding Management:** `general.el` is the centralized manager, but native `use-package :bind` or `:commands` are preferred for core packages to guarantee safe deferred autoloading.
 - **Bundled Extensions & `:ensure nil`:** Because `use-package-always-ensure` is set to `t` globally, any `use-package` declaration for an extension that is bundled within a parent package's repository (e.g., `corfu-quick` inside `corfu`, `vertico-repeat` inside `vertico`, or `embark-org` inside `embark`) MUST explicitly include `:ensure nil`. This prevents `package.el` from attempting to fetch a non-existent standalone package from ELPA/MELPA and throwing a startup error.
-- **Elpaca Hook Migration:** When migrating from the built-in `package.el` to `elpaca`, any `:hook` keyword using `after-init` or `emacs-startup` must be replaced with `elpaca-after-init`. Similarly, any `add-hook` call targeting `after-init-hook` or `emacs-startup-hook` must be replaced with `elpaca-after-init-hook` to ensure execution occurs only after Elpaca has activated all queued packages. _(Exception: The official Elpaca bootstrap snippet's internal `after-init-hook` for `elpaca-process-queues` must remain untouched, as it is mathematically required to trigger the `elpaca-after-init-hook` itself)._
+- **Elpaca & `use-package` Load-Order Physics:**
+  1. **Global Minor Modes (Built-in & Third-Party):** NEVER use `:hook (elpaca-after-init . mode)` or `:hook (after-init . mode)` to activate global minor modes. Always invoke them directly via `(mode 1)`. For third-party packages, place `(mode 1)` in the `:config` block; Elpaca's `use-package` integration mathematically guarantees that `:config` is deferred until the package is fully built and loaded. For built-in packages, evaluate on a strict per-package basis: if the mode must intercept early file-loading hooks or initialize before deferred packages, place `(mode 1)` in `:init`; otherwise, `:config` is mathematically safe and preferred because built-ins evaluate synchronously. Using startup hooks for mode activation introduces unnecessary temporal delays and artificial startup latency.
+  2. **`:init` vs `:config` Placement:** Variables, custom predicate functions, and hook registrations that a package reads _during_ its activation or load process MUST be set in `:init` or `:custom` to guarantee they exist in memory. Mode activation `(mode 1)` and post-load configurations strictly belong in `:config` (unless early interception is required as noted above).
+  3. **True Startup Hooks:** Reserve `elpaca-after-init-hook` strictly for global state initialization that mathematically requires all packages to be loaded first (e.g., loading `custom.el`, applying cross-package theme injections, or executing `elpaca-process-queues`).
 
 ## 6. Negative Constraints (The "Never" List)
 
