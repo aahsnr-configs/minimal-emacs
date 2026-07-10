@@ -1,4 +1,4 @@
-Emacs Configuration Project State Checkpoint (v10 - July 11, 2026)
+Emacs Configuration Project State Checkpoint (v11 - July 11, 2026)
 
 CRITICAL INSTRUCTIONS FOR THE NEW AI SESSION
 Before generating any code, making suggestions, or answering questions, you MUST:
@@ -27,6 +27,7 @@ The AI must strictly adhere to the following rules when generating or modifying 
   - For built-in packages, invoke `(mode 1)` directly in `:config` (or `:init` if early interception is required) to eliminate artificial startup latency.
   - Reserve `elpaca-after-init-hook` strictly for cross-package state initialization.
 - Header Status Keywords: NEVER add or change a section (`*`) or subsection (`**`) header to `DONE` unless the user explicitly states that the corresponding section or subsection has been finalized. Default to `TODO` or preserve the existing status.
+- Emacs 31 Version-Targeting Verification: Emacs 31 is in pretest (`31.0.90`, June 2026), not yet officially released. Emacs-31-specific code MUST be defensively guarded (`fboundp`/`boundp`/version checks) and MUST NOT reference the MPS incremental/concurrent garbage collector (`igc`) as an Emacs 31 feature — it was confirmed deferred out of the Emacs 31 release cycle. See Edge Cases below.
 
 The "Editor Behaviour" Paradigm Shift & Main Section Naming
 In v5, the `Editor Behaviour` concept was massively restructured to become the centralized pillar for how Emacs renders, parses, and manipulates text and buffers. In v10, the physical migration and finalization of these groups is the primary active objective.
@@ -60,6 +61,7 @@ The AI must NEVER suggest or implement the following patterns:
 - No Nerd Icons inside `prettify-symbols-alist`: Injecting PUA glyphs into buffer text causes mid-line font-fallback context switches and sub-pixel grid misalignments.
 - No `elpaca-after-init` hooks for built-in global minor modes (use direct `:config` invocation).
 - No custom ElDoc backends for `show-paren` (use native Emacs 29+ `'overlay` engine).
+- No treating the MPS incremental/concurrent garbage collector (`igc`) as an Emacs 31 feature: it was explicitly deferred out of the Emacs 31 release cycle (per `emacs-devel`, May 2026) and is absent from the `31.0.90` pretest. Any `igc`-related code targets a future post-31 release only and must be re-verified via web search before use.
 - No Package Merging: NEVER merge multiple distinct packages into a single `#+begin_src` block or a single subsection header. Every package must reside in its own dedicated `**` subsection with its own isolated source block.
 - No Scope Creep: NEVER modify, rewrite, or touch subsections, packages, or code blocks that were not explicitly tasked in the current prompt.
 
@@ -67,7 +69,8 @@ Edge Cases & Deferred Issues
 
 - Dirvish Multi-frame Flicker: Patched via `define-advice` on `dirvish-pre-redisplay-h` to debounce redisplay hooks in Emacs 30+.
 - lsp-mode Org Element API Crash: Patched via `:around` advice in the `lsp-mode :init` block to prevent `cl-generic` corruption.
-- Emacs 31 Unreleased APIs: Features like `grep-edit-mode` or MPS Incremental GC (`igc`) must be wrapped in defensive runtime guards.
+- Emacs 31 Unreleased APIs: Features like `grep-edit-mode` must be wrapped in defensive runtime guards.
+- **[v11 Correction]** MPS Incremental GC (`igc`) Removed From Scope: Prior state (v10 and earlier) incorrectly listed MPS Incremental GC (`igc`) alongside `grep-edit-mode` as an Emacs 31 API requiring defensive guards. A protocol audit (July 2026) against `emacs-devel` confirmed the Emacs 31 release manager announced in May 2026 that the new garbage collector would **not** ship in Emacs 31 — the `emacs-31` branch was cut without it, and the subsequent `31.0.90` pretest (June 2026) confirms its absence. `igc` is therefore struck from all Emacs-31-targeting guards and negative-constraint language going forward; it is deferred to an unspecified future (post-31) release and must not be assumed present without a fresh, dated web search.
 - `no-littering` API Typo: Fixed hallucinated `no-littering-expand-var-directory-name` to the correct `no-littering-expand-var-file-name` (with trailing slash for directories) in `treesit` and `undo-fu-session` blocks.
 - `treesit` Block Parenthesis Mismatch: Fixed an extra closing parenthesis in the `treesit--build-grammar` advice that caused an `Invalid read syntax: )` crash during tangling.
 - `treesit-fold` Ellipsis Injection: Upstream `treesit-fold` (Jan 2025 refactor) natively inherits Emacs' built-in `truncate-string-ellipsis`. Custom overlay advice for ellipses is no longer required; global `setq` is sufficient.
@@ -79,6 +82,10 @@ Architectural Decisions & Load-Order Physics (Session v10)
 - Code Folding Unification (Group 4 Complete): Replaced fragmented folding with a unified dispatcher engine routing Evil's `z` prefix to `treesit-fold` (AST), `hideshow` (Regex/Fold-markers), `outline-minor-mode` (Prose fallback), and `vimish-fold` (Visual).
 - Whitespace & Indentation Strategy (Group 5 Complete): Rejected `stripspace` in favor of `ws-butler` (unobtrusive, modified-lines-only trimming to protect Git diffs). `dtrt-indent` is routed to `change-major-mode-after-body-hook` to prevent LSP race conditions.
 - `general.el` Eager Load-Order Physics: Verified that `general.el` is synchronously and eagerly loaded (`:ensure (:wait t)`, `:demand t`) at the end of the Vim Emulation section. This mathematically guarantees that `general-define-key`, `ar/global-leader`, and `ar/local-leader` are globally available for all downstream deferred packages without requiring `with-eval-after-load` wrappers.
+
+Architectural Decisions & Load-Order Physics (Session v11)
+
+- Protocol Fact-Audit (Emacs 31 Version Targeting): Conducted a web-search-backed audit of `system-prompt-protocol.md`'s Emacs 31 claims against current (July 2026) upstream sources. Confirmed `grep-edit-mode` is a real, correctly named Emacs 31 feature (per the GNU ELPA Vertico package README). Confirmed the MPS incremental/concurrent garbage collector was deferred out of Emacs 31 entirely (per `emacs-devel`, May 2026) and does not exist in the `31.0.90` pretest. All prior guidance treating `igc` as an in-scope, guard-wrapped Emacs 31 feature is superseded; see corrected Edge Case entry above. No config.org.txt code changes result from this audit — it is a documentation/protocol correction only, since no `igc` code has yet been written into `config.org`.
 
 Pending Architectural Decisions & In-Code TODOs
 
