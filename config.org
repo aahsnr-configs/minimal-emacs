@@ -1812,39 +1812,144 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
 #+end_src
 
 
-* TODO Folding
-Manages structural and textual collapsing mechanisms. Hides implementation details via AST-aware blocks and regex-based visual folds.
-- [ ] =https://raw.githubusercontent.com/doomemacs/modules/refs/heads/main/modules/editor/fold/config.el=
-
-** TODO Treesit Fold
-NOTE: =check with doom-emacs modules=
+* DONE Code Folding
+Manages structural and textual collapsing mechanisms. Unifies AST-aware, outline, and regex-based folding engines behind standard Vim motions.
 #+begin_src emacs-lisp
-;; (use-package treesit-fold
-;;   :defer t
-;;   :straight (:host github :repo "emacs-tree-sitter/treesit-fold")
-;;   ;; :custom
-;;   ;; (treesit-fold-indicators-priority -1)
-;;   :config
-;;   (global-treesit-fold-mode 1)
-;;   (global-treesit-fold-indicators-mode 1))
-#+end_src
+;; ==========================================
+;; GLOBAL ELLIPSIS UNIFICATION
+;; ==========================================
+;; Emacs 29+ native variable inherited by `treesit-fold', `outline', and `hideshow'.
+(setq truncate-string-ellipsis " ↴ ")
 
+(with-eval-after-load 'org
+  (setq org-ellipsis " ↴ "))
 
-** TODO Vimish Fold
-NOTE: =check with doom-emacs modules=
-#+begin_src emacs-lisp
+;; ==========================================
+;; TOP-LEVEL DISPATCHER & HELPER ENGINE
+;; ==========================================
+;; Defined at the top level to guarantee obarray registration prior to
+;; deferred package loading, preventing `void-function' crashes on `za'.
+(defun ar/hs-overlay-line-count (ov)
+  "Append hidden line count to the native ellipsis for visual feedback."
+  (when (eq 'code (overlay-get ov 'hs))
+    (let* ((start (overlay-start ov))
+           (end (overlay-end ov))
+           (lines (count-lines start end)))
+      (overlay-put ov 'display
+                   (format "%s [%d lines]" truncate-string-ellipsis lines)))))
+
+(defun ar/fold-toggle ()
+  (interactive)
+  (cond ((bound-and-true-p treesit-fold-mode) (treesit-fold-toggle))
+        ((bound-and-true-p outline-minor-mode) (outline-cycle))
+        ((bound-and-true-p hs-minor-mode) (hs-toggle-hiding))
+        ((fboundp 'vimish-fold-toggle)
+         (condition-case nil (vimish-fold-toggle)
+           (error (user-error "No foldable region at point"))))
+        (t (user-error "No foldable region at point"))))
+
+(defun ar/fold-open ()
+  (interactive)
+  (cond ((bound-and-true-p treesit-fold-mode) (treesit-fold-open))
+        ((bound-and-true-p outline-minor-mode) (outline-show-subtree))
+        ((bound-and-true-p hs-minor-mode) (hs-show-block))
+        ((fboundp 'vimish-fold-unfold) (vimish-fold-unfold))
+        (t (user-error "No foldable region at point"))))
+
+(defun ar/fold-close ()
+  (interactive)
+  (cond ((bound-and-true-p treesit-fold-mode) (treesit-fold-close))
+        ((bound-and-true-p outline-minor-mode) (outline-hide-subtree))
+        ((bound-and-true-p hs-minor-mode) (hs-hide-block))
+        (t (user-error "No foldable region at point"))))
+
+(defun ar/fold-open-all ()
+  (interactive)
+  (cond ((bound-and-true-p treesit-fold-mode) (treesit-fold-open-all))
+        ((bound-and-true-p outline-minor-mode) (outline-show-all))
+        ((bound-and-true-p hs-minor-mode) (hs-show-all))
+        ((fboundp 'vimish-fold-delete-all) (vimish-fold-delete-all)))
+  (message "All folds opened"))
+
+(defun ar/fold-close-all ()
+  (interactive)
+  (cond ((bound-and-true-p treesit-fold-mode) (treesit-fold-close-all))
+        ((bound-and-true-p outline-minor-mode) (outline-hide-body))
+        ((bound-and-true-p hs-minor-mode) (hs-hide-all)))
+  (message "All folds closed"))
+
+;; ==========================================
+;; 1. HIDE/SHOW (Built-in Regex/Fold-markers)
+;; ==========================================
+(use-package hideshow
+  :ensure nil
+  :defer t
+  :commands (hs-toggle-hiding hs-hide-block hs-show-block hs-hide-all hs-show-all)
+  :config
+  (setq hs-hide-comments-when-hiding-all nil
+        hs-set-up-overlay #'ar/hs-overlay-line-count)
+  ;; Aborts activation in massive buffers to prevent main-thread freezing.
+  (define-advice hs-minor-mode (:before-while (&optional arg) guard-large-files)
+    (or (and arg (< (prefix-numeric-value arg) 1))
+        (not (too-long-file-p))))
+  ;; Generic fold-marker fallback for languages lacking tree-sitter grammars.
+  (unless (assq 't hs-special-modes-alist)
+    (setq hs-special-modes-alist
+          (append hs-special-modes-alist
+                  '((t "{{{" "}}}" nil nil))))))
+
+;; ==========================================
+;; 2. TREESIT-FOLD (AST-Aware Folding)
+;; ==========================================
+(use-package treesit-fold
+  :if (treesit-available-p)
+  :defer t
+  :hook ((prog-mode text-mode conf-mode) . treesit-fold-mode)
+  :config
+  (global-treesit-fold-indicators-mode 1)
+  ;; Lower priority prevents fringe indicator collisions with diff-hl/flymake.
+  (setq treesit-fold-indicators-priority -1)
+  ;; Aborts activation in massive buffers to prevent main-thread freezing.
+  (define-advice treesit-fold-mode (:before-while (&optional arg) guard-large-files)
+    (or (and arg (< (prefix-numeric-value arg) 1))
+        (not (too-long-file-p)))))
+
+;; ==========================================
+;; 3. VIMISH-FOLD (Visual Region Folding)
+;; ==========================================
 (use-package vimish-fold
   :defer t
   :after evil
-  :config (vimish-fold-global-mode 1))
+  :init
+  ;; Route cache to no-littering var directory to prevent ~/.emacs.d pollution.
+  (setq vimish-fold-dir (no-littering-expand-var-file-name "vimish-fold/")
+        vimish-fold-indication-mode 'right-fringe)
+  :config
+  (vimish-fold-global-mode 1))
 
 (use-package evil-vimish-fold
   :defer t
   :after vimish-fold
   :init
-  (setq evil-vimish-fold-mode-lighter " ⮒")
-  (setq evil-vimish-fold-target-modes '(prog-mode conf-mode text-mode))
-  :config (global-evil-vimish-fold-mode))
+  (setq evil-vimish-fold-mode-lighter " ↴"
+        evil-vimish-fold-target-modes '(prog-mode conf-mode text-mode))
+  :config
+  (global-evil-vimish-fold-mode 1))
+
+;; ==========================================
+;; EVIL KEYBINDING ROUTING
+;; ==========================================
+(general-define-key
+ :states 'motion
+ "za" #'ar/fold-toggle
+ "zo" #'ar/fold-open
+ "zc" #'ar/fold-close
+ "zR" #'ar/fold-open-all
+ "zM" #'ar/fold-close-all
+ "zf" #'evil-vimish-fold/create
+ "zF" #'evil-vimish-fold/create-line
+ "zd" #'vimish-fold-delete
+ "zE" #'vimish-fold-delete-all)
 #+end_src
 
 
@@ -1852,41 +1957,78 @@ NOTE: =check with doom-emacs modules=
 * TODO Spatial Alignment & Whitespace Hygiene
 Enforces spatial alignment, trailing character cleanup, and indentation guides. Maintains visual grid consistency across diverse programming languages.
 
-** TODO Stripspace
-=Look at doom emacs modules for inspiration=
-- [ ] Do you think it is better to use any of the configuration settings for whitespace, dirt-indent and ws-bulter from =https://raw.githubusercontent.com/doomemacs/modules/refs/heads/main/modules/editor/whitespace/config.el= instead of using stripspace from below. I already have dirt-indent configured in under Indentation main section. You might as well review that dirt-indent config with stripspace subsection. You will review indent-bars subsection right after review dirt-indent config block
+* TODO Spatial Alignment & Whitespace Hygiene
+Enforces spatial alignment, trailing character cleanup, and indentation guides. Maintains visual grid consistency across diverse programming languages.
+
+** TODO Whitespace
+Native visual highlighting for trailing spaces and mixed indentation. Aborts activation in massive buffers to prevent main-thread blocking.
 #+begin_src emacs-lisp
-(use-package stripspace
-  :commands stripspace-local-mode
-  :hook ((prog-mode . stripspace-local-mode)
-         (text-mode . stripspace-local-mode)
-         (conf-mode . stripspace-local-mode))
-  :custom
-  (stripspace-only-if-initially-clean nil)
-  (stripspace-restore-column t))
+(use-package whitespace
+  :ensure nil
+  :defer t
+  :hook ((prog-mode text-mode conf-mode) . whitespace-mode)
+  :config
+  ;; Strictly highlight trailing spaces and mixed indentation (tabs vs spaces).
+  (setq whitespace-style '(face trailing indentation tabs tab-mark)
+        whitespace-display-mappings '((tab-mark ?\t [?› ?\t])))
+  ;; Aborts activation in massive buffers to prevent main-thread freezing.
+  (define-advice whitespace-mode (:before-while (&optional arg) guard-large-files)
+    (or (and arg (< (prefix-numeric-value arg) 1))
+        (not (too-long-file-p)))))
 #+end_src
 
+** TODO Ws-Butler
+Unobtrusive trailing whitespace trimming. Strictly confines cleanup to modified lines to prevent Git diff pollution.
+#+begin_src emacs-lisp
+(use-package ws-butler
+  :defer t
+  :config
+  ;; Exempt interactive terminals, REPLs, and special buffers where trailing
+  ;; whitespace is structurally required or causes prompt corruption.
+  (dolist (mode '(special-mode
+                  comint-mode
+                  term-mode
+                  eshell-mode
+                  ghostel-mode
+                  diff-mode
+                  magit-status-mode))
+    (add-to-list 'ws-butler-global-exempt-modes mode))
+  ;; Enable global unobtrusive trimming (replaces `stripspace').
+  (ws-butler-global-mode 1))
+#+end_src
 
-** TODO Dirt Indent
-- [ ] Look at indent module from doom emacs
+** TODO Dtrt Indent
+Heuristic indentation guessing. Hooks into post-mode initialization to prevent LSP race conditions and silently aborts on massive files.
 #+begin_src emacs-lisp
 (use-package dtrt-indent
   :defer t
   :config
-  (dtrt-indent-global-mode 1)
-  ;; Optional: Adjust verbosity
-  ;; 0 = silent, 1 = notify on change (default), 2 = explain why not changed, 3 = debug
-  (setq dtrt-indent-verbosity 1)
-  ;; Optional: Set minimum confidence threshold
-  ;; Only adjust if dtrt-indent is confident in its detection
-  (setq dtrt-indent-min-quality 80.0)
-
-  ;; Optional: Exclude certain modes where you want manual control
-  (setq dtrt-indent-mode-exclude-list '(org-mode)))
+  ;; Enable in SMIE modes to update `tab-width' and `evil-shift-width'.
+  (setq dtrt-indent-run-after-smie t
+        ;; Reduce scan threshold to prevent main-thread micro-stutters.
+        dtrt-indent-max-lines 2000
+        ;; Minimum confidence threshold for indentation detection.
+        dtrt-indent-min-quality 80.0
+        ;; Silence echo-area spam.
+        dtrt-indent-verbosity 0)
+  ;; Hook into `change-major-mode-after-body-hook' to guarantee execution
+  ;; AFTER the major mode is established, but BEFORE LSP servers spawn.
+  (add-hook 'change-major-mode-after-body-hook
+            (lambda ()
+              (unless (or (bound-and-true-p so-long-detected-p)
+                          (too-long-file-p)
+                          (apply #'derived-mode-p '(org-mode
+                                                    text-mode
+                                                    markdown-mode
+                                                    gfm-mode
+                                                    special-mode)))
+                (dtrt-indent-mode 1)))))
 #+end_src
 
 
+
 ** TODO Indent Bars
+- [ ] Match indent-bar colors with the depth of rainbow-delimiters colors
 #+begin_src emacs-lisp
 (use-package indent-bars
   :defer t
@@ -2059,6 +2201,8 @@ Renders visual feedback, window dividers, and modeline components. Provides spat
 Provides O(1) spatial traversal, in-buffer search tracking, and localized multi-cursor refactoring. Accelerates cursor movement and targeted text mutations.
 
 ** TODO Avy
+- [ ] Issue is avy replaces characters, so the original position to go to is difficult to select using a letter when the letter is blocking the view of the letter to go to.
+-
 Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy is inherently mode-agnostic, its entry points are mapped to Vim-style mnemonic prefixes (e.g., =s= for character jumps, =g s= for two-character jumps, =g w= for word jumps) within Evil's motion state. This preserves strict Vim muscle memory and operator-pending compatibility (e.g., =d g s= to delete up to a jumped character) while bypassing the linear scanning overhead of native Vim motions.
 #+begin_src emacs-lisp
 #+end_src
@@ -2066,6 +2210,7 @@ Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy
 
 ** TODO Anzu
 - [ ] Do I need to anything with other isearch functionalities in the rest of the emacs config to work with anzu?
+- [ ] Integrate anzu lsp-mode
 #+begin_src emacs-lisp
 (use-package anzu
   :bind (([remap query-replace] . anzu-query-replace)

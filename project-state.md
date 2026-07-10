@@ -28,6 +28,7 @@ The AI must strictly adhere to the following rules when generating or modifying 
   - NEVER use `:hook (elpaca-after-init . mode)` or `:hook (after-init . mode)` to activate global minor modes.
   - For built-in packages, invoke `(mode 1)` directly in `:config` (or `:init` if early interception is required) to eliminate artificial startup latency.
   - Reserve `elpaca-after-init-hook` strictly for cross-package state initialization.
+- **Header Status Keywords:** NEVER add or change a section (`*`) or subsection (`**`) header to `DONE` unless the user explicitly states that the corresponding section or subsection has been finalized. Default to `TODO` or preserve the existing status.
 
 ## The "Editor Behaviour" Paradigm Shift & Main Section Naming
 
@@ -36,8 +37,8 @@ In v5, the `Editor Behaviour` concept was massively restructured to become the c
 1. **Visual Chrome & UI Overlays (Group 1 - FULLY FINALIZED)**
 2. **Interactive Buffers & Redisplay Physics (Group 2 - FULLY FINALIZED)**
 3. **AST Parsing & Structural Typing (Group 3 - FULLY FINALIZED)**
-4. **Code Folding & Region Concealment (Group 4)**
-5. **Spatial Alignment & Whitespace Hygiene (Group 5)**
+4. **Code Folding & Region Concealment (Group 4 - FULLY FINALIZED)**
+5. **Spatial Alignment & Whitespace Hygiene (Group 5 - IN PROGRESS / TODO)**
 6. **Frame Chrome & Status Indicators (Group 6)**
 7. **Spatial Traversal & Inline Mutations (Group 7)**
 8. **Lexical Validation & Comparative Workflows (Group 8)**
@@ -52,6 +53,8 @@ The AI must NEVER suggest or implement the following patterns:
 - **No `combobulate`:** Fundamentally clashes with Evil's operator-pending grammar and causes keymap collisions.
 - **No `tree-edit`:** Relies on the legacy `elisp-tree-sitter` (`tsc`) engine and forked grammars, causing dual-engine memory bloat and fatal conflicts with native Emacs 30 `treesit`.
 - **No `expand-region`:** Replaced by `expreg`, which utilizes O(1) AST-aware pre-computation via native `treesit` instead of fragile regex/syntax-table heuristics.
+- **No `stripspace`:** Replaced by `ws-butler` to prevent Git diff pollution via modified-lines-only trimming.
+- **No `kirigami.el` / `origami.el`:** Heavy abstraction layers for folding. A custom transparent dispatcher is preferred for Vanilla Emacs.
 - **No `completion-in-region-function` overrides** (Corfu must remain strictly in-buffer).
 - **No `which-key` Embark Hacks** (use `vertico-multiform` grid).
 - **No `consult-projectile`** (obsolete).
@@ -61,6 +64,8 @@ The AI must NEVER suggest or implement the following patterns:
 - **No Nerd Icons inside `prettify-symbols-alist`:** Injecting PUA glyphs into buffer text causes mid-line font-fallback context switches and sub-pixel grid misalignments.
 - **No `elpaca-after-init` hooks for built-in global minor modes** (use direct `:config` invocation).
 - **No custom ElDoc backends for `show-paren`** (use native Emacs 29+ `'overlay` engine).
+- **No Package Merging:** NEVER merge multiple distinct packages into a single `#+begin_src` block or a single subsection header. Every package must reside in its own dedicated `**` subsection with its own isolated source block.
+- **No Scope Creep:** NEVER modify, rewrite, or touch subsections, packages, or code blocks that were not explicitly tasked in the current prompt.
 
 ## Edge Cases & Deferred Issues
 
@@ -69,13 +74,15 @@ The AI must NEVER suggest or implement the following patterns:
 - **Emacs 31 Unreleased APIs:** Features like `grep-edit-mode` or MPS Incremental GC (`igc`) must be wrapped in defensive runtime guards.
 - **`no-littering` API Typo:** Fixed hallucinated `no-littering-expand-var-directory-name` to the correct `no-littering-expand-var-file-name` (with trailing slash for directories) in `treesit` and `undo-fu-session` blocks.
 - **`treesit` Block Parenthesis Mismatch:** Fixed an extra closing parenthesis in the `treesit--build-grammar` advice that caused an `Invalid read syntax: )` crash during tangling.
+- **`treesit-fold` Ellipsis Injection:** Upstream `treesit-fold` (Jan 2025 refactor) natively inherits Emacs' built-in `truncate-string-ellipsis`. Custom overlay advice for ellipses is no longer required; global `setq` is sufficient.
 
 ## Architectural Decisions & Load-Order Physics (Session v9)
 
 - **Non-Lisp AST Stack Finalization (Group 3 Complete):** Rejected `smartparens`/`puni`, `combobulate`, `tree-edit`, and `expand-region`. Standardized on `elec-pair`, `evil-surround` + `evil-embrace`, `delete-pair`, `evil-textobj-tree-sitter`, `evil-ts-obj`, `treesit-navigate-thing`, and `expreg` for structural editing.
 - **`evil-ts-obj` Transient Isolation (Pillar 4):** Fulfills structural manipulation (slurp, barf, raise, extract). Default global bindings (`M-j`, `M-k`, etc.) are aggressively purged in `:config` to prevent collisions with `general.el` and `move-text`. Operators are strictly isolated within an `ar/ast-refactor-transient` menu routed to `SPC c s`.
-- **`expreg` & `treesit-thing` Native Integration:** Leveraged Emacs 30's native C-level `treesit` and `treesit-thing` APIs for O(1) region expansion and sibling hopping (`]s`, `[s`, `]x`, `[x`), entirely bypassing heavy query-based overhead.
+- **Code Folding Unification (Group 4 Complete):** Replaced fragmented folding with a unified dispatcher engine routing Evil's `z` prefix to `treesit-fold` (AST), `hideshow` (Regex/Fold-markers), `outline-minor-mode` (Prose fallback), and `vimish-fold` (Visual).
 - **`general.el` Eager Load-Order Physics:** Verified that `general.el` is synchronously and eagerly loaded (`:ensure (:wait t)`, `:demand t`) at the end of the Vim Emulation section. This mathematically guarantees that `general-define-key`, `ar/global-leader`, and `ar/local-leader` are globally available for all downstream deferred packages without requiring `with-eval-after-load` wrappers.
+- **Whitespace & Indentation Strategy (Group 5):** Rejected `stripspace` in favor of `ws-butler` (unobtrusive, modified-lines-only trimming to protect Git diffs). `dtrt-indent` is routed to `change-major-mode-after-body-hook` to prevent LSP race conditions.
 
 ## Pending Architectural Decisions & In-Code TODOs
 
@@ -93,20 +100,22 @@ The AI must NEVER suggest or implement the following patterns:
 - **Visual Chrome & UI Overlays (Editor Behaviour Group 1):** All 8 subsections finalized.
 - **Interactive Buffers & Redisplay Physics (Group 2):** All 5 subsections finalized.
 - **AST Parsing & Structural Typing (Group 3):** All 12 subsections finalized (`Treesit`, `Electric Pair`, `Evil Surround`, `Delete Pair`, `Show Paren Mode`, `Blink Matching Paren`, `Rainbow Delimiters`, `Evil Matchit`, `Evil Textobj Tree-Sitter`, `Evil TS Obj`, `Treesit Navigate Thing`, `Expreg`).
+- **Code Folding & Region Concealment (Group 4):** Unified dispatcher finalized (`Treesit Fold`, `Hideshow`, `Vimish Fold`).
 - **Vim Emulation:** All 12 subsections finalized.
+- **General Keybindings:** Core `use-package general` block finalized and eagerly loaded.
 
-### Partially Finalized Main Sections
+### Partially Finalized / In-Progress Main Sections
 
+- **Spatial Alignment & Whitespace Hygiene (Group 5):** `Indent Bars` is finalized. **`Whitespace`, `Ws-butler`, and `Dirt Indent` (Dtrt Indent) are strictly in `TODO` state** pending final user review and greenlight.
 - **Window:** 1 subsection finalized (`Windmove`). Pending: `Winner`, `Popper`.
-- **General Keybindings:** Elisp payload is heavily optimized and fully written, but main heading remains `TODO` pending final sign-off and integration testing.
-- **Completion Framework:** Elisp payload is heavily optimized and present, but main heading and subsections still marked `TODO` pending final sign-off.
 
 ### Untouched / Pending Main Sections (In Document Order)
 
-- **Editor Behaviour (Groups 4-8):** Require physical Org-mode restructuring and placeholder creation.
+- **Editor Behaviour (Groups 6-8):** Require physical Org-mode restructuring and placeholder creation.
 - **Version Control:** Magit, Forge, Diff-hl, Git-Timemachine, Transient Menu.
 - **Org Mode & Second Brain:** Dynamic Directory Structure, Per-Project Context, Denote, Org GTD, Org Agenda, Org Capture, Org Super Agenda.
 - **Workflow Management:** Dired, Dired Extensions, Dirvish, Project Management, iBuffer, Treemacs, Workspaces.
+- **Completion Framework:** Orderless, Vertico, Marginalia, Consult, Embark, Corfu, Cape, Dabbrev. (Code is heavily optimized and present, but main heading and subsections still marked `TODO` pending final sign-off).
 - **Development Tools:** LSP, Formatting, DAP, Syntax Checking, Direnv, Eldoc.
 - **Highlight TODOs:** hl-todo, consult-todo, magit-todos.
 - **Snippet Engine:** Yasnippet, File Templates.
@@ -117,10 +126,11 @@ The AI must NEVER suggest or implement the following patterns:
 
 ## Immediate Structural Action Plan for `config.org.txt`
 
-The Elisp payloads for Groups 1, 2, and 3 are fully finalized. The immediate next physical task requires structural reordering in `config.org`:
+The Elisp payloads for Groups 1, 2, 3, and 4 are fully finalized. Group 5 is currently under active review.
 
-1. **REORGANIZE ENTIRE CONFIG:** Physically reorganize the whole `config.org` file to match the 8 Logical Groups defined in `editor-architecture.md`. Create the missing main section headers (`* Code Folding & Region Concealment`, etc.) and move the existing `** DONE` and `** TODO` subsections into their correct architectural pillars.
-2. **Delete Legacy Bloat:** Delete the massive, multi-language regex `* TODO Prettify Symbols` main section from the bottom of the file (it has been replaced by the simplified Group 1 block).
+1. **Finalize Group 5:** Await user greenlight to mark `Whitespace`, `Ws-butler`, and `Dirt Indent` as `DONE` and inject the finalized payloads.
+2. **REORGANIZE ENTIRE CONFIG:** Physically reorganize the whole `config.org` file to match the 8 Logical Groups defined in `editor-architecture.md`. Create the missing main section headers (`* Frame Chrome & Status Indicators`, etc.) and move the existing `** DONE` and `** TODO` subsections into their correct architectural pillars.
+3. **Delete Legacy Bloat:** Delete the massive, multi-language regex `* TODO Prettify Symbols` main section from the bottom of the file (it has been replaced by the simplified Group 1 block).
 
 ## Remaining Work & Questions (Checklists)
 
