@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.4
+#+VERSION: 0.5
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -2345,7 +2345,9 @@ Provides O(1) spatial traversal, in-buffer search tracking, and localized multi-
 
 ** TODO Avy
 - [ ] Issue is avy replaces characters when it is active, so the original position to go to is difficult to select using a letter when the letter is blocking the view of the letter to go to.
--
+- [ ] What are the common productivity related issues most people face when using emacs?
+- [ ] Find the modern alternatives of avy
+
 Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy is inherently mode-agnostic, its entry points are mapped to Vim-style mnemonic prefixes (e.g., =s= for character jumps, =g s= for two-character jumps, =g w= for word jumps) within Evil's motion state. This preserves strict Vim muscle memory and operator-pending compatibility (e.g., =d g s= to delete up to a jumped character) while bypassing the linear scanning overhead of native Vim motions.
 #+begin_src emacs-lisp
 #+end_src
