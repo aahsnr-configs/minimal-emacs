@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.3
+#+VERSION: 0.4
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -212,6 +212,7 @@ Provides a fallback for text operations lacking an explicit region."
       (buffer-substring-no-properties (region-beginning) (region-end))
     (thing-at-point 'symbol t)))
 #+end_src
+
 
 ** DONE Constants
 System and Emacs version constants. Utilizes =user-uid= for reliable root privilege detection in containerized and sudo environments, and =version<= for semantic version compatibility across Emacs 29, 30, and 31.
@@ -544,7 +545,6 @@ Centralizes user identity variables for Git commits, Org-mode exports, and autom
 
 ** DONE Title
 Configures the window and icon title bars to display the current buffer name using the =%b= format specifier.
-
 #+begin_src emacs-lisp
 (setq frame-title-format '("Emacs - %b")
       icon-title-format frame-title-format)
@@ -552,18 +552,16 @@ Configures the window and icon title bars to display the current buffer name usi
 
 
 * DONE Vim Emulation
-
 ** DONE Undo Fu
 Linear undo/redo engine with persistent session history. Replaces branching undo to prevent history corruption. Routes state to =var/undo-fu-session/= via =no-littering=, excludes encrypted and transient files to prevent metadata leakage, hashes deep paths to bypass 255-character OS limits, and applies conditional =zstd=/=gzip= compression.
 #+begin_src emacs-lisp
-(use-package undo-fu
-  :defer t)
+(use-package undo-fu :defer t)
 
 (use-package undo-fu-session
   :hook (elpaca-after-init . undo-fu-session-global-mode)
   :custom
   ;; Route persistent undo history to the no-littering var directory.
-  (undo-fu-session-directory (no-littering-expand-var-directory-name "undo-fu-session/"))
+  (undo-fu-session-directory (no-littering-expand-var-file-name "undo-fu-session/"))
   ;; Exclude encrypted and transient Git files to prevent metadata leakage and I/O errors.
   ;; Strict \\' regex anchors prevent false positives on directory names.
   (undo-fu-session-incompatible-files '("\\.gpg\\'" "/COMMIT_EDITMSG\\'" "/git-rebase-todo\\'"))
@@ -582,7 +580,6 @@ Linear undo/redo engine with persistent session history. Replaces branching undo
   (setq undo-fu-session-make-file-name-function #'ar/undo-fu-session-hash-path))
 #+end_src
 
-
 ** DONE Goto Chg
 Tracks text mutations (Changelist) orthogonal to the Jump List. Powers Evil's native =COUNT=-aware =g;= and =g,= temporal navigation.
 #+begin_src emacs-lisp
@@ -593,7 +590,6 @@ Tracks text mutations (Changelist) orthogonal to the Jump List. Powers Evil's na
   ;; Spatial threshold to group micro-edits into logical navigation blocks.
   (glc-default-span 16))
 #+end_src
-
 
 ** DONE Evil
 Core Vim emulation engine. Provides modal editing, operator-pending motions, and ex commands. Configured for strict Vim parity, state-dependent cursor shapes, and native minibuffer history cycling. Foundational dependency; loaded synchronously to prevent downstream keybinding voids.
@@ -659,7 +655,6 @@ Core Vim emulation engine. Provides modal editing, operator-pending motions, and
   (evil-set-initial-state 'dashboard-mode 'normal))
 #+end_src
 
-
 ** DONE Evil Collection
 Injects standardized Vim bindings into non-text buffers. Enables Unimpaired bracket navigation and unified LSP reference jumping. Minibuffer integration is strictly omitted to protect the Vertico type-to-filter paradigm.
 #+begin_src emacs-lisp
@@ -678,7 +673,6 @@ Injects standardized Vim bindings into non-text buffers. Enables Unimpaired brac
   (evil-collection-init))
 #+end_src
 
-
 ** DONE Evil Commentary
 Provides =gc= and =gcc= operators via native APIs. Supersedes custom commenting logic.
 #+begin_src emacs-lisp
@@ -688,7 +682,6 @@ Provides =gc= and =gcc= operators via native APIs. Supersedes custom commenting 
   ;; Register gc/gcc operators.
   (evil-commentary-mode 1))
 #+end_src
-
 
 ** DONE Evil Multiedit
 Wraps =iedit= in a dedicated Evil state for localized multi-cursor refactoring.
@@ -703,8 +696,6 @@ Wraps =iedit= in a dedicated Evil state for localized multi-cursor refactoring.
   (evil-multiedit-default-keybinds))
 #+end_src
 
-
-
 ** DONE Evil Args
 Provides =a= text objects for function arguments.
 #+begin_src emacs-lisp
@@ -716,7 +707,6 @@ Provides =a= text objects for function arguments.
   (define-key evil-outer-text-objects-map "a" 'evil-outer-arg))
 #+end_src
 
-
 ** DONE Evil Numbers
 Increments and decrements numbers at point. Global bindings delegated to =general.el=.
 #+begin_src emacs-lisp
@@ -724,7 +714,6 @@ Increments and decrements numbers at point. Global bindings delegated to =genera
   :defer t
   :commands (evil-numbers/inc-at-pt evil-numbers/dec-at-pt))
 #+end_src
-
 
 ** DONE Evil Exchange
 Swaps two regions of text via the =gx= motion.
@@ -735,7 +724,6 @@ Swaps two regions of text via the =gx= motion.
   ;; Register the gx motion and gX cancel motion.
   (evil-exchange-install))
 #+end_src
-
 
 ** DONE Evil Goggles
 Provides visual feedback pulses for editing operations. Inherits theme faces for visual consistency.
@@ -753,7 +741,6 @@ Provides visual feedback pulses for editing operations. Inherits theme faces for
   (evil-goggles-mode 1))
 #+end_src
 
-
 ** DONE Evil Lion
 Aligns text regions via the =gl= operator.
 #+begin_src emacs-lisp
@@ -763,7 +750,6 @@ Aligns text regions via the =gl= operator.
   ;; Register the gl alignment operator.
   (evil-lion-mode 1))
 #+end_src
-
 
 ** DONE Smart Comment Continuation
 Intercepts Evil's =o= and =O= operators to continue comment lines natively. Utilizes bounded O(1) line searches to verify comment presence, ensure correct prefix propagation, and guarantee precise cursor placement.
@@ -808,6 +794,27 @@ Intercepts Evil's =o= and =O= operators to continue comment lines natively. Util
 #+end_src
 
 
+* DONE General
+Centralized keybinding router establishing global and local leader prefixes for modal state routing. Synchronously loaded to guarantee macro availability prior to downstream deferred package evaluations.
+#+begin_src emacs-lisp
+(use-package general
+  :ensure (:wait t)
+  :demand t
+  :after evil
+  :config
+  ;; Establishes the global leader prefix (SPC) for cross-buffer and universal commands.
+  (general-create-definer ar/global-leader
+    :states '(normal insert visual emacs)
+    :prefix "SPC"
+    :global-prefix "C-SPC")
+
+  ;; Establishes the local leader prefix (SPC m) for major-mode-specific commands.
+  (general-create-definer ar/local-leader
+    :states '(normal insert visual emacs)
+    :prefix "SPC m"
+    :global-prefix "C-SPC m"))
+#+end_src
+
 
 * DONE Visual Overlays
 Establishes the visual baseline, typography, and foundational UI overlays. Manages theme rendering, glyph substitution, and childframe APIs required by downstream packages.
@@ -841,7 +848,6 @@ Establishes the foundational child frame API and global border theming. Configur
             (- parent-height posframe-height (* 2 font-height))))))
 #+end_src
 
-
 ** DONE Nerd Icons
 Foundational glyph substitution and icon API. Eagerly loaded to prevent void-function errors in downstream UI packages lacking strict dependency declarations.
 #+begin_src emacs-lisp
@@ -853,7 +859,6 @@ Foundational glyph substitution and icon API. Eagerly loaded to prevent void-fun
   ;; Enables colorized glyphs; upstream fallbacks handle terminal degradation.
   (nerd-icons-color-icons t))
 #+end_src
-
 
 ** DONE Fonts
 Configures global typography and baseline monospaced faces. Utilizes server-frame hooks for daemon-safe inheritance and integer line-spacing to prevent sub-pixel artifacts.
@@ -879,7 +884,6 @@ Configures global typography and baseline monospaced faces. Utilizes server-fram
 (setq font-lock-maximum-decoration t)
 #+end_src
 
-
 ** DONE Doom Themes
 Applies the Tokyo Night palette and integrates downstream UI enhancements. Synchronously loaded to prevent initial frame Flash of Unstyled Content (FOUC).
 #+begin_src emacs-lisp
@@ -899,7 +903,6 @@ Applies the Tokyo Night palette and integrates downstream UI enhancements. Synch
     (doom-themes-org-config)))
 #+end_src
 
-
 ** DONE Solaire Mode
 Swaps background faces to distinguish side-windows and popups. Deferred until the theme engine finalizes to prevent mapping race conditions.
 #+begin_src emacs-lisp
@@ -910,7 +913,6 @@ Swaps background faces to distinguish side-windows and popups. Deferred until th
   (solaire-global-mode +1))
 #+end_src
 
-
 ** DONE Transient
 Foundational API for ephemeral keybinding menus. Strictly deferred to respect downstream evaluation wrappers and configured for variable-pitch grid alignment.
 #+begin_src emacs-lisp
@@ -920,7 +922,6 @@ Foundational API for ephemeral keybinding menus. Strictly deferred to respect do
   ;; Guarantees rectangular grid alignment when invoked inside proportional Org buffers.
   (transient-align-variable-pitch t))
 #+end_src
-
 
 ** DONE Which Key
 Keystroke discovery UI overlay. Renders prefix bindings in the echo area with alphabetical sorting and optimized pagination.
@@ -943,7 +944,6 @@ Keystroke discovery UI overlay. Renders prefix bindings in the echo area with al
   :config
   (which-key-mode 1))
 #+end_src
-
 
 ** DONE Prettify Symbols & Ligatures
 Delegates operator ligatures to HarfBuzz via ligature.el and reserves Elisp substitution strictly for semantic keywords.
@@ -970,10 +970,8 @@ Delegates operator ligatures to HarfBuzz via ligature.el and reserves Elisp subs
 #+end_src
 
 
-
 * DONE Interactive Buffers
 Governs fundamental buffer I/O, terminal emulation, and scroll rendering. Dictates how Emacs processes asynchronous input and refreshes the display matrix.
-
 
 ** DONE Autorevert
 Synchronizes buffers with external disk modifications via native OS file notifications. Suppresses echo-area logging and avoids interval polling to eliminate I/O overhead.
@@ -1357,10 +1355,8 @@ Delegates hardware input to =ultra-scroll= and keyboard interpolation to =good-s
 #+end_src
 
 
-* TODO Structural Typing and Parsing
+* DONE Structural Typing and Parsing
 Establishes the C-level parsing foundation and non-Lisp typing layer. Provides AST-aware text objects, boundary wrapping, and deep node refactoring.
-
-
 
 ** DONE Treesit
 Configures the native C-level AST engine and routes grammar binaries to the =no-littering= var directory. Implements defensive version-forking to support Emacs 30 manual remapping and Emacs 31 native auto-installation.
@@ -1372,7 +1368,7 @@ Configures the native C-level AST engine and routes grammar binaries to the =no-
   :init
   ;; Route grammar binaries to the no-littering var directory.
   (defvar ar/treesit-grammar-dir
-    (no-littering-expand-var-directory-name "tree-sitter/")
+    (no-littering-expand-var-file-name "tree-sitter/")
     "Target directory for compiled tree-sitter grammars.")
   (unless (file-exists-p ar/treesit-grammar-dir)
     (make-directory ar/treesit-grammar-dir t))
@@ -1380,7 +1376,6 @@ Configures the native C-level AST engine and routes grammar binaries to the =no-
   :config
   ;; Maximize syntax highlighting decoration across all AST buffers.
   (setq treesit-font-lock-level 4)
-
   ;; Additive merging of upstream C-source repositories.
   (dolist (source '((python "https://github.com/tree-sitter/tree-sitter-python")
                     (bash "https://github.com/tree-sitter/tree-sitter-bash")
@@ -1402,14 +1397,12 @@ Configures the native C-level AST engine and routes grammar binaries to the =no-
                     (typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
                     (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")))
     (setf (alist-get (car source) treesit-language-source-alist) (cdr source)))
-
   ;; Emacs 31+ native auto-installation and mode routing.
   (when emacs/>=31p
     (when (boundp 'treesit-auto-install-grammar)
       (setq treesit-auto-install-grammar t))
     (when (boundp 'treesit-enabled-modes)
       (setq treesit-enabled-modes t)))
-
   ;; Emacs 30 manual major mode remapping and install path enforcement.
   (unless emacs/>=31p
     (dolist (remap '((python-mode . python-ts-mode)
@@ -1427,15 +1420,13 @@ Configures the native C-level AST engine and routes grammar binaries to the =no-
                      (c++-mode . c++-ts-mode)
                      (java-mode . java-ts-mode)))
       (setf (alist-get (car remap) major-mode-remap-alist) (cdr remap)))
-
     ;; Force manual grammar installations to the no-littering directory.
     (defun ar/treesit--install-to-var-dir (fn lang &optional out-dir &rest args)
       "Force tree-sitter grammar installation to `ar/treesit-grammar-dir'."
       (apply fn lang (or out-dir ar/treesit-grammar-dir) args))
     (when (>= emacs-major-version 30)
       (advice-add #'treesit-install-language-grammar :around #'ar/treesit--install-to-var-dir)
-      (advice-add #'treesit--build-grammar :around #'ar/treesit--install-to-var-dir))))
-
+      (advice-add #'treesit--build-grammar :around #'ar/treesit--install-to-var-dir)))
   ;; Prevent specific ts-modes from clobbering global file associations.
   (dolist (mode '(python-ts-mode csharp-ts-mode))
     (advice-add mode :around
@@ -1443,9 +1434,6 @@ Configures the native C-level AST engine and routes grammar binaries to the =no-
                   (let (auto-mode-alist interpreter-mode-alist)
                     (apply fn args))))))
 #+end_src
-
-
-
 
 ** DONE Electric Pair
 Native auto-pairing, O(1) prose formatting, and AST-aware re-indentation.
@@ -1511,7 +1499,6 @@ Strictly confined to `prog-mode' derivatives to prevent prose collision."
   (add-hook 'electric-indent-functions #'ar/electric-indent-words-fn))
 #+end_src
 
-
 ** DONE Evil Surround
 Provides retro-active Vim-style wrapping via =ys=, =cs=, and =ds= operators. Integrates =evil-embrace= to extend the base alist with regex-aware, multi-character, and asymmetric structural pairs for prose and LaTeX environments.
 #+begin_src emacs-lisp
@@ -1542,8 +1529,6 @@ Provides retro-active Vim-style wrapping via =ys=, =cs=, and =ds= operators. Int
   (add-hook 'markdown-mode-hook #'ar/embrace-markdown-setup)
   (add-hook 'gfm-mode-hook #'ar/embrace-markdown-setup))
 #+end_src
-
-
 
 ** DONE Delete Pair
 Configures the native =delete-pair= engine and provides an O(1) DWIM wrapper for adjacent, string, and nested pair deletion, strictly confined to programming modes.
@@ -1588,8 +1573,6 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
         (scan-error (user-error "Not inside a deletable pair")))))))
 #+end_src
 
-
-
 ** DONE Show Paren Mode
 Native delimiter highlighting and Emacs 29+ overlay context rendering.
 #+begin_src emacs-lisp
@@ -1615,32 +1598,43 @@ Native delimiter highlighting and Emacs 29+ overlay context rendering.
     (setq show-paren-not-in-comments-or-strings t)))
 #+end_src
 
-** TODO Blink Matching Paren [built-in]
+** DONE Blink Matching Paren
+Event-driven visual feedback upon closing delimiter insertion. Search limits are disabled to guarantee accuracy in massive buffers.
+#+begin_src emacs-lisp
+;; Preloaded `simple.el` variables; raw `setq` prevents startup latency.
+(setq blink-matching-paren t
+      blink-matching-paren-distance nil ; Unbounded search for deep AST blocks.
+      blink-matching-delay 0.1)         ; Prevents main-thread micro-stutters.
 
+;; Emacs 30+: Renders off-screen matches as buffer overlays, protecting the echo area.
+(when (boundp 'blink-matching-paren-highlight-offscreen)
+  (setq blink-matching-paren-highlight-offscreen t))
+#+end_src
 
-
-** TODO Rainbow Delimiters
-
+** DONE Rainbow Delimiters
+Depth-based delimiter colorization. Activation is confined to code buffers and aborted in massive files to prevent main-thread blocking.
 #+begin_src emacs-lisp
 (use-package rainbow-delimiters
   :defer t
-  :hook ((LaTeX-mode . rainbow-delimiters-mode)
-         (prog-mode . rainbow-delimiters-mode))
+  :custom-face
+  ;; Tokyo Night depth mapping.
+  (rainbow-delimiters-depth-1-face ((t (:foreground "#7aa2f7"))))
+  (rainbow-delimiters-depth-2-face ((t (:foreground "#e0af68"))))
+  (rainbow-delimiters-depth-3-face ((t (:foreground "#9ece6a"))))
+  (rainbow-delimiters-depth-4-face ((t (:foreground "#1abc9c"))))
+  (rainbow-delimiters-depth-5-face ((t (:foreground "#bb9af7"))))
+  (rainbow-delimiters-depth-6-face ((t (:foreground "#9d7cd8"))))
+  (rainbow-delimiters-depth-7-face ((t (:foreground "#ff9e64"))))
+  (rainbow-delimiters-depth-8-face ((t (:foreground "#f7768e"))))
+  (rainbow-delimiters-depth-9-face ((t (:foreground "#7aa2f7"))))
+  :hook ((prog-mode . rainbow-delimiters-mode)
+         (LaTeX-mode . rainbow-delimiters-mode))
   :config
-  (custom-set-faces
-   '(rainbow-delimiters-depth-1-face ((t (:foreground "#7aa2f7"))))
-   '(rainbow-delimiters-depth-2-face ((t (:foreground "#e0af68"))))
-   '(rainbow-delimiters-depth-3-face ((t (:foreground "#9ece6a"))))
-   '(rainbow-delimiters-depth-4-face ((t (:foreground "#1abc9c"))))
-   '(rainbow-delimiters-depth-5-face ((t (:foreground "#bb9af7"))))
-   '(rainbow-delimiters-depth-6-face ((t (:foreground "#9d7cd8"))))
-   '(rainbow-delimiters-depth-7-face ((t (:foreground "#ff9e64"))))
-   '(rainbow-delimiters-depth-8-face ((t (:foreground "#f7768e"))))
-   '(rainbow-delimiters-depth-9-face ((t (:foreground "#7aa2f7"))))))
+  ;; Aborts activation in massive buffers; bypasses guard to allow explicit deactivation.
+  (define-advice rainbow-delimiters-mode (:before-while (&optional arg) guard-large-files)
+    (or (and arg (< (prefix-numeric-value arg) 1))
+        (not (too-long-file-p)))))
 #+end_src
-
-
-
 
 ** DONE Evil Matchit
 Extends =%= motion to jump across semantic blocks (LaTeX, HTML, code).
@@ -1652,14 +1646,170 @@ Extends =%= motion to jump across semantic blocks (LaTeX, HTML, code).
   (global-evil-matchit-mode 1))
 #+end_src
 
+** DONE Evil Textobj Tree-Sitter
+Maps native Tree-sitter AST nodes to Evil operator-pending text objects and Unimpaired-style goto motions. Which-key annotations are sanitized to prevent UI clutter.
+#+begin_src emacs-lisp
+(use-package evil-textobj-tree-sitter
+  :defer t
+  :after evil
+  :config
+  ;; Maps AST nodes directly to Evil's native operator-pending text-object keymaps.
+  (define-key evil-inner-text-objects-map "f" (evil-textobj-tree-sitter-get-textobj "function.inner"))
+  (define-key evil-outer-text-objects-map "f" (evil-textobj-tree-sitter-get-textobj "function.outer"))
+  (define-key evil-inner-text-objects-map "F" (evil-textobj-tree-sitter-get-textobj "call.inner"))
+  (define-key evil-outer-text-objects-map "F" (evil-textobj-tree-sitter-get-textobj "call.outer"))
+  (define-key evil-inner-text-objects-map "C" (evil-textobj-tree-sitter-get-textobj "class.inner"))
+  (define-key evil-outer-text-objects-map "C" (evil-textobj-tree-sitter-get-textobj "class.outer"))
+  (define-key evil-outer-text-objects-map "c" (evil-textobj-tree-sitter-get-textobj "comment.outer"))
+  (define-key evil-inner-text-objects-map "v" (evil-textobj-tree-sitter-get-textobj "conditional.inner"))
+  (define-key evil-outer-text-objects-map "v" (evil-textobj-tree-sitter-get-textobj "conditional.outer"))
+  (define-key evil-inner-text-objects-map "l" (evil-textobj-tree-sitter-get-textobj "loop.inner"))
+  (define-key evil-outer-text-objects-map "l" (evil-textobj-tree-sitter-get-textobj "loop.outer"))
+  (define-key evil-inner-text-objects-map "a" (evil-textobj-tree-sitter-get-textobj '("parameter.inner" "call.inner")))
+  (define-key evil-outer-text-objects-map "a" (evil-textobj-tree-sitter-get-textobj '("parameter.outer" "call.outer")))
 
-** TODO Evil Textobj Tree-Sitter
+  ;; Dynamically registers named interactive commands for Unimpaired-style bracket navigation.
+  (defun ar/ts-register-goto (key node &optional previous)
+    (let* ((suffix (if previous "prev" "next"))
+           (cmd-name (intern (format "ar/ts-goto-%s-%s"
+                                     (string-replace "." "-" node)
+                                     suffix)))
+           (doc (format "Jump to %s %s node." (if previous "previous" "next") node)))
+      (defalias cmd-name
+        `(lambda ()
+           (interactive)
+           (evil-textobj-tree-sitter-goto-textobj ,node ,previous))
+        doc)
+      (general-define-key
+       :states '(normal visual motion)
+       key cmd-name)))
 
-** TODO Treesit Navigate Thing
+  (ar/ts-register-goto "]f" "function.outer")
+  (ar/ts-register-goto "[f" "function.outer" t)
+  (ar/ts-register-goto "]F" "call.outer")
+  (ar/ts-register-goto "[F" "call.outer" t)
+  (ar/ts-register-goto "]C" "class.outer")
+  (ar/ts-register-goto "[C" "class.outer" t)
+  (ar/ts-register-goto "]c" "comment.outer")
+  (ar/ts-register-goto "[c" "comment.outer" t)
+  (ar/ts-register-goto "]v" "conditional.outer")
+  (ar/ts-register-goto "[v" "conditional.outer" t)
+  (ar/ts-register-goto "]l" "loop.outer")
+  (ar/ts-register-goto "[l" "loop.outer" t)
+  (ar/ts-register-goto "]a" "parameter.outer")
+  (ar/ts-register-goto "[a" "parameter.outer" t)
 
-** TODO Expreg
+  ;; Strips verbose package prefixes and .inner/.outer suffixes from Which-Key popups.
+  (with-eval-after-load 'which-key
+    (add-to-list 'which-key-replacement-alist
+                 '(("" . "\\`+?evil-textobj-tree-sitter-function--\\(.*\\)\\(?:\\.inner\\|\\.outer\\)") . (nil . "\\1")))))
+#+end_src
 
-** TODO Tree Edit
+** DONE Evil TS Obj
+Provides AST-aware structural manipulation via the Emacs 30 =treesit-thing= API. Refactoring operators are isolated within a Transient menu to prevent global keymap collisions.
+#+begin_src emacs-lisp
+(use-package evil-ts-obj
+  :ensure (evil-ts-obj :host github
+                       :repo "dvzubarev/evil-ts-obj")
+  :if emacs/>=30p
+  :defer t
+  :after evil
+  :hook ((prog-mode . evil-ts-obj-mode)
+         (LaTeX-mode . evil-ts-obj-mode))
+  :config
+  ;; Aborts activation in massive buffers; bypasses guard to allow explicit deactivation.
+  (define-advice evil-ts-obj-mode (:before-while (&optional arg) guard-large-files)
+    (or (and arg (< (prefix-numeric-value arg) 1))
+        (not (too-long-file-p))))
+
+  ;; Purges default bindings to prevent collisions with `general.el` and standard motions.
+  (dolist (key '("M-j" "M-k" "M-f" "M-b" "M-h" "M-l" "M-r" "M-s" "M-e" "M-a"
+                 "zr" "ze" "zt" "zx" "(" ")" "[" "]" "{" "}"))
+    (define-key evil-ts-obj-mode-map (kbd key) nil))
+
+  ;; Isolates structural mutations to prevent accidental execution during rapid typing.
+  (with-eval-after-load 'transient
+    (defun ar/ast-refactor-title ()
+      (concat
+       (if (fboundp 'nerd-icons-codicon)
+           (nerd-icons-codicon "nf-cod-symbol_structure" :face 'transient-heading :v-adjust 0.02)
+         "")
+       (propertize " AST Refactor" 'face 'transient-heading)))
+
+    (transient-define-prefix ar/ast-refactor-transient ()
+      "AST Structural Refactoring"
+      [:description ar/ast-refactor-title
+       ["Drag & Swap"
+        ("j" "Drag Down" evil-ts-obj-drag-down :transient t)
+        ("k" "Drag Up" evil-ts-obj-drag-up :transient t)
+        ("J" "Swap Down" evil-ts-obj-swap-dwim-down :transient t)
+        ("K" "Swap Up" evil-ts-obj-swap-dwim-up :transient t)]
+       ["Extract & Inject"
+        ("l" "Extract Out" evil-ts-obj-extract-down-dwim :transient t)
+        ("h" "Extract In" evil-ts-obj-extract-up-dwim :transient t)
+        ("s" "Inject Down" evil-ts-obj-inject-down-dwim :transient t)
+        ("S" "Inject Up" evil-ts-obj-inject-up-dwim :transient t)]
+       ["Mutate"
+        ("r" "Raise" evil-ts-obj-raise-dwim :transient t)
+        ("c" "Clone After" evil-ts-obj-clone-after-dwim :transient t)
+        ("C" "Clone Before" evil-ts-obj-clone-before-dwim :transient t)
+        (">" "Slurp" evil-ts-obj-slurp :transient t)
+        ("<" "Barf" evil-ts-obj-barf :transient t)
+        ("<escape>" "" transient-quit-one :format " ")]])))
+
+;; TODO Inject the following line into the `general.el` "c" (code) prefix block:
+;; "c s" '(ar/ast-refactor-transient :wk "Structure")
+#+end_src
+
+** DONE Treesit Navigate Thing
+Exposes the Emacs 30 =treesit-thing= API via Unimpaired bracket motions. Provides O(1) C-level AST sibling traversal natively.
+#+begin_src emacs-lisp
+;; Emacs 30+: Built-in `-ts-mode` modes natively invoke `treesit-major-mode-setup`,
+;; automatically overriding `forward-sexp-function` and `forward-sentence-function`.
+;; Evil's `evil-forward-sexp` inherits this AST-awareness without manual rebinding.
+(when emacs/>=30p
+  (general-define-key
+   :states '(normal visual motion)
+   "]s" (lambda () (interactive) (ignore-errors (treesit-thing-next 'sentence)))
+   "[s" (lambda () (interactive) (ignore-errors (treesit-thing-prev 'sentence)))
+   "]x" (lambda () (interactive) (ignore-errors (treesit-thing-next 'sexp)))
+   "[x" (lambda () (interactive) (ignore-errors (treesit-thing-prev 'sexp)))))
+#+end_src
+
+** DONE Expreg
+Provides O(1) AST-aware visual selection expansion via the native =treesit= engine. Integrates with =repeat-mode= for modifier-less tapping and preserves cursor origin on contraction.
+#+begin_src emacs-lisp
+(use-package expreg
+  :if (treesit-available-p)
+  :defer t
+  ;; Registers autoloads to prevent `void-function` crashes from deferred `general-define-key`.
+  :commands (expreg-expand expreg-contract)
+  :config
+  ;; Restores exact cursor origin upon `C-g` (keyboard-quit) to prevent spatial drift.
+  (setq expreg-restore-point-on-quit t)
+
+  ;; Emacs 29+ `repeat-mode` integration for modifier-less expansion loops.
+  (defvar-keymap expreg-repeat-map
+    :doc "Keymap for repeating expreg commands."
+    "+" #'expreg-expand
+    "=" #'expreg-expand
+    "-" #'expreg-contract
+    "_" #'expreg-contract)
+  (put 'expreg-expand 'repeat-map 'expreg-repeat-map)
+  (put 'expreg-contract 'repeat-map 'expreg-repeat-map)
+
+  ;; Visual State Routing: Hijacks `v` for seamless AST expansion loops.
+  ;; Preserves `V` for Visual-Line mode and `C-v` for Visual-Block mode.
+  (general-define-key
+   :states 'visual
+   "v" #'expreg-expand)
+
+  ;; Global Fallback: Mapped to `C-M-+` and `C-M--` to avoid clobbering text-scale bindings.
+  (general-define-key
+   :states '(normal visual motion)
+   "C-M-+" #'expreg-expand
+   "C-M--" #'expreg-contract))
+#+end_src
 
 
 * TODO Folding
@@ -1718,6 +1868,7 @@ Enforces spatial alignment, trailing character cleanup, and indentation guides. 
 
 
 ** TODO Dirt Indent
+- [ ] Look at indent module from doom emacs
 #+begin_src emacs-lisp
 (use-package dtrt-indent
   :defer t
@@ -8300,3 +8451,5 @@ This section raises questions if some features, capabilities, etc can be achieve
 - [ ] Are there any other evil related packages that can useful for my workflow?
 - [ ] Is there a way to execute nerd-icons-install-fonts during intial emacs setup using elpaca?
 - [ ] How do I get history evil commands in the echo area like doom emacs?
+- [ ] How can I make the echo area useful? Do this at the very end of the configuration
+- [ ] How to open links from org buffers by pressing enter and using the correct browser?
