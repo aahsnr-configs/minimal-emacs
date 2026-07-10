@@ -818,6 +818,13 @@ Centralized keybinding router establishing global and local leader prefixes for 
     :states '(normal insert visual emacs)
     :prefix "SPC m"
     :global-prefix "C-SPC m"))
+
+(ar/global-leader
+ "SPC" '(execute-extended-command :wk "M-x")
+ ":" '(eval-expression :wk "Eval")
+ "u" '(universal-argument :wk "Universal arg")
+ "!" '(shell-command :wk "Shell cmd")
+ "X" '(org-capture :wk "Org capture"))
 #+end_src
 
 
@@ -1719,18 +1726,18 @@ Provides AST-aware structural manipulation via the Emacs 30 =treesit-thing= API.
   :if emacs/>=30p
   :defer t
   :after evil
-  :hook ((prog-mode . evil-ts-obj-mode)
+  :hook ((prog-mode . ar/evil-ts-obj-maybe-enable)
          (LaTeX-mode . evil-ts-obj-mode))
+  :init
+  ;; Guards activation against Lisp modes to prevent missing grammar warnings.
+  (defun ar/evil-ts-obj-maybe-enable ()
+    (unless (derived-mode-p 'lisp-mode 'emacs-lisp-mode 'lisp-interaction-mode 'lisp-data-mode)
+      (evil-ts-obj-mode 1)))
   :config
   ;; Aborts activation in massive buffers; bypasses guard to allow explicit deactivation.
   (define-advice evil-ts-obj-mode (:before-while (&optional arg) guard-large-files)
     (or (and arg (< (prefix-numeric-value arg) 1))
         (not (too-long-file-p))))
-
-  ;; Purges default bindings to prevent collisions with `general.el` and standard motions.
-  (dolist (key '("M-j" "M-k" "M-f" "M-b" "M-h" "M-l" "M-r" "M-s" "M-e" "M-a"
-                 "zr" "ze" "zt" "zx" "(" ")" "[" "]" "{" "}"))
-    (define-key evil-ts-obj-mode-map (kbd key) nil))
 
   ;; Isolates structural mutations to prevent accidental execution during rapid typing.
   (with-eval-after-load 'transient
@@ -1761,9 +1768,6 @@ Provides AST-aware structural manipulation via the Emacs 30 =treesit-thing= API.
         (">" "Slurp" evil-ts-obj-slurp :transient t)
         ("<" "Barf" evil-ts-obj-barf :transient t)
         ("<escape>" "" transient-quit-one :format " ")]])))
-
-;; TODO Inject the following line into the `general.el` "c" (code) prefix block:
-;; "c s" '(ar/ast-refactor-transient :wk "Structure")
 #+end_src
 
 ** DONE Treesit Navigate Thing
@@ -1909,7 +1913,12 @@ Manages structural and textual collapsing mechanisms. Unifies AST-aware, outline
 (use-package treesit-fold
   :if (treesit-available-p)
   :defer t
-  :hook ((prog-mode text-mode conf-mode) . treesit-fold-mode)
+  :hook ((prog-mode text-mode conf-mode) . ar/treesit-fold-maybe-enable)
+  :init
+  ;; Guards activation against Lisp modes to prevent missing grammar warnings, strictly enforcing the "Non-Lisp AST Stack" architectural boundary.
+  (defun ar/treesit-fold-maybe-enable ()
+    (unless (derived-mode-p 'lisp-mode 'emacs-lisp-mode 'lisp-interaction-mode 'lisp-data-mode)
+      (treesit-fold-mode 1)))
   :config
   (global-treesit-fold-indicators-mode 1)
   ;; Lower priority prevents fringe indicator collisions with diff-hl/flymake.
@@ -2051,7 +2060,10 @@ AST-aware vertical guides synchronizing depth colorization with rainbow-delimite
              (frame-parameter nil 'parent-frame)
              (bound-and-true-p org-indent-mode)
              (string-prefix-p " *org-src-fontification:" (buffer-name))
-             (derived-mode-p 'org-mode))))
+             (derived-mode-p 'org-mode
+                             'lisp-mode
+                             'emacs-lisp-mode
+                             'lisp-interaction-mode 'lisp-data-mode))))
   (defun ar/indent-bars-maybe-enable ()
     "Enable indent-bars-mode if conditions are met."
     (when (ar/indent-bars-should-enable-p)
@@ -2320,6 +2332,10 @@ Native Emacs 29+ face-remapping engine for global typography scaling. Prevents P
  "C-<wheel-up>" #'ar/global-zoom-in
  "C-<wheel-down>" #'ar/global-zoom-out)
 #+end_src
+
+
+
+
 
 
 
@@ -8097,13 +8113,6 @@ Native directional window navigation. Enables wrap-around physics for spatial tr
     :prefix "SPC m"
     :global-prefix "C-SPC m")
 
-  (ar/global-leader
-    "SPC" '(execute-extended-command :wk "M-x")
-    ":" '(eval-expression :wk "Eval")
-    "u" '(universal-argument :wk "Universal arg")
-    "!" '(shell-command :wk "Shell cmd")
-    "X" '(org-capture :wk "Org capture"))
-
   ;; Buffer operations (SPC b)
   (ar/global-leader
     "b" '(:ignore t :wk "buffer")
@@ -8302,6 +8311,7 @@ Native directional window navigation. Enables wrap-around physics for spatial tr
     "c p" '(ar/flymake-prev-error :wk "Prev error")
     "c f" '(apheleia-format-buffer :wk "Format buffer")
     "c r" '(eglot-rename :wk "Rename")
+    "c s" '(ar/ast-refactor-transient :wk "Structure")
     "c a" '(eglot-code-actions :wk "Code action"))
 
   ;; Git operations (SPC g)

@@ -24,3 +24,4 @@ transient/
 .cache/
 straight/
 perspective-state
+emacs-diff.md
