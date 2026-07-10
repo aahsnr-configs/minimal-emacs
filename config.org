@@ -2299,7 +2299,6 @@ Native redisplay concealment for terminal, agenda, and UI buffers. Replaces unma
 (add-hook 'org-agenda-finalize-hook #'ar/enable-hide-modeline)
 #+end_src
 
-
 ** DONE Text Scaling
 Native Emacs 29+ face-remapping engine for global typography scaling. Prevents PGTK/Wayland frame geometry expansion.
 #+begin_src emacs-lisp
