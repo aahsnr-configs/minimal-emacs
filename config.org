@@ -495,8 +495,13 @@ Configures core =simple.el= behaviors, modeline indicators, whitespace managemen
         track-eol t
         set-mark-command-repeat-pop t)
 
-  ;; Hides trailing whitespace by default.
-  (setq-default show-trailing-whitespace nil)
+  ;; Zero-overhead trailing space highlighting. Bypasses `whitespace-mode`'s
+  ;; heavy font-lock injection to prevent Tree-sitter conflicts in Emacs 30/31.
+  (setq-default show-trailing-whitespace t)
+  ;; Disable in prose buffers where trailing spaces are structurally irrelevant.
+  (dolist (mode '(org-mode markdown-mode text-mode))
+    (add-hook (intern (format "%s-hook" mode))
+              (lambda () (setq-local show-trailing-whitespace nil))))
 
   ;; Replaces verbose yes/no prompts with single-character y/n inputs (Emacs 28+).
   (setq use-short-answers t)
@@ -1954,130 +1959,129 @@ Manages structural and textual collapsing mechanisms. Unifies AST-aware, outline
 
 
 
-* TODO Spatial Alignment & Whitespace Hygiene
+* DONE Spatial Alignment & Whitespace Hygiene
 Enforces spatial alignment, trailing character cleanup, and indentation guides. Maintains visual grid consistency across diverse programming languages.
 
-* TODO Spatial Alignment & Whitespace Hygiene
-Enforces spatial alignment, trailing character cleanup, and indentation guides. Maintains visual grid consistency across diverse programming languages.
-
-** TODO Whitespace
-Native visual highlighting for trailing spaces and mixed indentation. Aborts activation in massive buffers to prevent main-thread blocking.
+** DONE Whitespace
+Restricts font-lock to mixed-indentation detection. Delegates trailing spaces and line limits to native display engines.
 #+begin_src emacs-lisp
 (use-package whitespace
   :ensure nil
   :defer t
-  :hook ((prog-mode text-mode conf-mode) . whitespace-mode)
+  :hook ((prog-mode conf-mode) . whitespace-mode)
+  :custom
+  ;; Restricts font-lock to mixed-indentation errors.
+  (whitespace-style '(space-before-tab space-after-tab indentation))
   :config
-  ;; Strictly highlight trailing spaces and mixed indentation (tabs vs spaces).
-  (setq whitespace-style '(face trailing indentation tabs tab-mark)
-        whitespace-display-mappings '((tab-mark ?\t [?› ?\t])))
-  ;; Aborts activation in massive buffers to prevent main-thread freezing.
+  ;; Aborts activation in massive buffers.
   (define-advice whitespace-mode (:before-while (&optional arg) guard-large-files)
     (or (and arg (< (prefix-numeric-value arg) 1))
         (not (too-long-file-p)))))
 #+end_src
 
-** TODO Ws-Butler
-Unobtrusive trailing whitespace trimming. Strictly confines cleanup to modified lines to prevent Git diff pollution.
+
+** DONE Ws-Butler
+Unobtrusive trailing whitespace trimming confined to modified lines to prevent Git diff pollution. Exempts prose and terminal modes where trailing spaces carry structural meaning.
 #+begin_src emacs-lisp
 (use-package ws-butler
-  :defer t
+  :demand t
   :config
-  ;; Exempt interactive terminals, REPLs, and special buffers where trailing
-  ;; whitespace is structurally required or causes prompt corruption.
+  ;; Exempts terminals and prose modes where trailing spaces carry structural meaning.
   (dolist (mode '(special-mode
                   comint-mode
                   term-mode
+                  vterm-mode
+                  eat-mode
                   eshell-mode
                   ghostel-mode
                   diff-mode
-                  magit-status-mode))
+                  magit-status-mode
+                  org-mode
+                  markdown-mode
+                  gfm-mode))
     (add-to-list 'ws-butler-global-exempt-modes mode))
-  ;; Enable global unobtrusive trimming (replaces `stripspace').
+  ;; Activates global unobtrusive trimming.
   (ws-butler-global-mode 1))
 #+end_src
 
-** TODO Dtrt Indent
-Heuristic indentation guessing. Hooks into post-mode initialization to prevent LSP race conditions and silently aborts on massive files.
+
+** DONE Dtrt Indent
+Heuristic indentation detection for programming buffers. Executes post-mode initialization to preempt LSP spawning and aborts on massive files.
 #+begin_src emacs-lisp
 (use-package dtrt-indent
   :defer t
+  :custom
+  ;; Defers to SMIE indentation engines in supported modes.
+  (dtrt-indent-run-after-smie t)
+  ;; Synchronizes Emacs' global fallback indentation variable.
+  (dtrt-indent-update-standard-indent t)
+  ;; Restricts line scanning to prevent main-thread micro-stutters.
+  (dtrt-indent-max-lines 2000)
+  ;; Minimum confidence threshold for indentation detection.
+  (dtrt-indent-min-quality 80.0)
+  ;; Suppresses echo-area logging.
+  (dtrt-indent-verbosity 0)
+  :init
+  (defun ar/dtrt-indent-maybe-enable ()
+    "Enable `dtrt-indent-mode' in programming buffers, excluding structural exceptions."
+    (when (and (derived-mode-p 'prog-mode 'conf-mode)
+               (not (too-long-file-p))
+               ;; Excludes Makefiles (requires hard tabs) and YAML (strict spacing).
+               (not (apply #'derived-mode-p '(makefile-mode yaml-mode))))
+      (dtrt-indent-mode 1)))
+  ;; Executes after major-mode body but before mode hooks and LSP spawning.
+  (add-hook 'change-major-mode-after-body-hook #'ar/dtrt-indent-maybe-enable)
   :config
-  ;; Enable in SMIE modes to update `tab-width' and `evil-shift-width'.
-  (setq dtrt-indent-run-after-smie t
-        ;; Reduce scan threshold to prevent main-thread micro-stutters.
-        dtrt-indent-max-lines 2000
-        ;; Minimum confidence threshold for indentation detection.
-        dtrt-indent-min-quality 80.0
-        ;; Silence echo-area spam.
-        dtrt-indent-verbosity 0)
-  ;; Hook into `change-major-mode-after-body-hook' to guarantee execution
-  ;; AFTER the major mode is established, but BEFORE LSP servers spawn.
-  (add-hook 'change-major-mode-after-body-hook
-            (lambda ()
-              (unless (or (bound-and-true-p so-long-detected-p)
-                          (too-long-file-p)
-                          (apply #'derived-mode-p '(org-mode
-                                                    text-mode
-                                                    markdown-mode
-                                                    gfm-mode
-                                                    special-mode)))
-                (dtrt-indent-mode 1)))))
+  ;; Synchronizes Evil shift-width with the detected indentation offset.
+  (add-hook 'dtrt-indent-hook
+            (lambda () (setq-local evil-shift-width tab-width))))
 #+end_src
 
 
-
-** TODO Indent Bars
-- [ ] Match indent-bar colors with the depth of rainbow-delimiters colors
+** DONE Indent Bars
+AST-aware vertical guides synchronizing depth colorization with rainbow-delimiters. Restricts activation to programming buffers to prevent Org-mode structural corruption.
 #+begin_src emacs-lisp
 (use-package indent-bars
   :defer t
-  :config
-  (require 'seq)
-
-  (setq indent-bars-treesit-support t
-        indent-bars-starting-column 0
-        indent-bars-no-descend-lists 'skip
-        indent-bars-color '(highlight :face-bg t :blend 0.185)
-        indent-bars-no-descend-string 'all
-        indent-bars-highlight-current-depth '(:face default :blend 0.85)
-        indent-bars-prefer-character t)
-
+  :init
+  ;; Blocks activation in massive files, child frames, fontification buffers, and Org buffers.
   (defun ar/indent-bars-should-enable-p ()
-    "Return non-nil if indent-bars should be enabled in current buffer.
-Returns nil to block activation if any inhibiting condition is met."
-    (not (or
-          (frame-parameter nil 'parent-frame)
-          (bound-and-true-p org-indent-mode)
-          (string-prefix-p " *org-src-fontification:" (buffer-name))
-          (and (derived-mode-p 'org-mode)
-               (not (bound-and-true-p org-src-mode))))))
-
+    "Return non-nil if indent-bars should be enabled in current buffer."
+    (not (or (too-long-file-p)
+             (frame-parameter nil 'parent-frame)
+             (bound-and-true-p org-indent-mode)
+             (string-prefix-p " *org-src-fontification:" (buffer-name))
+             (derived-mode-p 'org-mode))))
   (defun ar/indent-bars-maybe-enable ()
     "Enable indent-bars-mode if conditions are met."
     (when (ar/indent-bars-should-enable-p)
       (indent-bars-mode 1)))
-
-  (defun ar/indent-bars-fix-move-to-column (original-fn col &rest args)
-    "Prevent move-to-column from incorrectly handling display property newlines.
-When indent-bars uses display properties containing newlines on blank lines,
-move-to-column can incorrectly move past the visual line end, breaking Evil
-operators and other column-based navigation."
-    (if-let* (((bound-and-true-p indent-bars-mode))
-              ((bound-and-true-p indent-bars-display-on-blank-lines))
-              (line-end (line-end-position))
-              (display-prop (get-text-property line-end 'display))
-              ((seq-contains-p display-prop ?\n))
-              ((> col (- line-end (point)))))
-        (goto-char line-end)
-      (apply original-fn col args)))
-
-  (advice-add 'move-to-column :around #'ar/indent-bars-fix-move-to-column)
-
+  :custom
+  ;; Enforces AST structural boundaries and prevents string descent.
+  (indent-bars-treesit-support t)
+  (indent-bars-no-descend-lists t)
+  (indent-bars-no-descend-string 'all)
+  ;; Encapsulates multi-line AST nodes to prevent visual fragmentation.
+  (indent-bars-treesit-wrap '((python arguments parameters argument_list parameter_list)
+                              (c argument_list parameter_list)
+                              (cpp argument_list parameter_list)
+                              (rust arguments parameters)
+                              (javascript arguments formal_parameters)
+                              (typescript arguments formal_parameters)
+                              (tsx arguments formal_parameters)))
+  ;; Renders ghost bars on empty lines to connect structural blocks.
+  (indent-bars-display-on-blank-lines t)
+  ;; Unicode fallback for terminals and PGTK stipple failures.
+  (indent-bars-no-stipple-char ?▍)
+  ;; Tokyo Night depth palette matching rainbow-delimiters.
+  (indent-bars-color-by-depth '(:palette ("#7aa2f7" "#e0af68" "#9ece6a" "#1abc9c" "#bb9af7" "#9d7cd8" "#ff9e64" "#f7768e") :blend 1))
+  ;; High-contrast active scope tracking.
+  (indent-bars-highlight-current-depth '(:color "#c0caf5" :blend 0.3 :width 0.25))
+  :hook ((prog-mode conf-mode yaml-mode) . ar/indent-bars-maybe-enable)
+  :config
+  ;; Disables rendering inside magit-blame overlays.
   (with-eval-after-load 'magit-blame
-    (add-to-list 'magit-blame-disable-modes 'indent-bars-mode))
-
-  :hook ((prog-mode text-mode conf-mode yaml-mode) . ar/indent-bars-maybe-enable))
+    (add-to-list 'magit-blame-disable-modes 'indent-bars-mode)))
 #+end_src
 
 
@@ -2085,48 +2089,92 @@ operators and other column-based navigation."
 * TODO Frame Chrome & Status Indicators
 Renders visual feedback, window dividers, and modeline components. Provides spatial orientation and contextual metadata within the editing frame.
 
-** TODO Line Numbers
-- [ ] Does this conflict with any of my other configurations by any chance? Look at the whole configuration.
+** DONE Line Numbers
+Native C-level margin rendering for spatial orientation. Utilizes hybrid relative numbering for Vim motions and aborts on massive files.
 #+begin_src emacs-lisp
 (use-package display-line-numbers
   :ensure nil
-  :hook ((prog-mode
-          conf-mode toml-ts-mode
-          yaml-mode yaml-ts-mode)
-         . display-line-numbers-mode)
-  :init (setq display-line-numbers-width-start t))
+  :defer t
+  :hook ((prog-mode conf-mode yaml-mode LaTeX-mode tex-mode) . display-line-numbers-mode)
+  :custom
+  ;; Pre-calculates maximum margin width to prevent initial rendering shifts.
+  (display-line-numbers-width-start t)
+  ;; Prevents margin shrinking to eliminate horizontal redisplay jitter.
+  (display-line-numbers-grow-only t)
+  ;; Hybrid paradigm: absolute current line, relative surrounding lines.
+  (display-line-numbers-type 'relative)
+  :custom-face
+  ;; Recessive margin typography to prevent visual fatigue.
+  (line-number ((t (:inherit shadow :foreground "#565f89"))))
+  ;; High-contrast active line tracking.
+  (line-number-current-line ((t (:inherit default :foreground "#c0caf5" :weight bold))))
+  :config
+  ;; Aborts activation in massive buffers.
+  (define-advice display-line-numbers-mode (:before-while (&optional arg) guard-large-files)
+    (or (and arg (< (prefix-numeric-value arg) 1))
+        (not (too-long-file-p)))))
 #+end_src
 
-
-** TODO Display dividers
+** DONE Fill Column Indicator
+Native C-level display primitive rendering vertical boundary at =fill-column=. Confined to programming and configuration buffers.
 #+begin_src emacs-lisp
-(setq window-divider-default-places t
-      window-divider-default-bottom-width 1
-      window-divider-default-right-width 1)
-(add-hook 'window-setup-hook #'window-divider-mode)
+(add-hook 'prog-mode-hook #'display-fill-column-indicator-mode)
+(add-hook 'conf-mode-hook #'display-fill-column-indicator-mode)
 #+end_src
 
+** DONE Display Dividers
+Native C-level display primitive rendering vertical window boundaries. Confined to right-only placement to eliminate horizontal redundancy.
+#+begin_src emacs-lisp
+(use-package frame
+  :ensure nil
+  :custom
+  ;; Restricts rendering to vertical boundaries and enforces a 1px baseline.
+  (window-divider-default-places 'right-only)
+  (window-divider-default-right-width 1)
+  (window-divider-default-bottom-width 1)
+  :custom-face
+  ;; Harmonizes divider typography with Tokyo Night borders.
+  (window-divider ((t (:foreground "#292e42"))))
+  :config
+  ;; Activates synchronously to guarantee matrix registration before frame painting.
+  (window-divider-mode 1))
+#+end_src
 
-** TODO hl-line
+** DONE Active Line Highlight
+Native C-level overlay rendering for active line tracking. Confines focus to the selected window and suspends rendering during Evil visual selections and excluded major modes.
 #+begin_src emacs-lisp
 (use-package hl-line
   :ensure nil
-  :hook ((after-init . global-hl-line-mode)
-         ((dashboard-mode eshell-mode shell-mode ghostel-compile-view-mode term-mode vterm-mode) .
-          (lambda () (setq-local global-hl-line-mode nil))))
+  :custom
+  ;; Confines highlight strictly to the active window.
+  (hl-line-sticky-flag nil)
+  ;; Forces overlay behind syntax highlighting, diagnostics, and whitespace markers.
+  (hl-line-overlay-priority -1)
   :config
-  (defun ar/disable-hl-line-in-visual ()
-    (when (bound-and-true-p hl-line-mode)
-      (hl-line-mode -1)
-      (setq-local ar/hl-line-was-on t)))
-
-  (defun ar/enable-hl-line-after-visual ()
-    (when (bound-and-true-p ar/hl-line-was-on)
-      (hl-line-mode 1)
-      (kill-local-variable 'ar/hl-line-was-on)))
-
-  (add-hook 'evil-visual-state-entry-hook #'ar/disable-hl-line-in-visual)
-  (add-hook 'evil-visual-state-exit-hook #'ar/enable-hl-line-after-visual))
+  ;; Intercepts the render cycle to delete the overlay in excluded modes.
+  (define-advice global-hl-line-highlight (:around (fn) guard-excluded-modes)
+    (if (derived-mode-p 'dired-mode
+                        'magit-mode
+                        'compilation-mode
+                        'special-mode
+                        'dashboard-mode
+                        'eshell-mode
+                        'shell-mode
+                        'term-mode
+                        'vterm-mode
+                        'eat-mode
+                        'ghostel-mode
+                        'ghostel-compile-view-mode
+                        'pdf-view-mode
+                        'treemacs-mode)
+        (when global-hl-line-overlay (delete-overlay global-hl-line-overlay))
+      (funcall fn)))
+  ;; Destroys the overlay on Evil visual state entry.
+  (add-hook 'evil-visual-state-entry-hook #'global-hl-line-unhighlight)
+  ;; Redraws the overlay upon exiting Evil visual state.
+  (add-hook 'evil-visual-state-exit-hook #'global-hl-line-highlight)
+  ;; Activates synchronously to guarantee overlay registration.
+  (global-hl-line-mode 1))
 #+end_src
 
 
@@ -2177,6 +2225,9 @@ Renders visual feedback, window dividers, and modeline components. Provides spat
 
 ** TODO Hide Modeline
 - [ ] Is the code here formatted correctly?
+- [ ] Is there a better way to handle the hiding of the modeline?
+- [ ] This package is no longer being maintained.
+- [ ] Search the web and determine how doom emacs handles hiding the modeline in various modes and buffers
 #+begin_src emacs-lisp
 (use-package hide-mode-line
   :autoload turn-off-hide-mode-line-mode
@@ -2201,7 +2252,7 @@ Renders visual feedback, window dividers, and modeline components. Provides spat
 Provides O(1) spatial traversal, in-buffer search tracking, and localized multi-cursor refactoring. Accelerates cursor movement and targeted text mutations.
 
 ** TODO Avy
-- [ ] Issue is avy replaces characters, so the original position to go to is difficult to select using a letter when the letter is blocking the view of the letter to go to.
+- [ ] Issue is avy replaces characters when it is active, so the original position to go to is difficult to select using a letter when the letter is blocking the view of the letter to go to.
 -
 Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy is inherently mode-agnostic, its entry points are mapped to Vim-style mnemonic prefixes (e.g., =s= for character jumps, =g s= for two-character jumps, =g w= for word jumps) within Evil's motion state. This preserves strict Vim muscle memory and operator-pending compatibility (e.g., =d g s= to delete up to a jumped character) while bypassing the linear scanning overhead of native Vim motions.
 #+begin_src emacs-lisp
@@ -2210,7 +2261,7 @@ Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy
 
 ** TODO Anzu
 - [ ] Do I need to anything with other isearch functionalities in the rest of the emacs config to work with anzu?
-- [ ] Integrate anzu lsp-mode
+- [ ] Integrate anzu with lsp-mode server only if possible and if needed
 #+begin_src emacs-lisp
 (use-package anzu
   :bind (([remap query-replace] . anzu-query-replace)
@@ -2226,6 +2277,7 @@ Avy provides an O(1) radix-tree jumping engine for spatial navigation. While Avy
 
 ** TODO Iedit
 - [ ] Is the current evil-multiedit need to be configured together with iedit?
+- [ ] Is iedit needed to integrated with lsp-mode
 
 
 
@@ -2648,6 +2700,9 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
 #+end_src
 
 ** TODO Project Management
+- [ ] Determine what SPC f p does in doom emacs. Create a similar function for my config
+- [ ] Determine what SPC p p does in doom emacs. Create a similar function for my config
+
 ** TODO iBuffer
 Ibuffer is the advanced buffer list manager. We configure it to hide empty filter groups (keeping the UI clean) and redefine the size column to display human-readable sizes (e.g., =1.2M=). It is integrated with =nerd-icons= for visual flair and =ibuffer-projectile= to automatically group all open buffers by their respective Projectile projects.
 
@@ -2775,8 +2830,6 @@ Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. W
 #+end_src
 
 ** TODO Workspaces
-
-
 
 * TODO Version Control
 ** TODO Magit: The Git Porcelain
@@ -5667,6 +5720,7 @@ buffer killing or garbage collection cycles."
 
 * TODO Development Tools
 ** TODO Language Server Protocol
+- [ ] Must disable and remove lsp-org at all costs
 #+begin_src emacs-lisp
 (use-package lsp-mode
   :defer t
@@ -5733,8 +5787,10 @@ buffer killing or garbage collection cycles."
 
 
 ** TODO Debug Adapter Protocol
-TODO: =Replace Dape with dap-mode=
-
+TODO:
+- [ ] =Replace Dape with dap-mode=
+- [ ] =Use Transient for dap-mode instead of the built-in hydra for dap-mode. Determine if installation of hydra can be skipped.=
+- [ ] =dap-mode must integrate properly with lsp-mode=
 #+begin_src emacs-lisp
 ;; (use-package dape
 ;;   :defer t
@@ -8588,6 +8644,7 @@ This section just contains checkboxes with stuff that still needs to be done for
 - [ ] Setup automatic pair generation for '**', '==', etc and make sure the cursor in insert mode is placed in the middle
 - [ ] Determine if compile-angel is needed for elpaca?
 - [ ] Determine if elpaca byte-compiles and native-compiles all packages. And is it okay to leave these settings to elpaca's default.
+- [ ] Pressing enter on a header should move a task from TODO to DONE like doom emacs does
 
 * TODO Questions
 This section raises questions if some features, capabilities, etc can be achieved in emacs in general.
