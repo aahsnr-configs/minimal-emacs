@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.5
+#+VERSION: 0.6
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -1975,10 +1975,8 @@ Manages structural and textual collapsing mechanisms. Unifies AST-aware, outline
 #+end_src
 
 
-
 * DONE Spatial Alignment & Whitespace Hygiene
 Enforces spatial alignment, trailing character cleanup, and indentation guides. Maintains visual grid consistency across diverse programming languages.
-
 ** DONE Whitespace
 Restricts font-lock to mixed-indentation detection. Delegates trailing spaces and line limits to native display engines.
 #+begin_src emacs-lisp
@@ -1995,7 +1993,6 @@ Restricts font-lock to mixed-indentation detection. Delegates trailing spaces an
     (or (and arg (< (prefix-numeric-value arg) 1))
         (not (too-long-file-p)))))
 #+end_src
-
 
 ** DONE Ws-Butler
 Unobtrusive trailing whitespace trimming confined to modified lines to prevent Git diff pollution. Exempts prose and terminal modes where trailing spaces carry structural meaning.
@@ -2020,7 +2017,6 @@ Unobtrusive trailing whitespace trimming confined to modified lines to prevent G
   ;; Activates global unobtrusive trimming.
   (ws-butler-global-mode 1))
 #+end_src
-
 
 ** DONE Dtrt Indent
 Heuristic indentation detection for programming buffers. Executes post-mode initialization to preempt LSP spawning and aborts on massive files.
@@ -2053,7 +2049,6 @@ Heuristic indentation detection for programming buffers. Executes post-mode init
   (add-hook 'dtrt-indent-hook
             (lambda () (setq-local evil-shift-width tab-width))))
 #+end_src
-
 
 ** DONE Indent Bars
 AST-aware vertical guides synchronizing depth colorization with rainbow-delimiters. Restricts activation to programming buffers to prevent Org-mode structural corruption.
@@ -2104,8 +2099,6 @@ AST-aware vertical guides synchronizing depth colorization with rainbow-delimite
     (add-to-list 'magit-blame-disable-modes 'indent-bars-mode)))
 #+end_src
 
-
-
 ** DONE Move Text
 Provides O(1) line and region dragging. Automatically re-indents displaced lines to preserve structural integrity in whitespace-sensitive languages.
 #+begin_src emacs-lisp
@@ -2128,7 +2121,6 @@ Provides O(1) line and region dragging. Automatically re-indents displaced lines
 
 * DONE Frame Chrome & Status Indicators
 Renders visual feedback, window dividers, and modeline components. Provides spatial orientation and contextual metadata within the editing frame.
-
 ** DONE Line Numbers
 Native C-level margin rendering for spatial orientation. Utilizes hybrid relative numbering for Vim motions and aborts on massive files.
 #+begin_src emacs-lisp
@@ -2408,91 +2400,92 @@ Provides an O(1) radix-tree jumping engine for long-distance spatial navigation.
 #+end_src
 
 
-** TODO Evil Easymotion
-raps Avy into Evil's operator-pending grammar. Maps spatial jumps to a unified =gs= prefix, enabling mutations like =dgsj= to delete regions across distances.
- emacs-lisp
-use-package evil-easymotion
- :defer t
- :after evil avy
- :commands (evilem-create evilem-default-keybindings-motions)
- :config
- (evilem-default-keybindings-motions "gs"))
 
+** TODO Evil Easymotion
+Wraps Avy into Evil's operator-pending grammar. Maps spatial jumps to a unified =gs= prefix, enabling mutations like =dgsj= to delete regions across distances.
+#+begin_src emacs-lisp
+(use-package evil-easymotion
+  :defer t
+  :after evil avy
+  :commands (evilem-create evilem-default-keybindings-motions)
+  :config
+  (evilem-default-keybindings-motions "gs"))
+#+end_src
 
 ** TODO Evil Snipe
-eplaces Avy for short-distance, two-character inline jumps to preserve typing flow. Hijacks native =f=, =F=, =t=, =T=, =z=, and =Z= motions with localized screen highlighting.
- emacs-lisp
-use-package evil-snipe
- :defer t
- :after evil
- :hook (evil-snipe-mode . (lambda () (setq evil-snipe-auto-disable-substitute t)))
- :custom
- (evil-snipe-enable-highlight t)
- (evil-snipe-enable-incremental-highlight t)
- (evil-snipe-auto-disable-substitute t)
- (evil-snipe-scope 'visible)
- :custom-face
- (evil-snipe-first-match-face ((t (:foreground "#7dcfff" :underline t))))
- (evil-snipe-matches-face ((t (:foreground "#7dcfff" :underline t))))
- :config
- (evil-snipe-mode 1)
- (evil-snipe-override-mode 1))
-
+Replaces Avy for short-distance, two-character inline jumps to preserve typing flow. Hijacks native =f=, =F=, =t=, =T=, =z=, and =Z= motions with localized screen highlighting.
+#+begin_src emacs-lisp
+(use-package evil-snipe
+  :defer t
+  :after evil
+  :hook (evil-snipe-mode . (lambda () (setq evil-snipe-auto-disable-substitute t)))
+  :custom
+  (evil-snipe-enable-highlight t)
+  (evil-snipe-enable-incremental-highlight t)
+  (evil-snipe-auto-disable-substitute t)
+  (evil-snipe-scope 'visible)
+  :custom-face
+  (evil-snipe-first-match-face ((t (:foreground "#7dcfff" :underline t))))
+  (evil-snipe-matches-face ((t (:foreground "#7dcfff" :underline t))))
+  :config
+  (evil-snipe-mode 1)
+  (evil-snipe-override-mode 1))
+#+end_src
 
 ** TODO Link Hint
-rovides Evil-native link jumping for read-only and help buffers. Targets URLs and buttons using the Avy engine while preserving link text readability.
- emacs-lisp
-use-package link-hint
- :defer t
- :commands (link-hint-open-link link-hint-copy-link))
-
+Provides Evil-native link jumping for read-only and help buffers. Targets URLs and buttons using the Avy engine while preserving link text readability.
+#+begin_src emacs-lisp
+(use-package link-hint
+  :defer t
+  :commands (link-hint-open-link link-hint-copy-link))
+#+end_src
 
 ** TODO Ace Window
-outes cross-window spatial jumps via the Avy radix-tree engine. Reserved for complex split layouts and strictly mapped via leader bindings to prevent global keymap pollution.
- emacs-lisp
-use-package ace-window
- :defer t
- :commands (ace-window ace-swap-window ace-delete-window)
- :custom
- (aw-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l))
- (aw-scope 'frame)
- (aw-background t)
- :custom-face
- (aw-leading-char-face ((t (:foreground "#1a1b26" :background "#e0af68" :weight bold :height 1.5)))))
-
+Routes cross-window spatial jumps via the Avy radix-tree engine. Reserved for complex split layouts and strictly mapped via leader bindings to prevent global keymap pollution.
+#+begin_src emacs-lisp
+(use-package ace-window
+  :defer t
+  :commands (ace-window ace-swap-window ace-delete-window)
+  :custom
+  (aw-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l))
+  (aw-scope 'frame)
+  (aw-background t)
+  :custom-face
+  (aw-leading-char-face ((t (:foreground "#1a1b26" :background "#e0af68" :weight bold :height 1.5)))))
+#+end_src
 
 ** TODO Anzu
-isplays current match index and total matches in the modeline during active searches. Operates strictly on the lexical plane and remains isolated from LSP semantic engines.
- emacs-lisp
-use-package anzu
- :defer t
- :hook (isearch-mode . anzu-isearch-start)
- :hook (isearch-mode-end . anzu-isearch-end)
- :bind (([remap query-replace] . anzu-query-replace)
-        ([remap query-replace-regexp] . anzu-query-replace-regexp)
-        :map isearch-mode-map
-        ([remap isearch-query-replace] . anzu-isearch-query-replace)
-        ([remap isearch-query-replace-regexp] . anzu-isearch-query-replace-regexp))
- :custom
- (anzu-mode-lighter "")
- (anzu-deactivate-region t)
- (anzu-search-threshold 1000)
- (anzu-replace-threshold 50)
- (anzu-replace-to-string-separator " → "))
-
+Displays current match index and total matches in the modeline during active searches. Operates strictly on the lexical plane and remains isolated from LSP semantic engines.
+#+begin_src emacs-lisp
+(use-package anzu
+  :defer t
+  :hook (isearch-mode . anzu-isearch-start)
+  :hook (isearch-mode-end . anzu-isearch-end)
+  :bind (([remap query-replace] . anzu-query-replace)
+         ([remap query-replace-regexp] . anzu-query-replace-regexp)
+         :map isearch-mode-map
+         ([remap isearch-query-replace] . anzu-isearch-query-replace)
+         ([remap isearch-query-replace-regexp] . anzu-isearch-query-replace-regexp))
+  :custom
+  (anzu-mode-lighter "")
+  (anzu-deactivate-region t)
+  (anzu-search-threshold 1000)
+  (anzu-replace-threshold 50)
+  (anzu-replace-to-string-separator " → "))
+#+end_src
 
 ** TODO Evil Anzu
-ntegrates Anzu's modeline tracking with Evil's native search operators. Ensures match indices update correctly during =/= and =?= motions.
- emacs-lisp
-use-package evil-anzu
- :defer t
- :after evil anzu
- :config
- (global-anzu-mode 1))
-
+Integrates Anzu's modeline tracking with Evil's native search operators. Ensures match indices update correctly during =/= and =?= motions.
+#+begin_src emacs-lisp
+(use-package evil-anzu
+  :defer t
+  :after evil anzu
+  :config
+  (global-anzu-mode 1))
+#+end_src
 
 ** TODO Iedit
-rovides the foundational engine for simultaneous multi-line editing. Highlights all instances of the current symbol or region for synchronized mutation.
+Provides the foundational engine for simultaneous multi-line editing. Highlights all instances of the current symbol or region for synchronized mutation.
 #+begin_src emacs-lisp
 (use-package iedit
   :defer t
@@ -2500,7 +2493,7 @@ rovides the foundational engine for simultaneous multi-line editing. Highlights 
 #+end_src
 
 ** TODO Evil Multiedit
-Wraps the Iedit engine in a dedicated Evil state for localized multi-cursor refactoring. Maps explicit Vim-mnemonics for cursor accumulation and bulk mutation..
+Wraps the Iedit engine in a dedicated Evil state for localized multi-cursor refactoring. Maps explicit Vim-mnemonics for cursor accumulation and bulk mutation.
 #+begin_src emacs-lisp
 (use-package evil-multiedit
   :defer t
@@ -2515,41 +2508,41 @@ Wraps the Iedit engine in a dedicated Evil state for localized multi-cursor refa
 #+end_src
 
 ** TODO Wgrep
-nables writable =*grep*= and =*occur*= buffers for cross-project bulk editing. Serves as the mandatory fallback for Emacs versions prior to 31.
- emacs-lisp
-unless (>= emacs-major-version 31)
- (use-package wgrep
-   :defer t
-   :commands (wgrep-setup wgrep-change-to-wgrep-mode)
-   :custom
-   (wgrep-auto-save-buffer t)
-   :config
-   (with-eval-after-load 'grep
-     (define-key grep-mode-map (kbd "e") #'wgrep-change-to-wgrep-mode))))
-
+Enables writable =*grep*= and =*occur*= buffers for cross-project bulk editing. Serves as the mandatory fallback for Emacs versions prior to 31.
+#+begin_src emacs-lisp
+(unless (>= emacs-major-version 31)
+  (use-package wgrep
+    :defer t
+    :commands (wgrep-setup wgrep-change-to-wgrep-mode)
+    :custom
+    (wgrep-auto-save-buffer t)
+    :config
+    (with-eval-after-load 'grep
+      (define-key grep-mode-map (kbd "e") #'wgrep-change-to-wgrep-mode))))
+#+end_src
 
 ** TODO Grep Edit Mode
-tilizes the native Emacs 31 C-level engine for writable grep buffers. Defensively guarded to prevent evaluation errors on older Emacs versions.
- emacs-lisp
-when (>= emacs-major-version 31)
- (with-eval-after-load 'grep
-   (define-key grep-mode-map (kbd "e") #'grep-change-to-grep-edit-mode)))
-
+Utilizes the native Emacs 31 C-level engine for writable grep buffers. Defensively guarded to prevent evaluation errors on older Emacs versions.
+#+begin_src emacs-lisp
+(when (>= emacs-major-version 31)
+  (with-eval-after-load 'grep
+    (define-key grep-mode-map (kbd "e") #'grep-change-to-grep-edit-mode)))
+#+end_src
 
 ** TODO Re-Builder
-rovides an interactive visual regex builder for complex search patterns. Opens a split window to highlight matches and capture groups in real-time before execution.
- emacs-lisp
-use-package re-builder
- :ensure nil
- :defer t
- :commands (re-builder)
- :custom
- (reb-re-syntax 'string))
-
+Provides an interactive visual regex builder for complex search patterns. Opens a split window to highlight matches and capture groups in real-time before execution.
+#+begin_src emacs-lisp
+(use-package re-builder
+  :ensure nil
+  :defer t
+  :commands (re-builder)
+  :custom
+  (reb-re-syntax 'string))
+#+end_src
 
 ** TODO Avy Transient Menu
+- [ ] Make sure to use casual-avy as reference
 Exposes Avy's mutation APIs under a dedicated Transient menu to prevent global keymap pollution. Groups complex line and region manipulations logically for rapid execution.
-- [ ] Use casual avy's code as reference
 #+begin_src emacs-lisp
 (with-eval-after-load 'transient
   (defun ar/avy-transient-title ()
@@ -2574,11 +2567,6 @@ Exposes Avy's mutation APIs under a dedicated Transient menu to prevent global k
      ["Exit"
       ("<escape>" "" transient-quit-one :format " ")]]))
 #+end_src
-
-
-
-
-
 
 
 * TODO Lexical Validation & Comparative Workflows

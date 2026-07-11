@@ -1,11 +1,11 @@
-# Emacs Configuration Project State Checkpoint (v14 - July 11, 2026)
+# Emacs Configuration Project State Checkpoint (v15 - July 12, 2026)
 
 ## CRITICAL INSTRUCTIONS FOR THE NEW AI SESSION
 
 Before generating any code, making suggestions, or answering questions, you MUST:
 
 1. Read and ingest the attached `early-init.el.txt` file.
-2. Read and ingest the attached `config.org.txt` (or `config.org.new.txt`) file. The `config.org.new.txt` will be added later after several prompts.
+2. Read and ingest the attached `config.org.txt` (or `config.org.new.txt`) file.
 3. Read and ingest the attached `system-prompt-protocol.md` file to understand your strict operational boundaries, research mandates, and formatting rules.
 4. Read this `project-state.md` file to understand the architectural decisions, the massive "Editor Behaviour" restructuring, and current progress.
 5. Acknowledge these rules and the current state.
@@ -32,7 +32,7 @@ The AI must strictly adhere to the following rules when generating or modifying 
 
 ## The "Editor Behaviour" Paradigm Shift & Main Section Naming
 
-In v5, the `Editor Behaviour` concept was massively restructured to become the centralized pillar for how Emacs renders, parses, and manipulates text and buffers. In v14, the physical migration and finalization of these groups is the primary active objective.
+In v5, the `Editor Behaviour` concept was massively restructured to become the centralized pillar for how Emacs renders, parses, and manipulates text and buffers. In v15, the physical migration and finalization of these groups is the primary active objective.
 
 - **Visual Chrome & UI Overlays (Group 1 - FULLY FINALIZED)**
 - **Interactive Buffers & Redisplay Physics (Group 2 - FULLY FINALIZED)**
@@ -65,75 +65,84 @@ The AI must NEVER suggest or implement the following patterns:
 - No treating the MPS incremental/concurrent garbage collector (`igc`) as an Emacs 31 feature: it was explicitly deferred out of the Emacs 31 release cycle (per `emacs-devel`, May 2026) and is absent from the `31.0.90` pretest. Any `igc`-related code targets a future post-31 release only and must be re-verified via web search before use.
 - No Package Merging: NEVER merge multiple distinct packages into a single `#+begin_src` block or a single subsection header. Every package must reside in its own dedicated `**` subsection with its own isolated source block.
 - No Scope Creep: NEVER modify, rewrite, or touch subsections, packages, or code blocks that were not explicitly tasked in the current prompt.
+- **No Modular Eglot Stack for IDE Parity:** Rejected the modular `eglot` + `flymake` + `dape` ecosystem in favor of the synergistic `lsp-mode` stack. `eglot` lacks native Code Lens and `launch.json` ingestion, requiring fragile custom Elisp bridges that violate the zero-maintenance IDE paradigm.
 
 ## Edge Cases & Deferred Issues
 
 - **Dirvish Multi-frame Flicker:** Patched via `define-advice` on `dirvish-pre-redisplay-h` to debounce redisplay hooks in Emacs 30+.
 - **lsp-mode Org Element API Crash:** Patched via `:around` advice in the `lsp-mode :init` block to prevent `cl-generic` corruption.
 - **Emacs 31 Unreleased APIs:** Features like `grep-edit-mode` must be wrapped in defensive runtime guards.
-- **[v11 Correction] MPS Incremental GC (`igc`) Removed From Scope:** Prior state (v10 and earlier) incorrectly listed MPS Incremental GC (`igc`) alongside `grep-edit-mode` as an Emacs 31 API requiring defensive guards. A protocol audit (July 2026) against `emacs-devel` confirmed the Emacs 31 release manager announced in May 2026 that the new garbage collector would not ship in Emacs 31 — the `emacs-31` branch was cut without it, and the subsequent `31.0.90` pretest (June 2026) confirms its absence. `igc` is therefore struck from all Emacs-31-targeting guards and negative-constraint language going forward; it is deferred to an unspecified future (post-31) release and must not be assumed present without a fresh, dated web search.
-- **`no-littering` API Typo:** Fixed hallucinated `no-littering-expand-var-directory-name` to the correct `no-littering-expand-var-file-name` (with trailing slash for directories) in `treesit` and `undo-fu-session` blocks.
-- **`treesit` Block Parenthesis Mismatch:** Fixed an extra closing parenthesis in the `treesit--build-grammar` advice that caused an `Invalid read syntax: )` crash during tangling.
-- **`treesit-fold` Ellipsis Injection:** Upstream `treesit-fold` (Jan 2025 refactor) natively inherits Emacs' built-in `truncate-string-ellipsis`. Custom overlay advice for ellipses is no longer required; global `setq` is sufficient.
+- **[v11 Correction] MPS Incremental GC (`igc`) Removed From Scope:** Prior state incorrectly listed MPS Incremental GC (`igc`) as an Emacs 31 API. Confirmed deferred out of Emacs 31 entirely.
+- **`no-littering` API Typo:** Fixed hallucinated `no-littering-expand-var-directory-name` to the correct `no-littering-expand-var-file-name`.
+- **`treesit` Block Parenthesis Mismatch:** Fixed an extra closing parenthesis in the `treesit--build-grammar` advice.
+- **`treesit-fold` Ellipsis Injection:** Upstream `treesit-fold` natively inherits Emacs' built-in `truncate-string-ellipsis`.
+- **[v15 Correction] Structural Nesting Anomaly (Group 7):** In `config.org.txt` (v0.6), `Precision Editing` (Group 7) is incorrectly nested as a `**` subsection under `* TODO Frame Chrome & Status Indicators`. It must be promoted to a top-level `* TODO Precision Editing` header in the next structural rewrite.
+- **[v15 Correction] Missing `Move Text` Package:** The `move-text` package and its `ar/move-text-indent-region-advice` are missing from the `Spatial Alignment & Whitespace Hygiene` section in the v0.6 file dump. It must be re-injected.
 
 ## Architectural Decisions & Load-Order Physics
 
 ### Session v10
 
-- **Non-Lisp AST Stack Finalization (Group 3 Complete):** Rejected `smartparens`/`puni`, `combobulate`, `tree-edit`, and `expand-region`. Standardized on `elec-pair`, `evil-surround` + `evil-embrace`, `delete-pair`, `evil-textobj-tree-sitter`, `evil-ts-obj`, `treesit-navigate-thing`, and `expreg` for structural editing.
-- **`evil-ts-obj` Transient Isolation (Pillar 4):** Fulfills structural manipulation (slurp, barf, raise, extract). Default global bindings (`M-j`, `M-k`, etc.) are aggressively purged in `:config` to prevent collisions with `general.el` and `move-text`. Operators are strictly isolated within an `ar/ast-refactor-transient` menu routed to `SPC c s`.
-- **Code Folding Unification (Group 4 Complete):** Replaced fragmented folding with a unified dispatcher engine routing Evil's `z` prefix to `treesit-fold` (AST), `hideshow` (Regex/Fold-markers), `outline-minor-mode` (Prose fallback), and `vimish-fold` (Visual).
-- **Whitespace & Indentation Strategy (Group 5 Complete):** Rejected `stripspace` in favor of `ws-butler` (unobtrusive, modified-lines-only trimming to protect Git diffs). `dtrt-indent` is routed to `change-major-mode-after-body-hook` to prevent LSP race conditions.
-- **`general.el` Eager Load-Order Physics:** Verified that `general.el` is synchronously and eagerly loaded (`:ensure (:wait t)`, `:demand t`) at the end of the Vim Emulation section. This mathematically guarantees that `general-define-key`, `ar/global-leader`, and `ar/local-leader` are globally available for all downstream deferred packages without requiring `with-eval-after-load` wrappers.
+- **Non-Lisp AST Stack Finalization (Group 3 Complete):** Standardized on `elec-pair`, `evil-surround` + `evil-embrace`, `delete-pair`, `evil-textobj-tree-sitter`, `evil-ts-obj`, `treesit-navigate-thing`, and `expreg`.
+- **`evil-ts-obj` Transient Isolation (Pillar 4):** Operators strictly isolated within an `ar/ast-refactor-transient` menu routed to `SPC c s`.
+- **Code Folding Unification (Group 4 Complete):** Unified dispatcher engine routing Evil's `z` prefix to `treesit-fold`, `hideshow`, `outline-minor-mode`, and `vimish-fold`.
+- **Whitespace & Indentation Strategy (Group 5 Complete):** Standardized on `ws-butler` and `dtrt-indent`.
+- **`general.el` Eager Load-Order Physics:** Synchronously and eagerly loaded to guarantee macro availability.
 
 ### Session v11
 
-- **Protocol Fact-Audit (Emacs 31 Version Targeting):** Conducted a web-search-backed audit of `system-prompt-protocol.md`'s Emacs 31 claims against current (July 2026) upstream sources. Confirmed `grep-edit-mode` is a real, correctly named Emacs 31 feature. Confirmed the MPS incremental/concurrent garbage collector was deferred out of Emacs 31 entirely. All prior guidance treating `igc` as an in-scope, guard-wrapped Emacs 31 feature is superseded.
+- **Protocol Fact-Audit (Emacs 31 Version Targeting):** Confirmed `grep-edit-mode` is real. Confirmed MPS GC deferred.
 
 ### Session v12
 
-- **Frame Chrome & Status Indicators (Group 6 Complete):** Replaced legacy `rainbow-mode` with `colorful-mode`. Replaced unmaintained `hide-mode-line` with a native buffer-local minor mode (`ar/hide-modeline-mode`). Replaced `default-text-scale` with native Emacs 29+ `global-text-scale-adjust` face-remapping engine. Consolidated `doom-modeline` inheritance physics.
-- **Non-Lisp AST Stack Guarding:** Injected defensive `derived-mode-p` guards into `treesit-fold`, `indent-bars`, and `evil-ts-obj` to strictly prevent AST engines from activating in `emacs-lisp-mode` and `lisp-interaction-mode`, eliminating missing grammar warnings and strictly enforcing the architectural boundary.
+- **Frame Chrome & Status Indicators (Group 6 Complete):** Replaced legacy packages with `colorful-mode`, `ar/hide-modeline-mode`, and native `global-text-scale-adjust`.
+- **Non-Lisp AST Stack Guarding:** Injected defensive `derived-mode-p` guards to prevent AST engines in Lisp modes.
 
 ### Session v13
 
-- **State Generation & Protocol Audit:** Executed unconditional state generation command. Verified structural parity between `config.org.txt` and `project-state.md`. Group 6 (Frame Chrome & Status Indicators) remains fully finalized. Group 7 (Spatial Traversal & Inline Mutations / Precision Editing) and Group 8 (Lexical Validation & Comparative Workflows) remain the active pending frontiers. Next immediate target: `Avy`.
+- **State Generation & Protocol Audit:** Verified structural parity. Group 6 finalized.
 
 ### Session v14
 
-- **Emacs 31 Targeting & Build Flags Consolidation:** The configuration now explicitly targets **Emacs 31** as the primary environment. The user is daily-driving the `emacs-pretest` package (v31.0.90) compiled with `--with-native-compilation=aot` and `--with-pgtk`. Defensive guards remain for highly experimental APIs, but Emacs 31 is treated as the baseline.
-- **Reference Cleanup:** Removed all references to the external `editor-architecture.md` file. The architectural paradigm is now fully self-contained within `project-state.md` and `system-prompt-protocol.md`.
+- **Emacs 31 Targeting & Build Flags Consolidation:** Configuration explicitly targets Emacs 31 (`--with-native-compilation=aot` and `--with-pgtk`).
+- **Reference Cleanup:** Removed external `editor-architecture.md` references.
+
+### Session v15
+
+- **IDE Stack Consolidation (LSP vs Eglot):** Committed to the synergistic `lsp-mode` ecosystem (`lsp-mode`, `lsp-ui`, `dap-mode`, `flycheck`) over the modular `eglot` stack. This guarantees 1:1 VSCode IDE parity (Code Lens, `launch.json` ingestion, sideline diagnostics) without inventing custom Elisp bridges.
+- **Workspace Management Selection:** Selected `bufferlo` over `tabspaces` and `persp-mode`. `bufferlo` provides native frame/tab buffer-list isolation and lightweight bookmark-based persistence, avoiding `desktop.el` bloat while integrating seamlessly with `consult-buffer`.
+- **Precision Editing (Group 7) Finalization:** Finalized the Avy/Expreg/Snipe stack. Mapped `M-j` to `avy-isearch`, restricted `avy-keys` to home-row, and enforced the `at-full` visual paradigm.
 
 ## Pending Architectural Decisions & In-Code TODOs
 
-- **Project & Workspace Management:** `Project Management` and `Workspaces` are empty placeholders. All code referencing `projectile` or `persp-mode` is commented out awaiting this decision.
-- **Syntax Checking Transition:** Transitioning from `flymake` to `flycheck`.
-- **Debug Adapter Protocol:** Evaluating `dape` vs `dap-mode`.
+- **Project & Workspace Management:** `bufferlo` selected for workspaces. `projection` selected for project management. Code referencing `projectile` or `persp-mode` must be excised and replaced.
+- **Syntax Checking Transition:** Transitioning from `flymake` to `flycheck` to integrate with `lsp-mode` diagnostics.
+- **Debug Adapter Protocol:** Committed to `dap-mode` (with `transient` menus) over `dape` to maintain `launch.json` parity.
 - **LaTeX / AUCTeX:** Pending integration of `preview-auto.el`, `cdlatex`, and Bibliography Management.
-- **LSP / Eglot Consolidation:** Several language blocks contain TODOs to replace `eglot` with `lsp-mode`.
 
 ## Overall Configuration Progress
 
 ### Fully Finalized Main Sections
 
 - **Core Emacs:** All 13 subsections finalized.
-- **Visual Chrome & UI Overlays (Editor Behaviour Group 1):** All 8 subsections finalized.
+- **Visual Chrome & UI Overlays (Group 1):** All 8 subsections finalized.
 - **Interactive Buffers & Redisplay Physics (Group 2):** All 5 subsections finalized.
 - **AST Parsing & Structural Typing (Group 3):** All 12 subsections finalized.
 - **Code Folding & Region Concealment (Group 4):** Unified dispatcher finalized.
-- **Spatial Alignment & Whitespace Hygiene (Group 5):** All 4 subsections finalized.
-- **Frame Chrome & Status Indicators (Group 6):** All 8 subsections finalized (`Line Numbers`, `Fill Column Indicator`, `Display Dividers`, `Active Line Highlight`, `Color Visualization`, `Modeline`, `Hide Modeline`, `Text Scaling`).
+- **Spatial Alignment & Whitespace Hygiene (Group 5):** 4/5 subsections finalized (Missing `Move Text` in v0.6 dump).
+- **Frame Chrome & Status Indicators (Group 6):** All 8 subsections finalized.
 - **Vim Emulation:** All 12 subsections finalized.
 - **General Keybindings:** Core `use-package general` block finalized and eagerly loaded.
 
 ### Partially Finalized / In-Progress Main Sections
 
 - **Window:** 1 subsection finalized (`Windmove`). Pending: `Winner`, `Popper`.
+- **Precision Editing (Group 7):** Avy, Evil Easymotion, Evil Snipe, Link Hint, Ace Window, Anzu, Iedit, Wgrep, Re-Builder finalized. _Requires structural promotion from `**` to `*`._
 
 ### Untouched / Pending Main Sections (In Document Order)
 
-- **Editor Behaviour (Groups 7-8):** `Spatial Traversal & Inline Mutations` (Avy, Anzu, Iedit) and `Lexical Validation & Comparative Workflows` (Jinx, Helpful, Ediff).
-- **Workflow Management:** Dired, Dired Extensions, Dirvish, Project Management, iBuffer, Treemacs, Workspaces.
+- **Lexical Validation & Comparative Workflows (Group 8):** Jinx, Helpful, Ediff, Woman.
+- **Workflow Management:** Dired, Dirvish, Project Management (`projection`), iBuffer, Treemacs, Workspaces (`bufferlo`).
 - **Version Control:** Magit, Forge, Diff-hl, Git-Timemachine, Transient Menu.
 - **Org Mode & Second Brain:** Dynamic Directory Structure, Per-Project Context, Denote, Org GTD, Org Agenda, Org Capture, Org Super Agenda.
 - **Completion Framework:** Orderless, Vertico, Marginalia, Consult, Embark, Corfu, Cape, Dabbrev.
@@ -147,89 +156,52 @@ The AI must NEVER suggest or implement the following patterns:
 
 ## Immediate Structural Action Plan for `config.org.txt`
 
-- The physical reorganization of the 8 Logical Groups defined in the architecture is COMPLETE.
-- The legacy `* TODO Prettify Symbols` bloat has been DELETED and replaced by the simplified Group 1 block.
-- Group 6 (Frame Chrome & Status Indicators) is FULLY FINALIZED.
-- Next Steps: Proceed to Group 7 (Spatial Traversal & Inline Mutations / Precision Editing) and Group 8 (Lexical Validation & Comparative Workflows).
+- **Promote Group 7:** Extract `** TODO Precision Editing` from under `Frame Chrome` and promote it to `* TODO Precision Editing`.
+- **Re-inject `Move Text`:** Add the `move-text` package block back into `Spatial Alignment & Whitespace Hygiene`.
+- **Excise Projectile/Persp:** Replace all commented-out `projectile` and `persp-mode` glue code with `projection` and `bufferlo` equivalents.
+- **Next Steps:** Proceed to Group 8 (Lexical Validation) and Workflow Management.
 
 ## Remaining Work & Questions (Checklists)
 
 ### Spatial Traversal & Inline Mutations (Group 7)
 
-- [ ] Avy: Issue is avy replaces characters when it is active, so the original position to go to is difficult to select using a letter when the letter is blocking the view of the letter to go to.
-- [ ] Anzu: Do I need to anything with other isearch functionalities in the rest of the emacs config to work with anzu?
-- [ ] Anzu: Integrate anzu with lsp-mode server only if possible and if needed
-- [ ] Iedit: Is the current evil-multiedit need to be configured together with iedit?
-- [ ] Iedit: Is iedit needed to integrated with lsp-mode
+- [x] Avy: Finalized `at-full` paradigm, home-row routing, and `avy-isearch` (`M-j`) binding.
+- [ ] Anzu: Integrate anzu with lsp-mode server only if possible and if needed.
+- [ ] Iedit: Determine if iedit needs explicit integration with lsp-mode semantic renaming.
 
 ### Lexical Validation & Comparative Workflows (Group 8)
 
-- [ ] Jinx: Instead of a dict.txt file, I prefer to have every exclusion written here and it should be case-insensitive
-- [ ] Helpful: How does doom emacs configure the helpful package and what keybinding does doom emacs have?
-- [ ] Helpful: It must integrate with the main development tools sections
-- [ ] Helpful: Revisit it again after writing development tools
-- [ ] Ediff: List all the features and functionalities of ediff
+- [ ] Jinx: Migrate exclusions from `dict.txt` to an inline, case-insensitive Elisp list.
+- [ ] Helpful: Integrate with the main development tools sections.
+- [ ] Ediff: Finalize transient menu and vim-style navigation bindings.
 
 ### Workflow Management
 
-- [ ] Project Management: Determine what SPC f p does in doom emacs. Create a similar function for my config
-- [ ] Project Management: Determine what SPC p p does in doom emacs. Create a similar function for my config
-- [ ] Project Management: Use projection package and read the readme carefully for this package: https://raw.githubusercontent.com/mohkale/projection/refs/heads/master/README.org
-
-### Org Mode & Second Brain
-
-- [ ] Transient Template System: Review transient code beforehand
-- [ ] Org Modern: Use this updated org-modern config instead
+- [ ] Project Management: Implement `projection` package.
+- [ ] Workspaces: Implement `bufferlo` package and wire `consult-buffer` sources.
 
 ### Development Tools
 
-- [ ] Language Server Protocol: Must disable and remove lsp-org at all costs
-- [ ] Debug Adapter Protocol: Replace Dape with dap-mode
-- [ ] Debug Adapter Protocol: Use Transient for dap-mode instead of the built-in hydra for dap-mode. Determine if installation of hydra can be skipped.
-- [ ] Debug Adapter Protocol: dap-mode must integrate properly with lsp-mode
-- [ ] Syntax Checking: Replace flymake with flycheck (flycheck and lsp-mode diagnostics must work together)
-- [ ] Eldoc: What scenarios does the doom emacs project use eldoc for? And how does it do them? Search the web thoroughly.
-
-### Highlight TODOs
-
-- [ ] flycheck-todo: Uncomment when setting up flycheck
-
-### LaTeX Writing Environment
-
-- [ ] General: This section should have extra math ligatures for org-mode in source code blocks and latex environments
-- [ ] Core AUCTeX: add preview-auto.el from https://github.com/ultronozm/preview-auto.el
-- [ ] Flymake Integration: Replace with flycheck
-- [ ] Bibliography Management: Uncomment when Project Management is setup
-- [ ] Fast LaTeX Input: Use doom emacs configuration
-- [ ] Preview LaTeX: Determine the difference between this preview package and preview-auto from https://github.com/ultronozm/preview-auto.el
-- [ ] Completions: LSP + AUCTeX + Company Integration: Determine
-
-### Languages
-
-- [ ] Nix: Deal with later / Replace eglot with lsp-mode / Add flycheck
-- [ ] Bash: Replace eglot with lsp-mode
-- [ ] PlantUML: Deal with later
-- [ ] C/C++: Deal with later
-- [ ] Python: Add flycheck
-- [ ] kdl: Deal with later
-- [ ] yaml: Replace eglot with lsp-mode
-- [ ] KBD: Deal with later
+- [ ] Language Server Protocol: Disable and remove `lsp-org` at all costs.
+- [ ] Debug Adapter Protocol: Replace Dape with `dap-mode` and wrap in `transient`.
+- [ ] Syntax Checking: Replace flymake with `flycheck` and chain with `lsp-mode` diagnostics.
+- [ ] Eldoc: Determine Doom Emacs eldoc scenarios and implement.
 
 ### Global Remaining Work
 
-- [ ] Add a doom emacs style keybinding with SPC as leader in general.el for `org-babel-remove-result-one-or-many`
-- [ ] Remove flycheck for now since messing with org-mode editing
-- [ ] Customize org-agenda-finalize to customize org-agenda buffer
-- [x] Setup automatic pair generation for '**', '==', etc and make sure the cursor in insert mode is placed in the middle (Solved via O(1) multi-char prose formatter in Electric Pair)
-- [ ] Determine if compile-angel is needed for elpaca?
-- [ ] Determine if elpaca byte-compiles and native-compiles all packages. And is it okay to leave these settings to elpaca's default.
-- [ ] Pressing enter on a header should move a task from TODO to DONE like doom emacs does
+- [ ] Fix `Precision Editing` header nesting anomaly in `config.org`.
+- [ ] Re-inject `Move Text` into `Spatial Alignment`.
+- [ ] Add a doom emacs style keybinding with SPC as leader in general.el for `org-babel-remove-result-one-or-many`.
+- [ ] Customize org-agenda-finalize to customize org-agenda buffer.
+- [x] Setup automatic pair generation for '**', '==', etc (Solved via O(1) multi-char prose formatter in Electric Pair).
+- [ ] Determine if compile-angel is needed for elpaca.
+- [ ] Pressing enter on a header should move a task from TODO to DONE like doom emacs does.
 
 ### Global Questions
 
 - [ ] Can org-level variation can only work for certain file and/or org buffers?
 - [ ] Are there any other evil related packages that can useful for my workflow?
-- [x] Is there a way to execute nerd-icons-install-fonts during intial emacs setup using elpaca? (Note: Answered - manual execution is mandated to prevent startup network I/O blocking).
-- [x] How do I get history evil commands in the echo area like doom emacs? (Note: Solved via `evil-ex-completion-map` arrow key bindings in the `Evil` subsection).
-- [ ] How can I make the echo area useful? Do this at the very end of the configuration
+- [x] Is there a way to execute nerd-icons-install-fonts during intial emacs setup using elpaca? (Answered: manual execution mandated).
+- [x] How do I get history evil commands in the echo area like doom emacs? (Answered: Solved via `evil-ex-completion-map` arrow keys).
+- [ ] How can I make the echo area useful? Do this at the very end of the configuration.
 - [ ] How to open links from org buffers by pressing enter and using the correct browser?
