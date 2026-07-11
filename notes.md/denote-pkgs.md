@@ -1,53 +1,101 @@
-Based on the latest developments in the Emacs ecosystem up to July 2026, the `denote` package has evolved from a monolithic script into a robust, modular ecosystem. In early 2025, the creator (Protesilaos Stavrou) officially split the project into a lightweight "core" and separate "extensions" . By the release of Denote 4.0.0 in April 2025, each extension became its own independent package . As of May 2026, the core package has reached version 4.2.0 .
+# The Truly Exhaustive Denote Ecosystem (July 2026)
 
-Here is the exhaustive breakdown of the Denote ecosystem as it stands today:
+## 1. Core Engine
 
-### 1. The Core Package
+| Package  | Repository | Description                                                                                           |
+| -------- | ---------- | ----------------------------------------------------------------------------------------------------- |
+| `denote` | GNU ELPA   | The foundational file-naming and retrieval engine. Currently at version 4.2.0 (released 2026-05-20) . |
 
-- **`denote`**: The foundational note-taking tool for Emacs created by Protesilaos Stavrou, based on a predictable and highly efficient file-naming scheme . Core features like `denote-rename-buffer-mode` (which automatically renames buffers to match the note's title) are built directly into this main package rather than being separated out .
+---
 
-### 2. Official Extensions (Maintained by Protesilaos Stavrou)
+## 2. Official Extensions (Maintained by Protesilaos Stavrou)
 
-These packages are officially supported and documented in the main Denote manual, designed to extend specific workflows without bloating the core:
+Following the "Great Denote Split" of February 2025 , these are all standalone GNU ELPA packages:
 
-- **`denote-org`**: Provides Org-specific extensions such as dynamic blocks, links to specific headings, and the ability to split an Org subtree into its own standalone Denote file .
-- **`denote-journal`**: Adds dedicated journaling capabilities, including deep integration with the Emacs `M-x calendar` to visually track and create daily entries .
-- **`denote-silo`**: Provides convenience functions for working with multiple "silos" (localized, isolated `denote-directory` setups that maintain separate contexts from your global notes directory) .
-- **`denote-sequence`**: Implements sequence notes and the _Folgezettel_ (Zettelkasten branching) method natively within the Denote file-naming ecosystem .
-- **`denote-markdown`**: Extensions that better integrate Denote's linking and file-management paradigms with Markdown files .
-- **`denote-merge`**: Released in late 2025, this extension streamlines the complex task of merging contents from one note into another, intelligently handling links between the source and destination files .
+| Package           | Description                                                                          |
+| ----------------- | ------------------------------------------------------------------------------------ |
+| `denote-org`      | Deep Org-mode integration: dynamic blocks, heading links, subtree splitting .        |
+| `denote-journal`  | Calendar integration and daily entry management .                                    |
+| `denote-silo`     | Management of isolated, localized `denote-directory` contexts .                      |
+| `denote-sequence` | Folgezettel (Zettelkasten branching) alphanumeric sequencing .                       |
+| `denote-markdown` | Markdown-specific linking and front-matter parsing .                                 |
+| `denote-merge`    | Utilities for safely merging contents between two Denote notes (released Nov 2025) . |
+| `consult-denote`  | Glue code integrating Denote with `consult` for live-preview filtering .             |
 
-### 3. Third-Party & Integration Packages
+---
 
-The strict file-naming convention of Denote has inspired a rich third-party ecosystem on GNU ELPA and MELPA that bridges Denote with other major Emacs frameworks:
+## 3. Third-Party Packages (MELPA, GitHub, Codeberg)
 
-#### Navigation & Search
+### Navigation, Search & Filtering
 
-- **`consult-denote`**: Maintained by Protesilaos, this provides glue code to integrate Denote with Daniel Mendler's `consult` package, heavily enhancing minibuffer interactions, filtering, and live-preview capabilities .
-- **`denote-search`**: Created by Lucas Quintana, this is a simple, Xref-based search utility that allows regex searching across the actual contents of all Denote notes, presenting the results in a dedicated, navigable buffer .
-- **`denote-menu`**: Created by Suliman/Mailus, this provides an alternative interface to Dired for viewing, filtering, and managing Denote files in a highly structured tabulated list buffer .
+| Package         | Author          | Repository | Description                                                                                                        |
+| --------------- | --------------- | ---------- | ------------------------------------------------------------------------------------------------------------------ |
+| `denote-search` | Lucas Quintana  | GNU ELPA   | Xref-based regex search across all Denote note contents with a navigable results buffer.                           |
+| `denote-menu`   | Suliman/namilus | GNU ELPA   | Replaces Dired with a tabulated list buffer for viewing/filtering Denote files by timestamp, title, and keywords . |
 
-#### Academic & Bibliographic Workflows
+### Academic & Bibliographic
 
-- **`citar-denote`**: Created by Peter Prevos, this package links bibliographic items managed by the `citar` package to Denote notes, streamlining academic literature reviews and citation management .
+| Package                 | Author          | Repository | Description                                                                                                                    |
+| ----------------------- | --------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `citar-denote`          | Peter Prevos    | MELPA      | Bridges `citar` bibliography manager with Denote for automatic literature note creation tied to BibTeX keys .                  |
+| `denote-citar-sections` | Samuel W. Flint | MELPA      | Universal Sidecar sections specifically for `citar-denote`, displaying formatted abstracts and citation metadata in sidebars . |
 
-#### Analytics & Visualization
+### Analytics & Visualization
 
-- **`denote-explore`**: Created by Peter Prevos, this offers helper functions to analyze, visualize, and generate statistics (like network graphs and tag distributions) for a Denote directory .
-- **`denote-wordcloud`**: Created by Alexander Kuzmin, this generates visual word clouds from the textual contents of your Denote notes .
+| Package            | Author                     | Repository | Description                                                                                                             |
+| ------------------ | -------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `denote-explore`   | Peter Prevos               | MELPA      | Statistical dashboards, network graphs (JavaScript/GraphViz/GEXF formats), random walks, and tag distribution metrics . |
+| `denote-wordcloud` | Alexander Kuzmin (treflip) | MELPA      | Generates clickable keyword clouds showing word frequencies in a separate buffer .                                      |
 
-#### UI & Sidebar Integrations
+### UI & Sidebar Integrations
 
-- **`denote-sections`**: Created by Samuel W. Flint, this integrates with the `universal-sidecar` package to manage and display distinct sections (like backlinks, metadata, or citations) within Denote notes in a dedicated sidebar .
-- **`ekg-denote`**: An integration package bridging the `ekg` (Emacs Knowledge Graph) system with Denote's file-naming and retrieval mechanisms .
+| Package           | Author            | Repository | Description                                                                                                      |
+| ----------------- | ----------------- | ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| `denote-refs`     | Akib Azmain Turja | Codeberg   | Automatically injects a visual list of outgoing links and incoming backlinks directly below the front matter .   |
+| `denote-sections` | Samuel W. Flint   | MELPA      | Integrates with `universal-sidecar` to render Denote metadata, backlinks, and citations in a dedicated sidebar . |
+| `ekg-denote`      | Andrew Hyatt      | GitHub     | Bridges the `ekg` (Emacs Knowledge Graph) SQLite-backed system with Denote's file-naming scheme.                 |
 
-### Architectural Recommendation for Your Configuration
+### Agenda & Calendar Integration
 
-For your `Second Brain & Productivity` workflow, the most mathematically sound stack to pair with your current `config.org` setup is:
+| Package         | Author    | Repository | Description                                                                                                                                                                                                                                     |
+| --------------- | --------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `denote-agenda` | Community | MELPA      | **NEW FIND** - Simple integration between Denote and Org-Agenda. Aware of `denote-journal` and provides configuration options to surface Denote notes in agenda views . Added to MELPA in February 2025 .                                       |
+| `denote-review` | mattof    | Codeberg   | **NEW FIND** - Implements a spaced-repetition review process for Denote notes using a `reviewdate` front matter property. Creates tabulated lists of notes due for review . Currently pending GNU ELPA acceptance (under discussion Jan 2026) . |
 
-1.  **Core + Journal:** `denote` + `denote-journal` (for your daily reviews).
-2.  **Org Integration:** `denote-org` (essential for dynamic blocks and subtree splitting).
-3.  **Minibuffer Synergy:** `consult-denote` (to leverage your existing Vertico/Consult stack for lightning-fast note retrieval).
-4.  **Academic/LaTeX Synergy:** `citar-denote` (to bridge your `citar` bibliography management with your literature notes).
+### Zettelkasten & Specialized Workflows
 
-Packages like `denote-menu` and `denote-explore` are optional quality-of-life additions, as your existing `dired`/`dirvish` and `consult-ripgrep` setups already cover most file management and search needs natively.
+| Package                   | Author               | Repository | Description                                                                                                 |
+| ------------------------- | -------------------- | ---------- | ----------------------------------------------------------------------------------------------------------- |
+| `denote-zettel-interface` | Kristoffer Balintona | GitHub     | Represents the folgezettel index in a `tabulated-list-mode` format for navigating Luhmann-style sequences . |
+| `denote-roam`             | BardofSprites        | GitHub     | A bridge package between Denote and `org-roam` for users migrating or maintaining both systems .            |
+
+### Publishing & Export
+
+| Package          | Author           | Repository | Description                                                                                                                                                                            |
+| ---------------- | ---------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `denote-publish` | Vedang Manerikar | GitHub     | Exports Denote files to Markdown with preserved metadata, customizable YAML front matter, and support for Denote-style internal links . Designed for static site generators like Hugo. |
+
+---
+
+## 4. Glue Code Patterns (No Standalone Package)
+
+| Pattern                       | Description                                                                                                       |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `org-transclusion` + Denote   | Community standard uses `denote-get-path-by-id` inside `org-transclusion` directives to dynamically embed notes . |
+| Obsidian Web Clipper + Denote | Workflow hack using Obsidian's web clipper configured to save in Denote's format .                                |
+| macOS Safari Capture          | OS-level service using AppleScript to capture Safari selections into Denote files .                               |
+
+---
+
+## Summary: What Was Missing From Previous Documents
+
+The following packages were **not** in your previous verification files:
+
+1. **`denote-agenda`** - Org-Agenda integration (MELPA, Feb 2025)
+2. **`denote-citar-sections`** - Universal Sidecar sections for citar-denote (MELPA, Jun 2024)
+3. **`denote-review`** - Spaced-repetition review system (Codeberg, pending ELPA)
+4. **`denote-zettel-interface`** - Tabulated folgezettel navigation (GitHub)
+5. **`denote-roam`** - Bridge between Denote and org-roam (GitHub)
+6. **`denote-publish`** - Markdown export with YAML front matter for Hugo/Jekyll (GitHub)
+
+The total count is now **22 distinct packages** (1 core + 7 official extensions + 14 third-party packages), plus 3 documented glue-code patterns.

@@ -1,4 +1,4 @@
-- Ingest the 5 attached files and make sure you have read everything to the letter and follow all the instructions to the letter.
+- Ingest the 5 attached files and make sure you have read everything to the letter and follow all the instructions to the letter. Then acknowlegde that you have read all 5 files
 
 - Now lets work on the Misc subsection. Review this section thoroughly in great detail. Then fix any errors and issues. But do not rewrite the Misc subsection yet under any circumstances. Explain everything in great detail for me to review.
 

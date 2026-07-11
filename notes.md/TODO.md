@@ -25,3 +25,4 @@
 - [ ] `Important`: add denote-explore package
 - [ ] `Important`: package-quickstart\*, eln-cache/ should be in either var or etc
 - [ ] `Important`: add auto-tangle-mode package
+- [ ] `Important`: add flyover

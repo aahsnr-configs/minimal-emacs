@@ -156,3 +156,65 @@ When implementing this stack in `config.org`, the following strict boundaries mu
 2.  **No `smartparens` or `puni`**: Regex-based pair tracking causes desyncs in complex strings/templates.
 3.  **Isolate Refactoring Tools**: Bind AST manipulation commands to a dedicated Transient menu or leader prefix (e.g., `SPC c r`) to prevent accidental structural mutations during rapid typing.
 4.  **Emacs 30/31 API Safety**: Any configuration utilizing native Emacs 30 AST functions must be wrapped in defensive runtime guards (e.g., `(when (fboundp 'treesit-navigate-thing) ...)`).
+
+# Avy Stack
+
+I have conducted a deep-dive analysis into the current Emacs spatial traversal ecosystem (up to July 2026), specifically focusing on how to complement **Avy** within a strict **Vanilla Emacs + Evil** workflow. I have also analyzed the specific visual friction you mentioned regarding Avy's overlays obscuring target characters.
+
+Below is a detailed architectural breakdown of the packages, built-in features, and styling paradigms that solve your issues and complete the spatial navigation stack. **As per the strict greenlight protocol, zero configuration code is included.**
+
+### 1. Solving the Avy Overlay "Blocking" Issue
+
+The issue you identified—where Avy replaces characters or obscures the target letter when the jump key matches the underlying text—is a known visual friction point caused by Avy's default overlay rendering engine.
+
+- **The `avy-style` Paradigm Shift:** By default, Avy often uses the `pre` or `at` styles, which inject a single character overlay directly on top of or immediately before the target . To solve the obscuration issue, modern configurations shift to **`at-full`** or **`words`**.
+  - `at-full`: Instead of replacing a single character, Avy highlights the _entire word_ containing the target, and applies a distinct, high-contrast face to the specific jump character . This preserves the surrounding context and makes the target instantly readable.
+  - `words`: Uses a dictionary of short, unique words (e.g., "the", "and", "for") as jump labels instead of single characters. This completely eliminates single-character overlap and is highly favored by touch-typists.
+- **De Bruijn Sequences:** For users who prefer single characters, setting `avy-style` to **`de-bruijn`** generates mathematically optimal, non-overlapping character sequences . This ensures that the sequence of keys you type is unique and minimizes visual clutter.
+- **Face Contrast & Background Dimming:** The obscuration issue is often mitigated not by changing the overlay text, but by changing the _background_. By enabling `avy-background` (which dims the rest of the buffer) and customizing `avy-lead-face-0`, `avy-lead-face-1`, and `avy-lead-face-2` with high-contrast, opaque background colors (e.g., bright neon blocks), the jump labels act as distinct "spotlights" rather than text replacements . The underlying code remains visible through the contrast, and the dimming effect forces the eye to focus strictly on the labeled targets.
+
+### 2. The "Short-Distance vs. Long-Distance" Paradigm (The Leap.nvim Equivalent)
+
+In the Neovim ecosystem, plugins like `leap.nvim` and `flash.nvim` have gained massive popularity by combining incremental search with spatial labels . In the Emacs/Evil ecosystem, this paradigm is best achieved by pairing **Avy** with **`evil-snipe`**.
+
+- **`evil-snipe` (The Local Jumper):** Created by Henrik Lissner (the architect behind Doom Emacs), `evil-snipe` is the definitive complement to Avy . While Avy requires a global buffer scan and a modal "jump state," `evil-snipe` extends Evil's native `f`, `F`, `t`, and `T` motions to search for **2-character combinations** across the visible screen .
+  - _Why it complements Avy:_ `evil-snipe` provides instant, low-latency jumps for local movement (e.g., jumping to the next `def` or `return` statement) without breaking your typing flow. You reserve Avy for long-distance jumps, complex targets, or cross-window navigation.
+  - _Visual Synergy:_ `evil-snipe` highlights all matches inline with a subtle underline or background color, providing immediate visual feedback before you even commit to the jump, which is a feature `leap.nvim` users praise .
+- **`avy-flash` / `key-leap` (The Modern Alternatives):** There have been recent community efforts to port `flash.nvim` directly to Emacs (e.g., `avy-flash`) , and packages like `key-leap` attempt to replicate the "leap to visible lines" mechanic . However, for a Vanilla Emacs + Evil stack, the combination of `consult-line` (for search-based jumping) + `evil-snipe` (for 2-char local jumping) + `avy` (for N-char global jumping) is mathematically superior and more stable than adopting niche ports.
+
+### 3. Essential External Complementary Packages
+
+To build a complete spatial traversal stack, the following packages are considered mandatory companions to Avy in modern configurations:
+
+- **`ace-window`:** The definitive companion to Avy for window management. While Avy jumps the cursor _within_ a buffer, `ace-window` uses the exact same radix-tree algorithm to jump _between_ split windows or frames . It maps window labels to the home row, allowing you to switch focus to any visible window in 1-2 keystrokes, completely eliminating the need for `C-x o` or mouse clicks.
+- **`ace-link`:** Emacs' native `*Help*`, `*Info*`, and `*Custom*` buffers are filled with unclickable text links. Navigating them with standard motions is painful. `ace-link` uses Avy-style overlays to let you jump to and open any visible link in 2 keystrokes . It integrates seamlessly with `evil-collection` and `helpful`.
+- **`avy-zap` (or `zap-to-char` integration):** Native Emacs `zap-to-char` (`M-z`) blindly deletes text up to the _first_ occurrence of a character, often destroying code if the character appears multiple times on the line. `avy-zap-to-char-dwim` replaces this by dropping Avy labels on every instance of the target character, allowing you to visually select exactly which instance to delete up to .
+- **`casual-avy` / `avy-menu`:** Avy has a massive API (`avy-copy-line`, `avy-move-line`, `avy-kill-region`, `avy-goto-char-timer`) that is difficult to memorize. `casual-avy` provides a Transient-based UI (a menu that appears in the echo area) to discover and execute these advanced Avy actions without memorizing dozens of distinct keybindings .
+
+### 4. Built-in Emacs Synergies
+
+You do not always need external packages to complement Avy; Emacs' native features offer deep integration:
+
+- **`isearch` + Avy Hijack:** Avy can natively intercept `isearch`. When you are in the middle of a standard `C-s` incremental search, pressing your designated Avy key (often `C-'` or `M-j`) instantly drops Avy labels _only_ on the current search matches . This is significantly faster than `consult-line` for purely visual, in-buffer targeting because it requires zero context switching.
+- **Native Emacs 30 `treesit-thing` Navigation:** As configured in your Group 3, `treesit-thing-next` and `treesit-thing-prev` provide O(1) AST sibling hopping. This replaces the need for Avy when jumping between functions, classes, or arguments, reserving Avy strictly for arbitrary string/character targeting where the AST is irrelevant.
+- **`xref` and `lsp-mode` Jumps:** While Avy is for _visible_ text, `xref-find-definitions` (`g d`) and `xref-find-references` (`g D`) handle _semantic_ spatial traversal. These are already mapped in your `general.el` block and form the "backend" to Avy's "frontend" visual jumping.
+
+### 5. Addressing Common Productivity Issues
+
+Implementing this complementary stack solves several major productivity bottlenecks frequently cited by Emacs users:
+
+- **The "Mouse Dependency" Trap:** Users frequently reach for the mouse to click on a distant line, a specific error in the compilation buffer, or a link in a help buffer. The combination of Avy + `ace-window` + `ace-link` completely eliminates the need for mouse input, keeping hands strictly on the home row and maintaining the "flow state" .
+- **Context Switching in Read-Only Buffers:** Navigating Emacs' native documentation buffers is notoriously difficult with standard Vim motions. `ace-link` and `avy-goto-line` turn these read-only buffers into instantly navigable dashboards.
+- **The "Which-Key" Ambiguity:** When using `avy-goto-char`, if there are multiple identical characters on screen, the user must type multiple keys. Using `avy-goto-char-2` (requiring a 2-character sequence) or `avy-goto-word-1` drastically reduces the "decision tree" depth, making jumps faster and less cognitively taxing .
+
+### Summary of the Recommended Stack
+
+To finalize the **Spatial Traversal & Inline Mutations (Group 7)** section, the architectural stack should consist of:
+
+1.  **Avy** (Core engine, styled with `at-full` or `words` to prevent obscuration).
+2.  **`evil-snipe`** (For 2-character local `f`/`t` extensions).
+3.  **`ace-window`** (For cross-window jumping).
+4.  **`ace-link`** (For Help/Org/Info link jumping).
+5.  **`avy-zap`** (For visual `zap-to-char` replacement).
+
+I am locked in and awaiting your signal to proceed with generating the `config.org` blocks for Avy and its companions.
