@@ -2098,7 +2098,7 @@ AST-aware vertical guides synchronizing depth colorization with rainbow-delimite
 
 
 
-* DONE Frame Chrome & Status Indicators
+* TODO Frame Chrome & Status Indicators
 Renders visual feedback, window dividers, and modeline components. Provides spatial orientation and contextual metadata within the editing frame.
 
 ** DONE Line Numbers
