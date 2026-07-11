@@ -2368,6 +2368,10 @@ Native Emacs 29+ face-remapping engine for global typography scaling. Prevents P
 
 
 
+
+
+
+
 * TODO Precision Editing
 ** DONE Avy
 Provides an O(1) radix-tree jumping engine for long-distance spatial navigation. Configured with the =at-full= overlay style, home-row routing, proximity sorting, and on-demand multi-window expansion.
@@ -2545,6 +2549,7 @@ use-package re-builder
 
 ** TODO Avy Transient Menu
 Exposes Avy's mutation APIs under a dedicated Transient menu to prevent global keymap pollution. Groups complex line and region manipulations logically for rapid execution.
+- [ ] Use casual avy's code as reference
 #+begin_src emacs-lisp
 (with-eval-after-load 'transient
   (defun ar/avy-transient-title ()
@@ -2569,6 +2574,11 @@ Exposes Avy's mutation APIs under a dedicated Transient menu to prevent global k
      ["Exit"
       ("<escape>" "" transient-quit-one :format " ")]]))
 #+end_src
+
+
+
+
+
 
 
 * TODO Lexical Validation & Comparative Workflows
