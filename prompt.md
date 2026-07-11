@@ -21,3 +21,26 @@
   6. It must be able to update the emacs package
   7. It must ask permisson at each step. The format would be y/N. Only pressing y approves the step. Pressing N or any other key denies the step
   8. It must provide all the instructions to build and install emacs from source. This is the main task. For now, it will download emacs-pretest. It must use the correct --config flags something like
+
+  ***
+
+  ***
+
+  ***
+
+Now look at the attached.el from doom emacs project. Determine there are any useful configurations we can borrow for the Precision Editing main section as well as the whole emacs config in config.org file.
+
+---
+
+- avy-all-windows-alt and avy-single-candidate-jump from `section 1`.
+- C-s bound to consult-history from `section 2A`
+- tabulated-list-mode and epg-pinentry-mode for `section 2B` and `section 2C` respectively.
+
+When you give the signal to proceed with future sections, I will mathematically inject:
+
+1.  `avy-all-windows-alt` and `avy-single-candidate-jump` into the **Avy** block.
+2.  `consult-history` routing into the **Vertico/Consult** block.
+3.  The `tabulated-list-mode` "q" fix and `epg-pinentry-mode` into **Core Emacs -> Small Configs**.
+4.  The `woman-manpath` extraction into the **Helpful/Woman** block.
+
+Change the keybindings `M-j` and `M-k` to use arrows and use git diff to write the changes.
