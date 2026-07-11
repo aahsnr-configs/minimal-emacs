@@ -342,6 +342,18 @@ Quality-of-life settings, safety guards, and core minor modes. Disables unused V
 ;; before Emacs overwrites them via kill/cut operations.
 (setq save-interprogram-paste-before-kill t)
 
+;; Routes GPG passphrase prompts to the native minibuffer, preventing external
+;; GTK/Qt OS dialog freezes and preserving daemon stability on PGTK/Wayland.
+(setq epg-pinentry-mode 'loopback)
+
+;; Standardizes `q` to gracefully bury read-only dashboard buffers (*Packages*,
+;; *Flycheck*, *Buffer List*, etc.) to match Vim/Emacs muscle memory.
+(with-eval-after-load 'tabulated-list
+  (define-key tabulated-list-mode-map "q" #'quit-window))
+
+
+
+
 ;; Fallback major-mode associations for extensions lacking native Emacs support.
 (dolist (pair '(("\\.in\\'" . text-mode)
                 ("\\.out\\'" . text-mode)
@@ -1813,9 +1825,10 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
    :states 'visual
    "v" #'expreg-expand)
 
-  ;; Global Fallback: Mapped to `C-M-+` and `C-M--` to avoid clobbering text-scale bindings.
+  ;; Global Fallback: Maps `M-=` (Doom's expand-region mnemonic) and modifier combinations.
   (general-define-key
    :states '(normal visual motion)
+   "M-=" #'expreg-expand
    "C-M-+" #'expreg-expand
    "C-M--" #'expreg-contract))
 #+end_src
@@ -2113,7 +2126,14 @@ Provides O(1) line and region dragging. Automatically re-indents displaced lines
           (indent-region (region-beginning) (region-end))
         (indent-region (line-beginning-position) (line-end-position)))
       (setq deactivate-mark deactivate)))
-  (advice-add #'move-text-up :after #'ar/move-text-indent-region-advice)
+  (advice-add #'move-text-down :after #'ar/move-text-indent-region-advice)
+
+  ;; PGTK-safe line dragging. Replaces legacy M-j/M-k bindings to preserve
+  ;; home-row availability and prevent terminal escape-sequence parsing bugs.
+  (general-define-key
+   :states '(normal visual insert)
+   "<M-down>" #'move-text-down
+   "<M-up>" #'move-text-up))
   (advice-add #'move-text-down :after #'ar/move-text-indent-region-advice))
 #+end_src
 
@@ -2361,18 +2381,12 @@ Native Emacs 29+ face-remapping engine for global typography scaling. Prevents P
 
 
 * TODO Precision Editing
-- [ ] Use avy-stack.md to update everything
-
-Governs spatial traversal, search tracking, and localized text mutations. Enforces strict separation between lexical search engines and semantic AST refactoring tools.
-
-** TODO Avy
+** DONE Avy
 Provides an O(1) radix-tree jumping engine for long-distance spatial navigation. Configured with the =at-full= overlay style, home-row routing, proximity sorting, and on-demand multi-window expansion.
 #+begin_src emacs-lisp
 (use-package avy
   :defer t
-  :commands (avy-goto-char-2 avy-goto-line avy-goto-word-1 avy-goto-word-0 avy-isearch
-             avy-move-line avy-copy-line avy-kill-region avy-transpose-lines-in-region
-             avy-move-region avy-copy-region avy-kill-ring-save-region)
+  :commands (avy-goto-char-2 avy-goto-line avy-goto-word-1 avy-goto-word-0 avy-isearch avy-move-line avy-copy-line avy-kill-region avy-transpose-lines-in-region avy-move-region avy-copy-region avy-kill-ring-save-region)
   :bind (:map isearch-mode-map
          ("M-j" . avy-isearch))
   :custom
@@ -8337,625 +8351,598 @@ Native directional window navigation. Enables wrap-around physics for spatial tr
 
 * TODO General Keybindings
 #+begin_src emacs-lisp
-(use-package general
-  :demand t
-  :after evil
-  :config
-  ;; Set up leader keys
-  (general-create-definer ar/global-leader
-    :states '(normal insert visual emacs)
-    :prefix "SPC"
-    :global-prefix "C-SPC")
-
-  (general-create-definer ar/local-leader
-    :states '(normal insert visual emacs)
-    :prefix "SPC m"
-    :global-prefix "C-SPC m")
-
   ;; Buffer operations (SPC b)
-  (ar/global-leader
-    "b" '(:ignore t :wk "buffer")
-    "b b" '(consult-buffer :wk "Switch buffer")
-    "b i" '(ibuffer :wk "Ibuffer")
-    "b k" '(kill-current-buffer :wk "Kill buffer")
-    "b K" '(kill-buffer :wk "Kill buffer (choose)")
-    "b n" '(next-buffer :wk "Next buffer")
-    "b p" '(previous-buffer :wk "Previous buffer")
-    "b r" '(revert-buffer-quick :wk "Revert buffer")
-    "b R" '(rename-buffer :wk "Rename buffer")
-    "b S" '(save-buffer :wk "Save buffer")
-    "b z" '(bury-buffer :wk "Bury buffer")
-    "b [" '(previous-buffer :wk "Previous buffer")
-    "b ]" '(next-buffer :wk "Next buffer"))
+(ar/global-leader
+  "b" '(:ignore t :wk "buffer")
+  "b b" '(consult-buffer :wk "Switch buffer")
+  "b i" '(ibuffer :wk "Ibuffer")
+  "b k" '(kill-current-buffer :wk "Kill buffer")
+  "b K" '(kill-buffer :wk "Kill buffer (choose)")
+  "b n" '(next-buffer :wk "Next buffer")
+  "b p" '(previous-buffer :wk "Previous buffer")
+  "b r" '(revert-buffer-quick :wk "Revert buffer")
+  "b R" '(rename-buffer :wk "Rename buffer")
+  "b S" '(save-buffer :wk "Save buffer")
+  "b z" '(bury-buffer :wk "Bury buffer")
+  "b [" '(previous-buffer :wk "Previous buffer")
+  "b ]" '(next-buffer :wk "Next buffer"))
 
-  ;; Dired/Dirvish operations (Doom-like)
-  (ar/global-leader
-    "d" '(:ignore t :wk "dired")
-    "d d" '(dired-jump :wk "Open dired here")
-    "d D" '(dired :wk "Open dired...")
-    "d s" '(dirvish-side :wk "Dirvish sidebar")
-    "d f" '(dirvish-dwim :wk "Dirvish fullscreen")
-    "d h" '(dirvish-show-history :wk "History")
-    "d a" '(dirvish-quick-access :wk "Quick access")
-    "d j" '(dirvish-fd-jump :wk "Jump fd"))
+;; Dired/Dirvish operations (Doom-like)
+(ar/global-leader
+  "d" '(:ignore t :wk "dired")
+  "d d" '(dired-jump :wk "Open dired here")
+  "d D" '(dired :wk "Open dired...")
+  "d s" '(dirvish-side :wk "Dirvish sidebar")
+  "d f" '(dirvish-dwim :wk "Dirvish fullscreen")
+  "d h" '(dirvish-show-history :wk "History")
+  "d a" '(dirvish-quick-access :wk "Quick access")
+  "d j" '(dirvish-fd-jump :wk "Jump fd"))
 
-  ;; Debug operations (SPC x) - "execute/run"
-  (ar/global-leader
-    "x" '(:ignore t :wk "execute/debug")
-    "x x" '(ar/toggles-dape :wk "Debug menu")
-    "x d" '(dape :wk "Start debugging")
-    "x b" '(dape-breakpoint-toggle :wk "Toggle breakpoint")
-    "x n" '(dape-next :wk "Next")
-    "x s" '(dape-step-in :wk "Step in")
-    "x o" '(dape-step-out :wk "Step out")
-    "x c" '(dape-continue :wk "Continue")
-    "x q" '(dape-quit :wk "Quit debugger")
-    "x k" '(dape-kill :wk "Kill debugger")
-    "x r" '(dape-restart :wk "Restart")
-    "x w" '(dape-watch-dwim :wk "Watch"))
+;; Debug operations (SPC x) - "execute/run"
+(ar/global-leader
+  "x" '(:ignore t :wk "execute/debug")
+  "x x" '(ar/toggles-dape :wk "Debug menu")
+  "x d" '(dape :wk "Start debugging")
+  "x b" '(dape-breakpoint-toggle :wk "Toggle breakpoint")
+  "x n" '(dape-next :wk "Next")
+  "x s" '(dape-step-in :wk "Step in")
+  "x o" '(dape-step-out :wk "Step out")
+  "x c" '(dape-continue :wk "Continue")
+  "x q" '(dape-quit :wk "Quit debugger")
+  "x k" '(dape-kill :wk "Kill debugger")
+  "x r" '(dape-restart :wk "Restart")
+  "x w" '(dape-watch-dwim :wk "Watch"))
 
-  ;; File operations (SPC f)
-  (ar/global-leader
-    "f" '(:ignore t :wk "file")
-    "f f" '(find-file :wk "Find file")
-    "f r" '(consult-recent-file :wk "Recent files")
-    "f s" '(save-buffer :wk "Save file")
-    "f S" '(write-file :wk "Save as")
-    ;; "f p" '(ar/open-emacs-config-project :wk "Config project")
-    "f E" '(sudo-edit :wk "Sudo edit")
-    "f l" '(reload-init-file :wk "Reload config")
-    "f e" '(:ignore t :wk "emacs")
-    "f e d" '((lambda () (interactive) (find-file user-emacs-directory)) :wk "Open emacs.d")
-    "f e i" '((lambda () (interactive) (find-file user-init-file)) :wk "Open init.el")
-    "f d" '(consult-dir :wk "Change directory")
-    "f j" '(consult-dir-jump-file :wk "Jump to file in dir"))
+;; File operations (SPC f)
+(ar/global-leader
+  "f" '(:ignore t :wk "file")
+  "f f" '(find-file :wk "Find file")
+  "f r" '(consult-recent-file :wk "Recent files")
+  "f s" '(save-buffer :wk "Save file")
+  "f S" '(write-file :wk "Save as")
+  ;; "f p" '(ar/open-emacs-config-project :wk "Config project")
+  "f E" '(sudo-edit :wk "Sudo edit")
+  "f l" '(reload-init-file :wk "Reload config")
+  "f e" '(:ignore t :wk "emacs")
+  "f e d" '((lambda () (interactive) (find-file user-emacs-directory)) :wk "Open emacs.d")
+  "f e i" '((lambda () (interactive) (find-file user-init-file)) :wk "Open init.el")
+  "f d" '(consult-dir :wk "Change directory")
+  "f j" '(consult-dir-jump-file :wk "Jump to file in dir"))
 
-  ;; Diff/Ediff operations (SPC v) - "view/compare"
-  (ar/global-leader
-    "v" '(:ignore t :wk "view/diff")
-    "v v" '(ar/ediff-transient :wk "Ediff menu")
-    "v d" '(ediff :wk "Ediff")
-    "v f" '(ediff-files :wk "Ediff files")
-    "v b" '(ediff-buffers :wk "Ediff buffers")
-    "v c" '(ediff-current-file :wk "Ediff current file")
-    "v r" '(ediff-revision :wk "Ediff revision")
-    "v 3" '(ediff3 :wk "Ediff3")
-    "v m" '(ediff-merge :wk "Merge")
-    "v M" '(ediff-merge-with-ancestor :wk "Merge with ancestor")
-    "v p" '(ediff-patch-file :wk "Patch file")
-    "v P" '(ediff-patch-buffer :wk "Patch buffer"))
-
-
-  ;; Search operations (SPC s)
-  (ar/global-leader
-    "s" '(:ignore t :wk "search")
-    "s c" '(evil-ex-nohighlight :wk "Clear highlights")
-    "s s" '(consult-line :wk "Search buffer")
-    "s S" '(consult-line-multi :wk "Search buffers")
-    "s p" '(consult-ripgrep :wk "Search project")
-    "s d" '(consult-dir :wk "Search directory")
-    "s i" '(consult-imenu :wk "Imenu")
-    "s I" '(consult-imenu-multi :wk "Imenu multi")
-    "s o" '(consult-outline :wk "Outline")
-    "s b" '(consult-line :wk "Search buffer")
-    "s j" '(evil-show-jumps :wk "Jump list")
-    "s m" '(consult-mark :wk "Mark ring")
-    "s e" '(consult-isearch-history :wk "Search history")
-    "s r" '(vertico-repeat :wk "Repeat last search")
-    "s y" '(consult-yasnippet :wk "Yasnippet")
-    "s t" '(hl-todo-occur :wk "Todo list")
-    "s T" '(hl-todo-rg-project :wk "Todo in project"))
-
-  ;; Window operations (SPC w)
-  (ar/global-leader
-    "w"           '(:ignore t :wk "window")
-    "w w"         '(other-window :wk "Other window")
-    "w d"         '(delete-window :wk "Delete window")
-    "w D"         '(delete-other-windows :wk "Delete other windows")
-    "w s"         '(split-window-below :wk "Split below")
-    "w v"         '(split-window-right :wk "Split right")
-    ;; Navigation (Arrow Keys)
-    "w <left>"    '(evil-window-left :wk "Window left")
-    "w <down>"    '(evil-window-down :wk "Window down")
-    "w <up>"      '(evil-window-up :wk "Window up")
-    "w <right>"   '(evil-window-right :wk "Window right")
-    ;; Moving Windows (Shift + Arrow Keys)
-    "w S-<left>"  '(evil-window-move-far-left :wk "Move far left")
-    "w S-<down>"  '(evil-window-move-very-bottom :wk "Move bottom")
-    "w S-<up>"    '(evil-window-move-very-top :wk "Move top")
-    "w S-<right>" '(evil-window-move-far-right :wk "Move far right")
-    "w ="         '(balance-windows :wk "Balance windows")
-    "w m"         '(delete-other-windows :wk "Maximize")
-    "w o"         '(other-window :wk "Other window")
-    "w u"         '(winner-undo :wk "Winner undo")
-    "w r"         '(winner-redo :wk "Winner redo")
-    "w t"         '(toggle-window-split :wk "Toggle split")
-    "w _"         '(split-window-vertically-instead :wk "Split vertically instead")
-    "w |"         '(split-window-horizontally-instead :wk "Split horizontally instead"))
-
-  ;; TODO: Replace with Projectile alternative
-  ;; Project operations (SPC p)
-  ;; (ar/global-leader
-  ;;   "p" '(:ignore t :wk "project")
-  ;;   "p p" '(ar/project-switch-to-file :wk "Switch project → find file")
-  ;;   "p P" '(ar/project-switch-with-menu :wk "Switch project (menu)")
-  ;;   "p f" '(projectile-find-file :wk "Find file in project")
-  ;;   "p s" '(consult-ripgrep :wk "Search project")
-  ;;   "p b" '(projectile-switch-to-buffer :wk "Project buffers")
-  ;;   "p k" '(projectile-kill-buffers :wk "Kill project buffers")
-  ;;   "p c" '(projectile-compile-project :wk "Compile project")
-  ;;   "p d" '(projectile-dired :wk "Dired project root")
-  ;;   "p e" '(projectile-run-eshell :wk "Eshell in project")
-  ;;   "p t" '(ar/treemacs-toggle :wk "Toggle treemacs (current project)")
-  ;;   "p i" '(projectile-invalidate-cache :wk "Invalidate cache")
-  ;;   "p r" '(projectile-replace :wk "Replace in project")
-  ;;   "p R" '(projectile-replace-regexp :wk "Replace regexp in project")
-  ;;   "p a" '(projectile-add-known-project :wk "Add known project"))
+;; Diff/Ediff operations (SPC v) - "view/compare"
+(ar/global-leader
+  "v" '(:ignore t :wk "view/diff")
+  "v v" '(ar/ediff-transient :wk "Ediff menu")
+  "v d" '(ediff :wk "Ediff")
+  "v f" '(ediff-files :wk "Ediff files")
+  "v b" '(ediff-buffers :wk "Ediff buffers")
+  "v c" '(ediff-current-file :wk "Ediff current file")
+  "v r" '(ediff-revision :wk "Ediff revision")
+  "v 3" '(ediff3 :wk "Ediff3")
+  "v m" '(ediff-merge :wk "Merge")
+  "v M" '(ediff-merge-with-ancestor :wk "Merge with ancestor")
+  "v p" '(ediff-patch-file :wk "Patch file")
+  "v P" '(ediff-patch-buffer :wk "Patch buffer"))
 
 
-  ;; Toggle operations (SPC t)
-  (ar/global-leader
-    "t" '(:ignore t :wk "toggle")
-    "t l" '(display-line-numbers-mode :wk "Line numbers")
-    "t w" '(whitespace-mode :wk "Whitespace")
-    "t f" '(toggle-frame-fullscreen :wk "Fullscreen")
-    "t m" '(markdown-toggle-markup-hiding :wk "Markdown markup")
-    "t v" '(visual-line-mode :wk "Visual line mode")
-    "t r" '(rainbow-mode :wk "Rainbow mode")
-    "t h" '(global-hl-line-mode :wk "Highlight line")
-    "t s" '(global-prettify-symbols-mode :wk "Prettify symbols")
-    "t p" '(show-paren-mode :wk "Show paren")
-    "t t" '(ar/toggles-transient :wk "Toggles menu"))
+;; Search operations (SPC s)
+(ar/global-leader
+  "s" '(:ignore t :wk "search")
+  "s c" '(evil-ex-nohighlight :wk "Clear highlights")
+  "s s" '(consult-line :wk "Search buffer")
+  "s S" '(consult-line-multi :wk "Search buffers")
+  "s p" '(consult-ripgrep :wk "Search project")
+  "s d" '(consult-dir :wk "Search directory")
+  "s i" '(consult-imenu :wk "Imenu")
+  "s I" '(consult-imenu-multi :wk "Imenu multi")
+  "s o" '(consult-outline :wk "Outline")
+  "s b" '(consult-line :wk "Search buffer")
+  "s j" '(evil-show-jumps :wk "Jump list")
+  "s m" '(consult-mark :wk "Mark ring")
+  "s e" '(consult-isearch-history :wk "Search history")
+  "s r" '(vertico-repeat :wk "Repeat last search")
+  "s y" '(consult-yasnippet :wk "Yasnippet")
+  "s t" '(hl-todo-occur :wk "Todo list")
+  "s T" '(hl-todo-rg-project :wk "Todo in project"))
 
-  ;; Open operations (SPC o)
-  (ar/global-leader
-   "o" '(:ignore t :wk "open")
-   "o t" '(ar/ghostel-toggle :wk "toggle ghostel")
-   "o T" '(ghostel-project :wk "Ghostel project")
-   "o s" '(shell :wk "Shell")
-   "o d" '(dired :wk "Dired")
-   "o D" '((lambda () (interactive) (switch-to-buffer "*dashboard*")) :wk "Dashboard")
-   "o P" '(popper-toggle :wk "Toggle popup"))
+;; Window operations (SPC w)
+(ar/global-leader
+  "w"           '(:ignore t :wk "window")
+  "w w"         '(other-window :wk "Other window")
+  "w d"         '(delete-window :wk "Delete window")
+  "w D"         '(delete-other-windows :wk "Delete other windows")
+  "w s"         '(split-window-below :wk "Split below")
+  "w v"         '(split-window-right :wk "Split right")
+  ;; Navigation (Arrow Keys)
+  "w <left>"    '(evil-window-left :wk "Window left")
+  "w <down>"    '(evil-window-down :wk "Window down")
+  "w <up>"      '(evil-window-up :wk "Window up")
+  "w <right>"   '(evil-window-right :wk "Window right")
+  ;; Moving Windows (Shift + Arrow Keys)
+  "w S-<left>"  '(evil-window-move-far-left :wk "Move far left")
+  "w S-<down>"  '(evil-window-move-very-bottom :wk "Move bottom")
+  "w S-<up>"    '(evil-window-move-very-top :wk "Move top")
+  "w S-<right>" '(evil-window-move-far-right :wk "Move far right")
+  "w ="         '(balance-windows :wk "Balance windows")
+  "w m"         '(delete-other-windows :wk "Maximize")
+  "w o"         '(other-window :wk "Other window")
+  "w u"         '(winner-undo :wk "Winner undo")
+  "w r"         '(winner-redo :wk "Winner redo")
+  "w t"         '(toggle-window-split :wk "Toggle split")
+  "w _"         '(split-window-vertically-instead :wk "Split vertically instead")
+  "w |"         '(split-window-horizontally-instead :wk "Split horizontally instead"))
 
-  ;; Help operations (SPC h)
-  (ar/global-leader
-    "h" '(:ignore t :wk "help")
-    "h f" '(helpful-callable :wk "Describe function")
-    "h v" '(helpful-variable :wk "Describe variable")
-    "h k" '(helpful-key :wk "Describe key")
-    "h m" '(describe-mode :wk "Describe mode")
-    "h o" '(helpful-symbol :wk "Describe symbol")
-    "h c" '(helpful-command :wk "Describe command")
-    "h C" '(ar/show-char-info :wk "Char info")
-    "h ." '(helpful-at-point :wk "Describe at point")
-    "h i" '(info :wk "Info")
-    "h I" '(consult-info :wk "Consult info")
-    "h p" '(describe-package :wk "Describe package")
-    "h a" '(apropos :wk "Apropos")
-    "h w" '(woman :wk "Woman")
-    "h r" '(:ignore t :wk "reload")
-    "h r r" '(reload-init-file :wk "Reload config"))
-
-  (general-define-key
-   :states 'motion
-    "] e" 'ar/flymake-next-error
-    "[ e" 'ar/flymake-prev-error)
-
-  (ar/global-leader
-    "c" '(:ignore t :wk "code")
-    "c ." '(ar/toggles-devtools :wk "Dev dashboard")
-    "c e" '(consult-flymake :wk "Search errors")
-    "c B" '(flymake-show-buffer-diagnostics :wk "Buffer diagnostics")
-    "c n" '(ar/flymake-next-error :wk "Next error")
-    "c p" '(ar/flymake-prev-error :wk "Prev error")
-    "c f" '(apheleia-format-buffer :wk "Format buffer")
-    "c r" '(eglot-rename :wk "Rename")
-    "c s" '(ar/ast-refactor-transient :wk "Structure")
-    "c a" '(eglot-code-actions :wk "Code action"))
-
-  ;; Git operations (SPC g)
-  (ar/global-leader
-    "g" '(:ignore t :wk "git")
-    "g s" '(magit-status :wk "Status")
-    "g c" '(magit-commit :wk "Commit")
-    "g C" '(magit-commit-amend :wk "Commit amend")
-    "g p" '(magit-push-current-to-pushremote :wk "Push")
-    "g P" '(magit-pull-from-upstream :wk "Pull")
-    "g b" '(magit-branch :wk "Branches")
-    "g l" '(magit-log-buffer-file :wk "Log current file")
-    "g L" '(magit-log-current :wk "Log current branch")
-    "g f" '(magit-fetch :wk "Fetch")
-    "g h" '(ar/toggles-vc-menu :wk "VC transient menu")
-    "g m" '(magit-merge :wk "Merge")
-    "g r" '(magit-rebase :wk "Rebase")
-    "g t" '(git-timemachine-toggle :wk "Timemachine")
-    "g n" '(diff-hl-next-hunk :wk "Next hunk")
-    "g N" '(diff-hl-previous-hunk :wk "Previous hunk")
-    "g S" '(diff-hl-stage-current-hunk :wk "Stage hunk")
-    "g R" '(diff-hl-revert-hunk :wk "Revert hunk")
-    "g H" '(diff-hl-show-hunk :wk "Preview hunk"))
+;; TODO: Replace with Projectile alternative
+;; Project operations (SPC p)
+;; (ar/global-leader
+;;   "p" '(:ignore t :wk "project")
+;;   "p p" '(ar/project-switch-to-file :wk "Switch project → find file")
+;;   "p P" '(ar/project-switch-with-menu :wk "Switch project (menu)")
+;;   "p f" '(projectile-find-file :wk "Find file in project")
+;;   "p s" '(consult-ripgrep :wk "Search project")
+;;   "p b" '(projectile-switch-to-buffer :wk "Project buffers")
+;;   "p k" '(projectile-kill-buffers :wk "Kill project buffers")
+;;   "p c" '(projectile-compile-project :wk "Compile project")
+;;   "p d" '(projectile-dired :wk "Dired project root")
+;;   "p e" '(projectile-run-eshell :wk "Eshell in project")
+;;   "p t" '(ar/treemacs-toggle :wk "Toggle treemacs (current project)")
+;;   "p i" '(projectile-invalidate-cache :wk "Invalidate cache")
+;;   "p r" '(projectile-replace :wk "Replace in project")
+;;   "p R" '(projectile-replace-regexp :wk "Replace regexp in project")
+;;   "p a" '(projectile-add-known-project :wk "Add known project"))
 
 
-  ;; Unified Capture
-  (ar/global-leader
-    "X" '(ar/capture-dispatch :wk "Smart capture"))
+;; Toggle operations (SPC t)
+(ar/global-leader
+  "t" '(:ignore t :wk "toggle")
+  "t l" '(display-line-numbers-mode :wk "Line numbers")
+  "t w" '(whitespace-mode :wk "Whitespace")
+  "t f" '(toggle-frame-fullscreen :wk "Fullscreen")
+  "t m" '(markdown-toggle-markup-hiding :wk "Markdown markup")
+  "t v" '(visual-line-mode :wk "Visual line mode")
+  "t r" '(rainbow-mode :wk "Rainbow mode")
+  "t h" '(global-hl-line-mode :wk "Highlight line")
+  "t s" '(global-prettify-symbols-mode :wk "Prettify symbols")
+  "t p" '(show-paren-mode :wk "Show paren")
+  "t t" '(ar/toggles-transient :wk "Toggles menu"))
 
-  ;; GTD operations
-  (ar/global-leader
-    "g d" '(:ignore t :wk "gtd")
-    "g d c" '(org-gtd-capture :wk "Capture to inbox")
-    "g d p" '(org-gtd-process-inbox :wk "Process inbox")
-    "g d e" '(org-gtd-engage :wk "Daily engage")
-    "g d n" '(org-gtd-show-all-next :wk "Show all NEXT")
-    "g d s" '(org-gtd-show-stuck-projects :wk "Stuck projects"))
+;; Open operations (SPC o)
+(ar/global-leader
+ "o" '(:ignore t :wk "open")
+ "o t" '(ar/ghostel-toggle :wk "toggle ghostel")
+ "o T" '(ghostel-project :wk "Ghostel project")
+ "o s" '(shell :wk "Shell")
+ "o d" '(dired :wk "Dired")
+ "o D" '((lambda () (interactive) (switch-to-buffer "*dashboard*")) :wk "Dashboard")
+ "o P" '(popper-toggle :wk "Toggle popup"))
 
-  (ar/global-leader
-    "j" '(:ignore t :wk "jinx (spellcheck)")
-    "j c" '(jinx-correct :wk "Correct word at point")
-    "j n" '(jinx-next-error :wk "Go to next error")
-    "j p" '(jinx-previous-error :wk "Go to previous error")
-    "j s" '(jinx-suggest :wk "Show suggestions")
-    "j a" '(jinx-add-word-to-personal-dictionary :wk "Add to dictionary")
-    "j l" '(jinx-languages :wk "Select language")
-    "j t" '(jinx-toggle-checking :wk "Toggle checking in buffer"))
+;; Help operations (SPC h)
+(ar/global-leader
+  "h" '(:ignore t :wk "help")
+  "h f" '(helpful-callable :wk "Describe function")
+  "h v" '(helpful-variable :wk "Describe variable")
+  "h k" '(helpful-key :wk "Describe key")
+  "h m" '(describe-mode :wk "Describe mode")
+  "h o" '(helpful-symbol :wk "Describe symbol")
+  "h c" '(helpful-command :wk "Describe command")
+  "h C" '(ar/show-char-info :wk "Char info")
+  "h ." '(helpful-at-point :wk "Describe at point")
+  "h i" '(info :wk "Info")
+  "h I" '(consult-info :wk "Consult info")
+  "h p" '(describe-package :wk "Describe package")
+  "h a" '(apropos :wk "Apropos")
+  "h w" '(woman :wk "Woman")
+  "h r" '(:ignore t :wk "reload")
+  "h r r" '(reload-init-file :wk "Reload config"))
 
-  ;; Register/Bookmark operations (SPC r)
-  (ar/global-leader
-    "r" '(:ignore t :wk "register/bookmark")
-    "r r" '(consult-register :wk "Registers")
-    "r s" '(consult-register-store :wk "Store register")
-    "r l" '(consult-register-load :wk "Load register")
-    "r b" '(consult-bookmark :wk "Bookmarks")
-    "r B" '(bookmark-set :wk "Set bookmark")
-    "r d" '(bookmark-delete :wk "Delete bookmark")
-    "r m" '(bookmark-bmenu-list :wk "Bookmark menu"))
+(general-define-key
+ :states 'motion
+  "] e" 'ar/flymake-next-error
+  "[ e" 'ar/flymake-prev-error)
 
-  ;; Notes (SPC n) — Denote
-  (ar/global-leader
-    "n" '(:ignore t :wk "notes")
+(ar/global-leader
+  "c" '(:ignore t :wk "code")
+  "c ." '(ar/toggles-devtools :wk "Dev dashboard")
+  "c e" '(consult-flymake :wk "Search errors")
+  "c B" '(flymake-show-buffer-diagnostics :wk "Buffer diagnostics")
+  "c n" '(ar/flymake-next-error :wk "Next error")
+  "c p" '(ar/flymake-prev-error :wk "Prev error")
+  "c f" '(apheleia-format-buffer :wk "Format buffer")
+  "c r" '(eglot-rename :wk "Rename")
+  "c s" '(ar/ast-refactor-transient :wk "Structure")
+  "c a" '(eglot-code-actions :wk "Code action"))
 
-    ;; Create
-    "n n" '(denote :wk "New note")
-    "n N" '(denote-subdirectory :wk "New note in subdir")
-    "n j" '(denote-journal-new-or-existing-entry :wk "Journal entry (today)")
-    "n J" '(denote-journal-new-entry :wk "New journal entry")
-    "n t" '(denote-type :wk "New note (choose type)")
-    "n c" '(ar/capture-dispatch :wk "Smart capture")
+;; Git operations (SPC g)
+(ar/global-leader
+  "g" '(:ignore t :wk "git")
+  "g s" '(magit-status :wk "Status")
+  "g c" '(magit-commit :wk "Commit")
+  "g C" '(magit-commit-amend :wk "Commit amend")
+  "g p" '(magit-push-current-to-pushremote :wk "Push")
+  "g P" '(magit-pull-from-upstream :wk "Pull")
+  "g b" '(magit-branch :wk "Branches")
+  "g l" '(magit-log-buffer-file :wk "Log current file")
+  "g L" '(magit-log-current :wk "Log current branch")
+  "g f" '(magit-fetch :wk "Fetch")
+  "g h" '(ar/toggles-vc-menu :wk "VC transient menu")
+  "g m" '(magit-merge :wk "Merge")
+  "g r" '(magit-rebase :wk "Rebase")
+  "g t" '(git-timemachine-toggle :wk "Timemachine")
+  "g n" '(diff-hl-next-hunk :wk "Next hunk")
+  "g N" '(diff-hl-previous-hunk :wk "Previous hunk")
+  "g S" '(diff-hl-stage-current-hunk :wk "Stage hunk")
+  "g R" '(diff-hl-revert-hunk :wk "Revert hunk")
+  "g H" '(diff-hl-show-hunk :wk "Preview hunk"))
 
-    ;; Find & Search
-    "n f" '(consult-denote-find :wk "Find note")
-    "n s" '(consult-denote-grep :wk "Search notes")
 
-    ;; Links & Backlinks
-    "n l" '(denote-link :wk "Insert link")
-    "n b" '(denote-backlinks :wk "Backlinks")
-    "n i" '(denote-link-or-create :wk "Insert link or create note")
+;; Unified Capture
+(ar/global-leader
+  "X" '(ar/capture-dispatch :wk "Smart capture"))
 
-    ;; Rename & Manage
-    "n r" '(denote-rename-file :wk "Rename file")
-    "n R" '(denote-rename-file-using-front-matter :wk "Rename from front matter")
-    "n k" '(denote-rename-file-keywords :wk "Edit keywords")
+;; GTD operations
+(ar/global-leader
+  "g d" '(:ignore t :wk "gtd")
+  "g d c" '(org-gtd-capture :wk "Capture to inbox")
+  "g d p" '(org-gtd-process-inbox :wk "Process inbox")
+  "g d e" '(org-gtd-engage :wk "Daily engage")
+  "g d n" '(org-gtd-show-all-next :wk "Show all NEXT")
+  "g d s" '(org-gtd-show-stuck-projects :wk "Stuck projects"))
 
-    ;; Dired & Grep
-    "n d" '(denote-dired :wk "Denote dired")
-    "n g" '(denote-grep :wk "Grep notes")
+(ar/global-leader
+  "j" '(:ignore t :wk "jinx (spellcheck)")
+  "j c" '(jinx-correct :wk "Correct word at point")
+  "j n" '(jinx-next-error :wk "Go to next error")
+  "j p" '(jinx-previous-error :wk "Go to previous error")
+  "j s" '(jinx-suggest :wk "Show suggestions")
+  "j a" '(jinx-add-word-to-personal-dictionary :wk "Add to dictionary")
+  "j l" '(jinx-languages :wk "Select language")
+  "j t" '(jinx-toggle-checking :wk "Toggle checking in buffer"))
 
-    ;; Bibliography
-    "n B" '(citar-denote-open-note :wk "Open bib note")
+;; Register/Bookmark operations (SPC r)
+(ar/global-leader
+  "r" '(:ignore t :wk "register/bookmark")
+  "r r" '(consult-register :wk "Registers")
+  "r s" '(consult-register-store :wk "Store register")
+  "r l" '(consult-register-load :wk "Load register")
+  "r b" '(consult-bookmark :wk "Bookmarks")
+  "r B" '(bookmark-set :wk "Set bookmark")
+  "r d" '(bookmark-delete :wk "Delete bookmark")
+  "r m" '(bookmark-bmenu-list :wk "Bookmark menu"))
 
-    ;; Review
-    "n w" '(ar/weekly-review :wk "Weekly review")
+;; Notes (SPC n) — Denote
+(ar/global-leader
+  "n" '(:ignore t :wk "notes")
 
-    ;; Agenda Views (Submenu)
-    "n a" '(:ignore t :wk "agenda")
-    "n a d" '((lambda () (interactive) (org-agenda nil "d")) :wk "Daily")
-    "n a w" '((lambda () (interactive) (org-agenda nil "w")) :wk "Weekly")
-    "n a p" '((lambda () (interactive) (org-agenda nil "p")) :wk "Projects")
+  ;; Create
+  "n n" '(denote :wk "New note")
+  "n N" '(denote-subdirectory :wk "New note in subdir")
+  "n j" '(denote-journal-new-or-existing-entry :wk "Journal entry (today)")
+  "n J" '(denote-journal-new-entry :wk "New journal entry")
+  "n t" '(denote-type :wk "New note (choose type)")
+  "n c" '(ar/capture-dispatch :wk "Smart capture")
 
-    ;; Table Operations (preserved from original)
-    "n T" '(:ignore t :wk "table")
-    "n T c" '(org-table-create :wk "Create table")
-    "n T a" '(org-table-align :wk "Align table")
-    "n T r" '(org-table-recalculate :wk "Recalculate"))
+  ;; Find & Search
+  "n f" '(consult-denote-find :wk "Find note")
+  "n s" '(consult-denote-grep :wk "Search notes")
 
-  ;; Quit/Session operations (SPC q)
-  (ar/global-leader
-    "q" '(:ignore t :wk "quit/session")
-    "q q" '(save-buffers-kill-terminal :wk "Quit Emacs")
-    "q Q" '(kill-emacs :wk "Quit (no save)")
-    "q f" '(delete-frame :wk "Delete frame")
-    "q s" '(tabspaces-save-session :wk "Save session")
-    "q l" '(tabspaces-restore-session :wk "Load session"))
+  ;; Links & Backlinks
+  "n l" '(denote-link :wk "Insert link")
+  "n b" '(denote-backlinks :wk "Backlinks")
+  "n i" '(denote-link-or-create :wk "Insert link or create note")
 
-  ;; Insert operations (SPC i)
-  (ar/global-leader
-    "i" '(:ignore t :wk "insert")
-    "i s" '(consult-yasnippet :wk "Snippet")
-    "i u" '(insert-char :wk "Unicode char"))
+  ;; Rename & Manage
+  "n r" '(denote-rename-file :wk "Rename file")
+  "n R" '(denote-rename-file-using-front-matter :wk "Rename from front matter")
+  "n k" '(denote-rename-file-keywords :wk "Edit keywords")
 
-  ;; TODO Replace with persp-mode alternative
-  ;; (ar/global-leader
-  ;;   ;; Core perspective management (SPC TAB)
-  ;;   "TAB"     '(:ignore t :wk "perspective")
-  ;;   "TAB TAB" '(persp-switch :wk "Switch/create perspective")
-  ;;   "TAB n"   '(persp-next :wk "Next perspective")
-  ;;   "TAB p"   '(persp-prev :wk "Previous perspective")
-  ;;   "TAB `"   '(ar/persp-switch-last :wk "Last perspective")
-  ;;   "TAB r"   '(persp-rename :wk "Rename perspective")
-  ;;   "TAB k"   '(persp-kill :wk "Kill perspective")
-  ;;   "TAB K"   '(ar/persp-kill-others :wk "Kill other perspectives")
+  ;; Dired & Grep
+  "n d" '(denote-dired :wk "Denote dired")
+  "n g" '(denote-grep :wk "Grep notes")
 
-  ;;   ;; Buffer management within perspectives
-  ;;   "TAB b"   '(persp-switch-to-buffer :wk "Switch to buffer")
-  ;;   "TAB B"   '(switch-to-buffer :wk "Switch buffer (all persp)")
-  ;;   "TAB a"   '(persp-add-buffer :wk "Add buffer")
-  ;;   "TAB A"   '(ar/persp-set-buffer :wk "Set buffer (remove from others)")
-  ;;   "TAB i"   '(persp-import-buffers :wk "Import buffer from perspective")
-  ;;   "TAB x"   '(persp-remove-buffer :wk "Remove buffer")
-  ;;   "TAB X"   '(ar/persp-kill-other-buffers :wk "Kill other buffers")
+  ;; Bibliography
+  "n B" '(citar-denote-open-note :wk "Open bib note")
 
-  ;;   ;; IBuffer integration
-  ;;   "TAB m"   '(ar/persp-ibuffer :wk "IBuffer (perspective-filtered)")
+  ;; Review
+  "n w" '(ar/weekly-review :wk "Weekly review")
 
-  ;;   ;; State management
-  ;;   "TAB s"   '(:ignore t :wk "state")
-  ;;   "TAB s s" '(persp-save-state-to-file :wk "Save state")
-  ;;   "TAB s l" '(persp-load-state-from-file :wk "Load/restore state")
+  ;; Agenda Views (Submenu)
+  "n a" '(:ignore t :wk "agenda")
+  "n a d" '((lambda () (interactive) (org-agenda nil "d")) :wk "Daily")
+  "n a w" '((lambda () (interactive) (org-agenda nil "w")) :wk "Weekly")
+  "n a p" '((lambda () (interactive) (org-agenda nil "p")) :wk "Projects")
 
-  ;;   ;; Project integration
-  ;;   "TAB P"   '(:ignore t :wk "project")
-  ;;   "TAB P s" '(ar/persp-project-switch :wk "Switch project + perspective")
-  ;;   "TAB P p" '(ar/persp-project-perspective :wk "Perspective for project")
-  ;;   "TAB P k" '(ar/persp-project-kill :wk "Kill project + perspective")
+  ;; Table Operations (preserved from original)
+  "n T" '(:ignore t :wk "table")
+  "n T c" '(org-table-create :wk "Create table")
+  "n T a" '(org-table-align :wk "Align table")
+  "n T r" '(org-table-recalculate :wk "Recalculate"))
 
-  ;;   ;; Utilities
-  ;;   "TAB l"   '(ar/persp-list-all-buffers :wk "List all buffers/perspectives"))
+;; Quit/Session operations (SPC q)
+(ar/global-leader
+  "q" '(:ignore t :wk "quit/session")
+  "q q" '(save-buffers-kill-terminal :wk "Quit Emacs")
+  "q Q" '(kill-emacs :wk "Quit (no save)")
+  "q f" '(delete-frame :wk "Delete frame")
+  "q s" '(tabspaces-save-session :wk "Save session")
+  "q l" '(tabspaces-restore-session :wk "Load session"))
 
-  ;; Macro operations (SPC @)
-  (ar/global-leader
-    "@" '(:ignore t :wk "macro")
-    "@ @" '(kmacro-end-and-call-macro :wk "End and call")
-    "@ s" '(kmacro-start-macro :wk "Start recording")
-    "@ e" '(kmacro-end-macro :wk "End recording")
-    "@ c" '(kmacro-call-macro :wk "Call macro")
-    "@ n" '(kmacro-name-last-macro :wk "Name last")
-    "@ b" '(kmacro-bind-to-key :wk "Bind to key")
-    "@ v" '(kmacro-view-macro :wk "View macro")
-    "@ d" '(kmacro-delete-ring-head :wk "Delete"))
+;; Insert operations (SPC i)
+(ar/global-leader
+  "i" '(:ignore t :wk "insert")
+  "i s" '(consult-yasnippet :wk "Snippet")
+  "i u" '(insert-char :wk "Unicode char"))
 
-  ;; Kill ring (SPC k)
-  (ar/global-leader
-    "k" '(browse-kill-ring :wk "Kill ring"))
+;; TODO Replace with persp-mode alternative
+;; (ar/global-leader
+;;   ;; Core perspective management (SPC TAB)
+;;   "TAB"     '(:ignore t :wk "perspective")
+;;   "TAB TAB" '(persp-switch :wk "Switch/create perspective")
+;;   "TAB n"   '(persp-next :wk "Next perspective")
+;;   "TAB p"   '(persp-prev :wk "Previous perspective")
+;;   "TAB `"   '(ar/persp-switch-last :wk "Last perspective")
+;;   "TAB r"   '(persp-rename :wk "Rename perspective")
+;;   "TAB k"   '(persp-kill :wk "Kill perspective")
+;;   "TAB K"   '(ar/persp-kill-others :wk "Kill other perspectives")
 
-  ;; Iedit (SPC e)
-  (ar/global-leader
-    "e" '(:ignore t :wk "iedit")
-    "e e" '(iedit-mode :wk "Iedit mode")
-    "e r" '(iedit-rectangle-mode :wk "Rectangle mode"))
+;;   ;; Buffer management within perspectives
+;;   "TAB b"   '(persp-switch-to-buffer :wk "Switch to buffer")
+;;   "TAB B"   '(switch-to-buffer :wk "Switch buffer (all persp)")
+;;   "TAB a"   '(persp-add-buffer :wk "Add buffer")
+;;   "TAB A"   '(ar/persp-set-buffer :wk "Set buffer (remove from others)")
+;;   "TAB i"   '(persp-import-buffers :wk "Import buffer from perspective")
+;;   "TAB x"   '(persp-remove-buffer :wk "Remove buffer")
+;;   "TAB X"   '(ar/persp-kill-other-buffers :wk "Kill other buffers")
 
-  (ar/global-leader
-    "a" '(embark-act :wk "Actions"))
+;;   ;; IBuffer integration
+;;   "TAB m"   '(ar/persp-ibuffer :wk "IBuffer (perspective-filtered)")
 
-  ;; Treemacs (SPC 0)
-  (ar/global-leader
-    "0" '(treemacs-select-window :wk "Select treemacs"))
+;;   ;; State management
+;;   "TAB s"   '(:ignore t :wk "state")
+;;   "TAB s s" '(persp-save-state-to-file :wk "Save state")
+;;   "TAB s l" '(persp-load-state-from-file :wk "Load/restore state")
 
-  (general-define-key
-   :states 'motion
-   ;; Avy bindings
-   "g s" 'avy-goto-char-2
-   "g S" 'avy-goto-line
-   "g w" 'avy-goto-word-1
-   "g e" 'avy-goto-word-0
+;;   ;; Project integration
+;;   "TAB P"   '(:ignore t :wk "project")
+;;   "TAB P s" '(ar/persp-project-switch :wk "Switch project + perspective")
+;;   "TAB P p" '(ar/persp-project-perspective :wk "Perspective for project")
+;;   "TAB P k" '(ar/persp-project-kill :wk "Kill project + perspective")
 
-   ;; Xref/LSP navigation
-   "g d" 'xref-find-definitions
-   "g D" 'xref-find-references
-   "g i" 'lsp-find-implementation
-   "g t" 'lsp-find-type-definition
-   "g ," 'xref-go-back)
+;;   ;; Utilities
+;;   "TAB l"   '(ar/persp-list-all-buffers :wk "List all buffers/perspectives"))
 
-  (general-define-key
-   :states 'normal
-    "o" #'ar/evil-open-below-smart
-    "O" #'ar/evil-open-above-smart)
+;; Macro operations (SPC @)
+(ar/global-leader
+  "@" '(:ignore t :wk "macro")
+  "@ @" '(kmacro-end-and-call-macro :wk "End and call")
+  "@ s" '(kmacro-start-macro :wk "Start recording")
+  "@ e" '(kmacro-end-macro :wk "End recording")
+  "@ c" '(kmacro-call-macro :wk "Call macro")
+  "@ n" '(kmacro-name-last-macro :wk "Name last")
+  "@ b" '(kmacro-bind-to-key :wk "Bind to key")
+  "@ v" '(kmacro-view-macro :wk "View macro")
+  "@ d" '(kmacro-delete-ring-head :wk "Delete"))
 
-  (general-define-key
-   :states '(normal visual)
-    ;; Avy zap
-    "z" 'avy-zap-to-char-dwim
-    "Z" 'avy-zap-up-to-char-dwim
-    ;; Evil Numbers
-    "C-a" #'evil-numbers/inc-at-pt
-    "C-x" #'evil-numbers/dec-at-pt
-    ;; Evil Multiedit
-    "M-d" #'evil-multiedit-match-symbol-and-next
-    "M-D" #'evil-multiedit-match-all)
+;; Kill ring (SPC k)
+(ar/global-leader
+  "k" '(browse-kill-ring :wk "Kill ring"))
 
-  (general-define-key
-   :states 'normal
-   ;; Undo-fu
-   "u" 'undo-fu-only-undo
-   "C-r" 'undo-fu-only-redo)
+;; Iedit (SPC e)
+(ar/global-leader
+  "e" '(:ignore t :wk "iedit")
+  "e e" '(iedit-mode :wk "Iedit mode")
+  "e r" '(iedit-rectangle-mode :wk "Rectangle mode"))
 
-  (general-define-key
-   ;; Ace-link
-   "M-o" 'ace-link-addr
+(ar/global-leader
+  "a" '(embark-act :wk "Actions"))
 
-   ;; Popper
-   "C-`" 'popper-toggle
-   "C-~" 'popper-cycle
-   "M-`" 'popper-toggle-type)
+;; Treemacs (SPC 0)
+(ar/global-leader
+  "0" '(treemacs-select-window :wk "Select treemacs"))
 
-  (general-define-key
-   :states 'normal
-   :keymaps 'dired-mode-map
-   "h" 'dired-up-directory
-   "l" 'dired-find-file
-   "o" 'dired-find-file-other-window
-   "v" 'dired-view-file
-   "m" 'dired-mark
-   "u" 'dired-unmark
-   "U" 'dired-unmark-all-marks
-   "c" 'dired-create-directory
-   "C" 'dired-do-copy
-   "D" 'dired-do-delete
-   "R" 'dired-do-rename
-   "Y" 'dired-do-copy
-   "!" 'dired-do-shell-command
-   "&" 'dired-do-async-shell-command
-   "q" 'quit-window
-   "g r" 'revert-buffer
-   "g g" 'evil-goto-first-line
-   "G" 'evil-goto-line
-   "s" 'dired-sort-toggle-or-edit
-   "(" 'dired-hide-details-mode
-   ")" 'dired-omit-mode)
+(general-define-key
+ :states 'motion
+ ;; Avy bindings
+ "g s" 'avy-goto-char-2
+ "g S" 'avy-goto-line
+ "g w" 'avy-goto-word-1
+ "g e" 'avy-goto-word-0
 
-  ;; Dirvish specific bindings (Moved from use-package dirvish)
-  (general-define-key
-   :states 'normal
-   :keymaps 'dirvish-mode-map
-   ;; Navigation (Arrow Keys)
-   "<left>"  'dired-up-directory
-   "<right>" 'dired-find-file
-   "<up>"    'dired-previous-line
-   "<down>"  'dired-next-line
+ ;; Xref/LSP navigation
+ "g d" 'xref-find-definitions
+ "g D" 'xref-find-references
+ "g i" 'lsp-find-implementation
+ "g t" 'lsp-find-type-definition
+ "g ," 'xref-go-back)
 
-   ;; Core Actions
-   "q"   'dirvish-quit
-   "TAB" 'dirvish-subtree-toggle
-   "?"   'dirvish-dispatch
+(general-define-key
+ :states 'normal
+  "o" #'ar/evil-open-below-smart
+  "O" #'ar/evil-open-above-smart)
 
-   ;; Layout & History
-   "M-t" 'dirvish-layout-switch
-   "F"   'dirvish-layout-toggle
-   "b"   'dirvish-history-go-backward
-   "f"   'dirvish-history-go-forward
+(general-define-key
+ :states '(normal visual)
+  ;; Evil Numbers
+  "C-a" #'evil-numbers/inc-at-pt
+  "C-x" #'evil-numbers/dec-at-pt
+  ;; Evil Multiedit
+  "M-d" #'evil-multiedit-match-symbol-and-next
+  "M-D" #'evil-multiedit-match-all)
 
-   ;; Menus & Tools
-   "a"   'dirvish-quick-access
-   "s"   'dirvish-quicksort
-   "y"   'dirvish-yank-menu
-   "v"   'dirvish-vc-menu
-   "M-e" 'dirvish-emerge-menu
-   "M-j" 'dirvish-fd-jump
-   "M-s" 'dirvish-setup-menu)
+(general-define-key
+ :states 'normal
+ ;; Undo-fu
+ "u" 'undo-fu-only-undo
+ "C-r" 'undo-fu-only-redo)
 
-  (general-define-key
-   :states 'normal
-   :keymaps 'pdf-view-mode-map
-   "j" 'pdf-view-next-line-or-next-page
-   "k" 'pdf-view-previous-line-or-previous-page
-   "h" 'image-backward-hscroll
-   "l" 'image-forward-hscroll
-   "J" 'pdf-view-next-page
-   "K" 'pdf-view-previous-page
-   "g g" 'pdf-view-first-page
-   "G" 'pdf-view-last-page
-   "g t" 'pdf-view-goto-page
-   "g l" 'pdf-view-goto-label
-   "+" 'pdf-view-enlarge
-   "=" 'pdf-view-enlarge
-   "-" 'pdf-view-shrink
-   "0" 'pdf-view-scale-reset
-   "W" 'pdf-view-fit-width-to-window
-   "H" 'pdf-view-fit-height-to-window
-   "P" 'pdf-view-fit-page-to-window
-   "n" 'pdf-view-next-page-command
-   "p" 'pdf-view-previous-page-command
-   "d" 'pdf-view-midnight-minor-mode
-   "/" 'isearch-forward
-   "?" 'isearch-backward
-   "o" 'pdf-outline
-   "m" 'pdf-view-set-slice-using-mouse
-   "b" 'pdf-view-set-slice-from-bounding-box
-   "r" 'pdf-view-reset-slice
-   "q" 'quit-window)
+(general-define-key
+ ;; Popper
+ "C-`" 'popper-toggle
+ "C-~" 'popper-cycle
+ "M-`" 'popper-toggle-type)
 
-  ;; Move text up and down
-  (general-define-key
-   :states '(normal visual insert)
-   "M-j" 'move-text-down
-   "M-k" 'move-text-up)
+(general-define-key
+ :states 'normal
+ :keymaps 'dired-mode-map
+ "h" 'dired-up-directory
+ "l" 'dired-find-file
+ "o" 'dired-find-file-other-window
+ "v" 'dired-view-file
+ "m" 'dired-mark
+ "u" 'dired-unmark
+ "U" 'dired-unmark-all-marks
+ "c" 'dired-create-directory
+ "C" 'dired-do-copy
+ "D" 'dired-do-delete
+ "R" 'dired-do-rename
+ "Y" 'dired-do-copy
+ "!" 'dired-do-shell-command
+ "&" 'dired-do-async-shell-command
+ "q" 'quit-window
+ "g r" 'revert-buffer
+ "g g" 'evil-goto-first-line
+ "G" 'evil-goto-line
+ "s" 'dired-sort-toggle-or-edit
+ "(" 'dired-hide-details-mode
+ ")" 'dired-omit-mode)
 
-  (ar/local-leader
-    :keymaps 'plantuml-mode-map
-    "c" '(:ignore t :wk "compile/preview")
-    "c c" '(plantuml-preview :wk "Preview (C-c C-c)")
-    "c b" '(plantuml-preview-buffer :wk "Preview buffer")
-    "c r" '(plantuml-preview :wk "Preview region/buffer")
-    "s" '(:ignore t :wk "settings")
-    "s m" '(plantuml-set-exec-mode :wk "Set execution mode")
-    "s o" '(ar/plantuml-set-output-type :wk "Set output type")
-    "s v" '(ar/plantuml-validate-installation :wk "Validate installation")
-    "i" '(:ignore t :wk "install")
-    "i j" '(ar/plantuml-install-jar :wk "Install/Download JAR")
-    "i b" '(ar/plantuml-insert-org-block :wk "Insert org block")
-    "=" '(plantuml-indent-buffer :wk "Indent buffer")
-    "TAB" '(plantuml-complete-symbol :wk "Complete symbol"))
+;; Dirvish specific bindings (Moved from use-package dirvish)
+(general-define-key
+ :states 'normal
+ :keymaps 'dirvish-mode-map
+ ;; Navigation (Arrow Keys)
+ "<left>"  'dired-up-directory
+ "<right>" 'dired-find-file
+ "<up>"    'dired-previous-line
+ "<down>"  'dired-next-line
 
-  ;; eshell keybindings
-  (general-define-key
-   :keymaps 'eshell-mode-map
-   :states '(insert normal)
-   "C-r" #'consult-history
-   "M-r" #'consult-history)
+ ;; Core Actions
+ "q"   'dirvish-quit
+ "TAB" 'dirvish-subtree-toggle
+ "?"   'dirvish-dispatch
 
-  (general-define-key
-   :keymaps 'eshell-mode-map
-   :states 'insert
-   "C-d" #'eshell-delchar-or-maybe-eof
-   "C-a" #'eshell-bol
-   "C-e" #'end-of-line
-   "C-u" #'eshell-kill-input)
+ ;; Layout & History
+ "M-t" 'dirvish-layout-switch
+ "F"   'dirvish-layout-toggle
+ "b"   'dirvish-history-go-backward
+ "f"   'dirvish-history-go-forward
 
-  (general-define-key
-   :keymaps 'eshell-mode-map
-   :states 'normal
-   "C-d" #'eshell-life-is-too-much
-   "C-l" (lambda () (interactive) (eshell/clear-scrollback) (eshell-emit-prompt))
-   "RET" (lambda () (interactive) (goto-char (point-max)))
-   "[[" #'eshell-previous-prompt
-   "]]" #'eshell-next-prompt)
+ ;; Menus & Tools
+ "a"   'dirvish-quick-access
+ "s"   'dirvish-quicksort
+ "y"   'dirvish-yank-menu
+ "v"   'dirvish-vc-menu
+ "M-e" 'dirvish-emerge-menu
+ "M-j" 'dirvish-fd-jump
+ "M-s" 'dirvish-setup-menu)
 
-  (ar/local-leader
-   :keymaps 'org-mode-map
-    "," '(org-ctrl-c-ctrl-c :wk "Ctrl-c Ctrl-c")
-    "." '(org-time-stamp :wk "Timestamp")
-    "*" '(org-ctrl-c-star :wk "Heading")
-    "-" '(org-ctrl-c-minus :wk "List")
-    "a" '(org-agenda :wk "Agenda")
-    "c" '(org-capture :wk "Capture")
-    "e" '(org-export-dispatch :wk "Export")
-    "i" '(:ignore t :wk "insert")
-    "i l" '(org-insert-link :wk "Link")
-    "@" '(org-cite-insert :wk "Insert citation")
-    "i s" '(org-download-screenshot :wk "Screenshot")
-    "i y" '(org-download-yank :wk "Yank image")
-    "i t" '(org-table-create :wk "Table")
-    "i h" '(org-insert-heading :wk "Heading")
-    "t" '(org-todo :wk "Todo")
-    "T" '(org-show-todo-tree :wk "Todo tree")
-    "s" '(org-schedule :wk "Schedule")
-    "d" '(org-deadline :wk "Deadline")
-    "p" '(org-priority :wk "Priority")
-    "r" '(org-refile :wk "Refile")
-    "A" '(org-archive-subtree :wk "Archive")
-    "l" '(:ignore t :wk "link")
-    "l l" '(org-insert-link :wk "Insert link")
-    "l s" '(org-store-link :wk "Store link")
-    "l i" '(org-id-get-create :wk "Insert ID")
-    "b" '(:ignore t :wk "babel")
-    "b t" '(org-babel-tangle :wk "Tangle")
-    "b e" '(org-babel-execute-src-block :wk "Execute")
-    "b b" '(org-babel-execute-buffer :wk "Execute buffer")
-    "b c" '(org-babel-check-src-block :wk "Check")
-    "x" '(:ignore t :wk "text")
-    "x b" '(org-toggle-checkbox :wk "Toggle checkbox")
-    "x i" '(org-toggle-item :wk "Toggle item")
-    "x p" '(org-set-property :wk "Set property")
-    "x t" '(org-set-tags-command :wk "Set tags")))
+(general-define-key
+ :states 'normal
+ :keymaps 'pdf-view-mode-map
+ "j" 'pdf-view-next-line-or-next-page
+ "k" 'pdf-view-previous-line-or-previous-page
+ "h" 'image-backward-hscroll
+ "l" 'image-forward-hscroll
+ "J" 'pdf-view-next-page
+ "K" 'pdf-view-previous-page
+ "g g" 'pdf-view-first-page
+ "G" 'pdf-view-last-page
+ "g t" 'pdf-view-goto-page
+ "g l" 'pdf-view-goto-label
+ "+" 'pdf-view-enlarge
+ "=" 'pdf-view-enlarge
+ "-" 'pdf-view-shrink
+ "0" 'pdf-view-scale-reset
+ "W" 'pdf-view-fit-width-to-window
+ "H" 'pdf-view-fit-height-to-window
+ "P" 'pdf-view-fit-page-to-window
+ "n" 'pdf-view-next-page-command
+ "p" 'pdf-view-previous-page-command
+ "d" 'pdf-view-midnight-minor-mode
+ "/" 'isearch-forward
+ "?" 'isearch-backward
+ "o" 'pdf-outline
+ "m" 'pdf-view-set-slice-using-mouse
+ "b" 'pdf-view-set-slice-from-bounding-box
+ "r" 'pdf-view-reset-slice
+ "q" 'quit-window)
+
+(ar/local-leader
+  :keymaps 'plantuml-mode-map
+  "c" '(:ignore t :wk "compile/preview")
+  "c c" '(plantuml-preview :wk "Preview (C-c C-c)")
+  "c b" '(plantuml-preview-buffer :wk "Preview buffer")
+  "c r" '(plantuml-preview :wk "Preview region/buffer")
+  "s" '(:ignore t :wk "settings")
+  "s m" '(plantuml-set-exec-mode :wk "Set execution mode")
+  "s o" '(ar/plantuml-set-output-type :wk "Set output type")
+  "s v" '(ar/plantuml-validate-installation :wk "Validate installation")
+  "i" '(:ignore t :wk "install")
+  "i j" '(ar/plantuml-install-jar :wk "Install/Download JAR")
+  "i b" '(ar/plantuml-insert-org-block :wk "Insert org block")
+  "=" '(plantuml-indent-buffer :wk "Indent buffer")
+  "TAB" '(plantuml-complete-symbol :wk "Complete symbol"))
+
+;; eshell keybindings
+(general-define-key
+ :keymaps 'eshell-mode-map
+ :states '(insert normal)
+ "C-r" #'consult-history
+ "M-r" #'consult-history)
+
+(general-define-key
+ :keymaps 'eshell-mode-map
+ :states 'insert
+ "C-d" #'eshell-delchar-or-maybe-eof
+ "C-a" #'eshell-bol
+ "C-e" #'end-of-line
+ "C-u" #'eshell-kill-input)
+
+(general-define-key
+ :keymaps 'eshell-mode-map
+ :states 'normal
+ "C-d" #'eshell-life-is-too-much
+ "C-l" (lambda () (interactive) (eshell/clear-scrollback) (eshell-emit-prompt))
+ "RET" (lambda () (interactive) (goto-char (point-max)))
+ "[[" #'eshell-previous-prompt
+ "]]" #'eshell-next-prompt)
+
+(ar/local-leader
+ :keymaps 'org-mode-map
+  "," '(org-ctrl-c-ctrl-c :wk "Ctrl-c Ctrl-c")
+  "." '(org-time-stamp :wk "Timestamp")
+  "*" '(org-ctrl-c-star :wk "Heading")
+  "-" '(org-ctrl-c-minus :wk "List")
+  "a" '(org-agenda :wk "Agenda")
+  "c" '(org-capture :wk "Capture")
+  "e" '(org-export-dispatch :wk "Export")
+  "i" '(:ignore t :wk "insert")
+  "i l" '(org-insert-link :wk "Link")
+  "@" '(org-cite-insert :wk "Insert citation")
+  "i s" '(org-download-screenshot :wk "Screenshot")
+  "i y" '(org-download-yank :wk "Yank image")
+  "i t" '(org-table-create :wk "Table")
+  "i h" '(org-insert-heading :wk "Heading")
+  "t" '(org-todo :wk "Todo")
+  "T" '(org-show-todo-tree :wk "Todo tree")
+  "s" '(org-schedule :wk "Schedule")
+  "d" '(org-deadline :wk "Deadline")
+  "p" '(org-priority :wk "Priority")
+  "r" '(org-refile :wk "Refile")
+  "A" '(org-archive-subtree :wk "Archive")
+  "l" '(:ignore t :wk "link")
+  "l l" '(org-insert-link :wk "Insert link")
+  "l s" '(org-store-link :wk "Store link")
+  "l i" '(org-id-get-create :wk "Insert ID")
+  "b" '(:ignore t :wk "babel")
+  "b t" '(org-babel-tangle :wk "Tangle")
+  "b e" '(org-babel-execute-src-block :wk "Execute")
+  "b b" '(org-babel-execute-buffer :wk "Execute buffer")
+  "b c" '(org-babel-check-src-block :wk "Check")
+  "x" '(:ignore t :wk "text")
+  "x b" '(org-toggle-checkbox :wk "Toggle checkbox")
+  "x i" '(org-toggle-item :wk "Toggle item")
+  "x p" '(org-set-property :wk "Set property")
+  "x t" '(org-set-tags-command :wk "Set tags"))
 #+end_src
 
 * TODO Remaining Work

@@ -274,7 +274,7 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
 This block contains the fully synthesized Avy engine. It includes the `at-full` visual paradigm, the home-row routing, the proximity sorting (`avy-orders-alist`), the tightened input latency (`avy-timeout-seconds`), the Doom extractions (`avy-all-windows-alt`, `avy-single-candidate-jump`), and the expanded `:commands` list to prevent the Transient Menu `void-function` trap. Finally, it injects `M-j` strictly into `isearch-mode-map` to fulfill the "Seek, then Jump" blueprint mandate.
 
 ```org
-** TODO Avy
+** DONE Avy
 Provides an O(1) radix-tree jumping engine for long-distance spatial navigation. Configured with the =at-full= overlay style, home-row routing, proximity sorting, and on-demand multi-window expansion.
 #+begin_src emacs-lisp
 (use-package avy
