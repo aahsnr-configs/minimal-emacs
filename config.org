@@ -1379,7 +1379,7 @@ Delegates hardware input to =ultra-scroll= and keyboard interpolation to =good-s
 #+end_src
 
 
-* TODO Structural Typing and Parsing
+* DONE Structural Typing and Parsing
 Establishes the C-level parsing foundation and non-Lisp typing layer. Provides AST-aware text objects, boundary wrapping, and deep node refactoring.
 
 ** DONE Treesit
@@ -1797,18 +1797,16 @@ Exposes the Emacs 30 =treesit-thing= API via Unimpaired bracket motions. Provide
    "[x" (lambda () (interactive) (ignore-errors (treesit-thing-prev 'sexp)))))
 #+end_src
 
-** TODO Expreg
+** DONE Expreg
 Provides O(1) AST-aware visual selection expansion via the native =treesit= engine. Integrates with =repeat-mode= for modifier-less tapping and preserves cursor origin on contraction.
 #+begin_src emacs-lisp
 (use-package expreg
   :if (treesit-available-p)
   :defer t
-  ;; Registers autoloads to prevent `void-function` crashes from deferred `general-define-key`.
   :commands (expreg-expand expreg-contract)
   :config
   ;; Restores exact cursor origin upon `C-g` (keyboard-quit) to prevent spatial drift.
   (setq expreg-restore-point-on-quit t)
-
   ;; Emacs 29+ `repeat-mode` integration for modifier-less expansion loops.
   (defvar-keymap expreg-repeat-map
     :doc "Keymap for repeating expreg commands."
@@ -1818,13 +1816,10 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
     "_" #'expreg-contract)
   (put 'expreg-expand 'repeat-map 'expreg-repeat-map)
   (put 'expreg-contract 'repeat-map 'expreg-repeat-map)
-
   ;; Visual State Routing: Hijacks `v` for seamless AST expansion loops.
-  ;; Preserves `V` for Visual-Line mode and `C-v` for Visual-Block mode.
   (general-define-key
    :states 'visual
    "v" #'expreg-expand)
-
   ;; Global Fallback: Maps `M-=` (Doom's expand-region mnemonic) and modifier combinations.
   (general-define-key
    :states '(normal visual motion)
@@ -1981,7 +1976,7 @@ Manages structural and textual collapsing mechanisms. Unifies AST-aware, outline
 
 
 
-* TODO Spatial Alignment & Whitespace Hygiene
+* DONE Spatial Alignment & Whitespace Hygiene
 Enforces spatial alignment, trailing character cleanup, and indentation guides. Maintains visual grid consistency across diverse programming languages.
 
 ** DONE Whitespace
@@ -2126,19 +2121,12 @@ Provides O(1) line and region dragging. Automatically re-indents displaced lines
           (indent-region (region-beginning) (region-end))
         (indent-region (line-beginning-position) (line-end-position)))
       (setq deactivate-mark deactivate)))
-  (advice-add #'move-text-down :after #'ar/move-text-indent-region-advice)
-
-  ;; PGTK-safe line dragging. Replaces legacy M-j/M-k bindings to preserve
-  ;; home-row availability and prevent terminal escape-sequence parsing bugs.
-  (general-define-key
-   :states '(normal visual insert)
-   "<M-down>" #'move-text-down
-   "<M-up>" #'move-text-up))
+  (advice-add #'move-text-up :after #'ar/move-text-indent-region-advice)
   (advice-add #'move-text-down :after #'ar/move-text-indent-region-advice))
 #+end_src
 
 
-* TODO Frame Chrome & Status Indicators
+* DONE Frame Chrome & Status Indicators
 Renders visual feedback, window dividers, and modeline components. Provides spatial orientation and contextual metadata within the editing frame.
 
 ** DONE Line Numbers
