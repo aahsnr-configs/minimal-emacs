@@ -11,3 +11,13 @@
 - Are you certain there are no errors and issues in this iteration? And are there any additional configuration settings that you think might be useful? Search the web and think longer for these tasks. You must not perform another rewrite. The information you get must be the latest till July 2026. Explain everything to me in detail.
 
 - Are you sure there are no more errors and issues in the 3rd iteration? And are you sure there are not any more extra configurations you need to add? Answer and explain everything to me in great detail. Do not perform a 4th rewrite. Search the web and think longer for this task and make sure the information you get is latest till July 2026.
+
+- Write a python script to build and install emacs from source. It will specifically install emacs-pretest package for now until emacs 31 has been released. It must have the following features and functionalities:
+  1. The script must follow best python practices.
+  2. It must be idempotent
+  3. It must use the paru package manager to install necessary packages
+  4. It must install python packages, if there are any, needed to run the script directly from arch linux repos using paru
+  5. It must also install build and runtime dependencies for emacs-pretest.
+  6. It must be able to update the emacs package
+  7. It must ask permisson at each step. The format would be y/N. Only pressing y approves the step. Pressing N or any other key denies the step
+  8. It must provide all the instructions to build and install emacs from source. This is the main task. For now, it will download emacs-pretest. It must use the correct --config flags something like
