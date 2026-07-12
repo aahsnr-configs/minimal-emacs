@@ -2400,48 +2400,140 @@ Provides an O(1) radix-tree jumping engine for long-distance spatial navigation.
 #+end_src
 
 
-
-** TODO Evil Easymotion
-Wraps Avy into Evil's operator-pending grammar. Maps spatial jumps to a unified =gs= prefix, enabling mutations like =dgsj= to delete regions across distances.
+** DONE Evil Easymotion
+Wraps Avy into Evil's operator-pending grammar via a unified =gs= prefix. Bypasses =evilem-create= infinite loop traps by registering native Avy commands directly into Evil's C-level motion registry.
 #+begin_src emacs-lisp
 (use-package evil-easymotion
-  :defer t
-  :after evil avy
-  :commands (evilem-create evilem-default-keybindings-motions)
+  :after (evil avy)
   :config
-  (evilem-default-keybindings-motions "gs"))
+  ;; Native Evil motion wrappers bypass `evilem-create` UI traps.
+  (evil-define-motion ar/evil-avy-goto-char-2 ()
+    "Jump to 2-char target."
+    :type exclusive :jump t
+    (avy-goto-char-2))
+  (evil-define-motion ar/evil-avy-goto-line ()
+    "Jump to visible line."
+    :type line :jump t
+    (avy-goto-line))
+  (evil-define-motion ar/evil-avy-goto-char-timer ()
+    "Jump to string target via timer."
+    :type exclusive :jump t
+    (avy-goto-char-timer))
+  ;; Populate `evilem-map` under the "gs" prefix.
+  (evilem-default-keybindings "gs")
+  ;; Inject custom wrappers into the `gs` namespace.
+  (define-key evilem-map "s" #'ar/evil-avy-goto-char-2)
+  (define-key evilem-map "l" #'ar/evil-avy-goto-line)
+  (define-key evilem-map "SPC" #'ar/evil-avy-goto-char-timer))
 #+end_src
 
-** TODO Evil Snipe
-Replaces Avy for short-distance, two-character inline jumps to preserve typing flow. Hijacks native =f=, =F=, =t=, =T=, =z=, and =Z= motions with localized screen highlighting.
+
+
+
+
+
+
+
+** DONE Evil Snipe
+Replaces native Evil character motions with incremental, regex-aware spatial jumps. Confines activation to text buffers while protecting specialized UI and terminal modes from keymap collisions.
 #+begin_src emacs-lisp
 (use-package evil-snipe
-  :defer t
   :after evil
-  :hook (evil-snipe-mode . (lambda () (setq evil-snipe-auto-disable-substitute t)))
   :custom
   (evil-snipe-enable-highlight t)
   (evil-snipe-enable-incremental-highlight t)
   (evil-snipe-auto-disable-substitute t)
-  (evil-snipe-scope 'visible)
+  ;; Full-screen spatial awareness for incremental highlighting.
+  (evil-snipe-scope 'whole-visible)
+  ;; Vim parity: lowercase is case-insensitive, uppercase is strict.
+  (evil-snipe-smart-case t)
+  ;; Keeps the echo area reserved for ElDoc and Which-Key.
+  (evil-snipe-show-prompt nil)
+  ;; Follows the cursor when jumping outside the current viewport.
+  (evil-snipe-auto-scroll t)
+  ;; Expands search scope to the entire buffer if a localized snipe fails.
+  (evil-snipe-spillover-scope 'whole-buffer)
+  ;; Allows pressing TAB to dynamically increase the snipe buffer size.
+  (evil-snipe-tab-increment t)
   :custom-face
   (evil-snipe-first-match-face ((t (:foreground "#7dcfff" :underline t))))
   (evil-snipe-matches-face ((t (:foreground "#7dcfff" :underline t))))
   :config
+  ;; Populate exclusions and aliases BEFORE activating the global modes.
+  ;; Modifying `defcustom` lists must happen in `:config` to prevent upstream overwrites.
+  (dolist (mode '(pdf-view-mode
+                  dirvish-directory-view-mode
+                  dirvish-mode
+                  git-timemachine-mode
+                  vterm-mode
+                  eat-mode
+                  eshell-mode
+                  ghostel-mode
+                  term-mode
+                  compilation-mode
+                  grep-mode
+                  occur-mode
+                  deadgrep-mode
+                  rg-mode
+                  ag-mode
+                  flycheck-error-list-mode
+                  flymake-diagnostics-buffer-mode
+                  xref--xref-buffer-mode
+                  embark-collect-mode
+                  lsp-ui-imenu-mode
+                  help-mode
+                  helpful-mode
+                  Info-mode
+                  woman-mode
+                  eww-mode
+                  docker-container-mode
+                  docker-image-mode
+                  Custom-mode
+                  ediff-mode
+                  profiler-report-mode
+                  dashboard-mode
+                  messages-buffer-mode
+                  backtrace-mode))
+    (add-to-list 'evil-snipe-disabled-modes mode))
+  ;; Map brackets and quotes to regex patterns for AST-boundary jumping.
+  (push '(?\[ "[[{(<]") evil-snipe-aliases)
+  (push '(?\] "[]})>]") evil-snipe-aliases)
+  (push '(?\" "[\"'`´]") evil-snipe-aliases)
+  ;; Activate global modes AFTER the exclusion list is fully populated.
   (evil-snipe-mode 1)
-  (evil-snipe-override-mode 1))
+  (evil-snipe-override-mode 1)
+  ;; Visual State Bindings: Inject `z` and `Z` to allow initiating a snipe and capturing the traversed region.
+  (evil-define-key 'visual evil-snipe-local-mode-map "z" #'evil-snipe-s)
+  (evil-define-key 'visual evil-snipe-local-mode-map "Z" #'evil-snipe-S)
+  ;; Inject `evilem-map` into the snipe parent transient map.
+  (with-eval-after-load 'evil-easymotion
+    (define-key evil-snipe-parent-transient-map "g" evilem-map)))
 #+end_src
 
+
 ** TODO Link Hint
-Provides Evil-native link jumping for read-only and help buffers. Targets URLs and buttons using the Avy engine while preserving link text readability.
+Routes Avy-backed semantic link mutations through a unified global prefix.
 #+begin_src emacs-lisp
 (use-package link-hint
   :defer t
-  :commands (link-hint-open-link link-hint-copy-link))
+  :commands (link-hint-open-link
+             link-hint-copy-link
+             link-hint-open-multiple-links
+             link-hint-copy-all-links)
+  :config
+  (ar/global-leader
+    "l" '(:ignore t :wk "links")
+    "l o" '(link-hint-open-link :wk "Open link")
+    "l y" '(link-hint-copy-link :wk "Yank link")
+    "l m" '(link-hint-open-multiple-links :wk "Open multiple")
+    "l a" '(link-hint-copy-all-links :wk "Yank all")))
 #+end_src
+
+
 
 ** TODO Ace Window
 Routes cross-window spatial jumps via the Avy radix-tree engine. Reserved for complex split layouts and strictly mapped via leader bindings to prevent global keymap pollution.
+- [ ] What is the ace-window-posframe.el file for?
 #+begin_src emacs-lisp
 (use-package ace-window
   :defer t
@@ -2633,6 +2725,8 @@ Manages spellchecking, contextual help systems, and heavy multi-buffer compariso
 
 ** TODO Ediff
 - [ ] List all the features and functionalities of ediff
+- [ ] I also need to know the evil style keybindings for ediff that exists in evil collection. evil-ediff has been integrated into evil collection package
+- [ ] I also need to know the correct format for how to add commands to :commands()
 #+begin_src emacs-lisp
 (use-package ediff
   :ensure nil
@@ -3360,6 +3454,7 @@ Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. W
 
 
 * TODO Org Mode
+- [ ] Find alternative packages to org-download
 ** TODO Dynamic Directory Structure
 #+begin_src emacs-lisp
 ;; Define base directory with symlinks resolved
@@ -4307,6 +4402,7 @@ If the file does not exist, creates it. Returns the full path."
   :after (denote org))
 #+end_src
 
+** TODO Denote Explore
 ** TODO Consult Denote
 #+begin_src emacs-lisp
 (use-package consult-denote
@@ -7862,6 +7958,163 @@ Auto-generates and syncs heading-derived TOC.
 #+end_src
 
 
+* TODO XML Document Viewer
+Native C-level XML ingestion and headless AST transformation. Renders XML state and protocol files as paginated, word-processor-style Org buffers utilizing proportional typography, centered margins, and native =dom.el= primitives.
+#+begin_src emacs-lisp
+(require 'dom)
+
+;; ==========================================
+;; RECURSIVE AST TRANSFORMATION ENGINE
+;; ==========================================
+(defun ar/xml-to-org (node &optional depth)
+  "Recursively convert XML DOM NODE to Org-mode syntax.
+DEPTH dictates the heading asterisk count."
+  (let ((depth (or depth 1)))
+    (cond
+     ((stringp node) (string-trim node))
+     ((consp node)
+      (let* ((tag (dom-tag node))
+             (attrs (dom-attributes node))
+             (children (dom-children node))
+             (title (or (alist-get 'title attrs)
+                        (alist-get 'name attrs)
+                        (alist-get 'id attrs)))
+             (child-texts (seq-filter
+                           (lambda (s) (not (string-empty-p (string-trim s))))
+                           (mapcar (lambda (c) (ar/xml-to-org c (1+ depth))) children))))
+        (pcase tag
+          ;; Root and structural containers
+          ((or 'project_state 'system_prompt_protocol 'metadata)
+           (mapconcat #'identity child-texts "\n"))
+          ;; Primary headings
+          ((or 'section 'group 'critical_instructions 'core_architectural_rules
+               'editor_behaviour_paradigm 'negative_constraints 'edge_cases_and_deferred_issues
+               'architectural_decisions 'pending_decisions_and_todos 'overall_progress
+               'immediate_structural_action_plan 'remaining_work_checklists 'global_questions
+               'strict_greenlight_protocol 'formatting_rules 'architectural_constraints
+               'strict_negative_constraints 'research_mandates 'state_generation
+               'initialization_protocol)
+           (let ((heading (concat (make-string depth ?*) " "
+                                  (or title (replace-regexp-in-string "_" " " (symbol-name tag))))))
+             (concat heading "\n\n" (mapconcat #'identity child-texts "\n") "\n")))
+          ;; List items
+          ((or 'rule 'constraint 'step 'task 'sub_rule 'mandate 'action 'todo 'issue 'decision 'question)
+           (let ((item-body (mapconcat #'identity child-texts " ")))
+             (concat "- " (when title (concat "*" title "*: ")) (string-trim item-body) "\n")))
+          ;; Sub-headings (Sessions)
+          ('session
+           (let ((session-id (alist-get 'id attrs)))
+             (concat (make-string (1+ depth) ?*) " Session " session-id "\n"
+                     (mapconcat #'identity child-texts "\n") "\n")))
+          ;; Text blocks and paragraphs
+          ((or 'description 'preamble 'summary 'state 'trigger 'exact_phrase 'condition
+               'wrapper 'internal_syntax 'tone_and_voice 'documentation_scope 'completeness
+               'header_status 'greenlight_reminder)
+           (concat (string-trim (mapconcat #'identity child-texts " ")) "\n"))
+          ;; Document metadata
+          ((or 'title 'version 'date)
+           (let ((body (string-trim (mapconcat #'identity child-texts " "))))
+             (pcase tag
+               ('title (concat "#+TITLE: " body "\n"))
+               ('version (concat "#+SUBTITLE: Version " body "\n"))
+               ('date (concat "#+DATE: " body "\n")))))
+          ;; Fallback passthrough
+          (_ (mapconcat #'identity child-texts "\n")))))
+     (t ""))))
+
+;; ==========================================
+;; WORD PROCESSOR VISUAL PARADIGM & ACTIONS
+;; ==========================================
+(defvar-local ar/xml-source-buffer nil
+  "Source XML buffer for live refresh.")
+
+(defun ar/xml-refresh-document ()
+  "Refresh the current Org document from the source XML buffer."
+  (interactive)
+  (unless (buffer-live-p ar/xml-source-buffer)
+    (user-error "Source XML buffer no longer exists"))
+  (let ((inhibit-read-only t)
+        (xml-dom (with-current-buffer ar/xml-source-buffer
+                   (save-excursion
+                     (goto-char (point-min))
+                     (libxml-parse-xml-region (point-min) (point-max)))))
+        (org-text (concat "#+LATEX_CLASS: cas-dc\n#+LATEX_COMPILER: lualatex\n"
+                          (ar/xml-to-org xml-dom))))
+    (erase-buffer)
+    (insert org-text)
+    (goto-char (point-min))
+    (org-overview)
+    (message "Document refreshed.")))
+
+(defun ar/export-document-to-pdf ()
+  "Export the current hidden Org buffer to PDF and open via `pdf-tools'."
+  (interactive)
+  (unless (fboundp 'org-latex-export-to-pdf)
+    (user-error "Org LaTeX export engine unavailable"))
+  (let* ((temp-org (make-temp-file "xml-doc-" ".org"))
+         (temp-pdf (concat (file-name-sans-extension temp-org) ".pdf")))
+    (write-region (point-min) (point-max) temp-org nil 'silent)
+    (with-current-buffer (find-file-noselect temp-org)
+      (unwind-protect
+          (org-latex-export-to-pdf)
+        (kill-buffer)))
+    (when (file-exists-p temp-pdf)
+      (find-file temp-pdf))))
+
+(defvar ar/xml-document-viewer-map
+  (let ((map (make-sparse-keymap)))
+    (set-keymap-parent map org-mode-map)
+    (define-key map (kbd "q") #'quit-window)
+    (define-key map (kbd "e") #'ar/export-document-to-pdf)
+    (define-key map (kbd "r") #'ar/xml-refresh-document)
+    map)
+  "Keymap for the rendered XML document viewer.")
+
+;;;###autoload
+(defun ar/view-xml-as-document ()
+  "Parse current XML buffer into a paginated Org-mode word processor view."
+  (interactive)
+  (unless (and (fboundp 'libxml-parse-xml-region) (libxml-available-p))
+    (user-error "Emacs lacks libxml support; cannot parse XML"))
+  (let* ((source-buf (current-buffer))
+         (xml-dom (save-excursion
+                    (goto-char (point-min))
+                    (libxml-parse-xml-region (point-min) (point-max))))
+         (org-text (concat "#+LATEX_CLASS: cas-dc\n#+LATEX_COMPILER: lualatex\n"
+                           (ar/xml-to-org xml-dom)))
+         (buf-name (format "*Document: %s*" (file-name-base (or (buffer-file-name) (buffer-name)))))
+         (buf (get-buffer-create buf-name)))
+    (with-current-buffer buf
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert org-text)
+        (goto-char (point-min))
+        (org-mode)
+        (use-local-map ar/xml-document-viewer-map)
+        (setq-local ar/xml-source-buffer source-buf)
+        (setq-local org-imenu-depth 8)
+        (visual-line-mode 1)
+        (variable-pitch-mode 1)
+        (goto-address-mode 1)
+        (setq-local show-trailing-whitespace nil)
+        ;; Centered margins via Olivetti
+        (when (fboundp 'olivetti-mode)
+          (olivetti-mode 1)
+          (setq-local olivetti-body-width 90))
+        ;; Modern typography via Org-Modern
+        (when (fboundp 'org-modern-mode)
+          (org-modern-mode 1))
+        ;; Inline LaTeX rendering
+        (when (fboundp 'org-fragtog-mode)
+          (org-fragtog-mode 1))
+        ;; Predictable folding state
+        (org-overview)
+        (read-only-mode 1)
+        (setq-local cursor-type nil)))
+    (switch-to-buffer buf)
+    (message "Document rendered. [q]uit | [e]xport PDF | [r]efresh")))
+#+end_src
+
 * TODO Study
 ** TODO PDF Tools
 #+begin_src emacs-lisp
@@ -8342,8 +8595,8 @@ Native directional window navigation. Enables wrap-around physics for spatial tr
   "b" '(:ignore t :wk "buffer")
   "b b" '(consult-buffer :wk "Switch buffer")
   "b i" '(ibuffer :wk "Ibuffer")
-  "b k" '(kill-current-buffer :wk "Kill buffer")
-  "b K" '(kill-buffer :wk "Kill buffer (choose)")
+  "b K" '(kill-current-buffer :wk "Kill buffer")
+  "b k" '(kill-buffer :wk "Kill buffer (choose)")
   "b n" '(next-buffer :wk "Next buffer")
   "b p" '(previous-buffer :wk "Previous buffer")
   "b r" '(revert-buffer-quick :wk "Revert buffer")
@@ -8727,12 +8980,6 @@ Native directional window navigation. Enables wrap-around physics for spatial tr
 
 (general-define-key
  :states 'motion
- ;; Avy bindings
- "g s" 'avy-goto-char-2
- "g S" 'avy-goto-line
- "g w" 'avy-goto-word-1
- "g e" 'avy-goto-word-0
-
  ;; Xref/LSP navigation
  "g d" 'xref-find-definitions
  "g D" 'xref-find-references
@@ -8942,7 +9189,36 @@ This section just contains checkboxes with stuff that still needs to be done for
 - [ ] Determine if elpaca byte-compiles and native-compiles all packages. And is it okay to leave these settings to elpaca's default.
 - [ ] Pressing enter on a header should move a task from TODO to DONE like doom emacs does
 - [ ] Add flyover package
-- [ ] add sideline-blame, flymake-collection, sideline-flymake,  packages
+- [ ] Move onto the following sections: 1. Workflow Management 2. Completion Framework 3. Development Tools 4. Treesitter/Folding
+- [ ] implement the email setup
+- [x] move customs.el to var
+- [ ] add more padding to emacs buffer
+- [x] move tree-sitter grammars to var/ or etc/
+- [ ] add eval +overlay module packages from doom emacs into my vanilla emacs config
+- [ ] go back to openrouter.ai for my corfu configuration.
+- [ ] make sure there are no modelines for popper and winne
+- [ ] implement settings from eval-overlay.md
+- [ ] recentf-mode not showing files in dashboard, but shows recent files in working buffers
+- [ ] I don't want to see files enclosed with ** when I execute consult-buffer
+- [ ] Add epithet and math-delimiters package from https://github.com/oantolin
+- [ ] Mismatched bracket error in the new consult config
+- [x] show-paren-mode should highlight matching brackets when cursor is inside that the bracket pair
+- [ ] orderless only matches letters next to each other; I dont want that
+- [ ] add keybindings for embark
+- [ ] add lsp-ltex-plus
+- [ ] `Important`: Write a test org-mode file to practice all the writing practices in org buffers. Then determine what and how to optimize the writing workflow.
+- [ ] lsp-mode ideas: 1. how would code lens be useful in python programming
+- [ ] I also need interactive custom functions for .dir-locals.el
+- [ ] `Important`: When working on development tools, after finalizing development tools main section, ask qwen to review the completion framework again to make sure if there are any overlapping configurations that need to be integrated with each other like vertico, cape and corfu.
+- [ ] `Important`: For both Completion Framework and Development Tools sections, use doom emacs keybindings whereever possible.
+- [ ] `Important`: Determine all the related packages that are integrated together in the whole emacs config.
+- [x] **Urgent*: Update project-state.md file with the following additions: 1. Keep track of TODO, NOTE, etc. keywords in the source code block itself; 2. Keep track of all the NOTE keywords anywhere they appear. 3. Also keep track of tasks that still needs to be done from the Remaining Work section near the end of file. This section just contains checkboxes. 4. Also keep track of questions from the Questions sections near end of file. 5. Keep track of TODO, NOTE, etc. keywords in areas other than org headers and org source code blocks, in other words, in general org text
+- [ ] `Important`: add denote-explore package
+- [ ] `Important`: package-quickstart, eln-cache/ should be in either var or etc
+- [ ] `Important`: add auto-tangle-mode package
+- [ ] `Important`: add flyover
+
+- [ ] *Urgent*: I need to revisit the description of every header and subheader. They don't describe what the package actually does.
 
 * TODO Questions
 This section raises questions if some features, capabilities, etc can be achieved in emacs in general.
@@ -8953,3 +9229,5 @@ This section raises questions if some features, capabilities, etc can be achieve
 - [ ] How do I get history evil commands in the echo area like doom emacs?
 - [ ] How can I make the echo area useful? Do this at the very end of the configuration
 - [ ] How to open links from org buffers by pressing enter and using the correct browser?
+- [ ] Is it necessary to configure for my emacs configuration that is evil centric?
+- [ ] Is there a chance that anzu and evil-anzu might collide with my lsp-mode configuration?

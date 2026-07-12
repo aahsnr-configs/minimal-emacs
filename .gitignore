@@ -25,3 +25,5 @@ transient/
 straight/
 perspective-state
 emacs-diff.md
+tmp/
+

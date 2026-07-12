@@ -1,0 +1,115 @@
+document:
+  title: "The `use-package` Execution Timeline & Load-Order Physics"
+  description: >
+    This document provides a comprehensive, canonical breakdown of how the `use-package`
+    macro configures Emacs packages. All definitions and execution timelines are derived
+    strictly from the Official GNU Emacs `use-package` User Manual (v2.4.5 / Emacs 30.2).
+
+  sections:
+    - id: 1
+      title: Core Philosophy
+      points:
+        - >
+          The `use-package` macro is not a package manager. Its primary purpose is to
+          organize package configuration declaratively, eliminate repetitive boilerplate,
+          and enforce lazy-loading (autoloading) to keep Emacs startup times near zero.
+        - >
+          When Emacs evaluates a `(use-package foo ...)` block, it does not simply run
+          the code top-to-bottom. Instead, the macro expands into a highly specific
+          chronological sequence of Emacs Lisp forms designed to respect the boundary
+          between pre-load state and post-load state.
+
+    - id: 2
+      title: The Chronological Execution Timeline
+      phases:
+        - name: "Phase 1: Pre-Load Preparation"
+          items:
+            - keyword: ":preface"
+              description: "Evaluated first, at both compile-time and run-time. Used strictly for defining variables/functions to satisfy the byte-compiler or provide conditions for `:if`."
+            - keyword: ":init"
+              description: "Evaluated just before the package is loaded."
+            - keyword: ":custom"
+              description: "Evaluated just before the package is loaded, utilizing `customize-set-variable` to safely register user options with Emacs' native Customization system."
+            - keyword: "Autoload Triggers (`:hook`, `:bind`, `:mode`, `:commands`)"
+              description: "These do not execute code immediately. Instead, they inject 'triggers' into Emacs' autoload registry, instructing Emacs to load the package only when a specific hook fires, key is pressed, or file extension is opened."
+
+        - name: "Phase 2: The Loading Boundary"
+          items:
+            - event: "The Package Loads"
+              description: "Emacs executes `(require 'foo)` or the package is loaded dynamically via an autoload trigger. At this exact moment, the package's internal `defcustom`, `defvar`, and `defun` macros are evaluated and registered into the Emacs obarray."
+
+        - name: "Phase 3: Post-Load Configuration"
+          items:
+            - keyword: ":config"
+              description: "Evaluated after the package has been fully loaded. If the package was lazy-loaded via a trigger, this block is deferred until the exact moment the package loads."
+
+    - id: 3
+      title: Detailed Keyword Breakdown
+      keywords:
+        - name: ":init"
+          subtitle: Pre-Load Execution
+          details:
+            - label: Official Definition
+              text: '"The `:init` section is evaluated just before the package is loaded".'
+            - label: 'The "Unconditional" Trap'
+              text: "The manual explicitly warns that `:init` forms are run unconditionally, even if the package is deferred or missing from the system."
+            - label: Purpose
+              text: "It is used to set up state that the package's internal logic might read during its load sequence, or to define hooks/variables that must exist before the package initializes."
+            - label: Constraint
+              text: "Because the package is not yet loaded, you cannot call the package's functions or modify its complex internal structures in `:init`. Attempting to do so will result in `void-function` or `void-variable` errors."
+
+        - name: ":hook"
+          subtitle: Autoload Triggers
+          details:
+            - label: Official Definition
+              text: '"The `:hook` keyword sets up a trigger that fires when the specified hook is run, and then loads the package automatically".'
+            - label: Purpose
+              text: "It replaces the manual boilerplate of `(add-hook 'some-hook 'foo-mode)`."
+            - label: Load-Order Physics
+              text: "Using `:hook` implicitly implies `:defer t`. The package is kept out of memory until the exact millisecond the specified major-mode or hook is activated."
+
+        - name: ":custom"
+          subtitle: Safe Variable Registration
+          details:
+            - label: Purpose
+              text: "Used to set user-facing options (variables defined via `defcustom` in the package source)."
+            - label: Mechanism
+              text: "Under the hood, `use-package` expands `:custom` into `customize-set-variable`. This is mathematically superior to `setq` because it registers the change with Emacs' `M-x customize` UI and safely handles type-validation."
+            - label: Timing
+              text: "It executes before the package loads, but because `defcustom` is designed to respect pre-existing bound values, the package will adopt your custom values when it finally loads."
+
+        - name: ":config"
+          subtitle: Post-Load Execution
+          details:
+            - label: Official Definition
+              text: '"The `:config` section is evaluated after the package has been loaded".'
+            - label: Purpose
+              text: "This is the safe zone for calling the package's functions, modifying its keymaps, advising its internal mechanics, and activating its global minor modes."
+            - label: Best Practice
+              text: 'The manual advises keeping `:init` as minimal as possible and putting "as much as you can get away with into the `:config` section" to maximize deferred loading performance.'
+
+    - id: 4
+      title: "Case Study: The `evil-snipe` `defcustom` List Modification"
+      problem:
+        description: "In the `evil-snipe` configuration, we must append a massive list of UI modes to the `evil-snipe-disabled-modes` variable to prevent the package from hijacking native keybindings in read-only buffers."
+
+      analysis:
+        - approach: "Why `:init` Fails"
+          explanation: "If you attempt to modify this list in `:init` using `dolist` and `add-to-list`:"
+          steps:
+            - "`:init` runs before `evil-snipe` loads."
+            - "The symbol `evil-snipe-disabled-modes` is currently unbound."
+            - "Your `dolist` creates a raw list and binds it to the symbol."
+            - "Emacs then loads `evil-snipe.el`. The package evaluates its internal `(defcustom evil-snipe-disabled-modes '(org-agenda-mode magit-mode ...))`."
+            - "Depending on the exact implementation of the package's initialization, the `defcustom` may overwrite your raw list, or the globalized minor mode `(evil-snipe-mode 1)` might scan the buffer list before your modifications are fully integrated into the package's internal state machine."
+
+        - approach: "Why `:config` is Bulletproof"
+          explanation: "By placing the `dolist` at the very beginning of `:config`, we guarantee the following sequence:"
+          steps:
+            - "The Package Loads: `evil-snipe.el` evaluates. The `defcustom` registers the upstream default list into the obarray."
+            - "Our Modification Runs: The `dolist` executes, safely appending our 30+ custom modes to the already populated upstream list."
+            - "The Mode Activates: `(evil-snipe-mode 1)` executes. The globalized minor mode scans the buffer list, checking against the fully merged exclusion list."
+
+      summary_rule_of_thumb:
+        - "Use `:init` only for variables that the package reads during its load sequence, or for defining functions that must exist before autoloads fire."
+        - "Use `:config` for modifying a package's `defcustom` lists, altering its keymaps, advising its functions, and turning on its global modes."
