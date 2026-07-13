@@ -1,9 +1,8 @@
 project_state:
   metadata:
     title: Emacs Configuration Project State Checkpoint
-    version: 17
-    date: July 12, 2026
-
+    version: 19
+    date: July 13, 2026
   critical_instructions:
     preamble: "Before generating any code, making suggestions, or answering questions, you MUST:"
     steps:
@@ -14,18 +13,28 @@ project_state:
       - Read and ingest use_package.yaml to under how use-package configurations work.
       - Acknowledge these rules and the current state.
     greenlight_reminder: "STRICT GREENLIGHT PROTOCOL: Do not write any code or output any `#+begin_src` blocks until the user explicitly gives the signal to proceed."
-
   core_architectural_rules:
     - name: Strict Org-Mode Formatting
       description: >
-        Zero Markdown syntax is allowed to bleed into Org-mode text or source blocks inside the `config.org` file. 
+        Zero Markdown syntax is allowed to bleed into Org-mode text or source blocks inside the `config.org` file.
         Use `=code=` or `~code~` for inline code, `*bold*` for bold, `/italics/` for italics, and standard Org headings (`*`, `**`, `***`).
     - name: Vanilla Emacs Paradigm
       description: "Do not use Doom Emacs proprietary macros (e.g., `map!`, `defadvice!`, `use-package!`). Translate Doom-inspired logic into native Vanilla Emacs equivalents."
     - name: Best Emacs Practices
       description: "Prioritize idiomatic, modern, and verifiable best Emacs practices over legacy hacks or outdated wiki snippets."
-    - name: Keybinding Management
-      description: "`general.el` is the centralized keybinding manager. Global motions and commands must be routed through `general.el`. Operator-pending text objects must be injected directly into Evil's internal C-level keymaps via `define-key` in a `:config` block guarded by `:after evil`."
+    - name: Keybinding Management & Leader Paradigm
+      description: >
+        1. Centralized Manager: `general.el` is the exclusive manager for global and local leader keybindings.
+        All `SPC` (global leader) and `SPC m` (local leader) bindings must be routed through custom `general` definers.
+        2. Doom Emacs Paradigm: Adhere to Doom Emacs mnemonic prefixes (e.g., `SPC b` for buffers, `SPC f` for files).
+        Always include `:wk` annotations for `which-key` discoverability.
+        3. `use-package :bind` Restriction: Native `:bind` is strictly reserved for simple global remaps (e.g., `[remap ...]`),
+        package-specific internal keymaps (e.g., `:map isearch-mode-map`), or core autoload triggers. It must never be used for `SPC` leader bindings.
+        4. Evil Structural Bindings: Operator-pending motions and text objects must be injected directly into Evil's internal C-level keymaps
+        (e.g., `evil-inner-text-objects-map`) via `define-key` or `evil-define-motion` in a `:config` block guarded by `:after evil`.
+        5. Minibuffer Preservation: Arrow keys are strictly preferred over `hjkl` in the minibuffer and completion maps to preserve the "type-to-filter" paradigm.
+        Never force `evil-normal-state` in the minibuffer.
+        6. Global Prefix Hygiene: Never bind raw `C-c <letter>` globally; reserve it for major modes. Use leader keys for global commands.
     - name: Corfu Confinement
       description: "`corfu` is strictly confined to buffer editing. It must never be enabled in the minibuffer, as it conflicts with `vertico`."
     - name: Minibuffer Navigation
@@ -35,7 +44,7 @@ project_state:
     - name: Pure Subheader Descriptions
       description: "Subheader descriptions must strictly and exclusively describe what the specific package does. Exclude workflow justifications, personal preferences, or architectural implementation details."
     - name: Bundled Extensions
-      description: "Because `use-package-always-ensure` is set to `t` globally, any `use-package` declaration for an extension bundled within a parent package's repository MUST explicitly include `:ensure nil`."
+      description: "Because `elpaca-use-package-by-default` is set to `t` globally, any `use-package` declaration for an extension bundled within a parent package's repository MUST explicitly include `:ensure nil`."
     - name: List Formatting
       description: "`:commands` lists must contain exactly one command per line. `dolist` iterables (such as mode lists) must contain exactly one item or mode per line."
     - name: Elpaca Load-Order Physics
@@ -43,6 +52,11 @@ project_state:
         - NEVER use `:hook (elpaca-after-init . mode)` or `:hook (after-init . mode)` to activate global minor modes.
         - For built-in packages, invoke `(mode 1)` directly in `:config` (or `:init` if early interception is required) to eliminate artificial startup latency.
         - Reserve `elpaca-after-init-hook` strictly for cross-package state initialization.
+    - name: Elpaca Package Management
+      description: >
+        Elpaca v0.12 is the exclusive asynchronous package manager. The `:ensure` 
+        keyword now accepts Elpaca recipe property lists (e.g., `:ensure (:host github :repo "user/repo")`)
+        instead of simple booleans or package names.
     - name: Header Status Keywords
       description: "NEVER add or change a section (`*`) or subsection (`**`) header to `DONE` unless the user explicitly states the phrase `change status from TODO to DONE`. Default to `TODO` or preserve the existing status."
     - name: Emacs 31 Targeting
@@ -50,9 +64,8 @@ project_state:
         The configuration explicitly targets Emacs 31. The user is currently daily-driving the `emacs-pretest` package (v31.0.90) built with
         `--with-native-compilation=aot` and `--with-pgtk`. Defensive guards (`fboundp`/`boundp`/version checks) should still wrap highly experimental APIs.
         The MPS incremental/concurrent garbage collector (`igc`) remains deferred out of the Emacs 31 release cycle and must NOT be treated as an Emacs 31 feature.
-
   editor_behaviour_paradigm:
-    summary: "In v5, the `Editor Behaviour` concept was massively restructured to become the centralized pillar for how Emacs renders, parses, and manipulates text and buffers. In v17, Group 7 continues to make progress with core spatial traversal engines finalized."
+    summary: "In v5, the `Editor Behaviour` concept was massively restructured to become the centralized pillar for how Emacs renders, parses, and manipulates text and buffers. In v19, Group 7 continues to make progress with core spatial traversal engines finalized."
     groups:
       - id: 1
         name: Visual Chrome & UI Overlays
@@ -78,7 +91,6 @@ project_state:
       - id: 8
         name: Lexical Validation & Comparative Workflows
         status: IN PROGRESS
-
   negative_constraints:
     - "No `smartparens` or `puni`: Regex-based pair tracking causes desyncs in complex strings/templates. Lisp-centric soft-deletion is irrelevant for Non-Lisp AST languages."
     - "No `combobulate`: Fundamentally clashes with Evil's operator-pending grammar and causes keymap collisions."
@@ -102,7 +114,8 @@ project_state:
     - "No Impure Descriptions: NEVER include workflow justifications or implementation details in subheader descriptions."
     - "No Multi-line Lists: NEVER place multiple commands in `:commands ()` or multiple modes in `dolist` on the same line."
     - "No Unauthorized Status Changes: NEVER change a header from `TODO` to `DONE` without the exact phrase `change status from TODO to DONE`."
-
+    - "No `:pin` or `:vc` Keywords: Elpaca manages its own sources and repositories natively via its recipe system. The traditional `package.el` `:pin` keyword and the Emacs 30 `:vc` keyword are obsolete and must never be used."
+    - "No Global `C-c <letter>` Bindings: Raw `C-c <letter>` is strictly reserved for major modes to prevent shadowing. Global commands must use leader keys (`SPC`)."
   edge_cases_and_deferred_issues:
     - "Dirvish Multi-frame Flicker: Patched via `define-advice` on `dirvish-pre-redisplay-h` to debounce redisplay hooks in Emacs 30+."
     - "lsp-mode Org Element API Crash: Patched via `:around` advice in the `lsp-mode :init` block to prevent `cl-generic` corruption."
@@ -113,7 +126,6 @@ project_state:
     - "`treesit-fold` Ellipsis Injection: Upstream `treesit-fold` natively inherits Emacs' built-in `truncate-string-ellipsis`."
     - "[v16 Resolution] Structural Nesting & Missing Packages: `Precision Editing` successfully promoted to top-level `*`. `Move Text` successfully re-injected into Group 5, finalizing the section."
     - "[v16 Correction] Evil Easymotion API Hallucination: `evilem-create` crashes when wrapping native Avy commands (Avy inside Avy infinite loop via `evilem--collect`). Replaced with native `evil-define-motion` wrappers for operator-pending support."
-
   architectural_decisions:
     v10:
       - Non-Lisp AST Stack Finalization (Group 3 Complete).
@@ -142,13 +154,15 @@ project_state:
       - "Protocol Hardening: Enforced strict status-change locks (`change status from TODO to DONE`), single-line list formatting (`:commands`, `dolist`), and pure-functional subheader descriptions."
       - "Precision Editing Progress: Finalized Evil Easymotion and Evil Snipe implementations in config.org."
       - "Window Management: Finalized native Windmove wrap-around physics."
-
+    v18:
+      - "Package Management Migration: Officially transitioned from `package.el` to Elpaca v0.12. Deprecated `:pin` and `:vc` keywords in favor of Elpaca recipe plists. Updated `use-package-always-ensure` references to `elpaca-use-package-by-default`."
+    v19:
+      - "Keybinding Architecture Hardening: Formalized the Doom Emacs Leader Paradigm via `general.el`. Restricted `use-package :bind` strictly to remaps/internal maps. Mandated Evil C-level keymap injection for text objects. Enforced Minibuffer `hjkl` prohibition and Global `C-c` prefix hygiene."
   pending_decisions_and_todos:
-    - "Project & Workspace Management: `bufferlo` and `projection` selected. Excise `projectile`/`persp-mode`."
+    - "Project & Workspace Management: `bufferlo` and `projection` selected. Excise `projectile` / `persp-mode`."
     - "Syntax Checking Transition: `flymake` to `flycheck`."
     - "Debug Adapter Protocol: `dap-mode` with `transient`."
     - "LaTeX / AUCTeX: Pending `preview-auto.el`, `cdlatex`, Bibliography."
-
   overall_progress:
     finalized:
       - Core Emacs (13 subsections)
@@ -177,12 +191,10 @@ project_state:
       - XML Document Viewer
       - Study
       - Misc (AI/LLM)
-
   immediate_structural_action_plan:
     - "Finalize Group 7: Proceed to remaining packages (Link Hint, Ace Window, Anzu, Iedit, etc.)."
     - Excise Projectile/Persp glue code.
     - "Next Steps: Proceed to Group 8 (Lexical Validation) and Workflow Management."
-
   remaining_work_checklists:
     - group: Spatial Traversal & Inline Mutations (Group 7)
       tasks:
@@ -248,7 +260,6 @@ project_state:
           description: "Determine if compile-angel is needed for elpaca."
         - status: pending
           description: "Pressing enter on a header should move a task from TODO to DONE like doom emacs does."
-
   global_questions:
     - status: pending
       question: "Can org-level variation only work for certain file and/or org buffers?"

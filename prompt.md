@@ -1,15 +1,4 @@
-- Ingest the 4 attached files and make sure you have read everything to the letter and follow all the instructions to the letter. Then acknowlegde that you have read all 4 files.
-
-- Ingest all the 4 attached files and perform the following tasks:
-  1. Update and rewrite the system_prompt_protocol.xml file so that it has the following instructions and constraints:
-  - [ ] Make sure system-prompt-protocol.xml instructs to allows use best emacs practices
-  - [ ] Also the Excecution Plan should never change status from TODO to DONE. system-prompt-protocol.xml should only change status when the user prompt has the phrase `change status from TODO to DONE`
-  - [ ] :commands () should have a single command per line
-  - [ ] dolist should also have a single mode per line
-  - [ ] header and subheader descriptions should only include descriptions of what the package does.
-  2. Using the config.org.txt update and rewrite the project_state.xml.
-
-  Both xml files should be in separate xml markdown code blocks.
+- Ingest the 5 attached files. Then acknowlegde that you have read all 5 files.
 
 - You have the `GREEN LIGHT` to execute the rewrite.
 
@@ -19,13 +8,13 @@
 
 - Okay then you have the signal to rewrite the Session Management subsection. Follow the protocols and instructions from system-prompt-protocols.md file and make sure the documentation is very concise as well.
 
-- Now review the next subsection: Evil Easymotion. Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from the system-prompt-protocol.md file. Also determine if there are additional configurations that might be useful. Then explain everything to me in detail and present me how you plan to deal with this configuration. Do not attempt the 1st iteration of the rewrite yet since I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 2026.
+- Now review the next subsection: iedit. Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from the system_prompt_protocol.yaml file. Also determine if there are additional configurations that might be useful. Also determine if there keybindings you should add using general.el and SPC as leader keys. Then explain everything to me in detail and present me how you plan to deal with this configuration. Do not attempt the 1st iteration of the rewrite yet since I need to review everything. Search the web and think longer for these task and make sure you have the latest information till July 2026. Don't review evil-multi-iedit.
 
-- Now review the next subsection: Link Hint. Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from the system-prompt-protocol.xml file. Also determine if there are additional configurations that might be useful. Then explain everything to me in detail and present me how you plan to deal with this configuration. Do not attempt the 1st iteration of the rewrite yet since I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 2026.
+- Now review the next subsection: evil-multiedit. Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from v19 of system_prompt_protocol.yaml file. Search the web determine if there are additional configuration settings that might be useful. Then explain everything to me in detail and present me how you plan to deal with this configuration.I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 2026.
 
-- Are you certain there are no more errors and issues in this iteration of evil-easymotion? And are there any additional configuration settings that you think might be useful? Also are you sure you are using the best emacs practices? Search the web and think longer for these tasks. You must not perform another rewrite. The information you get must be the latest till July 2026. Explain everything to me in detail.
+- Are you certain there are no more errors and issues in this iteration of Grep Edit Mode? Search the web and determine if there are there any additional configuration settings that you think might be useful? Also are you sure you are using the best emacs practices? Search the web and think longer for these tasks. You must not perform another rewrite. The information you get must be the latest till July 2026. Explain everything to me in detail.
 
-- Are you sure there are no more errors and issues in the 3rd iteration? And are you sure there are not any more extra configurations you need to add? Answer and explain everything to me in great detail. Do not perform a 4th rewrite. Search the web and think longer for this task and make sure the information you get is latest till July 2026.
+- Are you sure there are no more errors and issues in this iteration? And are you sure there are not any more extra configurations you need to add by search the web? Answer and explain everything to me in great detail.Search the web and think longer for this task and make sure the information you get is latest till July 2026.
 
 - Write a python script to build and install emacs from source. It will specifically install emacs-pretest package for now until emacs 31 has been released. It must have the following features and functionalities:
   1. The script must follow best python practices.
@@ -37,10 +26,20 @@
   7. It must ask permisson at each step. The format would be y/N. Only pressing y approves the step. Pressing N or any other key denies the step
   8. It must provide all the instructions to build and install emacs from source. This is the main task. For now, it will download emacs-pretest. It must use the correct --config flags something like
 
-  ***
+Now review the next subsection: iedit. First look at the source files:
 
-  ***
+```el
 
-  ***
+```
 
-  But you did not
+Then also look at its readme and if there are any useful configurations you can borrow:
+
+```txt
+
+```
+
+Then, find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from the system_prompt_protocol.yaml file. Also determine if there are additional configurations that might be useful. Also determine why posframe for ace-window would be needed. Then explain everything to me in detail and present me how you plan to deal with this configuration. Do not attempt the 1st iteration of the rewrite yet since I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 2026.
+
+Are you certain there are no more errors and issues in this iteration of [subsection]? Search the web and determine if there are there any additional configuration settings that you think might be useful? Also are you sure you are using the best emacs practices? Search the web thoroughly and think longer for these tasks. The information you get must be the latest till July 2026. Explain everything to me in detail for me to review.
+
+And are you certain there are no errors and issues in the Grep Edit Mode Test? Search the web, think for longer and explain everything to me

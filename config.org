@@ -2365,12 +2365,25 @@ Native Emacs 29+ face-remapping engine for global typography scaling. Prevents P
 
 
 * TODO Precision Editing
+- [ ] Set Doom Emacs style keybindings everywhere
+
 ** DONE Avy
 Provides an O(1) radix-tree jumping engine for long-distance spatial navigation. Configured with the =at-full= overlay style, home-row routing, proximity sorting, and on-demand multi-window expansion.
 #+begin_src emacs-lisp
 (use-package avy
   :defer t
-  :commands (avy-goto-char-2 avy-goto-line avy-goto-word-1 avy-goto-word-0 avy-isearch avy-move-line avy-copy-line avy-kill-region avy-transpose-lines-in-region avy-move-region avy-copy-region avy-kill-ring-save-region)
+  :commands (avy-goto-char-2
+             avy-goto-line
+             avy-goto-word-1
+             avy-goto-word-0
+             avy-isearch
+             avy-move-line
+             avy-copy-line
+             avy-kill-region
+             avy-transpose-lines-in-region
+             avy-move-region
+             avy-copy-region
+             avy-kill-ring-save-region)
   :bind (:map isearch-mode-map
          ("M-j" . avy-isearch))
   :custom
@@ -2512,124 +2525,188 @@ Replaces native Evil character motions with incremental, regex-aware spatial jum
 
 
 ** TODO Link Hint
-Routes Avy-backed semantic link mutations through a unified global prefix.
+Provides Avy-backed spatial navigation and mutation commands for visible URLs, file paths, and structural buttons across diverse buffer types.
 #+begin_src emacs-lisp
 (use-package link-hint
-  :defer t
   :commands (link-hint-open-link
              link-hint-copy-link
              link-hint-open-multiple-links
-             link-hint-copy-all-links)
-  :config
-  (ar/global-leader
-    "l" '(:ignore t :wk "links")
-    "l o" '(link-hint-open-link :wk "Open link")
-    "l y" '(link-hint-copy-link :wk "Yank link")
-    "l m" '(link-hint-open-multiple-links :wk "Open multiple")
-    "l a" '(link-hint-copy-all-links :wk "Yank all")))
+             link-hint-copy-all-links
+             link-hint-open-link-at-point
+             link-hint-copy-link-at-point)
+  :custom
+  ;; Seamless Embark fallback when no recognized link exists at point.
+  (link-hint-action-fallback-commands
+   (list :open (lambda ()
+                 (condition-case _
+                     (progn (embark-dwim) t)
+                   (error nil))))))
+
+ (ar/global-leader
+  "l"   '(:ignore t :wk "links")
+  "l o" '(link-hint-open-link :wk "Open link")
+  "l y" '(link-hint-copy-link :wk "Yank link")
+  "l m" '(link-hint-open-multiple-links :wk "Open multiple")
+  "l a" '(link-hint-copy-all-links :wk "Yank all")
+  "l ." '(link-hint-open-link-at-point :wk "Open at point"))
 #+end_src
 
 
 
-** TODO Ace Window
-Routes cross-window spatial jumps via the Avy radix-tree engine. Reserved for complex split layouts and strictly mapped via leader bindings to prevent global keymap pollution.
-- [ ] What is the ace-window-posframe.el file for?
+
+** DONE Ace Window
+Routes cross-window spatial jumps and dispatch actions via the Avy radix-tree engine.
 #+begin_src emacs-lisp
 (use-package ace-window
-  :defer t
-  :commands (ace-window ace-swap-window ace-delete-window)
+  :commands (ace-window
+             ace-swap-window
+             ace-delete-window
+             ace-delete-other-windows)
   :custom
+  ;; Restricts path generation to the home-row.
   (aw-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l))
+  ;; Limits selection scope strictly to the current frame.
   (aw-scope 'frame)
-  (aw-background t)
+  ;; Disables buffer dimming to eliminate redisplay overhead.
+  (aw-background nil)
+  ;; Forces the action menu to appear for single or dual window layouts.
+  (aw-dispatch-always t)
+  ;; Isolates UI chrome and popups from spatial selection targets.
+  (aw-ignored-buffers '("*Calc Trail*" " *LV*"
+                        treemacs-mode
+                        dirvish-mode
+                        dirvish-directory-view-mode
+                        "*popper*" "*which-key*"))
   :custom-face
-  (aw-leading-char-face ((t (:foreground "#1a1b26" :background "#e0af68" :weight bold :height 1.5)))))
+  ;; Scales typography for peripheral visibility inside centered child frames.
+  (aw-leading-char-face ((t (:foreground "#1a1b26" :background "#e0af68" :weight bold :height 2.5))))
+  :config
+  ;; Renders selection characters permanently in the modeline.
+  (ace-window-display-mode 1)
+  ;; Spawns centered hints via child frames, guarded for terminal safety.
+  (when (childframe-workable-p)
+    (ace-window-posframe-mode 1)))
 #+end_src
 
-** TODO Anzu
-Displays current match index and total matches in the modeline during active searches. Operates strictly on the lexical plane and remains isolated from LSP semantic engines.
+
+** DONE Anzu
+Displays the current match index and total match count in the mode-line during incremental searches and query replacements.
 #+begin_src emacs-lisp
 (use-package anzu
-  :defer t
-  :hook (isearch-mode . anzu-isearch-start)
-  :hook (isearch-mode-end . anzu-isearch-end)
+  :demand t
   :bind (([remap query-replace] . anzu-query-replace)
          ([remap query-replace-regexp] . anzu-query-replace-regexp)
          :map isearch-mode-map
          ([remap isearch-query-replace] . anzu-isearch-query-replace)
          ([remap isearch-query-replace-regexp] . anzu-isearch-query-replace-regexp))
   :custom
+  ;; Hides the default mode-line lighter.
   (anzu-mode-lighter "")
+  ;; Deactivates the active region during query replacements.
   (anzu-deactivate-region t)
+  ;; Caps the search count to prevent main-thread blocking.
   (anzu-search-threshold 1000)
+  ;; Limits the number of replacement overlays rendered simultaneously.
   (anzu-replace-threshold 50)
-  (anzu-replace-to-string-separator " → "))
-#+end_src
-
-** TODO Evil Anzu
-Integrates Anzu's modeline tracking with Evil's native search operators. Ensures match indices update correctly during =/= and =?= motions.
-#+begin_src emacs-lisp
-(use-package evil-anzu
-  :defer t
-  :after evil anzu
+  ;; Defines the visual separator between the 'from' and 'to' strings.
+  (anzu-replace-to-string-separator " → ")
+  ;; Disables native mode-line injection to prevent doom-modeline collisions.
+  (anzu-cons-mode-line-p nil)
   :config
+  ;; Activates the global minor mode to hook into isearch and query-replace.
   (global-anzu-mode 1))
 #+end_src
 
-** TODO Iedit
-Provides the foundational engine for simultaneous multi-line editing. Highlights all instances of the current symbol or region for synchronized mutation.
+
+
+** DONE Evil Anzu
+Advises Evil's search motions to trigger Anzu's modeline match tracking.
 #+begin_src emacs-lisp
-(use-package iedit
-  :defer t
-  :commands (iedit-mode iedit-rectangle-mode))
+(use-package evil-anzu :after (evil anzu))
 #+end_src
 
-** TODO Evil Multiedit
-Wraps the Iedit engine in a dedicated Evil state for localized multi-cursor refactoring. Maps explicit Vim-mnemonics for cursor accumulation and bulk mutation.
+
+** DONE Iedit
+Highlights and edits all instances of a selected word or region simultaneously.
+#+begin_src emacs-lisp
+(use-package iedit
+  :commands (iedit-mode
+             iedit-rectangle-mode)
+  :custom
+  ;; Prevents default C-; global keymap injection.
+  (iedit-toggle-key-default nil)
+  ;; Disables automatic defun narrowing.
+  (iedit-auto-narrow nil)
+  ;; Renders one context line around matches.
+  (iedit-occurrence-context-lines 1))
+#+end_src
+
+
+** DONE Evil Multiedit
+Provides multiple cursor editing in Evil mode by wrapping the iedit lexical engine.
 #+begin_src emacs-lisp
 (use-package evil-multiedit
-  :defer t
-  :after evil iedit
+  :after (evil iedit)
   :commands (evil-multiedit-match-symbol-and-next
+             evil-multiedit-match-symbol-and-prev
              evil-multiedit-match-all
              evil-multiedit-toggle-or-restrict-region)
   :custom-face
+  ;; Themes the match overlay to Tokyo Night purple.
   (evil-multiedit-match-face ((t (:background "#bb9af7" :foreground "#1a1b26"))))
   :config
+  ;; Registers internal state navigation bindings.
   (evil-multiedit-default-keybinds))
+
+;; general keybindings
+(general-define-key
+  :states '(normal visual)
+  "M-d" #'evil-multiedit-match-symbol-and-next
+  "M-D" #'evil-multiedit-match-all)
 #+end_src
 
-** TODO Wgrep
-Enables writable =*grep*= and =*occur*= buffers for cross-project bulk editing. Serves as the mandatory fallback for Emacs versions prior to 31.
+
+** TODO Grep
+Finds text across files and allows direct editing of the search results to update the original files.
 #+begin_src emacs-lisp
-(unless (>= emacs-major-version 31)
-  (use-package wgrep
-    :defer t
-    :commands (wgrep-setup wgrep-change-to-wgrep-mode)
-    :custom
-    (wgrep-auto-save-buffer t)
-    :config
-    (with-eval-after-load 'grep
-      (define-key grep-mode-map (kbd "e") #'wgrep-change-to-wgrep-mode))))
+(use-package grep
+  :ensure nil
+  :commands (grep
+             lgrep
+             rgrep
+             zgrep
+             zrgrep)
+  :custom
+  ;; Prevents automatic buffer saving before search execution.
+  (grep-save-buffers nil)
+  ;; Groups search results by filename with visual separators.
+  (grep-use-headings t)
+  :config
+  ;; Prioritizes ripgrep over standard grep for xref and grep commands.
+  (let* ((rg (executable-find "rg"))
+         (grep-exec (or rg (executable-find "grep")))
+         (rgp (and rg (string-match-p "rg" grep-exec))))
+    (when grep-exec
+      (setq grep-program grep-exec)
+      (setq grep-template
+            (if rgp
+                (concat grep-exec " -nH --null -e <R> <F>")
+              (concat grep-exec " <X> <C> -nH --null -e <R> <F>")))
+      (setq xref-search-program (if rgp 'ripgrep 'grep))))
+  ;; Forces Evil into normal state when the writable edit mode activates.
+  (evil-set-initial-state 'grep-edit-mode 'normal))
 #+end_src
 
-** TODO Grep Edit Mode
-Utilizes the native Emacs 31 C-level engine for writable grep buffers. Defensively guarded to prevent evaluation errors on older Emacs versions.
-#+begin_src emacs-lisp
-(when (>= emacs-major-version 31)
-  (with-eval-after-load 'grep
-    (define-key grep-mode-map (kbd "e") #'grep-change-to-grep-edit-mode)))
-#+end_src
 
 ** TODO Re-Builder
 Provides an interactive visual regex builder for complex search patterns. Opens a split window to highlight matches and capture groups in real-time before execution.
 #+begin_src emacs-lisp
 (use-package re-builder
   :ensure nil
-  :defer t
-  :commands (re-builder)
-  :custom
-  (reb-re-syntax 'string))
+  :commands (re-builder
+             regexp-builder)
+  :config
+  (setq reb-re-syntax 'read))
 #+end_src
 
 ** TODO Avy Transient Menu
@@ -2987,6 +3064,7 @@ These packages extend Dired's capabilities. =dired-x= provides advanced omitting
 #+end_src
 
 ** TODO Dirvish
+- [ ] Does wdired work in dirvish?
 Dirvish transforms Dired into a modern, Ranger-like file manager with live previews, emerge groups, and a dedicated sidebar.
 *Architectural Note:* Dirvish in 2025/2026 suffers from a known multi-frame feedback loop (Issue #353) that causes severe UI flickering when =emacsclient= opens new frames. We apply a Doom Emacs =define-advice= patch to debounce the redisplay hook. Additionally, we hook into =persp-before-switch-functions= to cleanly quit Dirvish side-windows before switching workspaces, preventing Emacs from throwing errors when trying to delete dedicated windows.
 
@@ -3099,10 +3177,15 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
   )
 #+end_src
 
+
+
 ** TODO Project Management
 - [ ] Determine what SPC f p does in doom emacs. Create a similar function for my config
 - [ ] Determine what SPC p p does in doom emacs. Create a similar function for my config
 - [ ] Use projection package and read the readme carefully for this package: https://raw.githubusercontent.com/mohkale/projection/refs/heads/master/README.org
+
+
+
 
 ** TODO iBuffer
 Ibuffer is the advanced buffer list manager. We configure it to hide empty filter groups (keeping the UI clean) and redefine the size column to display human-readable sizes (e.g., =1.2M=). It is integrated with =nerd-icons= for visual flair and =ibuffer-projectile= to automatically group all open buffers by their respective Projectile projects.
@@ -6631,7 +6714,11 @@ TODO: Uncomment when setting up flycheck
 
 
 * TODO Snippet Engine
+- [ ] Write a new variation of yatemplate to insert template using YASnippet and auto-insert-mode
+
 ** TODO Yasnippet
+
+
 #+begin_src emacs-lisp
 (defvar my/snippets-directory (expand-file-name "snippets" user-emacs-directory)
   "Directory for personal yasnippet snippets.")
@@ -8574,6 +8661,40 @@ Native directional window navigation. Enables wrap-around physics for spatial tr
 (setq windmove-wrap-around t)
 #+end_src
 
+** DONE Window Operations
+Centralized leader bindings for spatial window traversal, splitting, and ace-window routing.
+#+begin_src emacs-lisp
+(ar/global-leader
+  "w"           '(:ignore t :wk "window")
+  ;; Ace Window Routing
+  "w w"         '(ace-window :wk "Ace window")
+  "w d"         '(ace-delete-window :wk "Ace delete window")
+  "w m"         '(ace-delete-other-windows :wk "Maximize")
+  "w x"         '(ace-swap-window :wk "Ace swap window")
+  ;; Native Splitting
+  "w s"         '(split-window-below :wk "Split below")
+  "w v"         '(split-window-right :wk "Split right")
+  ;; Directional Navigation
+  "w <left>"    '(evil-window-left :wk "Window left")
+  "w <down>"    '(evil-window-down :wk "Window down")
+  "w <up>"      '(evil-window-up :wk "Window up")
+  "w <right>"   '(evil-window-right :wk "Window right")
+  ;; Directional Transposition
+  "w S-<left>"  '(evil-window-move-far-left :wk "Move far left")
+  "w S-<down>"  '(evil-window-move-very-bottom :wk "Move bottom")
+  "w S-<up>"    '(evil-window-move-very-top :wk "Move top")
+  "w S-<right>" '(evil-window-move-far-right :wk "Move far right")
+  ;; Utilities & Winner Mode
+  "w ="         '(balance-windows :wk "Balance windows")
+  "w u"         '(winner-undo :wk "Winner undo")
+  "w r"         '(winner-redo :wk "Winner redo")
+  "w t"         '(toggle-window-split :wk "Toggle split")
+  "w _"         '(split-window-vertically-instead :wk "Split vertically instead")
+  "w |"         '(split-window-horizontally-instead :wk "Split horizontally instead"))
+#+end_src
+
+
+
 * TODO AI/LLM
 * TODO Built-in Packages to Upgrade
 #+begin_src emacs-lisp
@@ -8683,33 +8804,6 @@ Native directional window navigation. Enables wrap-around physics for spatial tr
   "s y" '(consult-yasnippet :wk "Yasnippet")
   "s t" '(hl-todo-occur :wk "Todo list")
   "s T" '(hl-todo-rg-project :wk "Todo in project"))
-
-;; Window operations (SPC w)
-(ar/global-leader
-  "w"           '(:ignore t :wk "window")
-  "w w"         '(other-window :wk "Other window")
-  "w d"         '(delete-window :wk "Delete window")
-  "w D"         '(delete-other-windows :wk "Delete other windows")
-  "w s"         '(split-window-below :wk "Split below")
-  "w v"         '(split-window-right :wk "Split right")
-  ;; Navigation (Arrow Keys)
-  "w <left>"    '(evil-window-left :wk "Window left")
-  "w <down>"    '(evil-window-down :wk "Window down")
-  "w <up>"      '(evil-window-up :wk "Window up")
-  "w <right>"   '(evil-window-right :wk "Window right")
-  ;; Moving Windows (Shift + Arrow Keys)
-  "w S-<left>"  '(evil-window-move-far-left :wk "Move far left")
-  "w S-<down>"  '(evil-window-move-very-bottom :wk "Move bottom")
-  "w S-<up>"    '(evil-window-move-very-top :wk "Move top")
-  "w S-<right>" '(evil-window-move-far-right :wk "Move far right")
-  "w ="         '(balance-windows :wk "Balance windows")
-  "w m"         '(delete-other-windows :wk "Maximize")
-  "w o"         '(other-window :wk "Other window")
-  "w u"         '(winner-undo :wk "Winner undo")
-  "w r"         '(winner-redo :wk "Winner redo")
-  "w t"         '(toggle-window-split :wk "Toggle split")
-  "w _"         '(split-window-vertically-instead :wk "Split vertically instead")
-  "w |"         '(split-window-horizontally-instead :wk "Split horizontally instead"))
 
 ;; TODO: Replace with Projectile alternative
 ;; Project operations (SPC p)
@@ -8965,12 +9059,6 @@ Native directional window navigation. Enables wrap-around physics for spatial tr
 (ar/global-leader
   "k" '(browse-kill-ring :wk "Kill ring"))
 
-;; Iedit (SPC e)
-(ar/global-leader
-  "e" '(:ignore t :wk "iedit")
-  "e e" '(iedit-mode :wk "Iedit mode")
-  "e r" '(iedit-rectangle-mode :wk "Rectangle mode"))
-
 (ar/global-leader
   "a" '(embark-act :wk "Actions"))
 
@@ -9183,6 +9271,8 @@ This section just contains checkboxes with stuff that still needs to be done for
 
 - [ ] add a doom emacs style keybinding with SPC as leader in general.el for =org-babel-remove-result-one-or-many=
 - [ ] remove flycheck for now since messing with org-mode editing
+- [ ] Illustrate a workflow using iedit and evil-multiedit
+
 - [ ] customize org-agenda-finalize to customize org-agenda buffer
 - [ ] Setup automatic pair generation for '**', '==', etc and make sure the cursor in insert mode is placed in the middle
 - [ ] Determine if compile-angel is needed for elpaca?

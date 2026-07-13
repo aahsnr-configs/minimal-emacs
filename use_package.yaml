@@ -1,10 +1,16 @@
 document:
-  title: "The `use-package` Execution Timeline & Load-Order Physics"
+  title: "The `use-package` Execution Timeline & Load-Order Physics (Elpaca Edition)"
   description: >
-    This document provides a comprehensive, canonical breakdown of how the `use-package`
-    macro configures Emacs packages. All definitions and execution timelines are derived
-    strictly from the Official GNU Emacs `use-package` User Manual (v2.4.5 / Emacs 30.2).
-
+    This document provides a canonical breakdown of how the `use-package` macro
+    configures Emacs packages, specifically tailored for the Elpaca v0.12 
+    asynchronous package manager. All definitions and execution timelines are 
+    derived from the Official GNU Emacs `use-package` User Manual (v2.4.5, as 
+    distributed with Emacs 30.2), cross-checked line-by-line against the actual 
+    macro-expansion logic in Emacs 30.2's built-in `use-package-core.el` and 
+    `use-package-ensure.el`. Verified current as of July 2026; use-package 
+    remains at the version documented for Emacs 30.2, and no keyword-ordering 
+    changes have surfaced in the in-development Emacs 31 (which entered feature 
+    freeze near June 2026).
   sections:
     - id: 1
       title: Core Philosophy
@@ -12,104 +18,320 @@ document:
         - >
           The `use-package` macro is not a package manager. Its primary purpose is to
           organize package configuration declaratively, eliminate repetitive boilerplate,
-          and enforce lazy-loading (autoloading) to keep Emacs startup times near zero.
+          and enable lazy-loading (autoloading) to keep Emacs startup times low. In this
+          configuration, Elpaca acts as the actual package manager, handling installation
+          and load-path management asynchronously.
         - >
           When Emacs evaluates a `(use-package foo ...)` block, it does not simply run
-          the code top-to-bottom. Instead, the macro expands into a highly specific
-          chronological sequence of Emacs Lisp forms designed to respect the boundary
-          between pre-load state and post-load state.
+          the code top-to-bottom. The macro expands into a chronological sequence of
+          Emacs Lisp forms, ordered by a fixed internal keyword list
+          (`use-package-keywords`), designed to respect the boundary between
+          pre-load state and post-load state. Keyword order in your source does not
+          determine evaluation order — the internal keyword list does.
+        - >
+          One keyword deserves a special note: `:disabled`. The official manual specifies
+          that it completely inhibits the loading and configuration of a package, omitting
+          it entirely from the compiled output. Internally, the macro achieves this via a
+          pre-evaluation guard that bypasses the entire keyword-processing pipeline before
+          it begins, ensuring no side-effects (not even Elpaca's `:ensure` queueing) occur.
+          This is why `:disabled` can truthfully be described as happening "before everything."
 
     - id: 2
       title: The Chronological Execution Timeline
       phases:
-        - name: "Phase 1: Pre-Load Preparation"
+        - name: "Phase 0: Before Everything Else"
+          items:
+            - keyword: ":disabled"
+              description: >
+                If the keyword is present anywhere in the declaration, the entire
+                expansion is skipped — nothing else runs. This check happens via a
+                simple membership test (`memq`) on the raw argument list, before
+                `use-package`'s normal keyword-ordering logic even begins. One
+                consequence: the check looks for the *presence* of `:disabled`, not
+                the truth of its value, so `:disabled nil` still disables the
+                package.
+            - keyword: ":ensure (Elpaca Integration)"
+              description: >
+                Package installation is resolved before any other ordered keyword.
+                `use-package-ensure.el` prepends `:ensure` to the keyword list. Elpaca
+                integrates by overriding `use-package-ensure-function`, intercepting
+                `:ensure` and pushing the package (or recipe) into Elpaca's asynchronous
+                installation queue. Unlike `package.el`, Elpaca allows `:ensure` to accept
+                a full recipe property list (e.g., `:ensure (:host github :repo "user/repo")`).
+                Note: The Emacs 30 `:vc` keyword (for `package-vc.el`) and the traditional
+                `:pin` keyword are superseded and effectively ignored by Elpaca, as Elpaca
+                handles all repository fetching natively via its recipe system.
+        - name: "Phase 1: Preface and Conditionals"
           items:
             - keyword: ":preface"
-              description: "Evaluated first, at both compile-time and run-time. Used strictly for defining variables/functions to satisfy the byte-compiler or provide conditions for `:if`."
-            - keyword: ":init"
-              description: "Evaluated just before the package is loaded."
-            - keyword: ":custom"
-              description: "Evaluated just before the package is loaded, utilizing `customize-set-variable` to safely register user options with Emacs' native Customization system."
-            - keyword: "Autoload Triggers (`:hook`, `:bind`, `:mode`, `:commands`)"
-              description: "These do not execute code immediately. Instead, they inject 'triggers' into Emacs' autoload registry, instructing Emacs to load the package only when a specific hook fires, key is pressed, or file extension is opened."
-
-        - name: "Phase 2: The Loading Boundary"
+              description: >
+                Evaluated before anything else except :disabled and :ensure — notably,
+                even before the :if/:when/:unless condition is checked. It runs at
+                both byte-compile time and load time, so it must be limited to
+                symbol/function definitions with no side effects (needed to satisfy
+                the byte-compiler or to supply values for an :if test).
+            - keyword: ":if / :when / :unless"
+              description: >
+                Gates whether the *rest* of the declaration loads and initializes.
+                Mechanically, its handler wraps everything still to be processed —
+                :no-require, :catch, :after, :custom, :custom-face, and on through
+                :config — inside a single `(when PRED ...)` form. Evaluated at run-time.
+                Does not gate :preface, :disabled, or :ensure — those already
+                happened by this point in the keyword order.
+        - name: "Phase 2: Pre-Load Configuration"
           items:
-            - event: "The Package Loads"
-              description: "Emacs executes `(require 'foo)` or the package is loaded dynamically via an autoload trigger. At this exact moment, the package's internal `defcustom`, `defvar`, and `defun` macros are evaluated and registered into the Emacs obarray."
-
-        - name: "Phase 3: Post-Load Configuration"
+            - keyword: ":custom / :custom-face"
+              description: >
+                Processed next, before any autoload-trigger keyword and before :init.
+                Expands to `customize-set-variable` (or the equivalent face-setting
+                form) calls that run prior to the package loading.
+            - keyword: "Autoload Triggers (:hook, :bind, :mode, :commands, :interpreter, etc.)"
+              description: >
+                Do not execute package code immediately. Instead they register
+                'triggers' (autoloads) in Emacs, so the package loads only when a
+                hook fires, a key is pressed, or a matching file is opened. In the
+                source, this deferral is mediated through an implied :commands list.
+                This is why the docs say deferral is implied "in almost all cases" —
+                a :bind or :hook entry that doesn't resolve to an autoloadable
+                function symbol won't trigger it.
+            - keyword: ":init"
+              description: >
+                Evaluated just before the package is loaded, after :custom and after
+                autoload triggers have been registered.
+        - name: "Phase 3: The Loading Boundary"
+          items:
+            - event: "The Package Loads (Elpaca Async Context)"
+              description: >
+                Emacs executes `(require 'foo)`. For Elpaca users, because package
+                installation and activation are asynchronous, Elpaca dynamically manages
+                the `load-path`. If a package was just queued for installation, Elpaca's
+                integration ensures the `require` and subsequent `:config` block are
+                safely sequenced/deferred until Elpaca's background queue has finished
+                cloning and activating the package. Once active, the package's own
+                `defcustom`, `defvar`, and `defun` forms are evaluated and registered.
+        - name: "Phase 4: Post-Load Configuration"
           items:
             - keyword: ":config"
-              description: "Evaluated after the package has been fully loaded. If the package was lazy-loaded via a trigger, this block is deferred until the exact moment the package loads."
+              description: >
+                Evaluated after the package has fully loaded. For a deferred
+                package (or an Elpaca async-queued package), this is postponed until the exact moment loading occurs.
 
     - id: 3
       title: Detailed Keyword Breakdown
       keywords:
+        - name: ":disabled"
+          subtitle: First in the List, but Not Where the Real Work Happens
+          details:
+            - label: Official Definition
+              text: >
+                Inhibits loading a package, and all its customizations — equivalent
+                to commenting out or deleting the declaration.
+            - label: "Nominal position vs. actual mechanism"
+              text: >
+                `:disabled` is literally the first symbol in the base
+                `use-package-keywords` defcustom. But its handler in that list is a
+                pass-through no-op. The actual disabling logic lives entirely outside
+                that list: the public `use-package` macro wraps its whole body in an
+                early guard `(unless (memq :disabled args) ...)` that runs before
+                `use-package-core` is ever invoked. In effect, its spot at the head
+                of the list is vestigial.
+            - label: "Gotcha: value is never checked"
+              text: >
+                Because the outer test is `memq` (list membership), only the
+                keyword's *presence* matters. `(use-package foo :disabled nil ...)`
+                is disabled just as thoroughly as `(use-package foo :disabled t
+                ...)`. Idiomatic usage writes bare `:disabled` with no value at all.
+        - name: ":ensure"
+          subtitle: Prepended Ahead of the Base Keyword List (Elpaca Integration)
+          details:
+            - label: Official Definition
+              text: >
+                Makes use-package ask the package manager to install the package if it is not
+                already present on the system.
+            - label: Mechanism
+              text: >
+                `use-package-ensure.el` — required automatically by `use-package.el`
+                — calls `(add-to-list 'use-package-keywords :ensure)`. Since `add-to-list`
+                prepends by default, `:ensure` ends up ahead of the entire base list.
+                Elpaca v0.12 integrates by overriding `use-package-ensure-function`.
+                Instead of calling `package.el`, Elpaca intercepts `:ensure` and pushes
+                the package (or a full recipe plist) into its asynchronous installation queue.
+            - label: Interaction with :disabled
+              text: >
+                That positional detail turns out not to matter for :disabled itself:
+                as covered above, :disabled's actual disabling logic doesn't come
+                from its place in this list at all, but from a separate guard the
+                public macro checks before this list-driven pipeline is ever
+                invoked. So a disabled declaration still never reaches Elpaca's queueing code.
+            - label: "Obsolescence of :pin and :vc"
+              text: >
+                Because Elpaca manages its own sources and repositories natively via
+                its recipe system, the traditional `package.el` `:pin` keyword (for
+                archive pinning) and the Emacs 30 `:vc` keyword (for `package-vc.el`)
+                are rendered obsolete and are effectively ignored or superseded when
+                using Elpaca.
+        - name: ":preface"
+          subtitle: Evaluated First Among Ordered Keywords (with two exceptions)
+          details:
+            - label: Official Definition
+              text: "Evaluated before anything else, except :disabled and :ensure."
+            - label: Purpose
+              text: "Establishes function/variable definitions the byte-compiler needs, or that an :if test depends on."
+            - label: Constraint
+              text: >
+                Runs at both byte-compile time and load time, so it must be
+                side-effect-free — restrict it to declarations and definitions only.
+            - label: "Not gated by :if"
+              text: >
+                Because :preface is processed before the :if/:when/:unless check in
+                the keyword-order list, it runs even when the package's load
+                condition evaluates to nil. To make a condition affect :preface (or
+                :ensure) too, wrap the entire use-package form in `when`.
+        - name: ":if / :when / :unless"
+          subtitle: The Gate, Not the Gatekeeper's Gatekeeper
+          details:
+            - label: Official Definition
+              text: >
+                :if and its alias :when take a Lisp form; the package loads and
+                initializes only if it evaluates non-nil. :unless is the inverse of
+                :if.
+            - label: Mechanism
+              text: >
+                The handler recursively processes everything still queued behind it
+                in the keyword order, then wraps the resulting forms in a single
+                `(when PRED ...)`. Anything already evaluated before this point in
+                the list — :disabled, :ensure, :preface — is unaffected.
+            - label: Caveat
+              text: >
+                If a condition needs to gate :ensure or :preface as well, the manual
+                recommends wrapping the entire `use-package` form in its own `when`,
+                rather than relying on :if.
+        - name: ":custom"
+          subtitle: Safe Pre-Load Variable Registration
+          details:
+            - label: Purpose
+              text: "Sets user-facing options (variables defined via defcustom in the package source)."
+            - label: Mechanism
+              text: >
+                use-package expands each :custom entry into a `customize-set-variable`
+                call. This is preferred over `setq` because customizable variables can
+                have a `:set` function associated with them that Emacs runs on
+                assignment; plain `setq` bypasses that.
+            - label: Timing
+              text: >
+                Runs before the package loads — specifically, before any autoload
+                trigger keyword and before :init, per the canonical keyword-processing
+                order. Because a variable declared by defcustom (like one declared by
+                defvar) does not get reset if it is already bound, the package adopts
+                your custom value when it finally loads.
+            - label: "Caveat: custom-file desynchronization"
+              text: >
+                The official manual explicitly warns that values set via :custom are NOT
+                written to the standard Emacs custom-file. Use either :custom or 
+                `M-x customize-option` for a given variable, never both — mixing them
+                risks conflicting values that are hard to debug.
+            - label: "Caveat: byte-compilation"
+              text: >
+                The manual explicitly warns that byte-compiling a file which uses
+                :custom can cause the affected user options to reset back to their
+                initial values (for example if use-package is later loaded or
+                required again, as happens with lazy loading), and recommends against
+                byte-compiling files that use :custom for this reason.
         - name: ":init"
           subtitle: Pre-Load Execution
           details:
             - label: Official Definition
-              text: '"The `:init` section is evaluated just before the package is loaded".'
+              text: "Evaluated just before the package is loaded."
             - label: 'The "Unconditional" Trap'
-              text: "The manual explicitly warns that `:init` forms are run unconditionally, even if the package is deferred or missing from the system."
+              text: >
+                :init forms run unconditionally, even if the package is deferred or
+                missing from the system entirely — the manual is explicit that :init
+                code runs at startup "even if" the package turns out not to be
+                installed.
             - label: Purpose
-              text: "It is used to set up state that the package's internal logic might read during its load sequence, or to define hooks/variables that must exist before the package initializes."
+              text: >
+                Sets up state the package's own load sequence might read, or defines
+                hooks/variables that must exist before the package initializes.
             - label: Constraint
-              text: "Because the package is not yet loaded, you cannot call the package's functions or modify its complex internal structures in `:init`. Attempting to do so will result in `void-function` or `void-variable` errors."
-
+              text: >
+                Because the package is not yet loaded, its functions and variables
+                generally don't exist yet. Referencing them in :init typically raises
+                a `void-function` or `void-variable` error.
         - name: ":hook"
-          subtitle: Autoload Triggers
+          subtitle: Autoload Trigger
           details:
             - label: Official Definition
-              text: '"The `:hook` keyword sets up a trigger that fires when the specified hook is run, and then loads the package automatically".'
+              text: "Sets up a trigger that fires when the specified hook runs, then loads the package automatically."
             - label: Purpose
-              text: "It replaces the manual boilerplate of `(add-hook 'some-hook 'foo-mode)`."
+              text: "Replaces manual boilerplate like (add-hook 'some-hook 'foo-mode)."
             - label: Load-Order Physics
-              text: "Using `:hook` implicitly implies `:defer t`. The package is kept out of memory until the exact millisecond the specified major-mode or hook is activated."
-
-        - name: ":custom"
-          subtitle: Safe Variable Registration
-          details:
-            - label: Purpose
-              text: "Used to set user-facing options (variables defined via `defcustom` in the package source)."
-            - label: Mechanism
-              text: "Under the hood, `use-package` expands `:custom` into `customize-set-variable`. This is mathematically superior to `setq` because it registers the change with Emacs' `M-x customize` UI and safely handles type-validation."
-            - label: Timing
-              text: "It executes before the package loads, but because `defcustom` is designed to respect pre-existing bound values, the package will adopt your custom values when it finally loads."
-
+              text: >
+                Using :hook (like :bind, :mode, :interpreter, and :commands)
+                implicitly sets :defer t in the overwhelming majority of cases, since
+                the hooked function is registered as an autoloaded command. The
+                package stays out of memory until the hook actually fires. (The one
+                exception, per the source, is if the hooked symbol can't be resolved
+                to an autoloadable command at all — then no autoload gets created and
+                deferral isn't implied.)
         - name: ":config"
           subtitle: Post-Load Execution
           details:
             - label: Official Definition
-              text: '"The `:config` section is evaluated after the package has been loaded".'
+              text: "Evaluated after the package has been loaded."
             - label: Purpose
-              text: "This is the safe zone for calling the package's functions, modifying its keymaps, advising its internal mechanics, and activating its global minor modes."
+              text: >
+                The safe place to call the package's functions, modify its keymaps,
+                advise its internals, and activate its global minor modes.
             - label: Best Practice
-              text: 'The manual advises keeping `:init` as minimal as possible and putting "as much as you can get away with into the `:config` section" to maximize deferred loading performance.'
+              text: >
+                The manual recommends keeping :init forms minimal and putting as much
+                as possible into :config, so deferred loading stays effective.
 
     - id: 4
       title: "Case Study: The `evil-snipe` `defcustom` List Modification"
       problem:
-        description: "In the `evil-snipe` configuration, we must append a massive list of UI modes to the `evil-snipe-disabled-modes` variable to prevent the package from hijacking native keybindings in read-only buffers."
-
+        description: >
+          In an `evil-snipe` configuration, a list of UI modes must be appended to
+          `evil-snipe-disabled-modes`, to keep the package from hijacking native
+          keybindings in read-only or UI-heavy buffers (dired, Info, calc, treemacs,
+          and similar are common real-world entries added to this list).
       analysis:
         - approach: "Why `:init` Fails"
-          explanation: "If you attempt to modify this list in `:init` using `dolist` and `add-to-list`:"
+          explanation: >
+            Attempting to modify this list in :init using `dolist` and `add-to-list`
+            runs into a straightforward ordering problem:
           steps:
             - "`:init` runs before `evil-snipe` loads."
-            - "The symbol `evil-snipe-disabled-modes` is currently unbound."
-            - "Your `dolist` creates a raw list and binds it to the symbol."
-            - "Emacs then loads `evil-snipe.el`. The package evaluates its internal `(defcustom evil-snipe-disabled-modes '(org-agenda-mode magit-mode ...))`."
-            - "Depending on the exact implementation of the package's initialization, the `defcustom` may overwrite your raw list, or the globalized minor mode `(evil-snipe-mode 1)` might scan the buffer list before your modifications are fully integrated into the package's internal state machine."
-
+            - "The symbol `evil-snipe-disabled-modes` is unbound at this point — the package hasn't defined it yet."
+            - "Calling `add-to-list` (or reading the variable) on an unbound symbol signals a `void-variable` error, aborting the :init block."
+            - >
+              Dodging that error by pre-declaring the variable yourself (e.g. via
+              `defvar` in :preface) doesn't really solve the problem — it just trades
+              it for a subtler one. Since `defvar`/`defcustom` never overwrite a
+              variable that's already bound, whatever list you set in :init is locked
+              in permanently before evil-snipe.el's own `defcustom` form ever gets a
+              chance to establish its upstream default. You're now responsible for
+              knowing and duplicating that upstream default yourself.
         - approach: "Why `:config` is Bulletproof"
-          explanation: "By placing the `dolist` at the very beginning of `:config`, we guarantee the following sequence:"
+          explanation: >
+            Placing the `dolist` at the very beginning of `:config` guarantees this
+            sequence:
           steps:
-            - "The Package Loads: `evil-snipe.el` evaluates. The `defcustom` registers the upstream default list into the obarray."
-            - "Our Modification Runs: The `dolist` executes, safely appending our 30+ custom modes to the already populated upstream list."
-            - "The Mode Activates: `(evil-snipe-mode 1)` executes. The globalized minor mode scans the buffer list, checking against the fully merged exclusion list."
-
+            - "The package loads: evil-snipe.el evaluates, and its defcustom registers the upstream default list."
+            - "Your modification runs: the dolist executes, safely appending your custom modes to the already-populated upstream list."
+            - "The mode activates: (evil-snipe-mode 1) executes only after your modification, so it scans the buffer list against the fully merged exclusion list."
       summary_rule_of_thumb:
-        - "Use `:init` only for variables that the package reads during its load sequence, or for defining functions that must exist before autoloads fire."
-        - "Use `:config` for modifying a package's `defcustom` lists, altering its keymaps, advising its functions, and turning on its global modes."
+        - "Use :init only for variables/functions that don't depend on the target package already being loaded, or that the package's own load sequence needs to see."
+        - "Use :custom for the package's user-facing defcustom variables — it is processed before :init and is safer and more Customize-aware than setq."
+        - "Use :config for modifying a package's internal defcustom lists, altering its keymaps, advising its functions, and turning on its global modes — this is the only phase where the package is guaranteed to be fully loaded, with its own defaults already in place."
+
+    - id: 5
+      title: "Verification Notes"
+      points:
+        - "Primary source: Official GNU Emacs `use-package` User Manual (v2.4.5, bundled with Emacs 30.2)."
+        - "Canonical execution order confirmed directly against the `use-package-keywords` defcustom in Emacs 30.2's built-in `use-package-core.el` (base order), and against `use-package-ensure.el` (which prepends `:ensure` and `:pin` to that base order at load time) — not just the manual's prose description of that order."
+        - "The :disabled short-circuit was confirmed by reading the actual macro body in Emacs 30.2's `use-package.el`: `(unless (memq :disabled args) (macroexp-progn ...))`, which sits outside and prior to the use-package-keywords processing pipeline entirely."
+        - "Elpaca v0.12 integration verified: `elpaca-use-package-mode` overrides `use-package-ensure-function`, intercepts `:ensure`, accepts recipe plists, and renders `package.el`'s `:pin` and Emacs 30's `:vc` obsolete."
+        - "Emacs 31 Context: Emacs 31 entered its feature-freeze/branch-cut phase near June 2026. Public release previews confirm no structural changes to `use-package`'s keyword ordering or macro expansion logic since the 30.2 baseline."
+        - "Constraint adherence: The archived `jwiegley/use-package` GitHub repository was strictly excluded from the verification process, relying solely on GNU documentation, Elpaca manuals, and Emacs 30.2 core behaviors."
+
