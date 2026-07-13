@@ -3183,6 +3183,8 @@ Provides a visual directory editor and file manager for navigating the filesyste
 #+end_src
 
 
+
+
 ** TODO Dirvish
 - [ ] Install dirvish from https://github.com/latiagertrutis/dirvish instead of melpa
 - [ ] First print the finalized output of dired and dired extensions again to prompt
@@ -3190,7 +3192,7 @@ Provides a visual directory editor and file manager for navigating the filesyste
 - [ ] Make sure dirvish integrate with dired
 - [ ] Don't do anything from the TODO in the comments of the org source code block of dirvish
 - [ ] Use no-littering principle to dirvish cache directory
-
+- [ ] Determine if multi-frame feedback loop is still needed for the fork from latiagertrutis
 Dirvish transforms Dired into a modern, Ranger-like file manager with live previews, emerge groups, and a dedicated sidebar.
 *Architectural Note:* Dirvish in 2025/2026 suffers from a known multi-frame feedback loop (Issue #353) that causes severe UI flickering when =emacsclient= opens new frames. We apply a Doom Emacs =define-advice= patch to debounce the redisplay hook. Additionally, we hook into =persp-before-switch-functions= to cleanly quit Dirvish side-windows before switching workspaces, preventing Emacs from throwing errors when trying to delete dedicated windows.
 

@@ -16,10 +16,6 @@
 
 - Are you sure there are no more errors and issues in this iteration? And are you sure there are not any more extra configurations you need to add by search the web? Answer and explain everything to me in great detail.Search the web and think longer for this task and make sure the information you get is latest till July 2026.
 
-- [ ] When any issues are found based on information in sources 3 or more years ago, the AI must verify if these issues still exist and wrap the fix around a conditional
-- [ ] Keybindings using any sort of general keybindings should be outside a use-package block
-- [ ] Don't rely on trained data. Rely on your web search as your main source for everything using web_search and web_extractor tools
-
 - Write a python script to build and install emacs from source. It will specifically install emacs-pretest package for now until emacs 31 has been released. It must have the following features and functionalities:
   1. The script must follow best python practices.
   2. It must be idempotent
@@ -48,10 +44,6 @@ Are you certain there are no more errors and issues in this iteration of [subsec
 
 And are you certain there are no errors and issues in the Grep Edit Mode Test? Search the web, think for longer and explain everything to me
 
-You have 2 tasks regarding updating and rewrite 2 yaml files: 1. Use the attached config.org.txt file to generate the project_state.yaml file. 2. The system_prompt_protocol.yaml file must have the following additional instructions: (1) the header documentation should desribe the broader scope of the all the subheaders using non-technical layman terms. (2) all subheader documentations should describe the purpose of their respective packages/source code blocks in non-technical layman terms (3) inside org source code blocks there should 1-2 lines descriptions using technical language only
-
-There must be version tracking for project_prompt_protocol.yaml and project_state.yaml
-
 ---
 
 Using the elisp code as a template for transient menu configuration:
@@ -67,3 +59,11 @@ write a transient menu configuration for avy using the following source code fro
 ```
 
 in a single org config block. The toggle menu for this transient-menu should be ar/global-leader outside the use-package. If ar/global-leader binding is not possible, then suggest what to use. Then propose a plan to create this custom transient menu for avy
+
+---
+
+---
+
+---
+
+Now you are going to review Dirvish subsection instead of Dired Extensions subsection. In my current config.org file . Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from the system_prompt_protocol.yaml file. Also determine if there are additional configurations that might be useful. Also determine if there keybindings you should add using general.el and SPC as leader keys. Then explain everything to me in detail and present me how you plan to deal with this configuration. Do not attempt the 1st iteration of the rewrite yet since I need to review everything. Search the web and think longer for these task and make sure you have the latest information till July 2026. Don't review evil-multi-iedit.
