@@ -3308,8 +3308,7 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
   )
 
 ;; GENERAL KEYBINDINGS (Dired & Dirvish)
-;; Placed strictly OUTSIDE the use-package block to prevent deferred-registration traps, but kept inside the Dirvish Org subsection for structural cohesion.
-
+;; ------------------------------------
 (general-define-key
  :keymaps 'dired-mode-map
  "C-c C-e" #'wdired-change-to-wdired-mode)
@@ -3444,7 +3443,7 @@ These packages extend Dired's capabilities. =dired-x= provides advanced omitting
 
 
 
-** TODO iBuffer
+** TODO Buffer Management
 Ibuffer is the advanced buffer list manager. We configure it to hide empty filter groups (keeping the UI clean) and redefine the size column to display human-readable sizes (e.g., =1.2M=). It is integrated with =nerd-icons= for visual flair and =ibuffer-projectile= to automatically group all open buffers by their respective Projectile projects.
 
 #+begin_src emacs-lisp
@@ -3489,6 +3488,20 @@ Ibuffer is the advanced buffer list manager. We configure it to hide empty filte
 ;;                 project-name)
 ;;       (format "Project: %s" project-name)))
 ;;   (setq ibuffer-projectile-group-name-function #'ar/ibuffer-projectile-group-name))
+
+  ;; Buffer operations (SPC b)
+(ar/global-leader
+  "b" '(:ignore t :wk "buffer")
+  "b b" '(consult-buffer :wk "Switch buffer")
+  "b i" '(ibuffer :wk "Ibuffer")
+  "b K" '(kill-current-buffer :wk "Kill buffer")
+  "b k" '(kill-buffer :wk "Kill buffer (choose)")
+  "b n" '(next-buffer :wk "Next buffer")
+  "b p" '(previous-buffer :wk "Previous buffer")
+  "b r" '(revert-buffer-quick :wk "Revert buffer")
+  "b R" '(rename-buffer :wk "Rename buffer")
+  "b S" '(save-buffer :wk "Save buffer")
+  "b z" '(bury-buffer :wk "Bury buffer"))
 #+end_src
 
 ** TODO Treemacs
@@ -8973,20 +8986,6 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
 
 * TODO General Keybindings
 #+begin_src emacs-lisp
-  ;; Buffer operations (SPC b)
-(ar/global-leader
-  "b" '(:ignore t :wk "buffer")
-  "b b" '(consult-buffer :wk "Switch buffer")
-  "b i" '(ibuffer :wk "Ibuffer")
-  "b K" '(kill-current-buffer :wk "Kill buffer")
-  "b k" '(kill-buffer :wk "Kill buffer (choose)")
-  "b n" '(next-buffer :wk "Next buffer")
-  "b p" '(previous-buffer :wk "Previous buffer")
-  "b r" '(revert-buffer-quick :wk "Revert buffer")
-  "b R" '(rename-buffer :wk "Rename buffer")
-  "b S" '(save-buffer :wk "Save buffer")
-  "b z" '(bury-buffer :wk "Bury buffer"))
-
 
 ;; Debug operations (SPC x) - "execute/run"
 (ar/global-leader
@@ -9501,7 +9500,7 @@ This section just contains checkboxes with stuff that still needs to be done for
 - [ ] `Important`: package-quickstart, eln-cache/ should be in either var or etc
 - [ ] `Important`: add auto-tangle-mode package
 - [ ] `Important`: add flyover
-
+- [ ] You are forbidden to chinese sources.
 - [ ] *Urgent*: I need to revisit the description of every header and subheader. They don't describe what the package actually does.
 
 * TODO Questions
