@@ -1,7 +1,7 @@
 project_state:
   metadata:
     title: Emacs Configuration Project State Checkpoint
-    version: 19
+    version: 20
     date: July 13, 2026
   critical_instructions:
     preamble: "Before generating any code, making suggestions, or answering questions, you MUST:"
@@ -40,9 +40,9 @@ project_state:
     - name: Minibuffer Navigation
       description: 'Arrow keys (`<up>`, `<down>`, `C-<up>`, `C-<down>`) are preferred over `hjkl` in the minibuffer and window management to preserve the "type-to-filter" paradigm and prevent Evil state conflicts.'
     - name: Concise Documentation Protocol
-      description: 'Documentation inside `config.org` (both Org-mode text descriptions under headers AND Emacs Lisp comments inside `#+begin_src` blocks) must be ruthlessly terse (strictly 1-2 short sentences maximum, passive/objective voice). Never use "I", "we", "you", or "let''s".'
+      description: 'Documentation inside `config.org` must adhere to the strict Documentation Hierarchy defined in the system prompt protocol (Layman headers, Technical inline comments).'
     - name: Pure Subheader Descriptions
-      description: "Subheader descriptions must strictly and exclusively describe what the specific package does. Exclude workflow justifications, personal preferences, or architectural implementation details."
+      description: "Subheader descriptions must strictly and exclusively describe what the specific package does in non-technical layman terms. Exclude workflow justifications, personal preferences, or architectural implementation details."
     - name: Bundled Extensions
       description: "Because `elpaca-use-package-by-default` is set to `t` globally, any `use-package` declaration for an extension bundled within a parent package's repository MUST explicitly include `:ensure nil`."
     - name: List Formatting
@@ -65,7 +65,7 @@ project_state:
         `--with-native-compilation=aot` and `--with-pgtk`. Defensive guards (`fboundp`/`boundp`/version checks) should still wrap highly experimental APIs.
         The MPS incremental/concurrent garbage collector (`igc`) remains deferred out of the Emacs 31 release cycle and must NOT be treated as an Emacs 31 feature.
   editor_behaviour_paradigm:
-    summary: "In v5, the `Editor Behaviour` concept was massively restructured to become the centralized pillar for how Emacs renders, parses, and manipulates text and buffers. In v19, Group 7 continues to make progress with core spatial traversal engines finalized."
+    summary: "In v5, the `Editor Behaviour` concept was massively restructured to become the centralized pillar for how Emacs renders, parses, and manipulates text and buffers. In v20, Group 7 and Window Management continue to make progress with core spatial traversal and window operations finalized."
     groups:
       - id: 1
         name: Visual Chrome & UI Overlays
@@ -116,6 +116,7 @@ project_state:
     - "No Unauthorized Status Changes: NEVER change a header from `TODO` to `DONE` without the exact phrase `change status from TODO to DONE`."
     - "No `:pin` or `:vc` Keywords: Elpaca manages its own sources and repositories natively via its recipe system. The traditional `package.el` `:pin` keyword and the Emacs 30 `:vc` keyword are obsolete and must never be used."
     - "No Global `C-c <letter>` Bindings: Raw `C-c <letter>` is strictly reserved for major modes to prevent shadowing. Global commands must use leader keys (`SPC`)."
+    - "No Technical Jargon in Headers: Top-level and subheader descriptions must strictly use non-technical layman terms. Technical language is strictly confined to inline source code comments."
   edge_cases_and_deferred_issues:
     - "Dirvish Multi-frame Flicker: Patched via `define-advice` on `dirvish-pre-redisplay-h` to debounce redisplay hooks in Emacs 30+."
     - "lsp-mode Org Element API Crash: Patched via `:around` advice in the `lsp-mode :init` block to prevent `cl-generic` corruption."
@@ -158,6 +159,10 @@ project_state:
       - "Package Management Migration: Officially transitioned from `package.el` to Elpaca v0.12. Deprecated `:pin` and `:vc` keywords in favor of Elpaca recipe plists. Updated `use-package-always-ensure` references to `elpaca-use-package-by-default`."
     v19:
       - "Keybinding Architecture Hardening: Formalized the Doom Emacs Leader Paradigm via `general.el`. Restricted `use-package :bind` strictly to remaps/internal maps. Mandated Evil C-level keymap injection for text objects. Enforced Minibuffer `hjkl` prohibition and Global `C-c` prefix hygiene."
+    v20:
+      - "Documentation Hierarchy Refinement: Enforced strict separation of concerns for config.org documentation. Top-level and subheader descriptions must now use non-technical layman terms to describe scope and purpose. Technical, programmer-centric language is strictly confined to 1-2 line inline comments inside source code blocks."
+      - "Precision Editing Progress: Finalized Ace Window, Anzu, Evil Anzu, Iedit, and Evil Multiedit."
+      - "Window Management Progress: Finalized Window Operations leader bindings."
   pending_decisions_and_todos:
     - "Project & Workspace Management: `bufferlo` and `projection` selected. Excise `projectile` / `persp-mode`."
     - "Syntax Checking Transition: `flymake` to `flycheck`."
@@ -175,8 +180,8 @@ project_state:
       - Vim Emulation (12 subsections)
       - General Keybindings
     in_progress:
-      - "Precision Editing (Group 7: Avy, Evil Easymotion, Evil Snipe finalized. Pending: Link Hint, Ace Window, Anzu, Iedit, etc.)"
-      - "Window (Windmove finalized. Pending: Winner, Popper)"
+      - "Precision Editing (Group 7: Avy, Evil Easymotion, Evil Snipe, Ace Window, Anzu, Evil Anzu, Iedit, Evil Multiedit finalized. Pending: Link Hint, Grep, Re-Builder, Avy Transient Menu)"
+      - "Window (Windmove, Window Operations finalized. Pending: Winner, Popper)"
     untouched:
       - Lexical Validation & Comparative Workflows (Group 8)
       - Workflow Management
@@ -192,7 +197,8 @@ project_state:
       - Study
       - Misc (AI/LLM)
   immediate_structural_action_plan:
-    - "Finalize Group 7: Proceed to remaining packages (Link Hint, Ace Window, Anzu, Iedit, etc.)."
+    - "Finalize Group 7: Proceed to remaining packages (Link Hint, Grep, Re-Builder, Avy Transient Menu)."
+    - "Finalize Window Management: Proceed to Winner and Popper."
     - Excise Projectile/Persp glue code.
     - "Next Steps: Proceed to Group 8 (Lexical Validation) and Workflow Management."
   remaining_work_checklists:
@@ -204,14 +210,30 @@ project_state:
           description: "Evil Easymotion: Finalized unified `gs` prefix and native `evil-define-motion` wrappers."
         - status: done
           description: "Evil Snipe: Finalized transient injection and spatial jumps."
+        - status: done
+          description: "Ace Window: Finalized cross-window spatial jumps and dispatch actions."
+        - status: done
+          description: "Anzu & Evil Anzu: Finalized modeline match tracking and search integration."
+        - status: done
+          description: "Iedit & Evil Multiedit: Finalized localized multi-cursor refactoring and lexical engine wrapping."
         - status: pending
           description: "Link Hint: Route Avy-backed semantic link mutations."
         - status: pending
-          description: "Ace Window: Route cross-window spatial jumps."
+          description: "Grep: Finalize ripgrep integration and editable search results."
         - status: pending
-          description: "Anzu: Integrate anzu with lsp-mode server only if possible and if needed."
+          description: "Re-Builder: Finalize interactive visual regex builder."
         - status: pending
-          description: "Iedit: Determine if iedit needs explicit integration with lsp-mode semantic renaming."
+          description: "Avy Transient Menu: Expose Avy mutation APIs under a Transient menu."
+    - group: Window Management
+      tasks:
+        - status: done
+          description: "Windmove: Finalized native wrap-around physics."
+        - status: done
+          description: "Window Operations: Finalized centralized leader bindings for spatial traversal and splitting."
+        - status: pending
+          description: "Winner: Configure undo/redo window states."
+        - status: pending
+          description: "Popper: Configure popup management and echo dispatch."
     - group: Lexical Validation & Comparative Workflows (Group 8)
       tasks:
         - status: pending
@@ -236,14 +258,6 @@ project_state:
           description: "Syntax Checking: Replace flymake with `flycheck`."
         - status: pending
           description: "Eldoc: Determine Doom Emacs scenarios."
-    - group: Window Management
-      tasks:
-        - status: done
-          description: "Windmove: Finalized native wrap-around physics."
-        - status: pending
-          description: "Winner: Configure undo/redo window states."
-        - status: pending
-          description: "Popper: Configure popup management and echo dispatch."
     - group: Global Remaining Work
       tasks:
         - status: done

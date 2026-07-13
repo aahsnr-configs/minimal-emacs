@@ -8,7 +8,7 @@
 * DONE Core Emacs
 Foundational layer of the config: bootstrap sequence, package management, performance tuning, session persistence, and cross-platform env normalization. Tuned for Emacs 30/31 — responsive, OS-safe, and stutter-free under heavy IDE workloads (LSP, Tree-sitter).
 
-** DONE Lexical Binding
+able via Daraz Global / local custom imports (~1,200 - 2,200 BDT)	The side-lit legends align perfectly wi** DONE Lexical Binding
 Lexical binding is a strict requirement for modern Emacs Lisp. Unlike dynamic binding, it scopes variables to their enclosing block, enabling closures, preventing variable-bleeding bugs, and letting the byte-compiler generate faster, optimized code.
 
 The =no-byte-compile: t= header directive stops Emacs from prematurely compiling this tangled file before =compile-angel= registers its exclusion rules.

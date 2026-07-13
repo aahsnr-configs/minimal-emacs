@@ -43,3 +43,7 @@ Then, find and fix any errors and issues. Optimize this configuration. Follow th
 Are you certain there are no more errors and issues in this iteration of [subsection]? Search the web and determine if there are there any additional configuration settings that you think might be useful? Also are you sure you are using the best emacs practices? Search the web thoroughly and think longer for these tasks. The information you get must be the latest till July 2026. Explain everything to me in detail for me to review.
 
 And are you certain there are no errors and issues in the Grep Edit Mode Test? Search the web, think for longer and explain everything to me
+
+You have 2 tasks regarding updating and rewrite 2 yaml files: 1. Use the attached config.org.txt file to generate the project_state.yaml file. 2. The system_prompt_protocol.yaml file must have the following additional instructions: (1) the header documentation should desribe the broader scope of the all the subheaders using non-technical layman terms. (2) all subheader documentations should describe the purpose of their respective packages/source code blocks in non-technical layman terms (3) inside org source code blocks there should 1-2 lines descriptions using technical language only
+
+There must be version tracking for project_prompt_protocol.yaml and project_state.yaml
