@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.6
+#+VERSION: 0.7
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -2666,7 +2666,9 @@ Provides multiple cursor editing in Evil mode by wrapping the iedit lexical engi
 #+end_src
 
 
-** TODO Grep
+
+
+** DONE Grep
 Finds text across files and allows direct editing of the search results to update the original files.
 #+begin_src emacs-lisp
 (use-package grep
@@ -2682,60 +2684,210 @@ Finds text across files and allows direct editing of the search results to updat
   ;; Groups search results by filename with visual separators.
   (grep-use-headings t)
   :config
-  ;; Prioritizes ripgrep over standard grep for xref and grep commands.
-  (let* ((rg (executable-find "rg"))
-         (grep-exec (or rg (executable-find "grep")))
-         (rgp (and rg (string-match-p "rg" grep-exec))))
-    (when grep-exec
-      (setq grep-program grep-exec)
-      (setq grep-template
-            (if rgp
-                (concat grep-exec " -nH --null -e <R> <F>")
-              (concat grep-exec " <X> <C> -nH --null -e <R> <F>")))
-      (setq xref-search-program (if rgp 'ripgrep 'grep))))
-  ;; Forces Evil into normal state when the writable edit mode activates.
-  (evil-set-initial-state 'grep-edit-mode 'normal))
+  ;; `grep-apply-setting` persists templates across `grep-compute-defaults` cycles.
+  (when-let ((rg (executable-find "rg")))
+    (grep-apply-setting 'grep-command (format "%s -nH --null --no-heading --color=never -e " rg))
+    ;; `<X>` and `<C>` are dropped; `rg` lacks `--exclude` and ANSI colors corrupt `compilation-mode`.
+    (grep-apply-setting 'grep-template
+                        (format "%s -nH --null --no-heading --color=never -e <R> <F>" rg))
+    (grep-apply-setting 'grep-find-command (format "%s -nH --null --no-heading --color=never -e " rg))
+    ;; Routes `<X>` to `find` to bypass `rg`'s missing `--exclude` flag, then `-exec`s into `rg`.
+    (grep-apply-setting 'grep-find-template
+                        (format "find <D> <X> -type f <F> -exec %s -nH --null --no-heading --color=never -e <R> {} +" rg))
+    ;; Routes `xref-find-references` natively to ripgrep's regex engine.
+    (setq xref-search-program 'ripgrep))
+  ;; Forces Evil into normal state for read-only navigation.
+  (evil-set-initial-state 'grep-mode 'normal)
+  ;; Forces Evil into normal state for the writable edit mode.
+  (evil-set-initial-state 'grep-edit-mode 'normal)
+  ;; Injects Vim "write and quit" / "quit without saving" parity for grep mutations.
+  (evil-define-key 'normal grep-edit-mode-map
+    "ZZ" #'grep-edit-save
+    "ZQ" #'grep-edit-abort))
 #+end_src
 
 
-** TODO Re-Builder
-Provides an interactive visual regex builder for complex search patterns. Opens a split window to highlight matches and capture groups in real-time before execution.
+
+
+** DONE Re-Builder
+Provides an interactive visual workspace to construct, test, and highlight complex search patterns against live buffer text before execution.
 #+begin_src emacs-lisp
 (use-package re-builder
   :ensure nil
   :commands (re-builder
              regexp-builder)
+  :custom
+  ;; Eliminates double-escaping ("backslash hell") for external tool parity.
+  (reb-re-syntax 'string)
+  ;; Caps overlay rendering to prevent main-thread freezing on large buffers.
+  (reb-auto-match-limit 2000)
   :config
-  (setq reb-re-syntax 'read))
+  ;; Guarantees immediate typing upon invocation without requiring state transition.
+  (evil-set-initial-state 'reb-mode 'insert)
+  ;; Guarantees immediate typing when switching to `read` or `rx` syntax.
+  (when (boundp 'reb-lisp-mode)
+    (evil-set-initial-state 'reb-lisp-mode 'insert))
+  ;; Strips Elisp string quotes/escapes for direct use in `query-replace-regexp` or CLI tools.
+  (defun ar/re-builder-copy-interactive ()
+    "Copy current regex to kill-ring without Elisp string escaping."
+    (interactive)
+    (reb-copy)
+    (let* ((raw (pop kill-ring))
+           (clean (replace-regexp-in-string
+                   (rx "\\" (group anything)) "\\1"
+                   (string-trim raw "\"" "\""))))
+      (kill-new clean)
+      (message "Copied interactive regex: %s" clean)))
+  ;; Executes `occur` against the target buffer using the constructed regex.
+  (defun ar/re-builder-occur ()
+    "Run `occur' with the current regex in the target buffer."
+    (interactive)
+    ;; Defensive guard against killed target buffers.
+    (unless (buffer-live-p reb-target-buffer)
+      (user-error "Target buffer no longer exists"))
+    (let* ((target reb-target-buffer)
+           ;; Canonical upstream macro for safe regex extraction.
+           (regex (reb-target-binding reb-regexp)))
+      (reb-quit)
+      (switch-to-buffer target)
+      (occur regex)))
+  ;; Injects custom Transient menu for unified regex manipulation.
+  (with-eval-after-load 'transient
+    (defun ar/re-builder-title ()
+      (concat
+       (if (fboundp 'nerd-icons-mdicon)
+           (nerd-icons-mdicon "nf-md-regex" :face 'transient-heading :v-adjust 0.02)
+         "")
+       (propertize (format " Regex Builder (%s)"
+                           (if (bufferp reb-target-buffer)
+                               (buffer-name reb-target-buffer)
+                             "No Target"))
+                   'face 'transient-heading)))
+    (transient-define-prefix ar/re-builder-transient ()
+      "Regex Builder Control Panel"
+      [:description ar/re-builder-title
+       ["Change"
+        ("x" "Syntax" reb-change-syntax :transient t)
+        ("b" "Target Buffer" reb-change-target-buffer :transient t)
+        ("t" "Case Sensitivity" reb-toggle-case :transient t)]
+       ["Match"
+        ("n" "Next" reb-next-match :transient t)
+        ("p" "Previous" reb-prev-match :transient t)
+        ("f" "Force Update" reb-force-update :transient t)]
+       ["Display"
+        ("s" "Subexp Mode" reb-enter-subexp-mode)
+        ("o" "Occur Target" ar/re-builder-occur)]
+       ["Copy"
+        ("c" "Code (Elisp)" reb-copy :transient t)
+        ("w" "Interactive" ar/re-builder-copy-interactive :transient t)]
+       ["Exit"
+        ("q" "Quit Builder" reb-quit)
+        ("<escape>" "" transient-quit-one :format " ")]]
+    ;; Routes `C-o` to summon the Transient menu from within the builder buffer.
+    (define-key reb-mode-map (kbd "C-o") #'ar/re-builder-transient)
+    (when (boundp 'reb-lisp-mode-map)
+      (define-key reb-lisp-mode-map (kbd "C-o") #'ar/re-builder-transient))))
+
+;; Registers global leader binding for rapid workspace invocation.
+(ar/global-leader
+  "s x" '(re-builder :wk "Regex builder"))
 #+end_src
 
-** TODO Avy Transient Menu
-- [ ] Make sure to use casual-avy as reference
-Exposes Avy's mutation APIs under a dedicated Transient menu to prevent global keymap pollution. Groups complex line and region manipulations logically for rapid execution.
+
+** DONE Avy Transient Menu
+Provides a centralized dashboard for Avy's spatial jumping and remote text mutation APIs.
 #+begin_src emacs-lisp
+;; DRY dispatcher for Avy scope modifiers.
+(defun ar/avy-dispatch (cmd)
+  "Execute Avy CMD with `-above` or `-below` suffix based on transient args."
+  (let* ((t-args (transient-args transient-current-command))
+         (above (member "--above" t-args))
+         (below (member "--below" t-args))
+         (suffix (cond ((and above below) "")
+                       (above "-above")
+                       (below "-below")
+                       (t "")))
+         (target (intern (concat (symbol-name cmd) suffix))))
+    (call-interactively (if (fboundp target) target cmd))))
+
+;; Explicit wrappers to satisfy Transient's command resolution.
+(defun ar/avy-goto-char-2 () (interactive) (ar/avy-dispatch 'avy-goto-char-2))
+(defun ar/avy-goto-word-1 () (interactive) (ar/avy-dispatch 'avy-goto-word-1))
+(defun ar/avy-goto-symbol-1 () (interactive) (ar/avy-dispatch 'avy-goto-symbol-1))
+(defun ar/avy-goto-whitespace-end () (interactive) (ar/avy-dispatch 'avy-goto-whitespace-end))
+(defun ar/avy-goto-line () (interactive) (ar/avy-dispatch 'avy-goto-line))
+
 (with-eval-after-load 'transient
-  (defun ar/avy-transient-title ()
+  (defun ar/avy-title ()
     (concat
      (if (fboundp 'nerd-icons-faicon)
          (nerd-icons-faicon "nf-fa-crosshairs" :face 'transient-heading :v-adjust 0.02)
        "")
-     (propertize " Avy Mutations" 'face 'transient-heading)))
+     (propertize " Avy Spatial Jumps & Mutations" 'face 'transient-heading)))
 
-  (transient-define-prefix ar/avy-mutations-transient ()
-    "Avy Spatial Mutations"
-    [:description ar/avy-transient-title
-     ["Line Actions"
-      ("m" "Move Line" avy-move-line :transient t)
-      ("c" "Copy Line" avy-copy-line :transient t)
-      ("k" "Kill Line" avy-kill-region :transient t)
-      ("t" "Transpose Lines" avy-transpose-lines-in-region :transient t)]
-     ["Region Actions"
-      ("M" "Move Region" avy-move-region :transient t)
-      ("C" "Copy Region" avy-copy-region :transient t)
-      ("K" "Kill Region" avy-kill-ring-save-region :transient t)]
+  (transient-define-prefix ar/avy-transient ()
+    "Avy Spatial Jumps and Mutations Dashboard"
+    [:description ar/avy-title
+     ["Scope (applies to ⬍)"
+      :description (lambda ()
+                     (let ((args (transient-args transient-current-command)))
+                       (format "Scope (applies to (%s))"
+                               (cond ((and (member "--above" args) (member "--below" args)) "#")
+                                     ((member "--above" args) "↑")
+                                     ((member "--below" args) "↓")
+                                     (t "#")))))
+      :class transient-row
+      ("a" "Above" "--above")
+      ("b" "Below" "--below")]
+
+     ["Goto Thing"
+      ("c" "Character" avy-goto-char-timer)
+      ("2" "2 Characters ⬍" ar/avy-goto-char-2)
+      ("w" "Word ⬍" ar/avy-goto-word-1)
+      ("s" "Symbol ⬍" ar/avy-goto-symbol-1)
+      ("W" "Whitespace end ⬍" ar/avy-goto-whitespace-end)
+      ("p" "Pop mark" avy-pop-mark)]
+
+     ["Goto Line"
+      :pad-keys t
+      ("l" "Line ⬍" ar/avy-goto-line)
+      ("e" "End of line" avy-goto-end-of-line)
+      ("o" "Org heading" avy-org-goto-heading-timer :if (lambda () (derived-mode-p 'org-mode)))
+      ("n" "Line number" goto-line :if (lambda () (bound-and-true-p display-line-numbers-mode)))]
+
+     ["Edit Other Line"
+      ("C" "Copy" avy-kill-ring-save-whole-line)
+      ("k" "Kill" avy-kill-whole-line :if (lambda () (not buffer-read-only)))
+      ("m" "Move" avy-move-line :if (lambda () (not buffer-read-only)))
+      ("d" "Duplicate" avy-copy-line :if (lambda () (not buffer-read-only)))]
+
+     ["Edit Other Region"
+      ("r" "Copy" avy-kill-ring-save-region)
+      ("K" "Kill" avy-kill-region :if (lambda () (not buffer-read-only)))
+      ("M" "Move" avy-move-region :if (lambda () (not buffer-read-only)))
+      ("D" "Duplicate" avy-copy-region :if (lambda () (not buffer-read-only)))
+      ("t" "Transpose" avy-transpose-lines-in-region :if (lambda () (and (not buffer-read-only) (region-active-p))))]
+
+     ["Index & Errors"
+      ("g" "Org Goto…" org-goto :if (lambda () (derived-mode-p 'org-mode)))
+      ("i" "Index…" imenu :if (lambda () (bound-and-true-p imenu--index-alist)))
+      ("M-p" "Previous" previous-error)
+      ("M-n" "Next" next-error)]
+
      ["Exit"
-      ("<escape>" "" transient-quit-one :format " ")]]))
+      ("<escape>" "" transient-quit-one :format " ")
+      ("RET" "Exit Avy" transient-quit-all)]]))
+
+;; Registers global leader category and bindings for rapid spatial invocation.
+(ar/global-leader
+  "y"   '(:ignore t :wk "avy/jump")
+  "y y" '(ar/avy-transient :wk "Avy dashboard")
+  "y c" '(avy-goto-char-timer :wk "Char timer")
+  "y l" '(avy-goto-line :wk "Line")
+  "y w" '(avy-goto-word-1 :wk "Word")
+  "y s" '(avy-goto-symbol-1 :wk "Symbol"))
 #+end_src
+
 
 
 * TODO Lexical Validation & Comparative Workflows

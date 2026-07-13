@@ -1,7 +1,7 @@
 project_state:
   metadata:
     title: Emacs Configuration Project State Checkpoint
-    version: 20
+    version: 21
     date: July 13, 2026
   critical_instructions:
     preamble: "Before generating any code, making suggestions, or answering questions, you MUST:"
@@ -65,7 +65,7 @@ project_state:
         `--with-native-compilation=aot` and `--with-pgtk`. Defensive guards (`fboundp`/`boundp`/version checks) should still wrap highly experimental APIs.
         The MPS incremental/concurrent garbage collector (`igc`) remains deferred out of the Emacs 31 release cycle and must NOT be treated as an Emacs 31 feature.
   editor_behaviour_paradigm:
-    summary: "In v5, the `Editor Behaviour` concept was massively restructured to become the centralized pillar for how Emacs renders, parses, and manipulates text and buffers. In v20, Group 7 and Window Management continue to make progress with core spatial traversal and window operations finalized."
+    summary: "In v5, the `Editor Behaviour` concept was massively restructured to become the centralized pillar for how Emacs renders, parses, and manipulates text and buffers. In v21, Group 7 is nearly fully finalized with only Link Hint remaining pending. Window Management continues to make progress."
     groups:
       - id: 1
         name: Visual Chrome & UI Overlays
@@ -117,6 +117,9 @@ project_state:
     - "No `:pin` or `:vc` Keywords: Elpaca manages its own sources and repositories natively via its recipe system. The traditional `package.el` `:pin` keyword and the Emacs 30 `:vc` keyword are obsolete and must never be used."
     - "No Global `C-c <letter>` Bindings: Raw `C-c <letter>` is strictly reserved for major modes to prevent shadowing. Global commands must use leader keys (`SPC`)."
     - "No Technical Jargon in Headers: Top-level and subheader descriptions must strictly use non-technical layman terms. Technical language is strictly confined to inline source code comments."
+    - "No Parametric Memory Reliance: NEVER rely on internal training data for Emacs Lisp API behaviors or core file locations. Training data is heavily polluted with outdated wiki pages. MUST use `web_search` and `web_extractor` to verify live source code."
+    - "No General.el Enclosure: NEVER place `general-define-key`, `ar/global-leader`, or `ar/local-leader` inside a `use-package` block. Doing so creates a deferred-registration trap where `which-key` annotations remain invisible until the package is manually invoked."
+    - "No Blind Legacy Fixes: NEVER assume an issue documented in a 3+ year old forum post or wiki still exists in Emacs 30/31 without live web verification. Inconclusive fixes MUST be wrapped in defensive runtime guards (`fboundp`, `boundp`)."
   edge_cases_and_deferred_issues:
     - "Dirvish Multi-frame Flicker: Patched via `define-advice` on `dirvish-pre-redisplay-h` to debounce redisplay hooks in Emacs 30+."
     - "lsp-mode Org Element API Crash: Patched via `:around` advice in the `lsp-mode :init` block to prevent `cl-generic` corruption."
@@ -127,6 +130,8 @@ project_state:
     - "`treesit-fold` Ellipsis Injection: Upstream `treesit-fold` natively inherits Emacs' built-in `truncate-string-ellipsis`."
     - "[v16 Resolution] Structural Nesting & Missing Packages: `Precision Editing` successfully promoted to top-level `*`. `Move Text` successfully re-injected into Group 5, finalizing the section."
     - "[v16 Correction] Evil Easymotion API Hallucination: `evilem-create` crashes when wrapping native Avy commands (Avy inside Avy infinite loop via `evilem--collect`). Replaced with native `evil-define-motion` wrappers for operator-pending support."
+    - "Re-Builder `reb-copy` Hallucination: Confirmed via live Emacs `master` source code that `reb-copy` outputs double-escaped Elisp strings. Custom `ar/re-builder-copy-interactive` wrapper is mathematically required to strip quotes for CLI/query-replace parity."
+    - "Grep `grep-apply-setting` Physics: Replaced fragile `setq` template injection with `grep-apply-setting` to survive Emacs' internal `grep-compute-defaults` cycles. Dropped `<X>` from direct `rg` templates to prevent `--exclude` flag crashes."
   architectural_decisions:
     v10:
       - Non-Lisp AST Stack Finalization (Group 3 Complete).
@@ -163,6 +168,9 @@ project_state:
       - "Documentation Hierarchy Refinement: Enforced strict separation of concerns for config.org documentation. Top-level and subheader descriptions must now use non-technical layman terms to describe scope and purpose. Technical, programmer-centric language is strictly confined to 1-2 line inline comments inside source code blocks."
       - "Precision Editing Progress: Finalized Ace Window, Anzu, Evil Anzu, Iedit, and Evil Multiedit."
       - "Window Management Progress: Finalized Window Operations leader bindings."
+    v21:
+      - "Precision Editing Finalization: Finalized Grep (ripgrep integration + grep-edit-mode), Re-Builder (custom Transient menu + interactive regex export), and Avy Transient Menu (DRY scope dispatcher + spatial mutations dashboard). Link Hint remains the sole pending subsection in Group 7."
+      - "Protocol Hardening (v3): Enforced strict separation of layman headers vs technical inline comments. Mandated live web verification over parametric memory to prevent API hallucinations. Codified the General.el eager placement constraint to prevent deferred-registration traps."
   pending_decisions_and_todos:
     - "Project & Workspace Management: `bufferlo` and `projection` selected. Excise `projectile` / `persp-mode`."
     - "Syntax Checking Transition: `flymake` to `flycheck`."
@@ -180,7 +188,7 @@ project_state:
       - Vim Emulation (12 subsections)
       - General Keybindings
     in_progress:
-      - "Precision Editing (Group 7: Avy, Evil Easymotion, Evil Snipe, Ace Window, Anzu, Evil Anzu, Iedit, Evil Multiedit finalized. Pending: Link Hint, Grep, Re-Builder, Avy Transient Menu)"
+      - "Precision Editing (Group 7: Avy, Evil Easymotion, Evil Snipe, Ace Window, Anzu, Evil Anzu, Iedit, Evil Multiedit, Grep, Re-Builder, Avy Transient Menu finalized. Pending: Link Hint)"
       - "Window (Windmove, Window Operations finalized. Pending: Winner, Popper)"
     untouched:
       - Lexical Validation & Comparative Workflows (Group 8)
@@ -197,7 +205,7 @@ project_state:
       - Study
       - Misc (AI/LLM)
   immediate_structural_action_plan:
-    - "Finalize Group 7: Proceed to remaining packages (Link Hint, Grep, Re-Builder, Avy Transient Menu)."
+    - "Finalize Group 7: Proceed to Link Hint (the sole remaining package)."
     - "Finalize Window Management: Proceed to Winner and Popper."
     - Excise Projectile/Persp glue code.
     - "Next Steps: Proceed to Group 8 (Lexical Validation) and Workflow Management."
@@ -216,14 +224,14 @@ project_state:
           description: "Anzu & Evil Anzu: Finalized modeline match tracking and search integration."
         - status: done
           description: "Iedit & Evil Multiedit: Finalized localized multi-cursor refactoring and lexical engine wrapping."
+        - status: done
+          description: "Grep: Finalized ripgrep integration, `grep-apply-setting` physics, and `grep-edit-mode` Evil parity."
+        - status: done
+          description: "Re-Builder: Finalized interactive visual regex builder, custom Transient menu, and CLI export wrappers."
+        - status: done
+          description: "Avy Transient Menu: Finalized DRY scope dispatcher and spatial mutations dashboard."
         - status: pending
           description: "Link Hint: Route Avy-backed semantic link mutations."
-        - status: pending
-          description: "Grep: Finalize ripgrep integration and editable search results."
-        - status: pending
-          description: "Re-Builder: Finalize interactive visual regex builder."
-        - status: pending
-          description: "Avy Transient Menu: Expose Avy mutation APIs under a Transient menu."
     - group: Window Management
       tasks:
         - status: done
