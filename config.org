@@ -3115,61 +3115,71 @@ Extracts system =manpath= directories to guarantee native Emacs =woman= can loca
 
 
 * TODO Workflow Management
-** TODO Dired
-Dired is the native Emacs file manager. By default, it is fragile across different operating systems and network connections. This configuration applies Doom Emacs-inspired safeguards: it dynamically strips unsupported GNU =ls= flags when running on macOS/BSD or over TRAMP, and it uses a stale-predicate to prevent massive I/O hangs when revisiting large or remote directories.
+- [ ] Must revisit dired and dirvish workflows
 
+** TODO Dired
+Provides a visual directory editor and file manager for navigating the filesystem, copying, moving, and deleting files.
 #+begin_src emacs-lisp
 (use-package dired
   :ensure nil
   :defer t
-  :commands (dired dired-jump)
-  ;; Automatically hide verbose file details (permissions, owners) for a cleaner
-  ;; UI, and highlight the current line for better visual tracking.
-  :hook ((dired-mode . dired-hide-details-mode)
-         (dired-mode . hl-line-mode))
+  :commands (dired
+             dired-jump)
+  :hook ((dired-mode . hl-line-mode))
   :custom
-  ;; Doom-like cleanup: Don't confirm simple recursive deletes.
-  ;; By default, Emacs prompts for every single recursive copy or delete,
-  ;; which is incredibly tedious. 'always and 'top suppress these prompts
-  ;; while maintaining a baseline of safety.
+  ;; Suppress recursive operation prompts while maintaining baseline safety.
   (dired-recursive-copies 'always)
   (dired-recursive-deletes 'top)
-  ;; Move deleted files to the system trash instead of permanently deleting them.
-  (delete-by-moving-to-trash t)
-  ;; Do What I Mean: When copying/moving files between two split Dired windows,
-  ;; automatically suggest the other window's directory as the target.
+  ;; DWIM target: suggest the other window's directory for copy/move operations.
   (dired-dwim-target t)
-
-  ;; Performance & UX
-  ;; DOOM FIX: Use stale predicate instead of `t` to prevent I/O hangs on large/remote dirs.
-  ;; Setting this to `t` forces Emacs to synchronously re-read the directory over TRAMP
-  ;; every time you switch back to the buffer, which can freeze the UI for seconds.
-  ;; `dired-buffer-stale-p` only reverts if the directory has actually changed on disk.
-  (dired-auto-revert-buffer #'dired-buffer-stale-p)
-  ;; Kill the old Dired buffer when opening a new one in the same directory
-  ;; to prevent massive buffer bloat during deep filesystem navigation.
+  ;; Prevent buffer bloat by killing old Dired buffers of the same directory.
   (dired-kill-when-opening-new-dired-buffer t)
-
+  ;; Git Integration: Use `git mv` when renaming files in VC repositories.
+  (dired-vc-rename-file t)
+  ;; Prompt to create missing parent directories when copying/moving.
+  (dired-create-destination-dirs 'ask)
+  ;; Kill associated buffers when files are deleted via Dired.
+  (dired-clean-up-buffers-too t)
+  ;; Restrict C-s (isearch) to file names only when point is on a file.
+  (dired-isearch-filenames 'dwim)
+  ;; Emacs 29+: Enable drag-and-drop of files to external applications.
+  (dired-mouse-drag-files t)
+  ;; Defensive auto-revert: Revert local dirs, but strictly ignore TRAMP to prevent I/O hangs.
+  (dired-auto-revert-buffer (lambda (dir)
+                              (and (not (file-remote-p dir))
+                                   (dired-buffer-stale-p dir))))
   :config
-  ;; DOOM FIX: Cross-platform ls switches.
-  ;; macOS/BSD requires `gls` from coreutils for advanced flags like `--group-directories-first`.
-  ;; If `gls` is missing, or if we are over TRAMP, we strip the unsupported flags
-  ;; to prevent Dired from crashing or rendering blank screens.
-  (let ((args (list "-ahl" "-v" "--group-directories-first")))
-    (when (or (eq system-type 'darwin) (eq system-type 'berkeley-unix))
-      (if (executable-find "gls")
-          (setq insert-directory-program "gls")
-        (setq args (list (car args))))) ; Strip -v and --group-directories-first
-    (setq dired-listing-switches (string-join args " ")))
+  ;; Establish baseline GNU ls switches, stripping them on macOS/BSD if `gls` is absent.
+  (let ((switches '("-ahl" "-v" "--group-directories-first")))
+    (when (and (or (eq system-type 'darwin)
+                   (eq system-type 'berkeley-unix))
+               (not (executable-find "gls")))
+      (setq switches '("-ahl")))
+    (setq dired-listing-switches (string-join switches " ")))
 
-  ;; TRAMP Safety Hook: Remove extraneous GNU-specific switches when it's
-  ;; uncertain they are supported (e.g., over an SSH connection to a minimal
-  ;; Linux container or a BSD server).
-  (add-hook 'dired-mode-hook
-            (defun +dired-disable-gnu-ls-flags-maybe-h ()
-              (when (file-remote-p default-directory)
-                (setq-local dired-actual-switches "-ahl")))))
+  ;; Surgically strip GNU-specific flags before `dired-readin` parses the directory.
+  ;; Prevents blank screens over TRAMP or on native BSD/macOS `ls` binaries.
+  (defun ar/dired-strip-unsupported-ls-flags ()
+    "Strip unsupported ls flags for remote or BSD/macOS environments."
+    (let ((switches dired-actual-switches))
+      (when (or (file-remote-p default-directory)
+                (and (or (eq system-type 'darwin)
+                         (eq system-type 'berkeley-unix))
+                     (not (executable-find "gls"))))
+        (setq switches (replace-regexp-in-string "--group-directories-first" "" switches))
+        (setq switches (replace-regexp-in-string "-v" "" switches))
+        (setq switches (replace-regexp-in-string "  +" " " (string-trim switches)))
+        (setq-local dired-actual-switches switches))))
+  (add-hook 'dired-before-readin-hook #'ar/dired-strip-unsupported-ls-flags)
+
+  ;; Arch Linux / PGTK: Map common media and document extensions to xdg-open.
+  (setq dired-guess-shell-alist-user
+        '(("\\.pdf\\'" "xdg-open" "evince" "zathura")
+          ("\\.\\(?:jpe?g\\|png\\|gif\\|svg\\|webp\\)\\'" "xdg-open" "imv")
+          ("\\.\\(?:mp4\\|mkv\\|webm\\|mov\\)\\'" "xdg-open" "mpv")
+          ("\\.\\(?:mp3\\|flac\\|wav\\|ogg\\)\\'" "xdg-open"))))
 #+end_src
+
 
 ** TODO Dired Extensions
 These packages extend Dired's capabilities. =dired-x= provides advanced omitting and OS-integration, =diredfl= adds modern syntax highlighting (font-lock) to the directory listings, and =wdired= allows you to edit the Dired buffer like a text file to rename/move files in bulk.
@@ -3216,7 +3226,9 @@ These packages extend Dired's capabilities. =dired-x= provides advanced omitting
 #+end_src
 
 ** TODO Dirvish
+- [ ] First print the finalized output of dired and dired extensions again to prompt
 - [ ] Does wdired work in dirvish?
+- [ ] Make sure dirvish integrate with dired
 Dirvish transforms Dired into a modern, Ranger-like file manager with live previews, emerge groups, and a dedicated sidebar.
 *Architectural Note:* Dirvish in 2025/2026 suffers from a known multi-frame feedback loop (Issue #353) that causes severe UI flickering when =emacsclient= opens new frames. We apply a Doom Emacs =define-advice= patch to debounce the redisplay hook. Additionally, we hook into =persp-before-switch-functions= to cleanly quit Dirvish side-windows before switching workspaces, preventing Emacs from throwing errors when trying to delete dedicated windows.
 
@@ -3335,7 +3347,7 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
 - [ ] Determine what SPC f p does in doom emacs. Create a similar function for my config
 - [ ] Determine what SPC p p does in doom emacs. Create a similar function for my config
 - [ ] Use projection package and read the readme carefully for this package: https://raw.githubusercontent.com/mohkale/projection/refs/heads/master/README.org
-
+- [ ] Determine what package would be best for complex workflows consisting of programming, productivity management,
 
 
 
@@ -3466,6 +3478,7 @@ Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. W
 #+end_src
 
 ** TODO Workspaces
+
 
 
 * TODO Version Control
@@ -4258,7 +4271,11 @@ If the file does not exist, creates it. Returns the full path."
 #+end_src
 
 ** TODO Org Modern
+- [ ] List all the features of org-modern and determine optimal ways to use those features without relying on org-modern
+  OR
 - [ ] Use this updated org-modern config instead
+- [ ] Improve sluggishness when using org-modern
+- [ ] Look at https://github.com/minad/org-modern/blob/main/README.org about line spacing note for emacs 31 and look at https://debbugs.gnu.org/cgi/bugreport.cgi?bug=76390 to determine what it suggests
 #+begin_src emacs-lisp
 (use-package org-modern
   :hook (org-mode          . org-modern-mode)
@@ -4279,9 +4296,9 @@ If the file does not exist, creates it. Returns the full path."
         org-modern-block-name t   ; Prettify #+begin_/#+end_ prefixes
         org-modern-block-fringe nil ; Remove fringe marker (cleaner look)
         org-modern-horizontal-rule t   ; Draw lines for '-----'
-        org-modern-timestamp nil   ; Badges for timestamps
-        org-modern-statistics nil   ; Badges for [3/5]
-        org-modern-progress nil)  ; Progress bar in stats
+        org-modern-timestamp nil
+        org-modern-statistics nil
+        org-modern-progress nil) ; TODO what does the org-modern-progress bar do
 
   ;; Tables & Lists  (43 = +, 45 = -, 42 = *)
   (setq org-modern-list '((43 . "➤") (45 . "–") (42 . "•"))
@@ -8875,9 +8892,7 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
   "b r" '(revert-buffer-quick :wk "Revert buffer")
   "b R" '(rename-buffer :wk "Rename buffer")
   "b S" '(save-buffer :wk "Save buffer")
-  "b z" '(bury-buffer :wk "Bury buffer")
-  "b [" '(previous-buffer :wk "Previous buffer")
-  "b ]" '(next-buffer :wk "Next buffer"))
+  "b z" '(bury-buffer :wk "Bury buffer"))
 
 ;; Dired/Dirvish operations (Doom-like)
 (ar/global-leader
@@ -9473,3 +9488,6 @@ This section raises questions if some features, capabilities, etc can be achieve
 - [ ] How to open links from org buffers by pressing enter and using the correct browser?
 - [ ] Is it necessary to configure for my emacs configuration that is evil centric?
 - [ ] Is there a chance that anzu and evil-anzu might collide with my lsp-mode configuration?
+- [ ] Is it safe to use :demand t in solaire-mode?
+* TODO Errors
+- [X] Symbol's value as variable is void: solaire-mode--set-explicitly. Paste solaire-mode source code for to confirm everything is correct
