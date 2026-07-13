@@ -3186,8 +3186,7 @@ Provides a visual directory editor and file manager for navigating the filesyste
 
 
 ** TODO Dirvish
-Dirvish transforms Dired into a modern, Ranger-like file manager with live previews, emerge groups, and a dedicated sidebar.
-*Architectural Note:* Dirvish in 2025/2026 suffers from a known multi-frame feedback loop (Issue #353) that causes severe UI flickering when =emacsclient= opens new frames. We apply a Vanilla Emacs =advice-add= patch to debounce the redisplay hook. Additionally, we hook into =persp-before-switch-functions= to cleanly quit Dirvish side-windows before switching workspaces, preventing Emacs from throwing errors when trying to delete dedicated windows.
+Dirvish transforms Dired into a modern, Ranger-like file manager with live previews and a dedicated sidebar.
 #+begin_src emacs-lisp
 (use-package dirvish
   :ensure (:host github :repo "latiagertrutis/dirvish" :files (:defaults "extensions/*.el"))
@@ -3214,8 +3213,7 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
      ("c" "~/.config/" "Config")
      ("t" "~/.local/share/Trash/files/" "Trash")))
   ;; Visual attributes rendered in the file list.
-  ;; Note: `nerd-icons' is conditionally stripped in :config if treemacs-icons-dired is active.
-  (dirvish-attributes '(subtree-state nerd-icons collapse vc-state file-size git-msg))
+  (dirvish-attributes '(vc-state subtree-state collapse git-msg file-time file-size))
   ;; Doom-like UI: Enable custom headers and mode lines for Dirvish buffers.
   (dirvish-use-header-line t)
   (dirvish-use-mode-line t)
@@ -3226,18 +3224,9 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
    '(:left (sort file-time " " file-size symlink)
      :right (omit yank index)))
   ;; Session behavior.
-  ;; DOOM FIX: Set to 'open to prevent broken leftover buffers on errors.
   (dirvish-reuse-session 'open)
-  (dirvish-hide-cursor t)
+  (dirvish-hide-cursor '(dirvish dirvish-side))
   (dirvish-hide-details '(dirvish dirvish-side))
-  ;; Emerge groups: Automatically group files by type or recency.
-  (dirvish-emerge-groups
-   '(("Recent files" (predicate . recent-files-2h))
-     ("Documents" (extensions "pdf" "tex" "bib" "epub"))
-     ("Video" (extensions "mp4" "mkv" "webm"))
-     ("Pictures" (extensions "jpg" "png" "svg" "gif"))
-     ("Audio" (extensions "mp3" "flac" "wav" "ape"))
-     ("Archives" (extensions "gz" "rar" "zip"))))
   ;; Preview dispatchers: Define how different file types are previewed.
   (dirvish-preview-dispatchers '(image gif video audio epub archive pdf dired))
   :config
@@ -3257,15 +3246,18 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
   (require 'dirvish-ls)
   (require 'dirvish-rsync)
   (require 'dirvish-fd)
-  (require 'dirvish-emerge)
   (require 'dirvish-side)
 
   ;; Enable global peek mode for minibuffer file previews (Vertico synergy)
   (dirvish-peek-mode 1)
 
+  ;; Enable sidebar follow mode to track the active buffer
+  (dirvish-side-follow-mode 1)
+
+  ;; Subtree state visibility
+  (setq dirvish-subtree-always-show-state t)
+
   ;; Prevent double icons when `treemacs-icons-dired' is active globally.
-  ;; If `treemacs-icons-dired-mode' is enabled, we strip `nerd-icons' from
-  ;; Dirvish's native attributes to prevent overlay collisions.
   (when (bound-and-true-p treemacs-icons-dired-mode)
     (setq dirvish-attributes (delq 'nerd-icons dirvish-attributes)))
 
@@ -3275,8 +3267,6 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
         dirvish-side-display-alist '((side . left) (slot . -1) (window-width . 30)))
 
   ;; DOOM HACK: Prevent multi-frame feedback loop flickering (dirvish#353).
-  ;; In Emacs 30+, opening multiple frames with Dirvish active causes a redisplay
-  ;; feedback loop. This advice ensures the hook only fires for the selected window.
   (when (fboundp 'dirvish-pre-redisplay-h)
     (defun ar/dirvish--debounce-redisplay (fn window)
       "Debounce redisplay hook to prevent multi-frame flickering."
@@ -3284,43 +3274,75 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
         (funcall fn window)))
     (advice-add #'dirvish-pre-redisplay-h :around #'ar/dirvish--debounce-redisplay))
 
-  ;; Open large directories (over 20000 files) asynchronously using the `fd' command
-  ;; to prevent Emacs from freezing during directory read.
-  (setq dirvish-large-directory-threshold 20000)
+  ;; Open large directories asynchronously
+  (setq dirvish-large-directory-threshold 20000))
 
-  ;; Override the default mode-line format for the side-bar specifically.
-  (setq dirvish-mode-line-format
-        '(:left (sort symlink) :right (omit yank index)))
+;; ==========================================
+;; CUSTOM DIRVISH TRANSIENT DASHBOARD
+;; ==========================================
+;; Replaces the default `dirvish-dispatch` and `dirvish-emerge-menu`
+;; with a unified, Doom-inspired Transient dashboard.
+(with-eval-after-load 'transient
+  (defun ar/dirvish-title ()
+    (concat
+     (if (fboundp 'nerd-icons-mdicon)
+         (nerd-icons-mdicon "nf-md-folder" :face 'transient-heading :v-adjust 0.02)
+       "")
+     (propertize " Dirvish Dashboard" 'face 'transient-heading)))
 
-  ;; TODO: modify this to work with bufferlo/projection
-  ;; DOOM HACK: Clean up Dirvish before switching workspaces/projects.
-  ;; If Dirvish is open in a dedicated side-window and you switch workspaces,
-  ;; Emacs will throw an error trying to delete the dedicated window.
-  ;; (add-hook 'persp-before-switch-functions
-  ;;           (lambda (&rest _)
-  ;;             (when-let* ((dv (cl-loop for w in (window-list)
-  ;;                                      if (window-dedicated-p w)
-  ;;                                      if (with-current-buffer (window-buffer w) (dirvish-curr))
-  ;;                                      return it)))
-  ;;               (let (dirvish-reuse-session)
-  ;;                 (with-selected-window (dv-root-window dv)
-  ;;                   (dirvish-quit))))))
-  )
+  (transient-define-prefix ar/dirvish-transient ()
+    "Dirvish Dashboard"
+    [:description ar/dirvish-title
+     ["Navigation"
+      ("h" "History Back" dirvish-history-go-backward :transient t)
+      ("l" "History Forward" dirvish-history-go-forward :transient t)
+      ("j" "Jump (fd)" dirvish-fd-jump)
+      ("z" "History Jump" dirvish-history-jump)
+      ("b" "Quick Access" dirvish-quick-access)]
+     ["View & Layout"
+      ("F" "Toggle Layout" dirvish-layout-toggle)
+      ("S" "Quicksort" dirvish-quicksort)
+      ("s" "Setup Menu" dirvish-setup-menu)
+      ("n" "Narrow" dirvish-narrow)
+      ("i" "File Info" dirvish-file-info-menu)]
+     ["Tools"
+      ("y" "Yank Menu" dirvish-yank-menu)
+      ("v" "VC Menu" dirvish-vc-menu)
+      ("m" "Mark Menu" dirvish-mark-menu)
+      ("r" "Rsync" dirvish-rsync)]
+     ["Exit"
+      ("q" "Quit Dirvish" dirvish-quit)
+      ("<escape>" "" transient-quit-one :format " ")]]))
 
+;; ==========================================
 ;; GENERAL KEYBINDINGS (Dired & Dirvish)
-;; ------------------------------------
-(general-define-key
- :keymaps 'dired-mode-map
- "C-c C-e" #'wdired-change-to-wdired-mode)
-
-(ar/local-leader
-  :keymaps 'dired-mode-map
-  "h" #'dired-omit-mode)
+;; ==========================================
+(ar/global-leader
+  "d"   '(:ignore t :wk "dired")
+  "d d" '(dired-jump :wk "Open dired here")          ; Jump to current file's directory
+  "d D" '(dired :wk "Open dired...")                 ; Open specific directory via prompt
+  "d s" '(dirvish-side :wk "Dirvish sidebar")        ; Toggle persistent 30% left sidebar
+  "d f" '(dirvish-dwim :wk "Dirvish fullscreen")     ; Open fullscreen or split intelligently
+  "d h" '(dirvish-show-history :wk "History")        ; Jump to recently visited directories
+  "d a" '(dirvish-quick-access :wk "Quick access")   ; Summon bookmark menu for pinned dirs
+  "d j" '(dirvish-fd-jump :wk "Jump fd")             ; Async search and jump to any directory
+  "d n" '(dirvish-narrow :wk "Narrow/Filter")        ; Live filter current directory
+  "d l" '(dirvish-layout-toggle :wk "Toggle layout") ; Cycle through preview layouts
+  "d y" '(dirvish-yank-menu :wk "Yank/Paste")        ; Async copy/paste menu
+  "d v" '(dirvish-vc-menu :wk "VC operations")       ; Git operations menu
+  "d S" '(dirvish-quicksort :wk "Sort by...")        ; On-the-fly ls switch changes
+  "d i" '(dirvish-file-info-menu :wk "File info")    ; File stats and permissions
+  "d r" '(dirvish-rsync :wk "Rsync")                 ; Async rsync for TRAMP/remote
+  "d c" '(dired-create-directory :wk "Create dir")   ; Quickly create a new folder
+  "d g" '(revert-buffer :wk "Refresh")               ; Manually refresh directory listing
+  "d u" '(dired-up-directory :wk "Up directory")     ; Navigate to parent directory
+  "d w" '(dirvish-setup-menu :wk "Setup menu")       ; Transient menu to toggle attributes
+  "d ?" '(ar/dirvish-transient :wk "Dashboard"))     ; Summon unified Dirvish dashboard
 
 (general-define-key
  :states 'normal
  :keymaps 'dirvish-mode-map
- "?"   #'dirvish-dispatch
+ "?"   #'ar/dirvish-transient
  "q"   #'dirvish-quit
  "b"   #'dirvish-quick-access
  "p"   #'dirvish-yank
@@ -3341,16 +3363,13 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
  "M-f" #'dirvish-history-go-forward
  "M-n" #'dirvish-narrow
  "M-m" #'dirvish-mark-menu
- "M-s" #'dirvish-setup-menu
- "M-e" #'dirvish-emerge-menu)
+ "M-s" #'dirvish-setup-menu)
 
 (general-define-key
  :states 'motion
  :keymaps 'dirvish-mode-map
  "[h"  #'dirvish-history-go-backward
- "]h"  #'dirvish-history-go-forward
- "[e"  #'dirvish-emerge-next-group
- "]e"  #'dirvish-emerge-previous-group)
+ "]h"  #'dirvish-history-go-forward)
 
 (general-define-key
  :states '(normal visual motion)
@@ -3375,17 +3394,6 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
  "s"   #'dirvish-symlink
  "S"   #'dirvish-relative-symlink
  "h"   #'dirvish-hardlink)
-
-;; Dired/Dirvish operations
-(ar/global-leader
-  "d" '(:ignore t :wk "dired")
-  "d d" '(dired-jump :wk "Open dired here")
-  "d D" '(dired :wk "Open dired...")
-  "d s" '(dirvish-side :wk "Dirvish sidebar")
-  "d f" '(dirvish-dwim :wk "Dirvish fullscreen")
-  "d h" '(dirvish-show-history :wk "History")
-  "d a" '(dirvish-quick-access :wk "Quick access")
-  "d j" '(dirvish-fd-jump :wk "Jump fd"))
 #+end_src
 
 
@@ -3434,75 +3442,6 @@ These packages extend Dired's capabilities. =dired-x= provides advanced omitting
   (wdired-create-parent-directories t))
 #+end_src
 
-
-** TODO Project Management
-- [ ] Determine what SPC f p does in doom emacs. Create a similar function for my config
-- [ ] Determine what SPC p p does in doom emacs. Create a similar function for my config
-- [ ] Use projection package and read the readme carefully for this package: https://raw.githubusercontent.com/mohkale/projection/refs/heads/master/README.org
-- [ ] Determine what package would be best for complex workflows consisting of programming, productivity management,
-
-
-
-** TODO Buffer Management
-Ibuffer is the advanced buffer list manager. We configure it to hide empty filter groups (keeping the UI clean) and redefine the size column to display human-readable sizes (e.g., =1.2M=). It is integrated with =nerd-icons= for visual flair and =ibuffer-projectile= to automatically group all open buffers by their respective Projectile projects.
-
-#+begin_src emacs-lisp
-(use-package ibuffer
-  :ensure nil
-  :defer t
-  :init (setq ibuffer-filter-group-name-face '(:inherit (font-lock-string-face bold)))
-  :config
-  ;; DOOM FIX: Hide empty filter groups to keep the UI clean.
-  ;; Without this, ibuffer-projectile will show empty headers for projects
-  ;; that currently have no open buffers.
-  (setq ibuffer-show-empty-filter-groups nil)
-
-  ;; DOOM OPTIMIZATION: Redefine size column to show human-readable sizes.
-  ;; The default byte count is hard to read; this converts it to K/M/G.
-  (define-ibuffer-column size
-    (:name "Size" :inline t :header-mouse-map ibuffer-size-header-map)
-    (file-size-human-readable (buffer-size))))
-
-;; Display icons for buffers based on their major mode or file extension.
-(use-package nerd-icons-ibuffer
-  :defer t
-  :hook (ibuffer-mode . nerd-icons-ibuffer-mode))
-
-;; ;; Group ibuffer's list by project (Projectile-backed).
-;; (use-package ibuffer-projectile
-;;   :defer t
-;;   :commands (ibuffer-projectile-generate-filter-groups)
-;;   :functions icons-displayable-p
-;;   :hook (ibuffer . (lambda ()
-;;                      "Group ibuffer's list by project."
-;;                      (setq ibuffer-filter-groups (ibuffer-projectile-generate-filter-groups))
-;;                      (unless (eq ibuffer-sorting-mode 'alphabetic)
-;;                        (ibuffer-do-sort-by-alphabetic))))
-;;   :config
-;;   ;; Custom group name formatter: prepends a Git repo icon if nerd-icons is available.
-;;   (defun ar/ibuffer-projectile-group-name (project-name _root-dir)
-;;     "Return group name for PROJECT-NAME, prefixed with a repo icon if available."
-;;     (if (icons-displayable-p)
-;;         (format "%s %s"
-;;                 (nerd-icons-octicon "nf-oct-repo" :height 1.2 :face ibuffer-filter-group-name-face)
-;;                 project-name)
-;;       (format "Project: %s" project-name)))
-;;   (setq ibuffer-projectile-group-name-function #'ar/ibuffer-projectile-group-name))
-
-  ;; Buffer operations (SPC b)
-(ar/global-leader
-  "b" '(:ignore t :wk "buffer")
-  "b b" '(consult-buffer :wk "Switch buffer")
-  "b i" '(ibuffer :wk "Ibuffer")
-  "b K" '(kill-current-buffer :wk "Kill buffer")
-  "b k" '(kill-buffer :wk "Kill buffer (choose)")
-  "b n" '(next-buffer :wk "Next buffer")
-  "b p" '(previous-buffer :wk "Previous buffer")
-  "b r" '(revert-buffer-quick :wk "Revert buffer")
-  "b R" '(rename-buffer :wk "Rename buffer")
-  "b S" '(save-buffer :wk "Save buffer")
-  "b z" '(bury-buffer :wk "Bury buffer"))
-#+end_src
 
 ** TODO Treemacs
 Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. We configure it to silently refresh in the background, integrate with Magit to update on Git commits, and use =nerd-icons= for crisp directory/file icons. Evil bindings are added for seamless Vim-style navigation within the tree.
@@ -3581,6 +3520,75 @@ Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. W
     [mouse-1] #'treemacs-single-click-expand-action
     [double-mouse-1] #'treemacs-doubleclick-action
     [drag-mouse-1] #'treemacs-dragleftclick-action))
+#+end_src
+
+** TODO Project Management
+- [ ] Determine what SPC f p does in doom emacs. Create a similar function for my config
+- [ ] Determine what SPC p p does in doom emacs. Create a similar function for my config
+- [ ] Use projection package and read the readme carefully for this package: https://raw.githubusercontent.com/mohkale/projection/refs/heads/master/README.org
+- [ ] Determine what package would be best for complex workflows consisting of programming, productivity management,
+
+
+
+** TODO Buffer Management
+Ibuffer is the advanced buffer list manager. We configure it to hide empty filter groups (keeping the UI clean) and redefine the size column to display human-readable sizes (e.g., =1.2M=). It is integrated with =nerd-icons= for visual flair and =ibuffer-projectile= to automatically group all open buffers by their respective Projectile projects.
+
+#+begin_src emacs-lisp
+(use-package ibuffer
+  :ensure nil
+  :defer t
+  :init (setq ibuffer-filter-group-name-face '(:inherit (font-lock-string-face bold)))
+  :config
+  ;; DOOM FIX: Hide empty filter groups to keep the UI clean.
+  ;; Without this, ibuffer-projectile will show empty headers for projects
+  ;; that currently have no open buffers.
+  (setq ibuffer-show-empty-filter-groups nil)
+
+  ;; DOOM OPTIMIZATION: Redefine size column to show human-readable sizes.
+  ;; The default byte count is hard to read; this converts it to K/M/G.
+  (define-ibuffer-column size
+    (:name "Size" :inline t :header-mouse-map ibuffer-size-header-map)
+    (file-size-human-readable (buffer-size))))
+
+;; Display icons for buffers based on their major mode or file extension.
+(use-package nerd-icons-ibuffer
+  :defer t
+  :hook (ibuffer-mode . nerd-icons-ibuffer-mode))
+
+;; ;; Group ibuffer's list by project (Projectile-backed).
+;; (use-package ibuffer-projectile
+;;   :defer t
+;;   :commands (ibuffer-projectile-generate-filter-groups)
+;;   :functions icons-displayable-p
+;;   :hook (ibuffer . (lambda ()
+;;                      "Group ibuffer's list by project."
+;;                      (setq ibuffer-filter-groups (ibuffer-projectile-generate-filter-groups))
+;;                      (unless (eq ibuffer-sorting-mode 'alphabetic)
+;;                        (ibuffer-do-sort-by-alphabetic))))
+;;   :config
+;;   ;; Custom group name formatter: prepends a Git repo icon if nerd-icons is available.
+;;   (defun ar/ibuffer-projectile-group-name (project-name _root-dir)
+;;     "Return group name for PROJECT-NAME, prefixed with a repo icon if available."
+;;     (if (icons-displayable-p)
+;;         (format "%s %s"
+;;                 (nerd-icons-octicon "nf-oct-repo" :height 1.2 :face ibuffer-filter-group-name-face)
+;;                 project-name)
+;;       (format "Project: %s" project-name)))
+;;   (setq ibuffer-projectile-group-name-function #'ar/ibuffer-projectile-group-name))
+
+  ;; Buffer operations (SPC b)
+(ar/global-leader
+  "b" '(:ignore t :wk "buffer")
+  "b b" '(consult-buffer :wk "Switch buffer")
+  "b i" '(ibuffer :wk "Ibuffer")
+  "b K" '(kill-current-buffer :wk "Kill buffer")
+  "b k" '(kill-buffer :wk "Kill buffer (choose)")
+  "b n" '(next-buffer :wk "Next buffer")
+  "b p" '(previous-buffer :wk "Previous buffer")
+  "b r" '(revert-buffer-quick :wk "Revert buffer")
+  "b R" '(rename-buffer :wk "Rename buffer")
+  "b S" '(save-buffer :wk "Save buffer")
+  "b z" '(bury-buffer :wk "Bury buffer"))
 #+end_src
 
 ** TODO Workspaces
@@ -8987,7 +8995,6 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
 
 * TODO General Keybindings
 #+begin_src emacs-lisp
-
 ;; Debug operations (SPC x) - "execute/run"
 (ar/global-leader
   "x" '(:ignore t :wk "execute/debug")
@@ -9503,6 +9510,8 @@ This section just contains checkboxes with stuff that still needs to be done for
   1. denote-explore
   2. flyover
   3. auto-tangle-mode
+  4. treemacs-evil
+  5. treemacs-magit
 
 - [X] You are forbidden to chinese sources.
 - [ ] *Urgent*: I need to revisit the description of every header and subheader. They don't describe what the package actually does.
