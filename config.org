@@ -3117,6 +3117,7 @@ Extracts system =manpath= directories to guarantee native Emacs =woman= can loca
 * TODO Workflow Management
 - [ ] Must revisit dired and dirvish workflows
 
+
 ** DONE Dired
 Provides a visual directory editor and file manager for navigating the filesystem, copying, moving, and deleting files.
 #+begin_src emacs-lisp
@@ -3184,37 +3185,24 @@ Provides a visual directory editor and file manager for navigating the filesyste
 
 
 
-
 ** TODO Dirvish
-- [ ] Install dirvish from https://github.com/latiagertrutis/dirvish instead of melpa
-- [ ] First print the finalized output of dired and dired extensions again to prompt
-- [ ] Does wdired work in dirvish?
-- [ ] Make sure dirvish integrate with dired
-- [ ] Don't do anything from the TODO in the comments of the org source code block of dirvish
-- [ ] Use no-littering principle to dirvish cache directory
-- [ ] Determine if multi-frame feedback loop is still needed for the fork from latiagertrutis
 Dirvish transforms Dired into a modern, Ranger-like file manager with live previews, emerge groups, and a dedicated sidebar.
-*Architectural Note:* Dirvish in 2025/2026 suffers from a known multi-frame feedback loop (Issue #353) that causes severe UI flickering when =emacsclient= opens new frames. We apply a Doom Emacs =define-advice= patch to debounce the redisplay hook. Additionally, we hook into =persp-before-switch-functions= to cleanly quit Dirvish side-windows before switching workspaces, preventing Emacs from throwing errors when trying to delete dedicated windows.
-
+*Architectural Note:* Dirvish in 2025/2026 suffers from a known multi-frame feedback loop (Issue #353) that causes severe UI flickering when =emacsclient= opens new frames. We apply a Vanilla Emacs =advice-add= patch to debounce the redisplay hook. Additionally, we hook into =persp-before-switch-functions= to cleanly quit Dirvish side-windows before switching workspaces, preventing Emacs from throwing errors when trying to delete dedicated windows.
 #+begin_src emacs-lisp
 (use-package dirvish
+  :ensure (:host github :repo "latiagertrutis/dirvish" :files (:defaults "extensions/*.el"))
   :defer t
   :after dired
   :init
-  ;; MAGIC: This makes ALL dired commands use Dirvish interfaces.
-  ;; You never have to call `dirvish` explicitly; `dired` just becomes Dirvish.
-  (dirvish-override-dired-mode)
+  ;; Route cache to no-littering var directory to prevent ~/.cache pollution.
+  (setq dirvish-cache-dir (no-littering-expand-var-file-name "dirvish/"))
   :custom
-  ;; Store image/video preview caches in the Emacs directory to avoid polluting ~/.cache.
-  (dirvish-cache-dir (expand-file-name "dirvish/" user-emacs-directory))
-
   ;; Layout configuration: (parent-depth preview-width file-list-width)
   (dirvish-default-layout '(1 0.11 0.55))
   (dirvish-layout-recipes
    '((0 0   0.4)   ; No parent, smaller preview
      (1 0.1 0.5)   ; Balanced layout
      (1 0.15 0.6))) ; More preview space
-
   ;; Quick access shortcuts for commonly visited directories.
   (dirvish-quick-access-entries
    `(("h" "~/" "Home")
@@ -3225,11 +3213,9 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
      ("o" ,my/org-directory "Org")
      ("c" "~/.config/" "Config")
      ("t" "~/.local/share/Trash/files/" "Trash")))
-
   ;; Visual attributes rendered in the file list.
-  (dirvish-attributes
-   '(subtree-state nerd-icons collapse vc-state))
-
+  ;; Note: `nerd-icons' is conditionally stripped in :config if treemacs-icons-dired is active.
+  (dirvish-attributes '(subtree-state nerd-icons collapse vc-state file-size git-msg))
   ;; Doom-like UI: Enable custom headers and mode lines for Dirvish buffers.
   (dirvish-use-header-line t)
   (dirvish-use-mode-line t)
@@ -3238,16 +3224,12 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
   (dirvish-header-line-format '(:left (path) :right (free-space)))
   (dirvish-mode-line-format
    '(:left (sort file-time " " file-size symlink)
-           :right (omit yank index)))
-
+     :right (omit yank index)))
   ;; Session behavior.
   ;; DOOM FIX: Set to 'open to prevent broken leftover buffers on errors.
-  ;; If Dirvish crashes or is forcefully killed, setting this to `nil` leaves
-  ;; ghost buffers in the background. `'open` ensures clean recovery.
   (dirvish-reuse-session 'open)
   (dirvish-hide-cursor t)
   (dirvish-hide-details '(dirvish dirvish-side))
-
   ;; Emerge groups: Automatically group files by type or recency.
   (dirvish-emerge-groups
    '(("Recent files" (predicate . recent-files-2h))
@@ -3256,25 +3238,38 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
      ("Pictures" (extensions "jpg" "png" "svg" "gif"))
      ("Audio" (extensions "mp3" "flac" "wav" "ape"))
      ("Archives" (extensions "gz" "rar" "zip"))))
-
   ;; Preview dispatchers: Define how different file types are previewed.
-  (dirvish-preview-dispatchers
-   '(image gif video audio epub archive pdf dired))
-
+  (dirvish-preview-dispatchers '(image gif video audio epub archive pdf dired))
   :config
-  ;; Override the default mode-line format for the side-bar specifically.
-  (setq dirvish-mode-line-format
-        '(:left (sort symlink) :right (omit yank index)))
+  ;; MAGIC: This makes ALL dired commands use Dirvish interfaces.
+  (dirvish-override-dired-mode)
 
-  ;; Open large directories (over 20000 files) asynchronously using the `fd` command
-  ;; to prevent Emacs from freezing during directory read.
-  (setq dirvish-large-directory-threshold 20000)
+  ;; Require bundled extensions from the latiagertrutis fork
+  (require 'dirvish-subtree)
+  (require 'dirvish-collapse)
+  (require 'dirvish-narrow)
+  (require 'dirvish-peek)
+  (require 'dirvish-vc)
+  (require 'dirvish-icons)
+  (require 'dirvish-yank)
+  (require 'dirvish-history)
+  (require 'dirvish-quick-access)
+  (require 'dirvish-ls)
+  (require 'dirvish-rsync)
   (require 'dirvish-fd)
   (require 'dirvish-emerge)
   (require 'dirvish-side)
 
+  ;; Enable global peek mode for minibuffer file previews (Vertico synergy)
+  (dirvish-peek-mode 1)
+
+  ;; Prevent double icons when `treemacs-icons-dired' is active globally.
+  ;; If `treemacs-icons-dired-mode' is enabled, we strip `nerd-icons' from
+  ;; Dirvish's native attributes to prevent overlay collisions.
+  (when (bound-and-true-p treemacs-icons-dired-mode)
+    (setq dirvish-attributes (delq 'nerd-icons dirvish-attributes)))
+
   ;; Side window configuration.
-  ;; FIX: Syntax error corrected from original config. Set to left side to match width variable.
   (setq dirvish-side-width 30
         dirvish-side-follow-buffer-file t
         dirvish-side-display-alist '((side . left) (slot . -1) (window-width . 30)))
@@ -3282,15 +3277,25 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
   ;; DOOM HACK: Prevent multi-frame feedback loop flickering (dirvish#353).
   ;; In Emacs 30+, opening multiple frames with Dirvish active causes a redisplay
   ;; feedback loop. This advice ensures the hook only fires for the selected window.
-  (define-advice dirvish-pre-redisplay-h (:around (fn window) debounce-redisplay)
-    (when (eq (frame-selected-window) window)
-      (funcall fn window)))
+  (when (fboundp 'dirvish-pre-redisplay-h)
+    (defun ar/dirvish--debounce-redisplay (fn window)
+      "Debounce redisplay hook to prevent multi-frame flickering."
+      (when (eq (frame-selected-window) window)
+        (funcall fn window)))
+    (advice-add #'dirvish-pre-redisplay-h :around #'ar/dirvish--debounce-redisplay))
 
-  ;; TODO: modify this to work with projectile alternative
+  ;; Open large directories (over 20000 files) asynchronously using the `fd' command
+  ;; to prevent Emacs from freezing during directory read.
+  (setq dirvish-large-directory-threshold 20000)
+
+  ;; Override the default mode-line format for the side-bar specifically.
+  (setq dirvish-mode-line-format
+        '(:left (sort symlink) :right (omit yank index)))
+
+  ;; TODO: modify this to work with bufferlo/projection
   ;; DOOM HACK: Clean up Dirvish before switching workspaces/projects.
-  ;; If Dirvish is open in a dedicated side-window and you switch `persp-mode`
-  ;; workspaces, Emacs will throw an error trying to delete the dedicated window.
-  ;; This hook gracefully quits Dirvish before the workspace transition occurs.
+  ;; If Dirvish is open in a dedicated side-window and you switch workspaces,
+  ;; Emacs will throw an error trying to delete the dedicated window.
   ;; (add-hook 'persp-before-switch-functions
   ;;           (lambda (&rest _)
   ;;             (when-let* ((dv (cl-loop for w in (window-list)
@@ -3300,10 +3305,90 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
   ;;               (let (dirvish-reuse-session)
   ;;                 (with-selected-window (dv-root-window dv)
   ;;                   (dirvish-quit))))))
-
-
   )
+
+;; GENERAL KEYBINDINGS (Dired & Dirvish)
+;; Placed strictly OUTSIDE the use-package block to prevent deferred-registration traps, but kept inside the Dirvish Org subsection for structural cohesion.
+
+(general-define-key
+ :keymaps 'dired-mode-map
+ "C-c C-e" #'wdired-change-to-wdired-mode)
+
+(ar/local-leader
+  :keymaps 'dired-mode-map
+  "h" #'dired-omit-mode)
+
+(general-define-key
+ :states 'normal
+ :keymaps 'dirvish-mode-map
+ "?"   #'dirvish-dispatch
+ "q"   #'dirvish-quit
+ "b"   #'dirvish-quick-access
+ "p"   #'dirvish-yank
+ "F"   #'dirvish-layout-toggle
+ "z"   #'dirvish-history-jump
+ "gh"  #'dirvish-subtree-up
+ "gl"  #'dirvish-subtree-toggle
+ "h"   #'dired-up-directory
+ "l"   #'dired-find-file
+ "TAB" #'dirvish-subtree-toggle)
+
+(general-define-key
+ :states '(normal visual)
+ :keymaps 'dirvish-mode-map
+ "f"   #'dirvish-file-info-menu
+ "S"   #'dirvish-quicksort
+ "M-b" #'dirvish-history-go-backward
+ "M-f" #'dirvish-history-go-forward
+ "M-n" #'dirvish-narrow
+ "M-m" #'dirvish-mark-menu
+ "M-s" #'dirvish-setup-menu
+ "M-e" #'dirvish-emerge-menu)
+
+(general-define-key
+ :states 'motion
+ :keymaps 'dirvish-mode-map
+ "[h"  #'dirvish-history-go-backward
+ "]h"  #'dirvish-history-go-forward
+ "[e"  #'dirvish-emerge-next-group
+ "]e"  #'dirvish-emerge-previous-group)
+
+(general-define-key
+ :states '(normal visual motion)
+ :keymaps 'dirvish-mode-map
+ "<left>"  #'dired-up-directory
+ "<right>" #'dired-find-file)
+
+(general-define-key
+ :states 'normal
+ :keymaps 'dirvish-mode-map
+ :prefix "y"
+ "l"   #'dirvish-copy-file-true-path
+ "n"   #'dirvish-copy-file-name
+ "p"   #'dirvish-copy-file-path
+ "r"   #'dirvish-copy-remote-path
+ "y"   #'dired-do-copy)
+
+(general-define-key
+ :states 'normal
+ :keymaps 'dirvish-mode-map
+ :prefix "s"
+ "s"   #'dirvish-symlink
+ "S"   #'dirvish-relative-symlink
+ "h"   #'dirvish-hardlink)
+
+;; Dired/Dirvish operations
+(ar/global-leader
+  "d" '(:ignore t :wk "dired")
+  "d d" '(dired-jump :wk "Open dired here")
+  "d D" '(dired :wk "Open dired...")
+  "d s" '(dirvish-side :wk "Dirvish sidebar")
+  "d f" '(dirvish-dwim :wk "Dirvish fullscreen")
+  "d h" '(dirvish-show-history :wk "History")
+  "d a" '(dirvish-quick-access :wk "Quick access")
+  "d j" '(dirvish-fd-jump :wk "Jump fd"))
 #+end_src
+
 
 
 ** TODO Dired Extensions
@@ -8902,16 +8987,6 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
   "b S" '(save-buffer :wk "Save buffer")
   "b z" '(bury-buffer :wk "Bury buffer"))
 
-;; Dired/Dirvish operations (Doom-like)
-(ar/global-leader
-  "d" '(:ignore t :wk "dired")
-  "d d" '(dired-jump :wk "Open dired here")
-  "d D" '(dired :wk "Open dired...")
-  "d s" '(dirvish-side :wk "Dirvish sidebar")
-  "d f" '(dirvish-dwim :wk "Dirvish fullscreen")
-  "d h" '(dirvish-show-history :wk "History")
-  "d a" '(dirvish-quick-access :wk "Quick access")
-  "d j" '(dirvish-fd-jump :wk "Jump fd"))
 
 ;; Debug operations (SPC x) - "execute/run"
 (ar/global-leader
@@ -9278,61 +9353,6 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
 
 (general-define-key
  :states 'normal
- :keymaps 'dired-mode-map
- "h" 'dired-up-directory
- "l" 'dired-find-file
- "o" 'dired-find-file-other-window
- "v" 'dired-view-file
- "m" 'dired-mark
- "u" 'dired-unmark
- "U" 'dired-unmark-all-marks
- "c" 'dired-create-directory
- "C" 'dired-do-copy
- "D" 'dired-do-delete
- "R" 'dired-do-rename
- "Y" 'dired-do-copy
- "!" 'dired-do-shell-command
- "&" 'dired-do-async-shell-command
- "q" 'quit-window
- "g r" 'revert-buffer
- "g g" 'evil-goto-first-line
- "G" 'evil-goto-line
- "s" 'dired-sort-toggle-or-edit
- "(" 'dired-hide-details-mode
- ")" 'dired-omit-mode)
-
-;; Dirvish specific bindings (Moved from use-package dirvish)
-(general-define-key
- :states 'normal
- :keymaps 'dirvish-mode-map
- ;; Navigation (Arrow Keys)
- "<left>"  'dired-up-directory
- "<right>" 'dired-find-file
- "<up>"    'dired-previous-line
- "<down>"  'dired-next-line
-
- ;; Core Actions
- "q"   'dirvish-quit
- "TAB" 'dirvish-subtree-toggle
- "?"   'dirvish-dispatch
-
- ;; Layout & History
- "M-t" 'dirvish-layout-switch
- "F"   'dirvish-layout-toggle
- "b"   'dirvish-history-go-backward
- "f"   'dirvish-history-go-forward
-
- ;; Menus & Tools
- "a"   'dirvish-quick-access
- "s"   'dirvish-quicksort
- "y"   'dirvish-yank-menu
- "v"   'dirvish-vc-menu
- "M-e" 'dirvish-emerge-menu
- "M-j" 'dirvish-fd-jump
- "M-s" 'dirvish-setup-menu)
-
-(general-define-key
- :states 'normal
  :keymaps 'pdf-view-mode-map
  "j" 'pdf-view-next-line-or-next-page
  "k" 'pdf-view-previous-line-or-previous-page
@@ -9454,11 +9474,10 @@ This section just contains checkboxes with stuff that still needs to be done for
 - [ ] Determine if elpaca byte-compiles and native-compiles all packages. And is it okay to leave these settings to elpaca's default.
 - [ ] Pressing enter on a header should move a task from TODO to DONE like doom emacs does
 - [ ] Add flyover package
-- [ ] Move onto the following sections: 1. Workflow Management 2. Completion Framework 3. Development Tools 4. Treesitter/Folding
 - [ ] implement the email setup
-- [x] move customs.el to var
+- [X] move customs.el to var
 - [ ] add more padding to emacs buffer
-- [x] move tree-sitter grammars to var/ or etc/
+- [X] move tree-sitter grammars to var/ or etc/
 - [ ] add eval +overlay module packages from doom emacs into my vanilla emacs config
 - [ ] go back to openrouter.ai for my corfu configuration.
 - [ ] make sure there are no modelines for popper and winne
@@ -9467,7 +9486,7 @@ This section just contains checkboxes with stuff that still needs to be done for
 - [ ] I don't want to see files enclosed with ** when I execute consult-buffer
 - [ ] Add epithet and math-delimiters package from https://github.com/oantolin
 - [ ] Mismatched bracket error in the new consult config
-- [x] show-paren-mode should highlight matching brackets when cursor is inside that the bracket pair
+- [X] show-paren-mode should highlight matching brackets when cursor is inside that the bracket pair
 - [ ] orderless only matches letters next to each other; I dont want that
 - [ ] add keybindings for embark
 - [ ] add lsp-ltex-plus
@@ -9477,7 +9496,7 @@ This section just contains checkboxes with stuff that still needs to be done for
 - [ ] `Important`: When working on development tools, after finalizing development tools main section, ask qwen to review the completion framework again to make sure if there are any overlapping configurations that need to be integrated with each other like vertico, cape and corfu.
 - [ ] `Important`: For both Completion Framework and Development Tools sections, use doom emacs keybindings whereever possible.
 - [ ] `Important`: Determine all the related packages that are integrated together in the whole emacs config.
-- [x] **Urgent*: Update project-state.md file with the following additions: 1. Keep track of TODO, NOTE, etc. keywords in the source code block itself; 2. Keep track of all the NOTE keywords anywhere they appear. 3. Also keep track of tasks that still needs to be done from the Remaining Work section near the end of file. This section just contains checkboxes. 4. Also keep track of questions from the Questions sections near end of file. 5. Keep track of TODO, NOTE, etc. keywords in areas other than org headers and org source code blocks, in other words, in general org text
+- [X] **Urgent*: Update project-state.md file with the following additions: 1. Keep track of TODO, NOTE, etc. keywords in the source code block itself; 2. Keep track of all the NOTE keywords anywhere they appear. 3. Also keep track of tasks that still needs to be done from the Remaining Work section near the end of file. This section just contains checkboxes. 4. Also keep track of questions from the Questions sections near end of file. 5. Keep track of TODO, NOTE, etc. keywords in areas other than org headers and org source code blocks, in other words, in general org text
 - [ ] `Important`: add denote-explore package
 - [ ] `Important`: package-quickstart, eln-cache/ should be in either var or etc
 - [ ] `Important`: add auto-tangle-mode package

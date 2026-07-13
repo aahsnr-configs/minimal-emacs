@@ -66,4 +66,45 @@ in a single org config block. The toggle menu for this transient-menu should be 
 
 ---
 
-Now you are going to review Dirvish subsection instead of Dired Extensions subsection. In my current config.org file . Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from the system_prompt_protocol.yaml file. Also determine if there are additional configurations that might be useful. Also determine if there keybindings you should add using general.el and SPC as leader keys. Then explain everything to me in detail and present me how you plan to deal with this configuration. Do not attempt the 1st iteration of the rewrite yet since I need to review everything. Search the web and think longer for these task and make sure you have the latest information till July 2026. Don't review evil-multi-iedit.
+For your above iteration of Dirvish config org block, remove these keybindings for now:
+
+```el
+(general-define-key
+ :keymaps 'dired-mode-map
+ "C-c C-e" #'wdired-change-to-wdired-mode)
+
+(ar/local-leader
+  :keymaps 'dired-mode-map
+  "h" #'dired-omit-mode)
+```
+
+But
+
+```el
+(ar/local-leader
+  :keymaps 'dired-mode-map
+  "h" #'dired-omit-mode)
+```
+
+will be added when I work on Dired Extensions subsection.
+
+I also have added the following ar/global-leader keybindings from General Keybindings to dirvish config org block
+
+```el
+;; Dired/Dirvish operations
+(ar/global-leader
+  "d" '(:ignore t :wk "dired")
+  "d d" '(dired-jump :wk "Open dired here")
+  "d D" '(dired :wk "Open dired...")
+  "d s" '(dirvish-side :wk "Dirvish sidebar")
+  "d f" '(dirvish-dwim :wk "Dirvish fullscreen")
+  "d h" '(dirvish-show-history :wk "History")
+  "d a" '(dirvish-quick-access :wk "Quick access")
+  "d j" '(dirvish-fd-jump :wk "Jump fd"))
+
+```
+
+Keep all these changes I made in your context for now since you will need it when I give you the permission to rewrite. Also determine if there are other keybindings you may need to add to the above ar/global-leader for Dired and Dirvish operations. Determine if there are any errors and issues in this iteration of Dirvish. Search the web and determine if there are there any additional configuration settings that you think might be useful. Determine if you are using the best emacs practices. Search the web and think longer for these tasks. You must not perform another rewrite. The information you get must be the latest till July 2026. Explain everything to me in detail for me to review. To be clear, you don't have to rewrite the Doom Emacs Dired & Dirvish Commands / Keybindings Reference section any more since I have noted it down.
+
+- For the Double-icon issue, rethink your approach from scratch instead of the one you suggested.
+- Go ahead with your fixes from sections 1 to
