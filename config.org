@@ -3117,14 +3117,12 @@ Extracts system =manpath= directories to guarantee native Emacs =woman= can loca
 * TODO Workflow Management
 - [ ] Must revisit dired and dirvish workflows
 
-** TODO Dired
+** DONE Dired
 Provides a visual directory editor and file manager for navigating the filesystem, copying, moving, and deleting files.
 #+begin_src emacs-lisp
 (use-package dired
   :ensure nil
   :defer t
-  :commands (dired
-             dired-jump)
   :hook ((dired-mode . hl-line-mode))
   :custom
   ;; Suppress recursive operation prompts while maintaining baseline safety.
@@ -3147,27 +3145,31 @@ Provides a visual directory editor and file manager for navigating the filesyste
   ;; Defensive auto-revert: Revert local dirs, but strictly ignore TRAMP to prevent I/O hangs.
   (dired-auto-revert-buffer (lambda (dir)
                               (and (not (file-remote-p dir))
-                                   (dired-buffer-stale-p dir))))
+                                   (dired-buffer-stale-p))))
   :config
-  ;; Establish baseline GNU ls switches, stripping them on macOS/BSD if `gls` is absent.
-  (let ((switches '("-ahl" "-v" "--group-directories-first")))
-    (when (and (or (eq system-type 'darwin)
-                   (eq system-type 'berkeley-unix))
-               (not (executable-find "gls")))
-      (setq switches '("-ahl")))
-    (setq dired-listing-switches (string-join switches " ")))
+  ;; Arch Linux natively ships GNU coreutils. Establish baseline ls switches.
+  (setq dired-listing-switches "-ahl -v --group-directories-first")
+
+  ;; Enable `dired-find-alternate-file' to kill the current Dired buffer
+  ;; when drilling down into files/directories, preventing buffer bloat.
+  (put 'dired-find-alternate-file 'disabled nil)
+
+  ;; Prevent auto-revert in virtual Dired buffers (e.g., find-dired, locate).
+  ;; Reverting these buffers destroys the search results and throws errors.
+  (defun ar/dired--no-revert-in-virtual-buffers-p (&rest _)
+    "Return nil if the current buffer is a virtual Dired buffer."
+    (not (eq revert-buffer-function #'dired-virtual-revert)))
+  (advice-add #'dired-buffer-stale-p :before-while #'ar/dired--no-revert-in-virtual-buffers-p)
 
   ;; Surgically strip GNU-specific flags before `dired-readin` parses the directory.
-  ;; Prevents blank screens over TRAMP or on native BSD/macOS `ls` binaries.
+  ;; Prevents blank screens over TRAMP when connecting to minimal containers (e.g., Alpine/BusyBox) or BSD servers.
   (defun ar/dired-strip-unsupported-ls-flags ()
-    "Strip unsupported ls flags for remote or BSD/macOS environments."
-    (let ((switches dired-actual-switches))
-      (when (or (file-remote-p default-directory)
-                (and (or (eq system-type 'darwin)
-                         (eq system-type 'berkeley-unix))
-                     (not (executable-find "gls"))))
+    "Strip GNU-specific ls flags over TRAMP to prevent blank screens on minimal remote containers."
+    (when (file-remote-p default-directory)
+      (let ((switches dired-actual-switches))
         (setq switches (replace-regexp-in-string "--group-directories-first" "" switches))
         (setq switches (replace-regexp-in-string "-v" "" switches))
+        ;; Clean up multiple spaces left behind after stripping
         (setq switches (replace-regexp-in-string "  +" " " (string-trim switches)))
         (setq-local dired-actual-switches switches))))
   (add-hook 'dired-before-readin-hook #'ar/dired-strip-unsupported-ls-flags)
@@ -3181,54 +3183,14 @@ Provides a visual directory editor and file manager for navigating the filesyste
 #+end_src
 
 
-** TODO Dired Extensions
-These packages extend Dired's capabilities. =dired-x= provides advanced omitting and OS-integration, =diredfl= adds modern syntax highlighting (font-lock) to the directory listings, and =wdired= allows you to edit the Dired buffer like a text file to rename/move files in bulk.
-
-#+begin_src emacs-lisp
-(use-package dired-x
-  :ensure nil
-  :defer t
-  ;; Enable omit mode to hide "uninteresting" files (compiled artifacts, VCS dirs).
-  :hook (dired-mode . dired-omit-mode)
-  :config
-  (setq dired-omit-verbose nil
-        ;; Regex defining which files to hide when `dired-omit-mode` is active.
-        ;; Hides lockfiles, flycheck temp files, VCS directories, and compiled binaries.
-        dired-omit-files
-        (concat "^\\.?#\\|^\\.$\\|^\\.\\.$"
-                "\\|^\\.DS_Store\\'"
-                "\\|^flycheck_.*"
-                "\\|^\\.project\\(?:ile\\)?\\'"
-                "\\|^\\.\\(?:svn\\|git\\)\\'"
-                "\\|^\\.ccls-cache\\'"
-                "\\|\\(?:\\.js\\)?\\.meta\\'"
-                "\\|\\.\\(?:elc\\|o\\|pyo\\|swp\\|class\\)\\'"))
-  ;; Don't prompt for confirmation when killing buffers associated with deleted files.
-  (setq dired-clean-confirm-killing-deleted-buffers nil))
-
-(use-package diredfl
-  ;; Apply syntax highlighting to both standard Dired and Dirvish's directory views.
-  :hook
-  ((dired-mode . diredfl-mode)
-   (dirvish-directory-view-mode . diredfl-mode))
-  :config
-  ;; Make directory names bold for better visual distinction.
-  (set-face-attribute 'diredfl-dir-name nil :bold t))
-
-(use-package wdired
-  :ensure nil
-  :after dired
-  :custom
-  ;; Allow changing file permissions directly in the WDired buffer.
-  (wdired-allow-to-change-permissions t)
-  ;; Automatically create parent directories if you rename a file to a non-existent subfolder.
-  (wdired-create-parent-directories t))
-#+end_src
-
 ** TODO Dirvish
+- [ ] Install dirvish from https://github.com/latiagertrutis/dirvish instead of melpa
 - [ ] First print the finalized output of dired and dired extensions again to prompt
 - [ ] Does wdired work in dirvish?
 - [ ] Make sure dirvish integrate with dired
+- [ ] Don't do anything from the TODO in the comments of the org source code block of dirvish
+- [ ] Use no-littering principle to dirvish cache directory
+
 Dirvish transforms Dired into a modern, Ranger-like file manager with live previews, emerge groups, and a dedicated sidebar.
 *Architectural Note:* Dirvish in 2025/2026 suffers from a known multi-frame feedback loop (Issue #353) that causes severe UI flickering when =emacsclient= opens new frames. We apply a Doom Emacs =define-advice= patch to debounce the redisplay hook. Additionally, we hook into =persp-before-switch-functions= to cleanly quit Dirvish side-windows before switching workspaces, preventing Emacs from throwing errors when trying to delete dedicated windows.
 
@@ -3341,6 +3303,50 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
   )
 #+end_src
 
+
+** TODO Dired Extensions
+These packages extend Dired's capabilities. =dired-x= provides advanced omitting and OS-integration, =diredfl= adds modern syntax highlighting (font-lock) to the directory listings, and =wdired= allows you to edit the Dired buffer like a text file to rename/move files in bulk.
+
+#+begin_src emacs-lisp
+(use-package dired-x
+  :ensure nil
+  :defer t
+  ;; Enable omit mode to hide "uninteresting" files (compiled artifacts, VCS dirs).
+  :hook (dired-mode . dired-omit-mode)
+  :config
+  (setq dired-omit-verbose nil
+        ;; Regex defining which files to hide when `dired-omit-mode` is active.
+        ;; Hides lockfiles, flycheck temp files, VCS directories, and compiled binaries.
+        dired-omit-files
+        (concat "^\\.?#\\|^\\.$\\|^\\.\\.$"
+                "\\|^\\.DS_Store\\'"
+                "\\|^flycheck_.*"
+                "\\|^\\.project\\(?:ile\\)?\\'"
+                "\\|^\\.\\(?:svn\\|git\\)\\'"
+                "\\|^\\.ccls-cache\\'"
+                "\\|\\(?:\\.js\\)?\\.meta\\'"
+                "\\|\\.\\(?:elc\\|o\\|pyo\\|swp\\|class\\)\\'"))
+  ;; Don't prompt for confirmation when killing buffers associated with deleted files.
+  (setq dired-clean-confirm-killing-deleted-buffers nil))
+
+(use-package diredfl
+  ;; Apply syntax highlighting to both standard Dired and Dirvish's directory views.
+  :hook
+  ((dired-mode . diredfl-mode)
+   (dirvish-directory-view-mode . diredfl-mode))
+  :config
+  ;; Make directory names bold for better visual distinction.
+  (set-face-attribute 'diredfl-dir-name nil :bold t))
+
+(use-package wdired
+  :ensure nil
+  :after dired
+  :custom
+  ;; Allow changing file permissions directly in the WDired buffer.
+  (wdired-allow-to-change-permissions t)
+  ;; Automatically create parent directories if you rename a file to a non-existent subfolder.
+  (wdired-create-parent-directories t))
+#+end_src
 
 
 ** TODO Project Management
