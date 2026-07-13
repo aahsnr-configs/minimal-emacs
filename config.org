@@ -3808,6 +3808,7 @@ Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. W
 
 
 * TODO Org Mode
+- [ ] Use doom emacs settings wherever possible
 - [ ] Find alternative packages to org-download
 ** TODO Dynamic Directory Structure
 #+begin_src emacs-lisp
@@ -9496,11 +9497,14 @@ This section just contains checkboxes with stuff that still needs to be done for
 - [ ] `Important`: For both Completion Framework and Development Tools sections, use doom emacs keybindings whereever possible.
 - [ ] `Important`: Determine all the related packages that are integrated together in the whole emacs config.
 - [X] **Urgent*: Update project-state.md file with the following additions: 1. Keep track of TODO, NOTE, etc. keywords in the source code block itself; 2. Keep track of all the NOTE keywords anywhere they appear. 3. Also keep track of tasks that still needs to be done from the Remaining Work section near the end of file. This section just contains checkboxes. 4. Also keep track of questions from the Questions sections near end of file. 5. Keep track of TODO, NOTE, etc. keywords in areas other than org headers and org source code blocks, in other words, in general org text
-- [ ] `Important`: add denote-explore package
-- [ ] `Important`: package-quickstart, eln-cache/ should be in either var or etc
-- [ ] `Important`: add auto-tangle-mode package
-- [ ] `Important`: add flyover
-- [ ] You are forbidden to chinese sources.
+- [X] `Important`: package-quickstart, eln-cache/ should be in either var or etc
+- [ ] =Important=: add auto-tangle-mode package
+- [ ] =Important=: Add the following packages:
+  1. denote-explore
+  2. flyover
+  3. auto-tangle-mode
+
+- [X] You are forbidden to chinese sources.
 - [ ] *Urgent*: I need to revisit the description of every header and subheader. They don't describe what the package actually does.
 
 * TODO Questions

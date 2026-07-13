@@ -106,5 +106,55 @@ I also have added the following ar/global-leader keybindings from General Keybin
 
 Keep all these changes I made in your context for now since you will need it when I give you the permission to rewrite. Also determine if there are other keybindings you may need to add to the above ar/global-leader for Dired and Dirvish operations. Determine if there are any errors and issues in this iteration of Dirvish. Search the web and determine if there are there any additional configuration settings that you think might be useful. Determine if you are using the best emacs practices. Search the web and think longer for these tasks. You must not perform another rewrite. The information you get must be the latest till July 2026. Explain everything to me in detail for me to review. To be clear, you don't have to rewrite the Doom Emacs Dired & Dirvish Commands / Keybindings Reference section any more since I have noted it down.
 
-- For the Double-icon issue, rethink your approach from scratch instead of the one you suggested.
-- Go ahead with your fixes from sections 1 to
+- For the section 1 The Double-Icon Load-Order Physics Bug
+  issue, rethink your approach from scratch instead of the one you suggested. Basically go back to the dirvish setup from v0.7 of config.org.txt I initially uploaded. So search the web, think for longer and present a new approach from scratch to deal with Double-Icons.
+
+  However, reading https://github.com/latiagertrutis/dirvish/blob/main/docs/COMPARISON.org there was a workaround mentioned that was shown in https://github.com/alexluigit/dirvish/issues/16 Determine that you can access both the lines and it suggested the following code:
+
+```el
+(remove-hook 'dired-mode-hook 'treemacs-icons-dired-mode)
+(remove-hook 'dired-after-readin-hook 'treemacs-icons-dired--display)
+```
+
+But the upstream treemacs source file from https://raw.githubusercontent.com/Alexander-Miller/treemacs/refs/heads/master/src/extra/treemacs-icons-dired.el has the following function in treemacs-icons-dired.el
+
+```
+;;;###autoload
+(defun treemacs-icons-dired-enable-once ()
+  "Enable `treemacs-icons-dired-mode' and remove self from `dired-mode-hook'.
+
+This function is meant to be used as a single-use toggle added to
+`dired-mode-hook' to enable icons for Dired only once, without having to use
+\"with-eval-after-load \\='dired\", since Dired tends to be loaded early."
+  (treemacs-icons-dired-mode)
+  (remove-hook 'dired-mode-hook #'treemacs-icons-dired-enable-once))
+```
+
+This might be a better option since it is directly from treemacs github repo
+
+- Go ahead with your fixes from sections 2 to 5
+- For section 6, regarding Cursor Hiding Precision you did not present a change or fix. I do want to prevent edge-case rendering glitches if Dirvish is somehow bypassed
+- For section 7, so my combine (ar/global-leader) for Dired/Dirvish operations would be like this:
+
+```el
+(ar/global-leader
+  "d" '(:ignore t :wk "dired")
+  "d d" '(dired-jump :wk "Open dired here")
+  "d D" '(dired :wk "Open dired...")
+  "d s" '(dirvish-side :wk "Dirvish sidebar")
+  "d f" '(dirvish-dwim :wk "Dirvish fullscreen")
+  "d h" '(dirvish-show-history :wk "History")
+  "d a" '(dirvish-quick-access :wk "Quick access")
+  "d j" '(dirvish-fd-jump :wk "Jump fd")
+  "d n" '(dirvish-narrow :wk "Narrow/Filter")      ; Live filter current directory
+  "d e" '(dirvish-emerge-menu :wk "Emerge groups") ; Transient menu for grouping
+  "d l" '(dirvish-layout-toggle :wk "Toggle layout"); Cycle preview layouts
+  "d y" '(dirvish-yank-menu :wk "Yank/Paste")      ; Async copy/paste menu
+  "d v" '(dirvish-vc-menu :wk "VC operations")     ; Git operations menu
+  "d S" '(dirvish-quicksort :wk "Sort by...")      ; On-the-fly ls switch changes
+  "d i" '(dirvish-file-info-menu :wk "File info")  ; File stats and permissions
+  "d r" '(dirvish-rsync :wk "Rsync")               ; Async rsync for TRAMP/remote
+)
+```
+
+For the additional keybindings you also added side comments using ;. I would like to do that for the (ar/global-leader) block from above. Btw I am confused
