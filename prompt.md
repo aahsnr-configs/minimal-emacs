@@ -10,11 +10,9 @@
 
 - Okay then you have the signal to rewrite the Session Management subsection. Follow the protocols and instructions from system-prompt-protocols.md file and make sure the documentation is very concise as well.
 
-- Now lets review the Dirvish subsection. Dirvish installed from the github source mentioned is the most upto date and doom emacs recommended source. Find and fix any errors and issues that might still exist in dirvish config org block. Then search the web and determine if there are any useful configuration you can borrow for my emacs configuration. Follow the instructions and protocols laid out in system_prompt_protocol.yaml file and the use-package conventions laid out in use_package.yaml file. Do not hallucinate. You must verify everything you. Search the web and think longer for these tasks, but do not rewrite the config org block yet. Make sure you have the latest information till July 2026. Then explain everything back to me and what you plan to do for the rewrite.
-
 - Now review the subsection: Grep. Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from system_prompt_protocol.yaml file. Search the web determine if there are additional configuration settings that might be useful. Then explain everything to me in detail and present me how you plan to deal with this configuration.I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 2026.
 
-- Determine if there are any errors and issues in latest iteration of Dirvish. Search the web and determine if there are there any additional configuration settings that you think might be useful. Determine if you are using the best emacs practices Search the web and think longer for these tasks. You must not perform another rewrite. The information you get must be the latest till July 2026. Explain everything to me in detail.
+- Determine if there are any errors, issues and hallucinations in this latest iteration of Buffer Management subsection. Search the web and determine if there are there any additional configuration settings that you think might be useful. Determine if you are using the best emacs practices Search the web and think longer for these tasks. You must not perform another rewrite. You must verify everything. The information you get must be the latest till July 2026. Explain everything to me in detail.
 
 - Are you sure there are no more errors and issues in this iteration? And are you sure there are not any more extra configurations you need to add by search the web? Answer and explain everything to me in great detail.Search the web and think longer for this task and make sure the information you get is latest till July 2026.
 
@@ -30,7 +28,7 @@
   7. It must ask permisson at each step. The format would be y/N. Only pressing y approves the step. Pressing N or any other key denies the step
   8. It must provide all the instructions to build and install emacs from source. This is the main task. For now, it will download emacs-pretest. It must use the correct --config flags something like
 
-Now review the next subsection: Treemacs. First study the upstream source code files in https://github.com/Alexander-Miller/treemacs to get a basic idea how the project is setup and how to configure the package for emacs. Keep in mind that the extras in src folder need to be installed invididually. Then review the existing treemacs org config block in my existing emacs configuration. Then look at the readme in https://raw.githubusercontent.com/Alexander-Miller/treemacs/refs/heads/master/README.org to determine if there are some useful configuration you can borrow from it. Also keep in mind treemacs-icon-dired is prohibited from being installled. Then finally look at the treemacs module from the doom emacs project in https://raw.githubusercontent.com/doomemacs/modules/refs/heads/main/modules/ui/treemacs/config.el to also borrow possible useful configurations. Then, find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from the system_prompt_protocol.yaml file. Also determine if there are additional configurations that might be useful. Also determine why posframe for ace-window would be needed. Then explain everything to me in detail and present me how you plan to deal with this configuration. Do not attempt the 1st iteration of the rewrite yet since I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 2026.
+Now review the next subsection: Treemacs. First study the upstream source code files in https://github.com/Alexander-Miller/treemacs to get a basic idea how the project is setup and how to configure the package for emacs. Keep in mind that the extras in src folder need to be installed invididually. Then review the existing treemacs org config block in my existing emacs configuration. Then look at the readme in https://raw.githubusercontent.com/Alexander-Miller/treemacs/refs/heads/master/README.org to determine if there are some useful configuration you can borrow from it. Also keep in mind treemacs-icon-dired is prohibited from being installled. Then finally look at the treemacs module from the doom emacs project in https://raw.githubusercontent.com/doomemacs/modules/refs/heads/main/modules/ui/treemacs/config.el to also borrow possible useful configurations. Then, find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from the system_prompt_protocol.yaml file. Then explain everything to me in detail and present me how you plan to deal with this configuration. Do not attempt the 1st iteration of the rewrite yet since I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 2026.
 
 ## Sample large prompt
 
@@ -63,3 +61,25 @@ write a transient menu configuration for avy using the following source code fro
 ```
 
 in a single org config block. The toggle menu for this transient-menu should be ar/global-leader outside the use-package. If ar/global-leader binding is not possible, then suggest what to use. Then propose a plan to create this custom transient menu for avy
+
+---
+
+---
+
+---
+
+Lets work on the Buffer Managmement section. Review this section thoroughly in great detail. Make sure this subsection integrates with the other 2 subsections. Then fix any errors and issues. Use the workflow_management.yaml file as a guide, but anything in it can be subject to change if determine there are issues in this yaml file. Explain everything in great detail for me to review. Propose a plan on you plan to write/rewrite the 1st iteration of the Buffer Management section. Follow the instructions and protocols in the system_prompt_protocol.yaml file but you are allowed to break the "No Package Merging" negative constraint. Search the web and think longer for these tasks. Do not hallucinate and do not introduce errors. You are not allowed to use any sources/resources older than 3 years and you are not allowed to use any china-base sources/resources as well. And all the information you get must be the latest till July 2026.
+
+---
+
+---
+
+Using the attached v0.10 of the config.org.txt file, update and rewrite the attached v21 of the project_state.yaml and generate the v22 as a result.
+
+---
+
+Re-evaluate everything again by ingesting the readme for bufferlo from https://raw.githubusercontent.com/florommel/bufferlo/refs/heads/main/README.org and its source code: https://raw.githubusercontent.com/florommel/bufferlo/refs/heads/main/bufferlo.el
+
+Also ingest the readme for projection from https://raw.githubusercontent.com/mohkale/projection/refs/heads/master/README.org and also ingest the upstream source code files from https://github.com/mohkale/projection/tree/master/src
+
+Ingest all these files and then Re-evaluate everything again for workflow_management.yaml file before working on the Buffer Management subsection

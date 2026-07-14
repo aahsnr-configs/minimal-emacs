@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.9
+#+VERSION: 0.10
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -2897,7 +2897,7 @@ Manages spellchecking, contextual help systems, and heavy multi-buffer compariso
 - [ ] Instead of a dict.txt file, I prefer to have every exclusion written here and it should be case-insensitive
 #+begin_src emacs-lisp
 (use-package jinx
-  :hook (after-init . jinx-mode)
+  :hook (elpaca-after-init . jinx-mode)
   :custom
   (jinx-disabled-modes
    '(prog-mode
@@ -3572,57 +3572,152 @@ Provides a persistent file and project explorer sidebar for navigating directory
 
 
 
-** TODO Buffer Management
-Ibuffer is the advanced buffer list manager. We configure it to hide empty filter groups (keeping the UI clean) and redefine the size column to display human-readable sizes (e.g., =1.2M=). It is integrated with =nerd-icons= for visual flair and =ibuffer-projectile= to automatically group all open buffers by their respective Projectile projects.
 
+
+
+
+** TODO Buffer Management
+Provides a centralized dashboard and automated cleanup engine for viewing, filtering, and managing all open buffers across projects and workspaces.
+
+=ibuffer= provides a highly customizable dashboard for viewing, filtering, and managing open buffers with project and workspace awareness.
 #+begin_src emacs-lisp
 (use-package ibuffer
   :ensure nil
   :defer t
-  :init (setq ibuffer-filter-group-name-face '(:inherit (font-lock-string-face bold)))
+  :bind ([remap list-buffers] . ibuffer)
+  :init
+  ;; Override filter-group header face to inherit bold font-lock-string-face (Tokyo Night Magenta).
+  (setq ibuffer-filter-group-name-face '(:inherit (font-lock-string-face bold) :foreground "#bb9af7"))
+  :custom-face
+  ;; Map marked buffer indicators to Tokyo Night Red for high-contrast bulk operation feedback.
+  (ibuffer-marked-face ((t (:foreground "#f7768e" :weight bold))))
+  (ibuffer-deletion-face ((t (:foreground "#f7768e" :weight bold :strike-through t))))
   :config
-  ;; DOOM FIX: Hide empty filter groups to keep the UI clean.
-  ;; Without this, ibuffer-projectile will show empty headers for projects
-  ;; that currently have no open buffers.
+  ;; Suppress rendering of zero-match filter groups in the tabulated list grid.
   (setq ibuffer-show-empty-filter-groups nil)
 
-  ;; DOOM OPTIMIZATION: Redefine size column to show human-readable sizes.
-  ;; The default byte count is hard to read; this converts it to K/M/G.
-  (define-ibuffer-column size
-    (:name "Size" :inline t :header-mouse-map ibuffer-size-header-map)
-    (file-size-human-readable (buffer-size))))
+  ;; Regex alist evaluated by `ibuffer-filter-buffer-by-name` to cull ephemeral noise.
+  ;; Append new regex strings to this list to cull specific buffers (e.g., "^\\*my-custom-log\\*$").
+  (setq ibuffer-never-show-predicates '("^\\*Completions\\*$"
+                                        "^\\*Messages\\*$"
+                                        "^\\*Async-native-compile-log\\*$"
+                                        "^\\*Backtrace\\*$"
+                                        "^\\*Warnings\\*$"
+                                        "^\\*tramp/.*\\*$"
+                                        "^\\*eldoc\\*$"))
 
-;; Display icons for buffers based on their major mode or file extension.
+  ;; Redefine tabulated list column widths to prevent aggressive name truncation and optimize spatial distribution.
+  ;; Splices in `vc-status` if `ibuffer-vc` is available, and includes the `locked` mark indicator.
+  (setq ibuffer-formats
+        `((mark modified read-only locked " "
+                (name 40 40 :left :elide)
+                " "
+                (size 9 -1 :right)
+                " "
+                (mode 16 16 :left :elide)
+                ,@(when (require 'ibuffer-vc nil t)
+                    '(" " (vc-status 12 12 :left)))
+                " "
+                filename-and-process)
+          (mark " "
+                (name 16 -1)
+                " "
+                filename)))
+
+  ;; Minimize column padding to reclaim horizontal screen real estate in the tabulated list.
+  (setq ibuffer-default-shrink-to-minimum-size t)
+
+  ;; Map buffer states to semantic font-lock faces for Tokyo Night syntax parity.
+  (setq ibuffer-fontification-alist
+        `((10 buffer-read-only font-lock-constant-face)
+          (15 (and buffer-file-name (buffer-modified-p)) warning)
+          (20 (string-prefix-p "*" (buffer-name)) shadow)
+          (25 (derived-mode-p 'dired-mode) font-lock-function-name-face)
+          (30 auto-save-mode font-lock-warning-face)))
+
+  ;; Anti-Popper Guard: Force Ibuffer to reuse the current window or spawn a standard window.
+  ;; Strictly bypasses side-window drawers, dedicated popups, and popup managers.
+  (add-to-list 'display-buffer-alist
+               '("\\*Ibuffer\\*"
+                 (display-buffer-reuse-window display-buffer-same-window)
+                 (reusable-frames . visible))))
+#+end_src
+
+
+=nerd-icons-ibuffer= renders visual file and mode glyphs inside the buffer dashboard for quick visual identification.
+#+begin_src emacs-lisp
 (use-package nerd-icons-ibuffer
   :defer t
   :hook (ibuffer-mode . nerd-icons-ibuffer-mode))
+#+end_src
 
-;; ;; Group ibuffer's list by project (Projectile-backed).
-;; (use-package ibuffer-projectile
-;;   :defer t
-;;   :commands (ibuffer-projectile-generate-filter-groups)
-;;   :functions icons-displayable-p
-;;   :hook (ibuffer . (lambda ()
-;;                      "Group ibuffer's list by project."
-;;                      (setq ibuffer-filter-groups (ibuffer-projectile-generate-filter-groups))
-;;                      (unless (eq ibuffer-sorting-mode 'alphabetic)
-;;                        (ibuffer-do-sort-by-alphabetic))))
-;;   :config
-;;   ;; Custom group name formatter: prepends a Git repo icon if nerd-icons is available.
-;;   (defun ar/ibuffer-projectile-group-name (project-name _root-dir)
-;;     "Return group name for PROJECT-NAME, prefixed with a repo icon if available."
-;;     (if (icons-displayable-p)
-;;         (format "%s %s"
-;;                 (nerd-icons-octicon "nf-oct-repo" :height 1.2 :face ibuffer-filter-group-name-face)
-;;                 project-name)
-;;       (format "Project: %s" project-name)))
-;;   (setq ibuffer-projectile-group-name-function #'ar/ibuffer-projectile-group-name))
 
-  ;; Buffer operations (SPC b)
+=ibuffer-vc= injects version control status indicators directly into the buffer dashboard columns without overriding project groupings.
+#+begin_src emacs-lisp
+(use-package ibuffer-vc
+  :defer t
+  :after ibuffer)
+#+end_src
+
+
+=projection-ibuffer= automatically groups all open buffers by their active project roots while respecting workspace boundaries.
+#+begin_src emacs-lisp
+;; projection-ibuffer is bundled inside the `projection` package.
+;; It dynamically generates ibuffer filter groups based on project.el roots.
+(use-package projection-ibuffer
+  :ensure nil
+  :after projection
+  :commands
+  ibuffer-projection-set-filter-groups
+  ibuffer-projection-unset-filter-groups
+  ibuffer-projection-current-project
+  :init
+  ;; Register hook globally to trigger autoload on first `ibuffer` invocation.
+  ;; Force synchronous `ibuffer-update` post-mutation to bypass upstream `called-interactively-p` guard.
+  (add-hook 'ibuffer-mode-hook
+            (lambda ()
+              (ibuffer-projection-unset-filter-groups)
+              (ibuffer-projection-set-filter-groups)
+              (unless (eq ibuffer-sorting-mode 'alphabetic)
+                (ibuffer-do-sort-by-alphabetic))
+              (ibuffer-update nil t)))
+  :config
+  ;; Inject `cl-letf` shadow over `buffer-list` to intersect filter groups with `bufferlo` workspace boundaries.
+  (with-eval-after-load 'bufferlo
+    (define-advice projection-ibuffer--filter-groups (:around (fn) bufferlo-intersection)
+      (if (bound-and-true-p bufferlo-mode)
+          (cl-letf (((symbol-function 'buffer-list)
+                     (lambda (&rest _) (bufferlo-buffer-list))))
+            (funcall fn))
+        (funcall fn)))))
+#+end_src
+
+
+=buffer-terminator= automatically cleans up inactive, buried buffers to prevent memory bloat during long daemon sessions.
+#+begin_src emacs-lisp
+(use-package buffer-terminator
+  :demand t
+  :custom
+  ;; Suppress echo-area logging to keep the minibuffer clean.
+  (buffer-terminator-verbose nil)
+  :config
+  ;; Natively respects `tab-bar' and `bufferlo` hidden tabs.
+  ;; Explicitly enforce preservation of special, process, and visible buffers.
+  (setq buffer-terminator-keep-visible-buffers t
+        buffer-terminator-keep-special-buffers t
+        buffer-terminator-keep-process-buffers t)
+  ;; Activate the global minor mode directly in :config per Elpaca load-order physics.
+  (buffer-terminator-mode 1))
+#+end_src
+
+
+=general.el= routes centralized leader keybindings for buffer operations.
+#+begin_src emacs-lisp
 (ar/global-leader
-  "b" '(:ignore t :wk "buffer")
+  "b"   '(:ignore t :wk "buffer")
   "b b" '(consult-buffer :wk "Switch buffer")
-  "b i" '(ibuffer :wk "Ibuffer")
+  "b i" '(ibuffer :wk "Ibuffer (Workspace)")
+  "b I" '(ibuffer-projection-current-project :wk "Ibuffer (Single Project)")
   "b K" '(kill-current-buffer :wk "Kill buffer")
   "b k" '(kill-buffer :wk "Kill buffer (choose)")
   "b n" '(next-buffer :wk "Next buffer")
@@ -3632,6 +3727,7 @@ Ibuffer is the advanced buffer list manager. We configure it to hide empty filte
   "b S" '(save-buffer :wk "Save buffer")
   "b z" '(bury-buffer :wk "Bury buffer"))
 #+end_src
+
 
 
 ** TODO Project Management
@@ -3644,6 +3740,21 @@ Ibuffer is the advanced buffer list manager. We configure it to hide empty filte
 
 
 ** TODO Workspaces
+
+
+
+=general.el= routes centralized leader keybindings for workspace operations (to be relocated to the Workspaces subsection).
+#+begin_src emacs-lisp
+;; WORKSPACE KEYBINDINGS
+;; Extract this block and place it inside the `** TODO Workspaces` subsection.
+(ar/global-leader
+  "TAB"   '(:ignore t :wk "workspace")
+  "TAB b" '(bufferlo-switch-to-buffer :wk "Switch buffer (local)")
+  "TAB n" '(bufferlo-new-tab :wk "New workspace")
+  "TAB c" '(bufferlo-close-tab :wk "Close workspace")
+  "TAB p" '(bufferlo-isolate-project :wk "Isolate project"))
+#+end_src
+
 
 
 
@@ -5601,30 +5712,6 @@ Top-level keys:
 
 * TODO Completion Framework
 ** TODO Orderless
-=orderless= provides a flexible, space-separated completion style where each component can match anywhere in the candidate, in any order. This configuration implements a highly optimized, Doom Emacs-inspired dispatcher system while ensuring strict compatibility with Emacs' native file and TRAMP completion engines.
-
-*Architectural Decisions & Edge Cases Handled*
-
-1. *The TRAMP & File Completion Trap:*
-   The official =orderless= README suggests overriding the =file= category with only =partial-completion=. However, doing so completely strips =orderless= and =basic= from file completions. This breaks fuzzy file matching and, more critically, breaks TRAMP (SSH) hostname resolution, which strictly requires the =basic= style to be tried /first/. We explicitly define =(file (styles basic partial-completion orderless))= to guarantee that TRAMP works, wildcards work, and fuzzy matching works simultaneously.
-
-2. *Strict Global Matching Styles:*
-   We explicitly set =orderless-matching-styles= to =(orderless-regexp orderless-literal)=. We intentionally omit =orderless-flex= and =orderless-initialism= from the global defaults. Enabling them globally makes the search too broad, causing performance stuttering in large candidate lists (like =consult-ripgrep=) and returning excessive noise. You must explicitly opt-in to fuzzy matching using the =~= and =%= prefixes defined in our dispatchers.
-
-3. *Explicit Affix Dictionary & Annotation Matching:*
-   Standard =orderless= does not natively map Vim-like affixes without configuration. We explicitly define =orderless-affix-dispatch-alist= to create a predictable, documented dictionary:
-   - =!= :: Exclude candidates containing this term (=orderless-without-literal=).
-   - == = :: Match this term exactly, no regex (=orderless-literal=).
-   - =%= :: Match initialisms, e.g., =ffb= matches =find-file-buffer= (=orderless-initialism=).
-   - =~= :: Fuzzy match, allowing typos (=orderless-flex=).
-   - =,= :: Must start with this literal string (=orderless-literal-prefix=).
-   - =&= :: Search only the Marginalia annotation (e.g., typing =kill &command= filters out variables and buffers). Includes a failsafe to =orderless-literal= if =orderless-annotation= is unavailable.
-
-4. *The Consult "Tofu" Disambiguation Problem:*
-   =consult= appends invisible Unicode characters ("tofu") to buffer names to guarantee uniqueness in the minibuffer. Because of this, standard regex end-of-string anchors (like =$=) fail because the string actually ends with =\u{100000}=.
-   - *The Condition (O(1) Parsing):* We use native, O(1) string functions (=string-suffix-p=, =string-prefix-p=) to check if the user typed a dispatcher like =$= or =.ext=. This completely eliminates regex engine overhead during the parsing phase.
-   - *The Payload (Regex Injection):* We are mathematically forced to use =orderless-regexp= for the output payload to dynamically inject Consult's regex character class (=consult--tofu-regexp=). We also carefully escape literal dots (=\\.=) so they don't act as regex wildcards, and use the correct string escape (="*\\'"=) to generate the regex end-of-string anchor.
-
 #+begin_src emacs-lisp
 (use-package orderless
   :custom
@@ -6096,18 +6183,11 @@ Adds Nerd Font icons to minibuffer completion candidates. We hook it directly in
   ;; Configure narrowing
   (setq consult-narrow-key "<")
   (define-key consult-narrow-map (vconcat consult-narrow-key "?") #'consult-narrow-help))
+
+;;>
 #+end_src
 
 ** TODO Consult Dir
-=consult-dir= provides commands to insert directories into the minibuffer prompt, jump to recent directories, and switch contexts seamlessly while in the middle of a =find-file= operation.
-
-Upon strictly reviewing the =consult-dir= source code, it is evident that the package already possesses robust, built-in support for Projectile and external search tools. Writing custom glue code to inject a new source is redundant and mathematically unnecessary. Furthermore, the =consult-projectile= package is officially obsolete, unmaintained, and redundant since Projectile natively uses =completing-read= (which Vertico intercepts).
-
-Instead of writing fragile custom functions or relying on abandoned packages, we configure =consult-dir='s native API:
-
-1. *Projectile Integration:* We set =consult-dir-project-list-function= to =#'consult-dir-projectile-dirs=. This tells the built-in project source to pull directly from your =projectile-known-projects= list, completely bypassing Emacs' native =project.el=.
-2. *Fd Integration:* We set =consult-dir-jump-file-command= to =#'consult-fd=. When you use =consult-dir-jump-file= to search inside a chosen directory, it will use your lightning-fast =fd= executable instead of the slower GNU =find=.
-
 #+begin_src emacs-lisp
 (use-package consult-dir
   :defer t
@@ -6126,22 +6206,6 @@ Instead of writing fragile custom functions or relying on abandoned packages, we
 #+end_src
 
 ** TODO Embark
-=embark= provides context-dependent actions, comparable to a right-click context menu, for both the minibuffer and regular buffers. It allows the execution of arbitrary commands on the currently selected candidate or the target at point.
-
-1. *Modern Action Discovery (Vertico Grid Synergy):*
-   Legacy =which-key= integrations for Embark are fragile, rely on undocumented internal APIs, and cause UI flickering. In a modern completion stack leveraging Vertico, the optimal implementation is to use =vertico-multiform= to render the =embark-keybinding= category as a multi-column grid (configured in the Vertico section). This provides a searchable action menu that can be instantly filtered using =orderless=. To support this, =embark-indicators= is configured to use the =embark-minimal-indicator=, keeping the echo area clean and unobtrusive while relying on the Vertico grid and the =embark-help-key= (=C-h=) for action discovery.
-
-2. *Safe Deferred Autoloading:*
-   Core interactive commands (=embark-act=, =embark-bindings=, =embark-export=, =embark-collect=) are explicitly declared in the =:bind= keyword of the =use-package= declaration. This guarantees Emacs registers them for deferred autoloading, preventing =void-function= errors during startup before the package is fully loaded into memory.
-
-3. *Actionable Keybinding Discovery:*
-   The built-in =describe-bindings= (=C-h b=) generates a static, read-only help buffer. By remapping this to =embark-bindings=, the help buffer becomes an interactive command launcher. Pressing the =embark-act= key on any binding in the list allows immediate execution or action upon it, transforming passive documentation into an active workflow tool.
-
-4. *Doom-Inspired Keybindings (Vanilla Syntax):*
-   Doom Emacs keybindings are replicated using native =use-package= =:bind= declarations, avoiding external keybinding managers like =general.el= or Doom's proprietary =map!= macro for this specific block. =C-;= is mapped to =embark-act= globally and in the minibuffer. =C-c C-;= and =C-c C-l= are mapped to =embark-export= and =embark-collect= in the minibuffer.
-   - The Doom-specific =+vertico/embark-export-write= wrapper is omitted, as vanilla =embark-export= natively handles writable exports (via =wgrep=, =wdired=, or Emacs 31's =grep-edit-mode=).
-   - The explicit =(require 'consult)= found in Doom's config is omitted, as the dedicated =embark-consult= block below handles the integration cleanly via deferred loading.
-
 #+begin_src emacs-lisp
 (use-package embark
   :bind
@@ -6156,27 +6220,15 @@ Instead of writing fragile custom functions or relying on abandoned packages, we
    ("C-c C-l" . embark-collect))
 
   :init
-  ;; Prevent which-key from intercepting C-h after a prefix, allowing
-  ;; Embark's completing-read interface to handle prefix help instead.
   (setq which-key-use-C-h-commands nil
         prefix-help-command #'embark-prefix-help-command)
 
   :config
-  ;; ==========================================
-  ;; 1. UI & DISPLAY CLEANUP
-  ;; ==========================================
-  ;; Hide the mode line of the Embark live/completions buffers for a cleaner UI.
   (add-to-list 'display-buffer-alist
                '("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
                  nil
                  (window-parameters (mode-line-format . none))))
 
-  ;; ==========================================
-  ;; 2. INDICATORS
-  ;; ==========================================
-  ;; The minimal indicator is used to keep the echo area clean. Action discovery
-  ;; is handled natively by the Vertico multiform grid (configured in the
-  ;; Vertico section) and the `embark-help-key` (C-h).
   (setq embark-indicators
         '(embark-minimal-indicator
           embark-highlight-indicator
@@ -6184,10 +6236,6 @@ Instead of writing fragile custom functions or relying on abandoned packages, we
 #+end_src
 
 ** TODO Embark Consult
-=embark-consult= provides deep integration between Embark and Consult, enabling powerful export and preview workflows.
-
-This package provides exporters for several Consult commands. For example, it allows the use of =embark-export= on a =consult-ripgrep= search to generate a native =grep-mode= buffer (which can be edited with =wgrep= or Emacs 31's =grep-edit-mode=). It also hooks =consult-preview-at-point-mode= into =embark-collect-mode=, meaning if a search is snapshot into an Embark Collect buffer, moving the cursor over the results will live-preview the files in the main window.
-
 #+begin_src emacs-lisp
 (use-package embark-consult
   :defer t
@@ -6199,16 +6247,6 @@ This package provides exporters for several Consult commands. For example, it al
 #+end_src
 
 ** TODO Embark Org
-=embark-org= is an official extension bundled directly within the =embark= package repository and distributed via GNU ELPA. It teaches Embark how to recognize Org-mode's Abstract Syntax Tree (AST) elements as actionable targets.
-
-Without this extension, Embark treats Org buffers as plain text. By loading =embark-org=, specialized target finders and keymaps are automatically injected into Embark's internal registries.
-- *Links:* Pressing =embark-act= on an Org link allows opening it, copying the URL, copying the description, or exporting the link as Markdown.
-- *Source Blocks:* Execution of the babel block, tangling, copying contents, or narrowing directly from the minibuffer becomes available.
-- *Tables:* A dedicated keymap is provided to move rows/columns, evaluate formulas, or sort the table.
-- *Headings:* Refiling, scheduling, archiving, or inserting a link to the heading can be performed without moving the cursor.
-
-Because =embark-org= is bundled with the main =embark= package, it does not require a separate package installation. The =:ensure nil= keyword explicitly prevents the package manager from attempting to download a non-existent standalone package. It simply needs to be required after both parent packages are loaded, which automatically registers its targets and keymaps without any manual glue code.
-
 #+begin_src emacs-lisp
 (use-package embark-org
   :ensure nil
@@ -6216,26 +6254,6 @@ Because =embark-org= is bundled with the main =embark= package, it does not requ
 #+end_src
 
 ** TODO Corfu
-=corfu= provides a minimalistic, highly performant in-buffer completion UI using child frames. It serves as the direct in-buffer counterpart to the =vertico= minibuffer UI. This configuration strictly adheres to the architectural boundary that Corfu must never enter the minibuffer, while leveraging upstream extensions to create a cohesive, IDE-grade completion stack.
-
-1. *Protocol Compliance (Explicit Minibuffer Confinement):*
-The system protocol strictly mandates that Corfu is confined to buffer editing and MUST NEVER be enabled in the minibuffer, as it fundamentally conflicts with =vertico=. While =global-corfu-mode= implicitly leaves the minibuffer disabled by default, relying on implicit defaults violates defensive programming paradigms. =global-corfu-minibuffer= is explicitly set to =nil= to mathematically guarantee confinement.
-
-2. *Load-Order Physics & Bundled Extensions (=ensure nil=):*
-Corfu's extensions (=corfu-quick=, =corfu-popupinfo=, =corfu-history=) reside in separate Elisp files within the same upstream repository. Because the global configuration sets =use-package-always-ensure= to =t=, declaring these extensions without =:ensure nil= forces =package.el= to query ELPA/MELPA for non-existent standalone packages, resulting in fatal startup errors. Furthermore, placing their activation or keybindings directly inside the main =corfu= =use-package= block violates =use-package= load-order physics, causing shadowed autoloads and =void-function= errors. To guarantee mathematical safety and preserve lazy-loading, each extension is declared in its own isolated =use-package= block with =:after corfu= and =:ensure nil=.
-
-3. *Upstream Synergy: Avy-Style Jumping (=corfu-quick=):*
-To maintain muscle-memory synergy with =vertico-quick=, the =corfu-quick= extension is loaded. Pressing =M-q= overlays 1-or-2 character jump tags next to every candidate in the popup, allowing instant selection of distant items without repetitive arrow-key navigation. Unlike =corfu-history= or =corfu-popupinfo=, =corfu-quick= consists purely of standalone interactive commands and does not require a minor mode. The bindings are strictly aligned with the capitalization logic of the completion stack: =M-q= performs the lesser action (insert and keep open), while =M-Q= performs the final action (complete and close).
-
-4. *Upstream Synergy: Manual Documentation (=corfu-popupinfo=):*
-The =corfu-popupinfo= extension renders LSP and Elisp docstrings in a floating child frame adjacent to the completion menu. However, automatic hover triggers cause UI flickering and spam the LSP server with =completionItem/resolve= network requests. To preserve typing fluidity, the automatic delay is disabled (=corfu-popupinfo-delay nil=), and the popup is strictly bound to a manual toggle (=M-h=).
-
-5. *TAB-and-Go Safety Net & LSP Integration:*
-=corfu-preselect= is set to ='prompt=. This ensures that accidentally hitting =RET= inserts exactly what was typed, rather than blindly committing the first LSP candidate. Additionally, the =lsp-capf= category is explicitly overridden to inherit the global =completion-styles=, guaranteeing that =orderless= filters LSP candidates correctly.
-
-6. *Cleanup & Scope Reduction:*
-The =read-extended-command-predicate= variable is an Emacs core setting that belongs in the =Basic Completion= block; it is excluded here to prevent conceptual bleeding. Eshell-specific =RET= filters and =persistent-scratch= advices are removed as they fall outside the scope of this specific buffer-editing workflow.
-
 #+begin_src emacs-lisp
 (use-package corfu
   :init
@@ -9030,7 +9048,6 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
 #+end_src
 
 
-
 * TODO AI/LLM
 * TODO Built-in Packages to Upgrade
 #+begin_src emacs-lisp
@@ -9544,7 +9561,7 @@ This section just contains checkboxes with stuff that still needs to be done for
 - [ ] recentf-mode not showing files in dashboard, but shows recent files in working buffers
 - [ ] I don't want to see files enclosed with ** when I execute consult-buffer
 - [ ] Add epithet and math-delimiters package from https://github.com/oantolin
-- [ ] Mismatched bracket error in the new consult config
+- [X] Mismatched bracket error in the new consult config
 - [X] show-paren-mode should highlight matching brackets when cursor is inside that the bracket pair
 - [ ] orderless only matches letters next to each other; I dont want that
 - [ ] add keybindings for embark
@@ -9579,6 +9596,6 @@ This section raises questions if some features, capabilities, etc can be achieve
 - [ ] How to open links from org buffers by pressing enter and using the correct browser?
 - [ ] Is it necessary to configure for my emacs configuration that is evil centric?
 - [ ] Is there a chance that anzu and evil-anzu might collide with my lsp-mode configuration?
-- [ ] Is it safe to use :demand t in solaire-mode?
+- [X] Is it safe to use :demand t in solaire-mode?
 * TODO Errors
 - [X] Symbol's value as variable is void: solaire-mode--set-explicitly. Paste solaire-mode source code for to confirm everything is correct
