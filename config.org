@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.8
+#+VERSION: 0.9
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -3117,7 +3117,6 @@ Extracts system =manpath= directories to guarantee native Emacs =woman= can loca
 * TODO Workflow Management
 - [ ] Must revisit dired and dirvish workflows
 
-
 ** DONE Dired
 Provides a visual directory editor and file manager for navigating the filesystem, copying, moving, and deleting files.
 #+begin_src emacs-lisp
@@ -3187,18 +3186,22 @@ Provides a visual directory editor and file manager for navigating the filesyste
 
 
 
-** TODO Dirvish
-Dirvish transforms Dired into a modern, Ranger-like file manager with live previews, emerge groups, and a dedicated sidebar.
-*Architectural Note:* Dirvish in 2025/2026 suffers from a known multi-frame feedback loop (Issue #353) that causes severe UI flickering when =emacsclient= opens new frames. We apply a Vanilla Emacs =advice-add= patch to debounce the redisplay hook. Additionally, we hook into =persp-before-switch-functions= to cleanly quit Dirvish side-windows before switching workspaces, preventing Emacs from throwing errors when trying to delete dedicated windows.
+
+
+
+
+
+** DONE Dirvish
+Transforms the native directory editor into a modern, visual file manager with live previews, sidebars, and integrated version control overlays.
 #+begin_src emacs-lisp
 (use-package dirvish
   :ensure (:host github :repo "latiagertrutis/dirvish" :files (:defaults "extensions/*.el"))
   :defer t
-  :after dired
-  :init
-  ;; Route cache to no-littering var directory to prevent ~/.cache pollution.
-  (setq dirvish-cache-dir (no-littering-expand-var-file-name "dirvish/"))
+  :commands (dirvish-dired-noselect-a
+             dirvish--find-entry)
   :custom
+  ;; Route cache to no-littering var directory to prevent ~/.cache pollution.
+  (dirvish-cache-dir (no-littering-expand-var-file-name "dirvish/"))
   ;; Layout configuration: (parent-depth preview-width file-list-width)
   (dirvish-default-layout '(1 0.11 0.55))
   (dirvish-layout-recipes
@@ -3215,11 +3218,14 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
      ("o" ,my/org-directory "Org")
      ("c" "~/.config/" "Config")
      ("t" "~/.local/share/Trash/files/" "Trash")))
-  ;; Visual attributes rendered in the file list.
+  ;; Visual attributes rendered in the main file list.
   (dirvish-attributes '(vc-state subtree-state nerd-icons collapse git-msg file-time file-size))
-  ;; Doom-like UI: Enable custom headers and mode lines for Dirvish buffers.
-  (dirvish-use-header-line t)
+  ;; Isolated, stripped-down attributes for the narrow 30% sidebar to prevent visual clutter.
+  (dirvish-side-attributes '(vc-state nerd-icons collapse file-size))
+  ;; Doom-like UI: Span headers globally across all panes and hide the mode-line bar.
+  (dirvish-use-header-line 'global)
   (dirvish-use-mode-line t)
+  (dirvish-mode-line-bar-image-width 0)
   (dirvish-header-line-height '(25 . 35))
   (dirvish-mode-line-height 25)
   (dirvish-header-line-format '(:left (path) :right (free-space)))
@@ -3232,40 +3238,34 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
   (dirvish-hide-details '(dirvish dirvish-side))
   ;; Preview dispatchers: Define how different file types are previewed.
   (dirvish-preview-dispatchers '(image gif video audio epub archive pdf dired))
+  ;; Open large directories asynchronously using `fd' to prevent main-thread freezing.
+  (dirvish-large-directory-threshold 20000)
+  ;; Subtree state visibility
+  (dirvish-subtree-always-show-state t)
+  ;; Side window configuration.
+  (dirvish-side-width 30)
+  (dirvish-side-display-alist '((side . left) (slot . -1)))
+  :init
+  ;; Autoload Tripwire: Wraps native Dired C-level interception functions.
+  ;; Guarantees the very first `M-x dired` invocation is caught by Dirvish
+  ;; without forcing the entire package to load synchronously at startup.
+  (advice-add #'dired--find-file :override #'dirvish--find-entry)
+  (advice-add #'dired-noselect :around #'dirvish-dired-noselect-a)
   :config
-  ;; MAGIC: This makes ALL dired commands use Dirvish interfaces.
+  ;; Finalize UI setup, hooks, and secondary advice post-load.
   (dirvish-override-dired-mode)
-
-  ;; Require bundled extensions from the latiagertrutis fork
-  (require 'dirvish-subtree)
-  (require 'dirvish-collapse)
-  (require 'dirvish-narrow)
-  (require 'dirvish-peek)
-  (require 'dirvish-vc)
-  (require 'dirvish-icons)
-  (require 'dirvish-yank)
-  (require 'dirvish-history)
-  (require 'dirvish-quick-access)
-  (require 'dirvish-ls)
-  (require 'dirvish-rsync)
-  (require 'dirvish-fd)
-  (require 'dirvish-emerge)
-  (require 'dirvish-side)
-
   ;; Enable global peek mode for minibuffer file previews (Vertico synergy)
   (dirvish-peek-mode 1)
-
   ;; Enable sidebar follow mode to track the active buffer
   (dirvish-side-follow-mode 1)
-
-  ;; Subtree state visibility
-  (setq dirvish-subtree-always-show-state t)
-
-  ;; Side window configuration.
-  (setq dirvish-side-width 30
-        dirvish-side-follow-buffer-file t
-        dirvish-side-display-alist '((side . left) (slot . -1) (window-width . 30)))
-
+  ;; TRAMP Async Integration: Prevents Dirvish from freezing over synchronous SSH
+  ;; connections by enabling direct async processes for remote shells.
+  (connection-local-set-profile-variables
+   'remote-tramp-direct-async
+   '((tramp-direct-async-process . t)))
+  (connection-local-set-profiles
+   '(:application tramp :protocol "ssh")
+   'remote-tramp-direct-async)
   ;; DOOM HACK: Prevent multi-frame feedback loop flickering (dirvish#353).
   ;; In Emacs 30+, opening multiple frames with Dirvish active causes a redisplay
   ;; feedback loop. This advice ensures the hook only fires for the selected window.
@@ -3275,11 +3275,6 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
       (when (eq (frame-selected-window) window)
         (funcall fn window)))
     (advice-add #'dirvish-pre-redisplay-h :around #'ar/dirvish--debounce-redisplay))
-
-  ;; Open large directories (over 20000 files) asynchronously using the `fd' command
-  ;; to prevent Emacs from freezing during directory read.
-  (setq dirvish-large-directory-threshold 20000)
-
   ;; TODO: modify this to work with bufferlo/projection
   ;; DOOM HACK: Clean up Dirvish before switching workspaces/projects.
   ;; If Dirvish is open in a dedicated side-window and you switch workspaces,
@@ -3360,104 +3355,109 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
   "d ?" '(ar/dirvish-transient :wk "Dashboard"))     ; Summon unified Dirvish dashboard
 
 (general-define-key
- :states 'normal
- :keymaps 'dirvish-mode-map
- "?"   #'ar/dirvish-transient
- "q"   #'dirvish-quit
- "b"   #'dirvish-quick-access
- "p"   #'dirvish-yank
- "F"   #'dirvish-layout-toggle
- "z"   #'dirvish-history-jump
- "gh"  #'dirvish-subtree-up
- "gl"  #'dirvish-subtree-toggle
- "h"   #'dired-up-directory
- "l"   #'dired-find-file
- "TAB" #'dirvish-subtree-toggle)
+  :states 'normal
+  :keymaps 'dirvish-mode-map
+  "?"   #'ar/dirvish-transient
+  "q"   #'dirvish-quit
+  "b"   #'dirvish-quick-access
+  "p"   #'dirvish-yank
+  "F"   #'dirvish-layout-toggle
+  "z"   #'dirvish-history-jump
+  "gh"  #'dirvish-subtree-up
+  "gl"  #'dirvish-subtree-toggle
+  "h"   #'dired-up-directory
+  "l"   #'dired-find-file
+  "TAB" #'dirvish-subtree-toggle)
 
 (general-define-key
- :states '(normal visual)
- :keymaps 'dirvish-mode-map
- "f"   #'dirvish-file-info-menu
- "S"   #'dirvish-quicksort
- "M-b" #'dirvish-history-go-backward
- "M-f" #'dirvish-history-go-forward
- "M-n" #'dirvish-narrow
- "M-m" #'dirvish-mark-menu
- "M-s" #'dirvish-setup-menu
- "M-e" #'dirvish-emerge-menu)
+  :states '(normal visual)
+  :keymaps 'dirvish-mode-map
+  "f"   #'dirvish-file-info-menu
+  "S"   #'dirvish-quicksort
+  "M-b" #'dirvish-history-go-backward
+  "M-f" #'dirvish-history-go-forward
+  "M-n" #'dirvish-narrow
+  "M-m" #'dirvish-mark-menu
+  "M-s" #'dirvish-setup-menu
+  "M-e" #'dirvish-emerge-menu)
 
 (general-define-key
- :states 'motion
- :keymaps 'dirvish-mode-map
- "[h"  #'dirvish-history-go-backward
- "]h"  #'dirvish-history-go-forward
- "[e"  #'dirvish-emerge-next-group
- "]e"  #'dirvish-emerge-previous-group)
+  :states 'motion
+  :keymaps 'dirvish-mode-map
+  "[h"  #'dirvish-history-go-backward
+  "]h"  #'dirvish-history-go-forward
+  "[e"  #'dirvish-emerge-next-group
+  "]e"  #'dirvish-emerge-previous-group)
 
 (general-define-key
- :states '(normal visual motion)
- :keymaps 'dirvish-mode-map
- "<left>"  #'dired-up-directory
- "<right>" #'dired-find-file)
+  :states '(normal visual motion)
+  :keymaps 'dirvish-mode-map
+  "<left>"  #'dired-up-directory
+  "<right>" #'dired-find-file)
 
 (general-define-key
- :states 'normal
- :keymaps 'dirvish-mode-map
- :prefix "y"
- "l"   #'dirvish-copy-file-true-path
- "n"   #'dirvish-copy-file-name
- "p"   #'dirvish-copy-file-path
- "r"   #'dirvish-copy-remote-path
- "y"   #'dired-do-copy)
+  :states 'normal
+  :keymaps 'dirvish-mode-map
+  :prefix "y"
+  "l"   #'dirvish-copy-file-true-path
+  "n"   #'dirvish-copy-file-name
+  "p"   #'dirvish-copy-file-path
+  "r"   #'dirvish-copy-remote-path
+  "y"   #'dired-do-copy)
 
 (general-define-key
- :states 'normal
- :keymaps 'dirvish-mode-map
- :prefix "s"
- "s"   #'dirvish-symlink
- "S"   #'dirvish-relative-symlink
- "h"   #'dirvish-hardlink)
+  :states 'normal
+  :keymaps 'dirvish-mode-map
+  :prefix "s"
+  "s"   #'dirvish-symlink
+  "S"   #'dirvish-relative-symlink
+  "h"   #'dirvish-hardlink)
 #+end_src
 
 
 
 
 ** DONE Dired Extensions
-- State "DONE"       from "TODO"       [2026-07-14 Tue 07:55]
-These packages extend Dired's capabilities. =dired-x= provides advanced omitting and OS-integration, =diredfl= adds modern syntax highlighting to the directory listings, =wdired= allows you to edit the Dired buffer like a text file to rename or move files in bulk, and =nerd-icons-dired= renders visual file and folder icons in standard directory listings.
+*** DONE Dired X
+Provides advanced file omitting, OS-integration, and extended commands for the native directory editor.
 #+begin_src emacs-lisp
 (use-package dired-x
   :ensure nil
   :defer t
   :hook (dired-mode . dired-omit-mode)
-  :config
-  (setq dired-omit-verbose nil
-        ;; Regex defining which files to hide when `dired-omit-mode` is active.
-        ;; Hides lockfiles, flycheck temp files, VCS directories, and compiled binaries.
-        dired-omit-files
-        (concat "^\\.?#\\|^\\.$\\|^\\.\\.$"
-                "\\|^\\.DS_Store\\'"
-                "\\|^flycheck_.*"
-                "\\|^\\.project\\(?:ile\\)?\\'"
-                "\\|^\\.\\(?:svn\\|git\\)\\'"
-                "\\|^\\.ccls-cache\\'"
-                "\\|\\(?:\\.js\\)?\\.meta\\'"
-                "\\|\\.\\(?:elc\\|o\\|pyo\\|swp\\|class\\)\\'"))
+  :custom
+  ;; Suppress echo-area logging during omit operations.
+  (dired-omit-verbose nil)
   ;; Suppress confirmation prompt when killing buffers associated with deleted files.
-  (setq dired-clean-confirm-killing-deleted-buffers nil))
+  (dired-clean-confirm-killing-deleted-buffers nil)
+  ;; Regex defining which files to hide when `dired-omit-mode` is active.
+  ;; Uses `\`` (string-start) instead of `^` (line-start) to satisfy
+  ;; upstream `string-match-p` physics on isolated filename strings.
+  (dired-omit-files
+   (concat "\\`[.]?#.*\\|\\`[.][.]?\\'"  ; Exact upstream default for auto-save/backup files
+           "\\|\\`\\.DS_Store\\'"
+           "\\|\\`flycheck_.*"
+           "\\|\\`\\.project\\(?:ile\\)?\\'"
+           "\\|\\`\\.\\(?:svn\\|git\\)\\'"
+           "\\|\\`\\.ccls-cache\\'"
+           "\\|\\(?:\\.js\\)?\\.meta\\'"
+           "\\|\\.\\(?:elc\\|o\\|pyo\\|swp\\|class\\)\\'")))
 #+end_src
 
+*** DONE Diredfl
+Adds modern syntax highlighting and colorization to directory listings.
 #+begin_src emacs-lisp
 (use-package diredfl
   :defer t
-  ;; Apply syntax highlighting to both standard Dired and Dirvish's directory views.
   :hook ((dired-mode . diredfl-mode)
          (dirvish-directory-view-mode . diredfl-mode))
-  :config
+  :custom-face
   ;; Make directory names bold for better visual distinction.
-  (set-face-attribute 'diredfl-dir-name nil :bold t))
+  (diredfl-dir-name ((t (:weight bold)))))
 #+end_src
 
+*** DONE Wdired
+Allows direct editing of the directory buffer like a standard text file to rename or move files in bulk.
 #+begin_src emacs-lisp
 (use-package wdired
   :ensure nil
@@ -3470,19 +3470,17 @@ These packages extend Dired's capabilities. =dired-x= provides advanced omitting
   (wdired-create-parent-directories t))
 #+end_src
 
+*** DONE Nerd Icons Dired
+Renders visual file and folder glyphs in standard directory listings.
 #+begin_src emacs-lisp
 (use-package nerd-icons-dired
   :defer t
-  ;; Fallback icon engine for "Raw Dired" buffers (e.g., `project-dired`)
-  ;; that bypass Dirvish's override, ensuring consistent Nerd Font glyphs.
   :hook (dired-mode . nerd-icons-dired-mode))
 #+end_src
 
 
-
-** TODO Treemacs
-Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. We configure it to silently refresh in the background, integrate with Magit to update on Git commits, and use =nerd-icons= for crisp directory/file icons. Evil bindings are added for seamless Vim-style navigation within the tree.
-
+** DONE Treemacs
+Provides a persistent file and project explorer sidebar for navigating directory trees and workspaces.
 #+begin_src emacs-lisp
 (use-package treemacs
   :defer t
@@ -3494,9 +3492,10 @@ Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. W
   :custom
   (treemacs-width 33)
   (treemacs-position 'left)
-  ;; Prevent Treemacs from being selected by `other-window` (C-x o), keeping
-  ;; the focus strictly on the editing and minibuffer windows.
+  ;; Prevent Treemacs from being selected by `other-window` (C-x o).
   (treemacs-is-never-other-window t)
+  ;; Protect the sidebar from being destroyed by `delete-other-windows`.
+  (treemacs-no-delete-other-windows t)
   (treemacs-space-between-root-nodes t)
   ;; Silent background operations to prevent echo-area spam.
   (treemacs-silent-refresh t)
@@ -3504,66 +3503,72 @@ Treemacs provides a persistent, mouse-and-keyboard-friendly file tree sidebar. W
   ;; Delay before the sidebar follows the cursor to the current file.
   (treemacs-file-follow-delay 0.2)
   (treemacs-show-cursor nil)
-
+  ;; Case-insensitive sorting for logical visual grouping of mixed-case files.
+  (treemacs-sorting 'alphabetic-case-insensitive-asc)
+  ;; Always show dotfiles for DevOps and backend workflows.
+  (treemacs-show-hidden-files t)
+  ;; Directories to collapse/ignore during cleanup to prevent UI lag.
+  (treemacs-litter-directories '("/node_modules"
+                                 "/.venv"
+                                 "/.cask"
+                                 "/__pycache__"))
+  ;; Route session persistence to the no-littering var directory.
+  (treemacs-persist-file (no-littering-expand-var-file-name "treemacs/persist"))
+  (treemacs-last-error-persist-file (no-littering-expand-var-file-name "treemacs/persist-error"))
   :config
-  ;; Automatically follow the currently visited file in the tree.
-  (treemacs-follow-mode t)
+  ;; Automatically follow the currently visited file and project root in the tree.
+  (treemacs-follow-mode 1)
+  (treemacs-project-follow-mode 1)
   ;; Watch the filesystem for external changes (e.g., git checkouts, file creation).
-  (treemacs-filewatch-mode t)
+  (treemacs-filewatch-mode 1)
   ;; Show a visual indicator in the fringe for the currently selected node.
   (treemacs-fringe-indicator-mode 'always)
-
-  ;; DOOM FIX: Explicitly load the nerd-icons theme.
-  ;; Without this, treemacs falls back to missing or ugly default ASCII icons.
-  (use-package treemacs-nerd-icons
-    :after treemacs
-    :config (treemacs-load-theme "nerd-icons"))
-
-  ;; Git integration configuration.
+  ;; Visual depth lines.
+  (treemacs-indent-guide-mode 1)
+  ;; Git integration configuration (Doom/Upstream pcase fallback).
   ;; Deferred mode requires Python to parse git status asynchronously.
   ;; If Python is missing, fall back to simple (synchronous) mode.
-  (when (and (executable-find "git")
-             (executable-find "python3"))
-    (treemacs-git-mode 'deferred)
-    (setq treemacs-collapse-dirs 3))
-  (when (and (executable-find "git")
-             (not (executable-find "python3")))
-    (treemacs-git-mode 'simple)
-    (setq treemacs-collapse-dirs 0)))
+  (pcase (cons (not (null (executable-find "git")))
+               (not (null treemacs-python-executable)))
+    (`(t . t)
+     (treemacs-git-mode 'deferred)
+     (setq treemacs-collapse-dirs 3))
+    (`(t . _)
+     (treemacs-git-mode 'simple)
+     (setq treemacs-collapse-dirs 0)))
+  ;; Git commit diff relies on an async Python script (`treemacs--git-commit-diff.py`),
+  ;; NOT native git commands. It must be guarded by the Python executable check.
+  (when treemacs-python-executable
+    (treemacs-git-commit-diff-mode 1))
+  ;; Hide gitignored files. Must be called AFTER `treemacs-git-mode` is enabled
+  ;; to satisfy the upstream dependency chain.
+  (treemacs-hide-gitignored-files-mode 1))
 
-;; Integrate Treemacs icons into standard Dired buffers.
-(use-package treemacs-icons-dired
-  :hook (dired-mode . treemacs-icons-dired-enable-once)
-  :ensure t)
-
-;; Magit integration: automatically refresh the sidebar after git operations.
-(use-package treemacs-magit
-  :after (treemacs magit)
-  :hook ((magit-post-commit
-          git-commit-post-finish
-          magit-post-stage
-          magit-post-unstage)
-         . treemacs-magit--schedule-update))
-
-;; Evil navigation in the sidebar with mouse interface.
-(use-package treemacs-evil
-  :after (treemacs evil)
+(use-package treemacs-nerd-icons
+  :defer t
   :config
-  (evil-define-key 'normal treemacs-mode-map
-    (kbd "TAB") #'treemacs-TAB-action
-    (kbd "o")   #'treemacs-visit-node-ace
-    (kbd "q")   #'treemacs-quit
-    ;; Mouse interface for users who occasionally click the sidebar.
-    [mouse-1] #'treemacs-single-click-expand-action
-    [double-mouse-1] #'treemacs-doubleclick-action
-    [drag-mouse-1] #'treemacs-dragleftclick-action))
+  (treemacs-nerd-icons-config))
+
+(use-package treemacs-magit
+  :defer t
+  :after (treemacs magit))
+
+(use-package treemacs-evil
+  :defer t
+  :after (treemacs evil))
+
+(general-define-key
+  :states 'treemacs
+  :keymaps 'evil-treemacs-state-map
+  "RET"      #'treemacs-RET-action
+  "[return]" #'treemacs-RET-action
+  "TAB"      #'treemacs-TAB-action
+  "[tab]"    #'treemacs-TAB-action
+  "o v"      #'treemacs-visit-node-horizontal-split
+  "o s"      #'treemacs-visit-node-vertical-split
+  "q"        #'treemacs-quit)
 #+end_src
 
-** TODO Project Management
-- [ ] Determine what SPC f p does in doom emacs. Create a similar function for my config
-- [ ] Determine what SPC p p does in doom emacs. Create a similar function for my config
-- [ ] Use projection package and read the readme carefully for this package: https://raw.githubusercontent.com/mohkale/projection/refs/heads/master/README.org
-- [ ] Determine what package would be best for complex workflows consisting of programming, productivity management,
 
 
 
@@ -3627,6 +3632,16 @@ Ibuffer is the advanced buffer list manager. We configure it to hide empty filte
   "b S" '(save-buffer :wk "Save buffer")
   "b z" '(bury-buffer :wk "Bury buffer"))
 #+end_src
+
+
+** TODO Project Management
+- [ ] Determine what SPC f p does in doom emacs. Create a similar function for my config
+- [ ] Determine what SPC p p does in doom emacs. Create a similar function for my config
+- [ ] Use projection package and read the readme carefully for this package: https://raw.githubusercontent.com/mohkale/projection/refs/heads/master/README.org
+- [ ] Determine what package would be best for complex workflows consisting of programming, productivity management and scientific writing
+
+
+
 
 ** TODO Workspaces
 

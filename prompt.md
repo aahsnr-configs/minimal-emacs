@@ -10,7 +10,7 @@
 
 - Okay then you have the signal to rewrite the Session Management subsection. Follow the protocols and instructions from system-prompt-protocols.md file and make sure the documentation is very concise as well.
 
-- Now review the next subsection: grep. Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from the system_prompt_protocol.yaml file. Also determine if there are additional configurations that might be useful. Also determine if there keybindings you should add using general.el and SPC as leader keys. Then explain everything to me in detail and present me how you plan to deal with this configuration. Do not attempt the 1st iteration of the rewrite yet since I need to review everything. Search the web and think longer for these task and make sure you have the latest information till July 2026. Don't review evil-multi-iedit.
+- Now lets review the Dirvish subsection. Dirvish installed from the github source mentioned is the most upto date and doom emacs recommended source. Find and fix any errors and issues that might still exist in dirvish config org block. Then search the web and determine if there are any useful configuration you can borrow for my emacs configuration. Follow the instructions and protocols laid out in system_prompt_protocol.yaml file and the use-package conventions laid out in use_package.yaml file. Do not hallucinate. You must verify everything you. Search the web and think longer for these tasks, but do not rewrite the config org block yet. Make sure you have the latest information till July 2026. Then explain everything back to me and what you plan to do for the rewrite.
 
 - Now review the subsection: Grep. Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from system_prompt_protocol.yaml file. Search the web determine if there are additional configuration settings that might be useful. Then explain everything to me in detail and present me how you plan to deal with this configuration.I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 2026.
 
@@ -30,9 +30,11 @@
   7. It must ask permisson at each step. The format would be y/N. Only pressing y approves the step. Pressing N or any other key denies the step
   8. It must provide all the instructions to build and install emacs from source. This is the main task. For now, it will download emacs-pretest. It must use the correct --config flags something like
 
+Now review the next subsection: Treemacs. First study the upstream source code files in https://github.com/Alexander-Miller/treemacs to get a basic idea how the project is setup and how to configure the package for emacs. Keep in mind that the extras in src folder need to be installed invididually. Then review the existing treemacs org config block in my existing emacs configuration. Then look at the readme in https://raw.githubusercontent.com/Alexander-Miller/treemacs/refs/heads/master/README.org to determine if there are some useful configuration you can borrow from it. Also keep in mind treemacs-icon-dired is prohibited from being installled. Then finally look at the treemacs module from the doom emacs project in https://raw.githubusercontent.com/doomemacs/modules/refs/heads/main/modules/ui/treemacs/config.el to also borrow possible useful configurations. Then, find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from the system_prompt_protocol.yaml file. Also determine if there are additional configurations that might be useful. Also determine why posframe for ace-window would be needed. Then explain everything to me in detail and present me how you plan to deal with this configuration. Do not attempt the 1st iteration of the rewrite yet since I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 2026.
+
 ## Sample large prompt
 
-Now review the next subsection: iedit. First look at the source files:
+Now review the next subsection: Treemacs. First look at the source files:
 
 ```el
 
@@ -45,10 +47,6 @@ Then also look at its readme and if there are any useful configurations you can 
 ```
 
 Then, find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from the system_prompt_protocol.yaml file. Also determine if there are additional configurations that might be useful. Also determine why posframe for ace-window would be needed. Then explain everything to me in detail and present me how you plan to deal with this configuration. Do not attempt the 1st iteration of the rewrite yet since I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 2026.
-
-Are you certain there are no more errors and issues in this iteration of [subsection]? Search the web and determine if there are there any additional configuration settings that you think might be useful? Also are you sure you are using the best emacs practices? Search the web thoroughly and think longer for these tasks. The information you get must be the latest till July 2026. Explain everything to me in detail for me to review.
-
-And are you certain there are no errors and issues in the Grep Edit Mode Test? Search the web, think for longer and explain everything to me
 
 ---
 
@@ -65,71 +63,3 @@ write a transient menu configuration for avy using the following source code fro
 ```
 
 in a single org config block. The toggle menu for this transient-menu should be ar/global-leader outside the use-package. If ar/global-leader binding is not possible, then suggest what to use. Then propose a plan to create this custom transient menu for avy
-
-For your above iteration of Dirvish config org block, remove these keybindings for now:
-
-## Use the following transient menu template:
-
-```el
-(with-eval-after-load 'transient
-  (defun ar/devtools-title ()
-    (concat
-     (if (fboundp 'nerd-icons-faicon)
-         (nerd-icons-faicon "nf-fa-laptop_code" :face 'transient-heading :v-adjust 0.02)
-       "")
-     (propertize " Development Tools" 'face 'transient-heading)))
-
-  (transient-define-prefix ar/toggles-devtools ()
-    "Development Tools Dashboard"
-    [:description ar/devtools-title
-
-     ;; Group 1: LSP Code Actions
-     ["Actions"
-      ("a" "Code Action" eglot-code-actions)
-      ("r" "Rename Symb" eglot-rename)
-      ("f" "Frmt Buf" apheleia-format-buffer)
-      ("i" "Org Imports" eglot-code-action-organize-imports)
-      ("h" "Toggle Hint" eglot-inlay-hints-mode :transient t :if (lambda () (fboundp 'eglot-inlay-hints-mode)))
-      ("R" "Reconn LSP" eglot-reconnect)]
-
-     ;; Group 2: Navigation & Lookup
-     ["Navigate"
-      ("d" "Define" xref-find-definitions)
-      ("D" "Refer" xref-find-references)
-      ("t" "Type Def" eglot-find-typeDefinition)
-      ("I" "Implem" eglot-find-implementation)
-      ("A" "Apropos" xref-find-apropos)
-      ("." "Go Back" xref-go-back)]
-
-     ;; Group 3: Search & Outline
-     ["Search"
-      ("s" "LSP Symbols" consult-eglot-symbols)
-      ("o" "Outline" consult-outline)
-      ("m" "Imenu" consult-imenu)
-      ("M" "Imenu Multi" consult-imenu-multi)
-      ("l" "Search Line" consult-line)]
-
-     ;; Group 4: Error Management
-     ["Diagn"
-      ("n" "Next Err" ar/flymake-next-error :transient t)
-      ("p" "Prev Err" ar/flymake-prev-error :transient t)
-      ("e" "Buf Err" flymake-show-buffer-diagnostics)
-      ("E" "Proj Err" consult-flymake)
-      ("!" "Check" flymake-start :transient t)]
-
-     ;; Group 5: Code Folding
-     ["Folding"
-      ("TAB" "Toggle" treesit-fold-toggle :transient t)
-      ("O" "Open All" treesit-fold-open-all :transient t)
-      ("C" "Close All" treesit-fold-close-all :transient t)
-      ("v" "Vim Toggle" vimish-fold-toggle :transient t)]
-
-     ;; Group 6: Documentation
-     ["Docs"
-      ("k" "Hover Box" eldoc-box-help-at-point :transient t)
-      ("K" "Echo Doc" eldoc)
-      ("?" "Info Man" consult-info)
-      ("M" "Man Page" woman)
-      ("<escape>" "" transient-quit-one :format " ")]]))
-
-```
