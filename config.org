@@ -3720,29 +3720,217 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
 
 
 
-** TODO Project Management
-- [ ] Determine what SPC f p does in doom emacs. Create a similar function for my config
-- [ ] Determine what SPC p p does in doom emacs. Create a similar function for my config
-- [ ] Use projection package and read the readme carefully for this package: https://raw.githubusercontent.com/mohkale/projection/refs/heads/master/README.org
-- [ ] Determine what package would be best for complex workflows consisting of programming, productivity management and scientific writing
 
+
+** TODO Project Management
+- [ ] Revisit Consult and Embark config
+Provides a unified workspace engine for navigating, compiling, and managing code repositories. Replaces legacy external project managers with Emacs' native project detection, augmented by an abstraction layer that exposes transient build menus and multi-target compilation.
+
+=project= serves as the foundational, built-in workspace detector. It identifies repository boundaries, manages ignore patterns for massive monorepos, and routes project-scoped searches natively into the completion framework.
+#+begin_src emacs-lisp
+(use-package project
+  :ensure nil
+  :custom
+  ;; Route known projects list to the no-littering etc directory.
+  (project-list-file (no-littering-expand-etc-file-name "projects.el"))
+  ;; Recognize nested project boundaries in monorepos via standard manifest files.
+  (project-vc-extra-root-markers '("package.json"
+                                   "Cargo.toml"
+                                   "pyproject.toml"
+                                   "go.mod"
+                                   "Makefile"
+                                   ".project"))
+  ;; Massive ignore patterns to prevent indexing build artifacts and dependencies.
+  (project-vc-ignores '("node_modules/"
+                        ".venv/"
+                        "venv/"
+                        "__pycache__/"
+                        "build/"
+                        "dist/"
+                        "target/"
+                        ".next/"
+                        ".cache/"
+                        ".cask/"
+                        ".elixir_ls/"
+                        ".lsp/"))
+  ;; Display the entire transient menu immediately upon invoking the prefix.
+  (project-switch-use-entire-map t)
+  :config
+  ;; Wire native project.el into consult. Extracts root directory string safely,
+  ;; bypassing the `project-current` instance object to prevent type mismatches.
+  (with-eval-after-load 'consult
+    (setq consult-project-function
+          (lambda (may-prompt)
+            (when-let ((proj (project-current may-prompt)))
+              (project-root proj)))))
+  ;; Wire project roots into consult-dir for spatial directory jumping.
+  (with-eval-after-load 'consult-dir
+    (setq consult-dir-project-list-function #'project-known-project-roots))
+  ;; Enrich the native project dispatch menu with Doom-like actions.
+  (with-eval-after-load 'consult
+    (add-to-list 'project-switch-commands '(consult-find "Find file") t)
+    (add-to-list 'project-switch-commands '(consult-ripgrep "Ripgrep") t))
+  (with-eval-after-load 'magit
+    (add-to-list 'project-switch-commands '(magit-project-status "Magit") t)))
+#+end_src
+
+
+=Custom Utilities= provide O(1) wrapper functions for rapid configuration navigation and frictionless workspace teardown, mirroring Doom Emacs muscle memory.
+#+begin_src emacs-lisp
+(defun ar/find-file-in-emacs-config ()
+  "Instantly search the private Emacs configuration directory via `consult-find`.
+Mirrors Doom Emacs `SPC f p` behavior for rapid config navigation."
+  (interactive)
+  (let ((default-directory user-emacs-directory))
+    (call-interactively #'consult-find)))
+
+(defun ar/project-kill-buffers ()
+  "Kill project buffers without confirmation, mirroring Doom Emacs behavior.
+Bypasses the interactive `yes-or-no-p` prompt natively via the NO-CONFIRM argument."
+  (interactive)
+  (project-kill-buffers t))
+#+end_src
+
+
+=projection= extends the native workspace detector with Projectile-like abstractions. It injects project-specific buffer hooks, exposes transient menus for build systems, and enables intelligent file jumping across diverse language ecosystems.
+#+begin_src emacs-lisp
+(use-package projection
+  :defer t
+  :after project
+  :commands
+  (projection-find-other-file
+   projection-commands-build-project
+   projection-commands-test-project
+   projection-commands-run-project
+   projection-commands-configure-project)
+  :hook
+  (compilation-mode . projection-customize-compilation-mode)
+  :init
+  ;; Mark projection build/test/run commands as safe for .dir-locals.el
+  ;; to prevent Emacs from throwing "unsafe variable" security prompts.
+  (put 'projection-commands-configure-project 'safe-local-variable #'stringp)
+  (put 'projection-commands-build-project 'safe-local-variable #'stringp)
+  (put 'projection-commands-test-project 'safe-local-variable #'stringp)
+  (put 'projection-commands-run-project 'safe-local-variable #'stringp)
+  (put 'projection-commands-package-project 'safe-local-variable #'stringp)
+  (put 'projection-commands-install-project 'safe-local-variable #'stringp)
+  :custom
+  ;; Route compilation buffer naming to projection's project-aware function.
+  (compilation-buffer-name-function
+   #'projection-customize-compilation-buffer-name-function)
+  :config
+  ;; Guarantee projection extensions patch project.el correctly post-load.
+  (require 'projection)
+  ;; Enable project-specific buffer hooks (e.g., read-only for external deps).
+  (global-projection-hook-mode 1))
+#+end_src
+
+=projection-multi= integrates multi-target compilation into the workspace engine. It automatically extracts available build, test, and run targets from Makefiles, CMake, and language-specific toolchains, presenting them in a unified selection menu.
+#+begin_src emacs-lisp
+(use-package projection-multi
+  :defer t
+  :after projection
+  :commands
+  (projection-multi-compile))
+#+end_src
+
+=projection-multi-embark= bridges the multi-target compilation engine with Embark actions. It allows interactive selection and immediate reassignment of compilation targets directly from the minibuffer candidate list.
+#+begin_src emacs-lisp
+(use-package projection-multi-embark
+  :defer t
+  :after (projection-multi embark)
+  :config
+  ;; Add the projection set-command bindings to the embark command map.
+  (projection-multi-embark-setup-command-map))
+#+end_src
+
+=general.el= routes centralized leader keybindings for project operations, mirroring Doom Emacs mnemonics for spatial navigation, buffer switching, and workspace-scoped searches.
+#+begin_src emacs-lisp
+(ar/global-leader
+  "f p" '(ar/find-file-in-emacs-config :wk "Find in config")
+  "p"   '(:ignore t :wk "project")
+  "p p" '(project-switch-project :wk "Switch project")
+  "p f" '(project-find-file :wk "Find file")
+  "p b" '(project-switch-to-buffer :wk "Switch buffer")
+  "p s" '(consult-ripgrep :wk "Search project")
+  "p d" '(project-dired :wk "Dired root")
+  "p e" '(project-eshell :wk "Eshell")
+  "p S" '(project-shell :wk "Shell")
+  "p k" '(ar/project-kill-buffers :wk "Kill buffers")
+  "p o" '(projection-find-other-file :wk "Other file")
+  "p c" '(projection-multi-compile :wk "Compile")
+  "p C" '(projection-commands-build-project :wk "Build")
+  "p t" '(projection-commands-test-project :wk "Test")
+  "p r" '(projection-commands-run-project :wk "Run")
+  "p g" '(projection-commands-configure-project :wk "Configure"))
+#+end_src
 
 
 
 ** TODO Workspaces
+Provides mathematically strict buffer isolation per workflow context. Replaces legacy workspace managers with a headless native tab-bar engine augmented by an isolation layer that intercepts buffer creation and persists complex layouts across daemon restarts.
 
-
-
-=general.el= routes centralized leader keybindings for workspace operations (to be relocated to the Workspaces subsection).
+=tab-bar= serves as the foundational, built-in workspace container. It is configured headlessly to provide structural boundaries without rendering visual UI chrome.
 #+begin_src emacs-lisp
-(ar/global-leader
-  "TAB"   '(:ignore t :wk "workspace")
-  "TAB b" '(bufferlo-switch-to-buffer :wk "Switch buffer (local)")
-  "TAB n" '(bufferlo-new-tab :wk "New workspace")
-  "TAB c" '(bufferlo-close-tab :wk "Close workspace")
-  "TAB p" '(bufferlo-isolate-project :wk "Isolate project"))
+(use-package tab-bar
+  :ensure nil
+  :custom
+  ;; Hide UI chrome to maintain a minimalist aesthetic while preserving structural boundaries.
+  (tab-bar-show nil)
+  ;; Default to a standard scratch buffer for newly created workspaces.
+  (tab-bar-new-tab-choice t)
+  :config
+  ;; Activate the native tab engine globally.
+  (tab-bar-mode 1))
 #+end_src
 
+=bufferlo= extends the native tab container with strict buffer isolation, workspace-aware minibuffer interception, and lightweight bookmark persistence.
+#+begin_src emacs-lisp
+(use-package bufferlo
+  :after tab-bar
+  :custom
+  ;; Persist workspace layouts across daemon restarts via native Emacs bookmarks.
+  (bufferlo-bookmarks-save-at-emacs-exit 'all)
+  (bufferlo-bookmarks-load-at-emacs-startup 'all)
+  ;; Strict buffer filtering: exclude everything by default, whitelist core essentials.
+  (bufferlo-exclude-buffer-filters '(".*"))
+  (bufferlo-include-buffer-filters '("^\\*scratch\\*$"
+                                     "^\\*Messages\\*$"))
+  ;; Hide ephemeral noise and space-prefixed internal buffers from the local list.
+  (bufferlo-hidden-buffers '("^\\*Completions\\*$"
+                             "^\\*Flymake log\\*$"
+                             "^\\*tramp/.*\\*$"
+                             "^\\*eldoc\\*$"
+                             "^ "))
+  ;; Doom Parity: Kill modified buffers without remorse on workspace teardown.
+  (bufferlo-kill-modified-buffers-policy 'kill-modified)
+  ;; Suppress confirmation prompts for frictionless workspace destruction.
+  (bufferlo-close-tab-kill-buffers-prompt nil)
+  (bufferlo-kill-buffers-prompt nil)
+  :config
+  ;; Activate the core isolation engine.
+  (bufferlo-mode 1)
+  ;; Force all native `read-buffer` calls to respect workspace boundaries.
+  (bufferlo-anywhere-mode 1)
+  ;; Triad Integration: Wire bufferlo into consult-buffer to solve the "buffer soup" problem.
+  (with-eval-after-load 'consult
+    (setq consult-buffer-list-function #'bufferlo-local-buffers)))
+#+end_src
+
+=general.el= routes centralized leader keybindings for workspace operations, mirroring Doom Emacs mnemonics for spatial navigation, buffer switching, and project isolation.
+#+begin_src emacs-lisp
+(ar/global-leader
+  "TAB"         '(:ignore t :wk "workspace")
+  "TAB b"       '(bufferlo-switch-to-buffer :wk "Switch buffer (local)")
+  "TAB n"       '(tab-new :wk "New workspace")
+  "TAB c"       '(bufferlo-tab-close-kill-buffers :wk "Close workspace")
+  "TAB p"       '(bufferlo-isolate-project :wk "Isolate project")
+  "TAB r"       '(bufferlo-bookmark-tab-save-current :wk "Save workspace")
+  "TAB l"       '(bufferlo-bookmark-tab-load-current :wk "Load workspace")
+  "TAB ."       '(tab-switcher :wk "Switcher")
+  "TAB <right>" '(tab-next :wk "Next workspace")
+  "TAB <left>"  '(tab-previous :wk "Previous workspace"))
+#+end_src
 
 
 
@@ -9119,25 +9307,6 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
   "s t" '(hl-todo-occur :wk "Todo list")
   "s T" '(hl-todo-rg-project :wk "Todo in project"))
 
-;; TODO: Replace with Projectile alternative
-;; Project operations (SPC p)
-;; (ar/global-leader
-;;   "p" '(:ignore t :wk "project")
-;;   "p p" '(ar/project-switch-to-file :wk "Switch project → find file")
-;;   "p P" '(ar/project-switch-with-menu :wk "Switch project (menu)")
-;;   "p f" '(projectile-find-file :wk "Find file in project")
-;;   "p s" '(consult-ripgrep :wk "Search project")
-;;   "p b" '(projectile-switch-to-buffer :wk "Project buffers")
-;;   "p k" '(projectile-kill-buffers :wk "Kill project buffers")
-;;   "p c" '(projectile-compile-project :wk "Compile project")
-;;   "p d" '(projectile-dired :wk "Dired project root")
-;;   "p e" '(projectile-run-eshell :wk "Eshell in project")
-;;   "p t" '(ar/treemacs-toggle :wk "Toggle treemacs (current project)")
-;;   "p i" '(projectile-invalidate-cache :wk "Invalidate cache")
-;;   "p r" '(projectile-replace :wk "Replace in project")
-;;   "p R" '(projectile-replace-regexp :wk "Replace regexp in project")
-;;   "p a" '(projectile-add-known-project :wk "Add known project"))
-
 
 ;; Toggle operations (SPC t)
 (ar/global-leader
@@ -9528,6 +9697,7 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
 * TODO Remaining Work
 This section just contains checkboxes with stuff that still needs to be done for the whole emacs configuration
 
+- [ ] Revisit embark and consult config for Workflow Management
 - [ ] add a doom emacs style keybinding with SPC as leader in general.el for =org-babel-remove-result-one-or-many=
 - [ ] remove flycheck for now since messing with org-mode editing
 - [ ] Illustrate a workflow using iedit and evil-multiedit
@@ -9585,5 +9755,7 @@ This section raises questions if some features, capabilities, etc can be achieve
 - [ ] Is it necessary to configure for my emacs configuration that is evil centric?
 - [ ] Is there a chance that anzu and evil-anzu might collide with my lsp-mode configuration?
 - [X] Is it safe to use :demand t in solaire-mode?
+- [ ] If choose to go over eglot ecosystem, do I strictly need eldoc-box to have lsp-ui-doc like features? eldoc-box provides both diagnostics and documentation, but it is extremely slow. However, I can you corfu-popupinfo for documentation at point and flyover for diagnostics at point
+
 * TODO Errors
 - [X] Symbol's value as variable is void: solaire-mode--set-explicitly. Paste solaire-mode source code for to confirm everything is correct

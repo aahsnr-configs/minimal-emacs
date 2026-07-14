@@ -12,9 +12,7 @@
 
 - Now review the subsection: Grep. Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from system_prompt_protocol.yaml file. Search the web determine if there are additional configuration settings that might be useful. Then explain everything to me in detail and present me how you plan to deal with this configuration.I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 2026.
 
-- Determine if there are any errors, issues and hallucinations in this latest iteration of Buffer Management subsection. Search the web and determine if there are there any additional configuration settings that you think might be useful. Determine if you are using the best emacs practices Search the web and think longer for these tasks. You must not perform another rewrite. You must verify everything. The information you get must be the latest till July 2026. Explain everything to me in detail.
-
-- Are you sure there are no more errors and issues in this iteration? And are you sure there are not any more extra configurations you need to add by search the web? Answer and explain everything to me in great detail.Search the web and think longer for this task and make sure the information you get is latest till July 2026.
+- Are you sure there are no more errors and issues in this iteration of Workspaces? And are you sure there are not any more extra configurations you need to add by search the web? Answer and explain everything to me in great detail.Search the web and think longer for this task and make sure the information you get is latest till July 2026.
 
 ## Python script to build and install emacs from source
 
@@ -68,7 +66,13 @@ in a single org config block. The toggle menu for this transient-menu should be 
 
 ---
 
-Lets work on the Project Management subsection using the projection emacs package. Use its upstream sources include the sources for the built-in emacs packages this package depends on. Propose a plan to write the configuration from scratch. Make sure this subsection integrates with the other 2 subsections. Also make sure the configuration follows principles from the doom emacs project closely as can while integrating with my emacs configuration. Make sure you verify everything. Use the attached files: use_package.yaml, elpaca_package_manager.yaml files as guide, but anything in it can be subject to change if you determine there are issues in this yaml file. Explain everything in great detail for me to review. Propose a plan on you plan to write/rewrite the 1st iteration of the Project Management section. Follow the instructions and protocols in the system_prompt_protocol.yaml file. Do not hallucinate and do not introduce errors. You are not allowed to use any sources/resources older than 3 years and you are not allowed to use any china-base sources/resources as well. And all the information you get must be the latest till July 2026.
+## Project Management
+
+Lets work on the Workspacses subsection using the projection emacs package. Use its upstream sources include the sources for the built-in emacs packages this package depends on. Propose a plan to write the configuration from scratch. Make sure this subsection integrates with the Workflow Management main section. Also make sure the configuration follows principles from the doom emacs project closely as can while integrating with my emacs configuration. Make sure you verify everything. Use the attached files: use_package.yaml, elpaca_package_manager.yaml files as guide. Explain everything in great detail for me to review. Propose a plan on you plan to write/rewrite the 1st iteration of the Workspaces subsection. Follow the instructions and protocols in the system_prompt_protocol.yaml file. Do not hallucinate and do not introduce errors. You are not allowed to use any sources/resources older than 3 years and you are not allowed to use any china-base sources/resources as well. And all the information you get must be the latest till July 2026.
+
+---
+
+Determine if there are any errors, issues and hallucinations in this latest iteration of Project Management subsection. Search the web and determine if there are there any additional configuration settings that you think might be useful. Also determine if you need borrow useful ideas from the doom emacs project that doom emacs implements using projectile but you would use `ibuffer + project.el + projection + bufferlo`, whereas doom emacs would use `ibuffer + projectile + persp-mode`. Determine how doom emacs does things and if you think you can borrow any ideas from the doom emacs project for my whole Workflow Management section and not just Project Management subsection. Determine if you are using the best emacs practices. Search the web and think longer for these tasks. You must not perform another rewrite. You must verify everything. The information you get must be the latest till July 2026. Explain everything to me in detail.
 
 ---
 
