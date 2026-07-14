@@ -1,0 +1,99 @@
+document:
+  title: "The Elpaca Package Manager: Architecture, Async Physics, and `use-package` Integration (v2)"
+  description: >
+    This document provides a canonical, verified breakdown of the Elpaca package manager (v0.12+),
+    its asynchronous queue processing model, and its deep integration with `use-package`.
+    All definitions are derived from the official Elpaca manual and source code.
+    Verified current as of July 2026.
+  sections:
+    - id: 1
+      title: Core Philosophy
+      points:
+        - >
+          Elpaca is an asynchronous elisp package manager. It replaces `package.el` by delegating
+          downloading, byte-compiling, and activation to background processes.
+        - >
+          Elpaca processes its package queues *after* Emacs reads the init file (typically via
+          `after-init-hook`). This allows for holistic dependency resolution before installation begins.
+        - >
+          Because installation is asynchronous, standard synchronous load-order assumptions do not apply.
+          Code relying on a package being immediately available must be deferred or placed inside the
+          `elpaca` macro's body.
+    - id: 2
+      title: The Asynchronous Execution Timeline
+      phases:
+        - name: "Phase 1: Bootstrap & Installer"
+          items:
+            - event: "early-init.el"
+              description: >
+                `package-enable-at-startup` MUST be `nil`.
+            - event: "The Installer Block"
+              description: >
+                Clones Elpaca, builds it, and loads autoloads. This is the only synchronous operation.
+        - name: "Phase 2: Queue Registration (Init File Reading)"
+          items:
+            - event: "The `elpaca` Macro & `use-package` Expansion"
+              description: >
+                Calls to `(elpaca ...)` or `(use-package ... :ensure t)` register an "Order" (recipe)
+                into an internal queue. They do NOT install packages immediately.
+            - event: "The `elpaca-wait` Function (CRITICAL)"
+              description: >
+                `(elpaca-wait)` forces a synchronous block, processing all currently queued orders
+                immediately and halting init file reading until finished.
+                WARNING: Use sparingly (e.g., for `elpaca-use-package` or `no-littering`). Overuse
+                destroys async startup performance.
+            - event: "The `:wait` Recipe Keyword (Correction)"
+              description: >
+                The `:wait t` keyword inside a recipe (e.g., `:ensure (:wait t)`) instructs Elpaca
+                to block the *processing of subsequent orders in the queue* until this package is installed.
+                It DOES NOT halt the reading of the init file.
+        - name: "Phase 3: Queue Processing (Post-Init)"
+          items:
+            - event: "`elpaca-process-queues`"
+              description: >
+                Hooked to `after-init-hook`, this triggers async resolution, cloning, building, and
+                symlinking of all registered orders.
+        - name: "Phase 4: Activation & Post-Init Hooks"
+          items:
+            - event: "`elpaca-after-init-hook`"
+              description: >
+                A custom hook that runs ONLY after all queued packages are fully activated.
+                Any configuration relying on `after-init-hook` or `emacs-startup-hook` MUST be
+                attached here to guarantee package availability.
+    - id: 3
+      title: Anatomy of an Elpaca Recipe
+      keywords:
+        - name: ":host / :repo"
+          description: "Repository source (e.g., `:host github :repo \"user/repo\"`)."
+        - name: ":branch / :ref / :tag"
+          description: "Git targeting. `:ref` pins to a commit hash (reproducible), `:tag` to a release."
+        - name: ":files"
+          description: "Directives for symlinking files. `:defaults` expands to standard globs."
+        - name: ":main"
+          description: "The main elisp file. Speeds up dependency checking."
+    - id: 4
+      title: "`use-package` Integration Physics"
+      mechanics:
+        - title: "The `:ensure` Override"
+          detail: >
+            `elpaca-use-package-mode` overrides `use-package-ensure-function`. `:ensure` accepts
+            a full recipe plist (e.g., `:ensure (:host github ...)`).
+        - title: "The `:ensure nil` Bypass"
+          detail: >
+            Mandatory for built-in packages (e.g., `ibuffer`, `project`) and bundled extensions
+            to prevent Elpaca from querying MELPA for non-existent packages.
+        - title: "Macro Expansion"
+          detail: >
+            `(use-package foo :ensure t :config ...)` defers the `:config` block until Elpaca
+            has asynchronously installed and loaded `foo`.
+    - id: 5
+      title: Obsolete Paradigms
+      points:
+        - "The `:pin` keyword is OBSOLETE. Use recipe `:ref` or `:tag` for pinning."
+        - "The `:vc` keyword is superseded by Elpaca's native recipe system."
+        - "`package-quickstart` is obsolete."
+    - id: 6
+      title: Verification Notes
+      points:
+        - "Source: Official Elpaca Manual (Copyright 2022-2026 Nicholas Vollmer)."
+        - "Correction applied: Distinct behavior of `:wait` (recipe keyword) vs `elpaca-wait` (function)."

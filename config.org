@@ -3570,13 +3570,7 @@ Provides a persistent file and project explorer sidebar for navigating directory
 #+end_src
 
 
-
-
-
-
-
-
-** TODO Buffer Management
+** DONE Buffer Management
 Provides a centralized dashboard and automated cleanup engine for viewing, filtering, and managing all open buffers across projects and workspaces.
 
 =ibuffer= provides a highly customizable dashboard for viewing, filtering, and managing open buffers with project and workspace awareness.
@@ -3607,7 +3601,7 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
                                         "^\\*eldoc\\*$"))
 
   ;; Redefine tabulated list column widths to prevent aggressive name truncation and optimize spatial distribution.
-  ;; Splices in `vc-status` if `ibuffer-vc` is available, and includes the `locked` mark indicator.
+  ;; Splices in `vc-status` if `ibuffer-vc` is available, and includes the Emacs 28+ `locked` mark indicator.
   (setq ibuffer-formats
         `((mark modified read-only locked " "
                 (name 40 40 :left :elide)
@@ -3654,9 +3648,7 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
 
 =ibuffer-vc= injects version control status indicators directly into the buffer dashboard columns without overriding project groupings.
 #+begin_src emacs-lisp
-(use-package ibuffer-vc
-  :defer t
-  :after ibuffer)
+(use-package ibuffer-vc :defer t)
 #+end_src
 
 
@@ -3666,7 +3658,6 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
 ;; It dynamically generates ibuffer filter groups based on project.el roots.
 (use-package projection-ibuffer
   :ensure nil
-  :after projection
   :commands
   ibuffer-projection-set-filter-groups
   ibuffer-projection-unset-filter-groups
@@ -3696,17 +3687,16 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
 =buffer-terminator= automatically cleans up inactive, buried buffers to prevent memory bloat during long daemon sessions.
 #+begin_src emacs-lisp
 (use-package buffer-terminator
-  :demand t
   :custom
   ;; Suppress echo-area logging to keep the minibuffer clean.
   (buffer-terminator-verbose nil)
+  ;; Terminate buffers inactive for 30 minutes.
+  (buffer-terminator-inactivity-timeout (* 30 60))
+  ;; Check for inactive buffers every 10 minutes.
+  (buffer-terminator-interval (* 10 60))
   :config
-  ;; Natively respects `tab-bar' and `bufferlo` hidden tabs.
-  ;; Explicitly enforce preservation of special, process, and visible buffers.
-  (setq buffer-terminator-keep-visible-buffers t
-        buffer-terminator-keep-special-buffers t
-        buffer-terminator-keep-process-buffers t)
-  ;; Activate the global minor mode directly in :config per Elpaca load-order physics.
+  ;; Elpaca natively intercepts `:config` for external packages, wrapping it in an async callback.
+  ;; Omitting `:defer t` guarantees the background timer initializes safely post-build without blocking startup.
   (buffer-terminator-mode 1))
 #+end_src
 
@@ -3745,8 +3735,6 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
 
 =general.el= routes centralized leader keybindings for workspace operations (to be relocated to the Workspaces subsection).
 #+begin_src emacs-lisp
-;; WORKSPACE KEYBINDINGS
-;; Extract this block and place it inside the `** TODO Workspaces` subsection.
 (ar/global-leader
   "TAB"   '(:ignore t :wk "workspace")
   "TAB b" '(bufferlo-switch-to-buffer :wk "Switch buffer (local)")
