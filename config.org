@@ -1,14 +1,14 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.7
+#+VERSION: 0.8
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
 * DONE Core Emacs
 Foundational layer of the config: bootstrap sequence, package management, performance tuning, session persistence, and cross-platform env normalization. Tuned for Emacs 30/31 — responsive, OS-safe, and stutter-free under heavy IDE workloads (LSP, Tree-sitter).
 
-able via Daraz Global / local custom imports (~1,200 - 2,200 BDT)	The side-lit legends align perfectly wi** DONE Lexical Binding
+** DONE Lexical Binding
 Lexical binding is a strict requirement for modern Emacs Lisp. Unlike dynamic binding, it scopes variables to their enclosing block, enabling closures, preventing variable-bleeding bugs, and letting the byte-compiler generate faster, optimized code.
 
 The =no-byte-compile: t= header directive stops Emacs from prematurely compiling this tangled file before =compile-angel= registers its exclusion rules.
@@ -3185,8 +3185,11 @@ Provides a visual directory editor and file manager for navigating the filesyste
 
 
 
+
+
 ** TODO Dirvish
-Dirvish transforms Dired into a modern, Ranger-like file manager with live previews and a dedicated sidebar.
+Dirvish transforms Dired into a modern, Ranger-like file manager with live previews, emerge groups, and a dedicated sidebar.
+*Architectural Note:* Dirvish in 2025/2026 suffers from a known multi-frame feedback loop (Issue #353) that causes severe UI flickering when =emacsclient= opens new frames. We apply a Vanilla Emacs =advice-add= patch to debounce the redisplay hook. Additionally, we hook into =persp-before-switch-functions= to cleanly quit Dirvish side-windows before switching workspaces, preventing Emacs from throwing errors when trying to delete dedicated windows.
 #+begin_src emacs-lisp
 (use-package dirvish
   :ensure (:host github :repo "latiagertrutis/dirvish" :files (:defaults "extensions/*.el"))
@@ -3213,7 +3216,7 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
      ("c" "~/.config/" "Config")
      ("t" "~/.local/share/Trash/files/" "Trash")))
   ;; Visual attributes rendered in the file list.
-  (dirvish-attributes '(vc-state subtree-state collapse git-msg file-time file-size))
+  (dirvish-attributes '(vc-state subtree-state nerd-icons collapse git-msg file-time file-size))
   ;; Doom-like UI: Enable custom headers and mode lines for Dirvish buffers.
   (dirvish-use-header-line t)
   (dirvish-use-mode-line t)
@@ -3246,6 +3249,7 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
   (require 'dirvish-ls)
   (require 'dirvish-rsync)
   (require 'dirvish-fd)
+  (require 'dirvish-emerge)
   (require 'dirvish-side)
 
   ;; Enable global peek mode for minibuffer file previews (Vertico synergy)
@@ -3257,16 +3261,14 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
   ;; Subtree state visibility
   (setq dirvish-subtree-always-show-state t)
 
-  ;; Prevent double icons when `treemacs-icons-dired' is active globally.
-  (when (bound-and-true-p treemacs-icons-dired-mode)
-    (setq dirvish-attributes (delq 'nerd-icons dirvish-attributes)))
-
   ;; Side window configuration.
   (setq dirvish-side-width 30
         dirvish-side-follow-buffer-file t
         dirvish-side-display-alist '((side . left) (slot . -1) (window-width . 30)))
 
   ;; DOOM HACK: Prevent multi-frame feedback loop flickering (dirvish#353).
+  ;; In Emacs 30+, opening multiple frames with Dirvish active causes a redisplay
+  ;; feedback loop. This advice ensures the hook only fires for the selected window.
   (when (fboundp 'dirvish-pre-redisplay-h)
     (defun ar/dirvish--debounce-redisplay (fn window)
       "Debounce redisplay hook to prevent multi-frame flickering."
@@ -3274,14 +3276,30 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
         (funcall fn window)))
     (advice-add #'dirvish-pre-redisplay-h :around #'ar/dirvish--debounce-redisplay))
 
-  ;; Open large directories asynchronously
-  (setq dirvish-large-directory-threshold 20000))
+  ;; Open large directories (over 20000 files) asynchronously using the `fd' command
+  ;; to prevent Emacs from freezing during directory read.
+  (setq dirvish-large-directory-threshold 20000)
 
-;; ==========================================
+  ;; TODO: modify this to work with bufferlo/projection
+  ;; DOOM HACK: Clean up Dirvish before switching workspaces/projects.
+  ;; If Dirvish is open in a dedicated side-window and you switch workspaces,
+  ;; Emacs will throw an error trying to delete the dedicated window.
+  ;; (add-hook 'persp-before-switch-functions
+  ;;           (lambda (&rest _)
+  ;;             (when-let* ((dv (cl-loop for w in (window-list)
+  ;;                                      if (window-dedicated-p w)
+  ;;                                      if (with-current-buffer (window-buffer w) (dirvish-curr))
+  ;;                                      return it)))
+  ;;               (let (dirvish-reuse-session)
+  ;;                 (with-selected-window (dv-root-window dv)
+  ;;                   (dirvish-quit))))))
+  )
+
 ;; CUSTOM DIRVISH TRANSIENT DASHBOARD
-;; ==========================================
-;; Replaces the default `dirvish-dispatch` and `dirvish-emerge-menu`
-;; with a unified, Doom-inspired Transient dashboard.
+;; ------------------------------------------------------------------
+;; Replaces the default `dirvish-dispatch` with a unified, Doom-inspired
+;; Transient dashboard. Acts as the "Main Menu" that can also summon the
+;; native `dirvish-emerge-menu` sub-menu for visual file grouping.
 (with-eval-after-load 'transient
   (defun ar/dirvish-title ()
     (concat
@@ -3304,7 +3322,8 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
       ("S" "Quicksort" dirvish-quicksort)
       ("s" "Setup Menu" dirvish-setup-menu)
       ("n" "Narrow" dirvish-narrow)
-      ("i" "File Info" dirvish-file-info-menu)]
+      ("i" "File Info" dirvish-file-info-menu)
+      ("e" "Emerge Groups" dirvish-emerge-menu)]
      ["Tools"
       ("y" "Yank Menu" dirvish-yank-menu)
       ("v" "VC Menu" dirvish-vc-menu)
@@ -3327,6 +3346,7 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
   "d a" '(dirvish-quick-access :wk "Quick access")   ; Summon bookmark menu for pinned dirs
   "d j" '(dirvish-fd-jump :wk "Jump fd")             ; Async search and jump to any directory
   "d n" '(dirvish-narrow :wk "Narrow/Filter")        ; Live filter current directory
+  "d e" '(dirvish-emerge-menu :wk "Emerge groups")   ; Transient menu for grouping files
   "d l" '(dirvish-layout-toggle :wk "Toggle layout") ; Cycle through preview layouts
   "d y" '(dirvish-yank-menu :wk "Yank/Paste")        ; Async copy/paste menu
   "d v" '(dirvish-vc-menu :wk "VC operations")       ; Git operations menu
@@ -3363,13 +3383,16 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
  "M-f" #'dirvish-history-go-forward
  "M-n" #'dirvish-narrow
  "M-m" #'dirvish-mark-menu
- "M-s" #'dirvish-setup-menu)
+ "M-s" #'dirvish-setup-menu
+ "M-e" #'dirvish-emerge-menu)
 
 (general-define-key
  :states 'motion
  :keymaps 'dirvish-mode-map
  "[h"  #'dirvish-history-go-backward
- "]h"  #'dirvish-history-go-forward)
+ "]h"  #'dirvish-history-go-forward
+ "[e"  #'dirvish-emerge-next-group
+ "]e"  #'dirvish-emerge-previous-group)
 
 (general-define-key
  :states '(normal visual motion)
@@ -3398,14 +3421,14 @@ Dirvish transforms Dired into a modern, Ranger-like file manager with live previ
 
 
 
-** TODO Dired Extensions
-These packages extend Dired's capabilities. =dired-x= provides advanced omitting and OS-integration, =diredfl= adds modern syntax highlighting (font-lock) to the directory listings, and =wdired= allows you to edit the Dired buffer like a text file to rename/move files in bulk.
 
+** DONE Dired Extensions
+- State "DONE"       from "TODO"       [2026-07-14 Tue 07:55]
+These packages extend Dired's capabilities. =dired-x= provides advanced omitting and OS-integration, =diredfl= adds modern syntax highlighting to the directory listings, =wdired= allows you to edit the Dired buffer like a text file to rename or move files in bulk, and =nerd-icons-dired= renders visual file and folder icons in standard directory listings.
 #+begin_src emacs-lisp
 (use-package dired-x
   :ensure nil
   :defer t
-  ;; Enable omit mode to hide "uninteresting" files (compiled artifacts, VCS dirs).
   :hook (dired-mode . dired-omit-mode)
   :config
   (setq dired-omit-verbose nil
@@ -3420,20 +3443,25 @@ These packages extend Dired's capabilities. =dired-x= provides advanced omitting
                 "\\|^\\.ccls-cache\\'"
                 "\\|\\(?:\\.js\\)?\\.meta\\'"
                 "\\|\\.\\(?:elc\\|o\\|pyo\\|swp\\|class\\)\\'"))
-  ;; Don't prompt for confirmation when killing buffers associated with deleted files.
+  ;; Suppress confirmation prompt when killing buffers associated with deleted files.
   (setq dired-clean-confirm-killing-deleted-buffers nil))
+#+end_src
 
+#+begin_src emacs-lisp
 (use-package diredfl
+  :defer t
   ;; Apply syntax highlighting to both standard Dired and Dirvish's directory views.
-  :hook
-  ((dired-mode . diredfl-mode)
-   (dirvish-directory-view-mode . diredfl-mode))
+  :hook ((dired-mode . diredfl-mode)
+         (dirvish-directory-view-mode . diredfl-mode))
   :config
   ;; Make directory names bold for better visual distinction.
   (set-face-attribute 'diredfl-dir-name nil :bold t))
+#+end_src
 
+#+begin_src emacs-lisp
 (use-package wdired
   :ensure nil
+  :defer t
   :after dired
   :custom
   ;; Allow changing file permissions directly in the WDired buffer.
@@ -3441,6 +3469,15 @@ These packages extend Dired's capabilities. =dired-x= provides advanced omitting
   ;; Automatically create parent directories if you rename a file to a non-existent subfolder.
   (wdired-create-parent-directories t))
 #+end_src
+
+#+begin_src emacs-lisp
+(use-package nerd-icons-dired
+  :defer t
+  ;; Fallback icon engine for "Raw Dired" buffers (e.g., `project-dired`)
+  ;; that bypass Dirvish's override, ensuring consistent Nerd Font glyphs.
+  :hook (dired-mode . nerd-icons-dired-mode))
+#+end_src
+
 
 
 ** TODO Treemacs
