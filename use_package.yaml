@@ -1,5 +1,5 @@
 document:
-  title: "The `use-package` Execution Timeline & Load-Order Physics (Elpaca Edition)"
+  title: "The `use-package` Execution Timeline & Load-Order Physics (Elpaca Edition) (v2)"
   description: >
     This document provides a canonical breakdown of how the `use-package` macro
     configures Emacs packages, specifically tailored for the Elpaca v0.12 
@@ -11,6 +11,13 @@ document:
     remains at the version documented for Emacs 30.2, and no keyword-ordering 
     changes have surfaced in the in-development Emacs 31 (which entered feature 
     freeze near June 2026).
+    v2 CHANGELOG: Added a completeness note in the `:ensure` keyword section —
+    `use-package-ensure.el` prepends BOTH `:ensure` and `:pin` to
+    `use-package-keywords` (in that order via successive `add-to-list` calls),
+    which means `:pin` actually ends up ahead of `:ensure` in the final
+    processed list. The original v1 text was accurate about `:ensure` in
+    isolation but did not mention this, which could imply `:ensure` is
+    unconditionally the frontmost keyword among the two.
   sections:
     - id: 1
       title: Core Philosophy
@@ -156,6 +163,22 @@ document:
                 Elpaca v0.12 integrates by overriding `use-package-ensure-function`.
                 Instead of calling `package.el`, Elpaca intercepts `:ensure` and pushes
                 the package (or a full recipe plist) into its asynchronous installation queue.
+            - label: "COMPLETENESS NOTE (v2) — :pin is prepended too, and ends up ahead of :ensure"
+              text: >
+                `use-package-ensure.el` does not stop at `:ensure`. Immediately afterward it
+                also calls `(add-to-list 'use-package-keywords :pin)`. Because each
+                `add-to-list` call prepends to the front of the list, and `:pin` is added
+                SECOND, `:pin` ends up ahead of `:ensure` in the final `use-package-keywords`
+                list (final relative order: `:pin`, then `:ensure`, then the rest of the base
+                list starting with `:disabled`). This matches the code comment inside
+                `use-package-handler/:pin`: "Pinning should occur just before ensuring."
+                Practically: if a declaration uses `:pin`, its pin-form is emitted immediately
+                before the `:ensure` install call. This has low practical impact under Elpaca
+                specifically, since Elpaca users generally don't use the archive-pinning `:pin`
+                keyword at all (see the companion Elpaca document, Section 5), but it was a real
+                gap in the v1 "which keyword goes first" bookkeeping, which only discussed
+                `:ensure` in isolation and could have implied it is unconditionally the
+                frontmost keyword among the two.
             - label: Interaction with :disabled
               text: >
                 That positional detail turns out not to matter for :disabled itself:
@@ -331,7 +354,8 @@ document:
         - "Primary source: Official GNU Emacs `use-package` User Manual (v2.4.5, bundled with Emacs 30.2)."
         - "Canonical execution order confirmed directly against the `use-package-keywords` defcustom in Emacs 30.2's built-in `use-package-core.el` (base order), and against `use-package-ensure.el` (which prepends `:ensure` and `:pin` to that base order at load time) — not just the manual's prose description of that order."
         - "The :disabled short-circuit was confirmed by reading the actual macro body in Emacs 30.2's `use-package.el`: `(unless (memq :disabled args) (macroexp-progn ...))`, which sits outside and prior to the use-package-keywords processing pipeline entirely."
-        - "Elpaca v0.12 integration verified: `elpaca-use-package-mode` overrides `use-package-ensure-function`, intercepts `:ensure`, accepts recipe plists, and renders `package.el`'s `:pin` and Emacs 30's `:vc` obsolete."
-        - "Emacs 31 Context: Emacs 31 entered its feature-freeze/branch-cut phase near June 2026. Public release previews confirm no structural changes to `use-package`'s keyword ordering or macro expansion logic since the 30.2 baseline."
+        - "Elpaca v0.12 integration verified: `elpaca-use-package-mode` overrides `use-package-ensure-function`, intercepts `:ensure`, and accepts recipe plists. NOTE (v2 refinement): calling `package.el`'s `:pin` and Emacs 30's `:vc` flatly \"obsolete/ignored\" overstates it — see the companion Elpaca document (elpaca_package_manager.yaml, Section 5) for the corrected, more precise treatment of both keywords."
+        - "Emacs 31 Context: Emacs 31 entered its feature-freeze/branch-cut phase near June 2026 (branch cut ~early May 2026; first 31.0.90 pretest released June 5, 2026). Public release previews confirm no structural changes to `use-package`'s keyword ordering or macro expansion logic since the 30.2 baseline."
         - "Constraint adherence: The archived `jwiegley/use-package` GitHub repository was strictly excluded from the verification process, relying solely on GNU documentation, Elpaca manuals, and Emacs 30.2 core behaviors."
+        - "v2 correction applied: added a completeness note under the `:ensure` keyword (Section 3) documenting that `use-package-ensure.el` also prepends `:pin` via a second `add-to-list` call, which places `:pin` ahead of `:ensure` in the final processed keyword order — the v1 text was accurate but incomplete on this point."
 

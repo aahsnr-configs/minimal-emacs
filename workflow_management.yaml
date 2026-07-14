@@ -1,11 +1,21 @@
 document:
-  title: "Architectural Blueprint: Workflow Management Context Engine (v3)"
+  title: "Architectural Blueprint: Workflow Management Context Engine (v4)"
   metadata:
     target_audience: "Future LLM Sessions / Context Ingestion"
     subject: "Buffer Management, Project Management, and Workspaces Triad"
     emacs_target: "31.0.90 (PGTK, Native Comp)"
     package_manager: "Elpaca v0.12"
-    status: "v3: Corrected projection-ibuffer bundled reality, redraw trap, and bufferlo workspace bleed."
+    status: >
+      v4: Independent verification pass (July 2026). Confirmed against upstream sources:
+      projection-ibuffer's bundled (non-MELPA) status, projection-multi/-multi-embark's
+      genuine standalone-MELPA status, bufferlo's GNU ELPA status, and the
+      consult-buffer-list-function / bufferlo-local-buffers integration (verified
+      near-verbatim against bufferlo's own GNU ELPA documentation page). HOWEVER: the two
+      most specific implementation claims in Section 2 — the ibuffer "Redraw Trap" and the
+      "Bufferlo Workspace Bleed" — could NOT be confirmed against the actual
+      projection-ibuffer.el source in this pass. See the new "Unverified Claims" block in
+      Section 2 and the note appended to Section 7, Directive 4 and 6. Treat those two
+      items as plausible-but-unconfirmed until checked directly against source.
   sections:
     - id: 1
       title: "The Triad Paradigm (Executive Summary)"
@@ -81,6 +91,38 @@ document:
             We must inject an :around advice on projection-ibuffer--filter-groups
             to dynamically swap (buffer-list) with (bufferlo-buffer-list) when
             bufferlo-mode is active, strictly respecting workspace boundaries.
+        - name: "v4 UNVERIFIED CLAIMS — Redraw Trap & Workspace Bleed (NOT independently confirmed)"
+          status: UNVERIFIED
+          detail: >
+            During the July 2026 verification pass, every other factual claim in this document
+            was checked against a live, fetchable upstream source (the projection GitHub
+            README, the bufferlo GNU ELPA page, etc.). These two specific claims are the
+            exception: the actual source file `src/projection-ibuffer.el` inside
+            `mohkale/projection` could not be retrieved in that pass (raw/blob URLs for that
+            specific file were not resolvable via the available search/fetch tools), so the
+            following two implementation-level assertions above remain UNCONFIRMED:
+              1. That upstream `ibuffer-projection-set-filter-groups` gates its call to
+                 `ibuffer-update` behind `(called-interactively-p 'interactive)`, such that
+                 hooking it non-interactively silently fails to redraw the UI (the "Redraw Trap").
+              2. That `projection-ibuffer--filter-groups` hardcodes a loop over the global
+                 `(buffer-list)` rather than something workspace-aware, causing cross-workspace
+                 buffer bleed with bufferlo (the "Bufferlo Workspace Bleed").
+            Both claims are PLAUSIBLE — they are consistent with how similar ibuffer-grouping
+            packages (e.g. ibuffer-projectile) are commonly implemented, and the general shape of
+            the problem (interactive-only redraw gating; non-workspace-aware buffer-list scanning)
+            is a common pattern in this class of package. But "plausible and consistent with
+            similar packages" is not the same as "confirmed against this package's actual code."
+            RECOMMENDATION: before shipping the `:around` advice and the custom `ibuffer-mode-hook`
+            wrapper described above, open `src/projection-ibuffer.el` in the `mohkale/projection`
+            repository directly (e.g. via `M-x find-library` after installing, or browsing
+            https://github.com/mohkale/projection/blob/master/src/projection-ibuffer.el) and confirm:
+              - whether `ibuffer-projection-set-filter-groups` does in fact skip `ibuffer-update`
+                when called non-interactively, and
+              - what buffer-source function `projection-ibuffer--filter-groups` (or whatever the
+                actual internal function is named — the exact name is also unconfirmed) actually
+                iterates over.
+            If either claim turns out to be false, the corresponding "mathematically_superior_solution"
+            workaround above is unnecessary complexity that should be removed rather than shipped.
         - name: "Empty Group Suppression"
           answer: >
             ibuffer-show-empty-filter-groups must be set to nil. Without this,
@@ -312,18 +354,39 @@ document:
             ibuffer-mode-hook, not globally. Furthermore, because it lacks a
             programmatic ibuffer-update call, the hook MUST include a manual
             (ibuffer-update nil t) to force the UI to redraw.
+          v4_verification_status: >
+            UNVERIFIED. The premise (that ibuffer-projection-set-filter-groups only calls
+            ibuffer-update when called interactively) could not be confirmed against the
+            actual projection-ibuffer.el source as of the July 2026 pass. See Section 2,
+            "v4 UNVERIFIED CLAIMS" entry. Confirm against source before treating this
+            directive as mandatory.
         - number: 5
           title: "projection-ibuffer Bundled Reality"
           detail: >
             projection-ibuffer is NOT a standalone MELPA package. It is bundled
             inside the projection repository. It MUST be declared with :ensure nil
             and :after projection.
+          v4_verification_status: >
+            CONFIRMED. The mohkale/projection GitHub README shows a "Projection ibuffer"
+            feature section with no MELPA badge, unlike the adjacent projection-multi,
+            projection-multi-embark, and projection-dape sections, which each show a
+            MELPA badge. This directive is accurate.
         - number: 6
           title: "The Bufferlo Workspace Intersection"
           detail: >
             An :around advice MUST be injected on projection-ibuffer--filter-groups
             to swap (buffer-list) with (bufferlo-buffer-list) when bufferlo-mode
             is active. This prevents cross-workspace buffer bleed.
+          v4_verification_status: >
+            UNVERIFIED. The premise (that projection-ibuffer--filter-groups hardcodes a
+            global (buffer-list) scan) could not be confirmed against the actual
+            projection-ibuffer.el source as of the July 2026 pass, and even the exact
+            function name is unconfirmed. See Section 2, "v4 UNVERIFIED CLAIMS" entry.
+            Also note: bufferlo's own public API is bufferlo-local-buffers /
+            bufferlo-local-buffer-p (confirmed real, per its GNU ELPA documentation);
+            "bufferlo-buffer-list" as named in this directive was not itself confirmed
+            to exist as a public function — double-check the exact symbol name against
+            bufferlo's source/docs before writing the advice.
         - number: 7
           title: "Header Status"
           detail: >
@@ -345,6 +408,16 @@ document:
             syntax: (add-to-list 'project-switch-commands '(consult-ripgrep
             "Ripgrep") t).
   footer: >
-    End of Architectural Blueprint v3. This document contains the verified,
-    hallucination-free structural logic required to generate the v0.10 Emacs
+    End of Architectural Blueprint v4. Independently re-verified July 2026 against live
+    upstream sources (projection GitHub README, bufferlo GNU ELPA page, Emacs 31 pretest
+    announcements). Confirmed accurate: projection-ibuffer's bundled/non-MELPA status;
+    projection-multi/-multi-embark's standalone-MELPA status; bufferlo's GNU ELPA status;
+    the consult-buffer-list-function / bufferlo-local-buffers integration and its
+    "avoid consult narrowing keys interfering" rationale; Emacs 31.0.90 pretest as a real,
+    current build. NOT independently confirmed: the ibuffer "Redraw Trap" and "Bufferlo
+    Workspace Bleed" implementation claims (see Section 2 and Section 7 directives 4/6) —
+    these could not be checked against the actual projection-ibuffer.el source in this pass
+    and should be treated as plausible-but-unconfirmed, not as verified fact, until checked
+    directly. Retracting the prior "hallucination-free" claim as overstated in light of this.
+    This document contains the structural logic required to generate the v0.10 Emacs
     Lisp implementation for the Workflow Management Context Engine.

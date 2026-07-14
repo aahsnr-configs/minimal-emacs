@@ -1,8 +1,8 @@
 project_state:
   metadata:
     title: Emacs Configuration Project State Checkpoint
-    version: 21
-    date: July 13, 2026
+    version: 23
+    date: July 15, 2026
   critical_instructions:
     preamble: "Before generating any code, making suggestions, or answering questions, you MUST:"
     steps:
@@ -40,7 +40,7 @@ project_state:
     - name: Minibuffer Navigation
       description: 'Arrow keys (`<up>`, `<down>`, `C-<up>`, `C-<down>`) are preferred over `hjkl` in the minibuffer and window management to preserve the "type-to-filter" paradigm and prevent Evil state conflicts.'
     - name: Concise Documentation Protocol
-      description: 'Documentation inside `config.org` must adhere to the strict Documentation Hierarchy defined in the system prompt protocol (Layman headers, Technical inline comments).'
+      description: "Documentation inside `config.org` must adhere to the strict Documentation Hierarchy defined in the system prompt protocol (Layman headers, Technical inline comments)."
     - name: Pure Subheader Descriptions
       description: "Subheader descriptions must strictly and exclusively describe what the specific package does in non-technical layman terms. Exclude workflow justifications, personal preferences, or architectural implementation details."
     - name: Bundled Extensions
@@ -65,7 +65,7 @@ project_state:
         `--with-native-compilation=aot` and `--with-pgtk`. Defensive guards (`fboundp`/`boundp`/version checks) should still wrap highly experimental APIs.
         The MPS incremental/concurrent garbage collector (`igc`) remains deferred out of the Emacs 31 release cycle and must NOT be treated as an Emacs 31 feature.
   editor_behaviour_paradigm:
-    summary: "In v5, the `Editor Behaviour` concept was massively restructured to become the centralized pillar for how Emacs renders, parses, and manipulates text and buffers. In v21, Group 7 is nearly fully finalized with only Link Hint remaining pending. Window Management continues to make progress."
+    summary: "In v5, the `Editor Behaviour` concept was massively restructured to become the centralized pillar for how Emacs renders, parses, and manipulates text and buffers. In v22, Group 7 is nearly fully finalized with only Link Hint remaining pending. Window Management and Workflow Management continue to make progress."
     groups:
       - id: 1
         name: Visual Chrome & UI Overlays
@@ -171,6 +171,8 @@ project_state:
     v21:
       - "Precision Editing Finalization: Finalized Grep (ripgrep integration + grep-edit-mode), Re-Builder (custom Transient menu + interactive regex export), and Avy Transient Menu (DRY scope dispatcher + spatial mutations dashboard). Link Hint remains the sole pending subsection in Group 7."
       - "Protocol Hardening (v3): Enforced strict separation of layman headers vs technical inline comments. Mandated live web verification over parametric memory to prevent API hallucinations. Codified the General.el eager placement constraint to prevent deferred-registration traps."
+    v22:
+      - "State Synchronization & Config Audit: Aligned project state checkpoint with config.org v0.11. Mapped the massive TODO landscape for Org Mode, Completion Framework, Development Tools, and LaTeX. Formalized Workflow Management progress (Dired, Dirvish, Treemacs, Ibuffer finalized)."
   pending_decisions_and_todos:
     - "Project & Workspace Management: `bufferlo` and `projection` selected. Excise `projectile` / `persp-mode`."
     - "Syntax Checking Transition: `flymake` to `flycheck`."
@@ -186,13 +188,13 @@ project_state:
       - Spatial Alignment & Whitespace Hygiene (Group 5, 5/5 subsections)
       - Frame Chrome & Status Indicators (Group 6, 8 subsections)
       - Vim Emulation (12 subsections)
-      - General Keybindings
+      - General Keybindings (Centralized leader routing)
     in_progress:
       - "Precision Editing (Group 7: Avy, Evil Easymotion, Evil Snipe, Ace Window, Anzu, Evil Anzu, Iedit, Evil Multiedit, Grep, Re-Builder, Avy Transient Menu finalized. Pending: Link Hint)"
-      - "Window (Windmove, Window Operations finalized. Pending: Winner, Popper)"
+      - "Window Management (Windmove, Window Operations finalized. Pending: Winner, Popper)"
+      - "Workflow Management (Dired, Dirvish, Treemacs, Buffer Management finalized. Pending: Project Management, Workspaces)"
     untouched:
       - Lexical Validation & Comparative Workflows (Group 8)
-      - Workflow Management
       - Version Control
       - Org Mode & Second Brain
       - Completion Framework
@@ -207,8 +209,8 @@ project_state:
   immediate_structural_action_plan:
     - "Finalize Group 7: Proceed to Link Hint (the sole remaining package)."
     - "Finalize Window Management: Proceed to Winner and Popper."
-    - Excise Projectile/Persp glue code.
-    - "Next Steps: Proceed to Group 8 (Lexical Validation) and Workflow Management."
+    - "Finalize Workflow Management: Proceed to Project Management and Workspaces."
+    - "Next Steps: Proceed to Group 8 (Lexical Validation), Version Control, and Org Mode."
   remaining_work_checklists:
     - group: Spatial Traversal & Inline Mutations (Group 7)
       tasks:
@@ -242,6 +244,18 @@ project_state:
           description: "Winner: Configure undo/redo window states."
         - status: pending
           description: "Popper: Configure popup management and echo dispatch."
+    - group: Workflow Management
+      tasks:
+        - status: done
+          description: "Dired & Dirvish: Finalized native directory editing and visual file manager with live previews."
+        - status: done
+          description: "Treemacs: Finalized persistent file and project explorer sidebar."
+        - status: done
+          description: "Buffer Management: Finalized Ibuffer dashboard, projection integration, and buffer-terminator."
+        - status: pending
+          description: "Project Management: Implement `projection` package and excise projectile glue code."
+        - status: pending
+          description: "Workspaces: Implement `bufferlo` package and wire consult-buffer sources."
     - group: Lexical Validation & Comparative Workflows (Group 8)
       tasks:
         - status: pending
@@ -250,38 +264,86 @@ project_state:
           description: "Helpful: Integrate with the main development tools sections."
         - status: pending
           description: "Ediff: Finalize transient menu and vim-style navigation bindings."
-    - group: Workflow Management
-      tasks:
         - status: pending
-          description: "Project Management: Implement `projection` package."
-        - status: pending
-          description: "Workspaces: Implement `bufferlo` package and wire `consult-buffer` sources."
-    - group: Development Tools
-      tasks:
-        - status: pending
-          description: "LSP: Disable/remove `lsp-org`."
-        - status: pending
-          description: "DAP: Replace Dape with `dap-mode` + `transient`."
-        - status: pending
-          description: "Syntax Checking: Replace flymake with `flycheck`."
-        - status: pending
-          description: "Eldoc: Determine Doom Emacs scenarios."
+          description: "Woman: Extract system manpath directories for native Arch Linux manual integration."
     - group: Global Remaining Work
       tasks:
         - status: done
           description: "Fix `Precision Editing` header nesting anomaly in `config.org`."
         - status: done
           description: "Re-inject `Move Text` into `Spatial Alignment`."
+        - status: done
+          description: "Setup automatic pair generation for '**', '==', etc (Solved via O(1) multi-char prose formatter in Electric Pair)."
+        - status: done
+          description: "Move customs.el to var."
+        - status: done
+          description: "Move tree-sitter grammars to var/ or etc/."
+        - status: done
+          description: "Mismatched bracket error in the new consult config."
+        - status: done
+          description: "show-paren-mode should highlight matching brackets when cursor is inside that the bracket pair."
+        - status: done
+          description: "package-quickstart, eln-cache/ should be in either var or etc."
         - status: pending
           description: "Add a doom emacs style keybinding with SPC as leader in general.el for `org-babel-remove-result-one-or-many`."
         - status: pending
+          description: "Remove flycheck for now since messing with org-mode editing."
+        - status: pending
+          description: "Illustrate a workflow using iedit and evil-multiedit."
+        - status: pending
           description: "Customize org-agenda-finalize to customize org-agenda buffer."
-        - status: done
-          description: "Setup automatic pair generation for '**', '==', etc (Solved via O(1) multi-char prose formatter in Electric Pair)."
+        - status: pending
+          description: "Setup automatic pair generation for '**', '==', etc and make sure the cursor in insert mode is placed in the middle."
         - status: pending
           description: "Determine if compile-angel is needed for elpaca."
         - status: pending
+          description: "Determine if elpaca byte-compiles and native-compiles all packages."
+        - status: pending
           description: "Pressing enter on a header should move a task from TODO to DONE like doom emacs does."
+        - status: pending
+          description: "Add flyover package."
+        - status: pending
+          description: "Implement the email setup."
+        - status: pending
+          description: "Add more padding to emacs buffer."
+        - status: pending
+          description: "Add eval +overlay module packages from doom emacs into my vanilla emacs config."
+        - status: pending
+          description: "Go back to openrouter.ai for my corfu configuration."
+        - status: pending
+          description: "Make sure there are no modelines for popper and winner."
+        - status: pending
+          description: "Implement settings from eval-overlay.md."
+        - status: pending
+          description: "Recentf-mode not showing files in dashboard, but shows recent files in working buffers."
+        - status: pending
+          description: "I don't want to see files enclosed with ** when I execute consult-buffer."
+        - status: pending
+          description: "Add epithet and math-delimiters package from https://github.com/oantolin."
+        - status: pending
+          description: "Orderless only matches letters next to each other; I dont want that."
+        - status: pending
+          description: "Add keybindings for embark."
+        - status: pending
+          description: "Add lsp-ltex-plus."
+        - status: pending
+          description: "`Important`: Write a test org-mode file to practice all the writing practices in org buffers."
+        - status: pending
+          description: "lsp-mode ideas: 1. how would code lens be useful in python programming."
+        - status: pending
+          description: "I also need interactive custom functions for .dir-locals.el."
+        - status: pending
+          description: "`Important`: Review completion framework again after finalizing development tools."
+        - status: pending
+          description: "`Important`: Use doom emacs keybindings wherever possible for Completion Framework and Development Tools."
+        - status: pending
+          description: "`Important`: Determine all the related packages that are integrated together in the whole emacs config."
+        - status: pending
+          description: "=Important=: add auto-tangle-mode package."
+        - status: pending
+          description: "=Important=: Add denote-explore, flyover, auto-tangle-mode, treemacs-evil, treemacs-magit."
+        - status: pending
+          description: "*Urgent*: Revisit the description of every header and subheader to ensure they describe what the package actually does."
   global_questions:
     - status: pending
       question: "Can org-level variation only work for certain file and/or org buffers?"
@@ -295,3 +357,8 @@ project_state:
       question: "How to make the echo area useful?"
     - status: pending
       question: "How to open links from org buffers by pressing enter using correct browser?"
+    - status: pending
+      question: "Is it necessary to configure for my emacs configuration that is evil centric?"
+    - status: pending
+      question: "Is there a chance that anzu and evil-anzu might collide with my lsp-mode configuration?"
+

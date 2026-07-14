@@ -68,7 +68,7 @@ in a single org config block. The toggle menu for this transient-menu should be 
 
 ---
 
-Lets work on the Buffer Managmement section. Review this section thoroughly in great detail. Make sure this subsection integrates with the other 2 subsections. Then fix any errors and issues. Use the workflow_management.yaml file as a guide, but anything in it can be subject to change if determine there are issues in this yaml file. Explain everything in great detail for me to review. Propose a plan on you plan to write/rewrite the 1st iteration of the Buffer Management section. Follow the instructions and protocols in the system_prompt_protocol.yaml file but you are allowed to break the "No Package Merging" negative constraint. Search the web and think longer for these tasks. Do not hallucinate and do not introduce errors. You are not allowed to use any sources/resources older than 3 years and you are not allowed to use any china-base sources/resources as well. And all the information you get must be the latest till July 2026.
+Lets work on the Project Management subsection using the projection emacs package. Use its upstream sources include the sources for the built-in emacs packages this package depends on. Propose a plan to write the configuration from scratch. Make sure this subsection integrates with the other 2 subsections. Also make sure the configuration follows principles from the doom emacs project closely as can while integrating with my emacs configuration. Make sure you verify everything. Use the attached files: use_package.yaml, elpaca_package_manager.yaml files as guide, but anything in it can be subject to change if you determine there are issues in this yaml file. Explain everything in great detail for me to review. Propose a plan on you plan to write/rewrite the 1st iteration of the Project Management section. Follow the instructions and protocols in the system_prompt_protocol.yaml file. Do not hallucinate and do not introduce errors. You are not allowed to use any sources/resources older than 3 years and you are not allowed to use any china-base sources/resources as well. And all the information you get must be the latest till July 2026.
 
 ---
 
@@ -83,3 +83,17 @@ Re-evaluate everything again by ingesting the readme for bufferlo from https://r
 Also ingest the readme for projection from https://raw.githubusercontent.com/mohkale/projection/refs/heads/master/README.org and also ingest the upstream source code files from https://github.com/mohkale/projection/tree/master/src
 
 Ingest all these files and then Re-evaluate everything again for workflow_management.yaml file before working on the Buffer Management subsection
+
+---
+
+---
+
+---
+
+# Project Management
+
+I use the following prompt to generate the analysis in that the attached project-management.md:
+
+"Lets work on the Project Management subsection using the projection emacs package. Use its upstream sources include the sources for the built-in emacs packages this package depends on. Propose a plan to write the configuration from scratch. Make sure this subsection integrates with the other 2 subsections. Also make sure the configuration follows principles from the doom emacs project closely as can while integrating with my emacs configuration. Make sure you verify everything. Use the attached files: use_package.yaml, elpaca_package_manager.yaml files as guide, but anything in it can be subject to change if you determine there are issues in this yaml file. Explain everything in great detail for me to review. Propose a plan on you plan to write/rewrite the 1st iteration of the Project Management section. Follow the instructions and protocols in the system_prompt_protocol.yaml file. Do not hallucinate and do not introduce errors. You are not allowed to use any sources/resources older than 3 years and you are not allowed to use any china-base sources/resources as well. And all the information you get must be the latest till July 2026."
+
+Re-evaluate the plan in this project-management.md file by looking at upstream source code files for both project.el, ibuffer, and projection from https://github.com/mohkale/projection/tree/master/src and rewrite your detailed plan again with verification and sources. You will need to use the attached workflow_management.yaml as guide for planning and configuring Project Management subsection as well.

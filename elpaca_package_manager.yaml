@@ -1,10 +1,13 @@
 document:
-  title: "The Elpaca Package Manager: Architecture, Async Physics, and `use-package` Integration (v2)"
+  title: "The Elpaca Package Manager: Architecture, Async Physics, and `use-package` Integration (v3)"
   description: >
     This document provides a canonical, verified breakdown of the Elpaca package manager (v0.12+),
     its asynchronous queue processing model, and its deep integration with `use-package`.
     All definitions are derived from the official Elpaca manual and source code.
     Verified current as of July 2026.
+    v3 CHANGELOG: Corrected the semantics of the `:wait` recipe keyword, which v2 had
+    inverted (a "correction" that was itself wrong). Refined the obsolescence claims for
+    `:pin`, `:vc`, and `package-quickstart`, which were previously overstated.
   sections:
     - id: 1
       title: Core Philosophy
@@ -36,17 +39,31 @@ document:
               description: >
                 Calls to `(elpaca ...)` or `(use-package ... :ensure t)` register an "Order" (recipe)
                 into an internal queue. They do NOT install packages immediately.
-            - event: "The `elpaca-wait` Function (CRITICAL)"
+            - event: "The `elpaca-wait` Function"
               description: >
                 `(elpaca-wait)` forces a synchronous block, processing all currently queued orders
                 immediately and halting init file reading until finished.
                 WARNING: Use sparingly (e.g., for `elpaca-use-package` or `no-littering`). Overuse
                 destroys async startup performance.
-            - event: "The `:wait` Recipe Keyword (Correction)"
+            - event: "The `:wait` Recipe Keyword (v3 CORRECTED)"
               description: >
-                The `:wait t` keyword inside a recipe (e.g., `:ensure (:wait t)`) instructs Elpaca
-                to block the *processing of subsequent orders in the queue* until this package is installed.
-                It DOES NOT halt the reading of the init file.
+                v2 of this document claimed `:wait t` blocks only "subsequent queue processing" and
+                does NOT halt init-file reading. This was backwards and has been corrected.
+
+                Per the official Elpaca manual: "`:wait` — When non-nil, process all queued orders
+                immediately before continuing," and "The `:wait` recipe keyword splits the current
+                queue and immediately begins processing prior queues." The use-package integration
+                section is explicit that it is used "to block until a package has been installed and
+                configured" (e.g. `(use-package general :ensure (:wait t) :demand t)`).
+
+                Because Emacs reads and evaluates init-file top-level forms sequentially, a keyword
+                that blocks until a package is installed necessarily pauses evaluation of every form
+                that follows it. In practice, `:wait t` on a given order has the SAME effect on
+                init-file reading as calling `(elpaca-wait)` immediately after that declaration — it
+                is a localized, inline version of `elpaca-wait`, not an exemption from it. The only
+                real distinction from the bare `elpaca-wait` function is scope/ergonomics (it is
+                attached to one specific order rather than issued as a separate top-level call), not
+                whether init-file reading is halted.
         - name: "Phase 3: Queue Processing (Post-Init)"
           items:
             - event: "`elpaca-process-queues`"
@@ -87,13 +104,47 @@ document:
             `(use-package foo :ensure t :config ...)` defers the `:config` block until Elpaca
             has asynchronously installed and loaded `foo`.
     - id: 5
-      title: Obsolete Paradigms
+      title: "Obsolete / Superseded Paradigms (v3 REFINED)"
       points:
-        - "The `:pin` keyword is OBSOLETE. Use recipe `:ref` or `:tag` for pinning."
-        - "The `:vc` keyword is superseded by Elpaca's native recipe system."
-        - "`package-quickstart` is obsolete."
+        - keyword: ":pin"
+          v2_claim: "The :pin keyword is OBSOLETE. Use recipe :ref or :tag for pinning."
+          v3_correction: >
+            Overstated. Elpaca's recipe system DOES still define its own `:pin` keyword — but with
+            different semantics than `package.el`/`use-package`'s archive-pinning `:pin`. Elpaca's
+            `:pin` means "when non-nil, ignore the package during update commands" (i.e., opt a
+            package out of `elpaca-update`/`elpaca-update-all`), not "lock to an archive." It is the
+            legacy *archive-pinning* meaning of `:pin` that is obsolete under Elpaca, since Elpaca
+            doesn't fetch from `package.el` archives at all — source selection is handled by the
+            recipe (`:host`/`:repo`/menus), and version pinning is handled via `:ref`/`:tag`.
+        - keyword: ":vc"
+          v2_claim: "The :vc keyword is superseded by Elpaca's native recipe system, and is effectively ignored by Elpaca."
+          v3_correction: >
+            Inaccurate. `elpaca-use-package-mode` only overrides `use-package-ensure-function`
+            (i.e., it intercepts `:ensure`). It does not touch the separate handler that Emacs 30's
+            built-in `package-vc.el` registers for the `:vc` keyword. If `:vc` is actually used in a
+            declaration alongside Elpaca, it is NOT silently ignored — it still invokes
+            `package-vc.el`'s own synchronous, non-Elpaca install path, independently of Elpaca's
+            async queue, which can produce confusing double-management rather than a clean no-op.
+            The correct guidance is: don't mix `:vc` with Elpaca; use the recipe system (`:host`,
+            `:repo`, `:ref`) instead of `:vc` entirely.
+        - keyword: "package-quickstart"
+          v2_claim: "package-quickstart is obsolete."
+          v3_correction: >
+            Category error. `package-quickstart` is a `package.el` feature and remains fully valid
+            in vanilla Emacs configurations that still use `package.el`. It is not "obsolete" in any
+            general sense — it is simply INAPPLICABLE under Elpaca, because Elpaca users set
+            `package-enable-at-startup nil` and never invoke `package.el`'s activation path that
+            `package-quickstart` accelerates.
     - id: 6
       title: Verification Notes
       points:
         - "Source: Official Elpaca Manual (Copyright 2022-2026 Nicholas Vollmer)."
-        - "Correction applied: Distinct behavior of `:wait` (recipe keyword) vs `elpaca-wait` (function)."
+        - >
+          v3 correction applied: the `:wait` recipe keyword DOES effectively halt init-file reading
+          at the point it is evaluated (same practical effect as calling `elpaca-wait` inline),
+          contrary to the v2 "correction," which had this backwards. Verified directly against the
+          manual's Recipes/`:wait` keyword reference, its Queues section, and its use-package
+          integration section.
+        - >
+          v3 correction applied: `:pin`, `:vc`, and `package-quickstart` obsolescence claims were
+          overstated/imprecise in v2; refined per Section 5 above.
