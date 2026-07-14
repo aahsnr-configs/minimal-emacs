@@ -1,0 +1,350 @@
+document:
+  title: "Architectural Blueprint: Workflow Management Context Engine (v3)"
+  metadata:
+    target_audience: "Future LLM Sessions / Context Ingestion"
+    subject: "Buffer Management, Project Management, and Workspaces Triad"
+    emacs_target: "31.0.90 (PGTK, Native Comp)"
+    package_manager: "Elpaca v0.12"
+    status: "v3: Corrected projection-ibuffer bundled reality, redraw trap, and bufferlo workspace bleed."
+  sections:
+    - id: 1
+      title: "The Triad Paradigm (Executive Summary)"
+      summary: >
+        In the v0.10 Emacs configuration, the Workflow Management section is anchored
+        by a synergistic triad that strictly replaces the legacy, monolithic
+        projectile + persp-mode stack. This triad forms the "Context Engine" of the
+        IDE, mathematically isolating buffers, defining project boundaries, and
+        persisting complex workflows across daemon restarts.
+      strict_negative_constraints:
+        - constraint: "NO projectile"
+          detail: "Replaced entirely by projection and native project.el."
+        - constraint: "NO persp-mode / perspective.el"
+          detail: "Replaced entirely by bufferlo and native tab-bar."
+        - constraint: "NO consult-projectile"
+          detail: "Obsolete and unmaintained; consult natively supports project.el."
+      triad_components:
+        - name: "Buffer Management"
+          packages: "ibuffer + projection-ibuffer (bundled)"
+          description: "The visual dashboard for buffer triage, dynamically grouped by project roots and isolated by bufferlo workspaces."
+        - name: "Project Management"
+          packages: "projection + project.el"
+          description: >
+            The structural boundary engine that defines "what constitutes a project"
+            without the overhead of a background indexing daemon.
+        - name: "Workspaces"
+          packages: "bufferlo"
+          description: >
+            The spatial isolation layer that leverages native Emacs tab-bar (hidden)
+            to provide mathematically strict buffer lists per workflow context.
+    - id: 2
+      title: "Subsection 1: Buffer Management"
+      packages:
+        - name: "ibuffer"
+          source: "Built-in"
+        - name: "nerd-icons-ibuffer"
+          source: "MELPA"
+        - name: "projection-ibuffer"
+          source: "Bundled inside projection"
+      architectural_decisions:
+        - question: "Why ibuffer over bufler/buffalo?"
+          answer: >
+            Packages like bufler introduce heavy, custom DSLs (Domain Specific
+            Languages) for grouping buffers, violating the "Vanilla Emacs Paradigm"
+            constraint. ibuffer is built-in, highly performant, and natively
+            supports complex programmatic filter groups.
+        - name: "The projection-ibuffer Bundled Reality"
+          v2_error: >
+            V2 incorrectly listed projection-ibuffer as a standalone MELPA package.
+          v3_verified_physics: >
+            Live source-code extraction confirms projection-ibuffer.el is a bundled
+            utility file inside the projection repository (src/). It MUST be declared
+            with :ensure nil and loaded strictly :after projection.
+        - name: "The Redraw Trap (CRITICAL FIX)"
+          v2_error: >
+            V2 suggested simply hooking ibuffer-projection-set-filter-groups into ibuffer-hook.
+          v3_verified_physics: >
+            Upstream ibuffer-projection-set-filter-groups ONLY calls ibuffer-update
+            if (called-interactively-p 'interactive) is true. If hooked natively,
+            it modifies the filter variables but FAILS to redraw the UI.
+          mathematically_superior_solution: >
+            We must engineer a custom lambda wrapper hooked into ibuffer-mode-hook
+            that calls ibuffer-projection-set-filter-groups and then forces a
+            redraw via (ibuffer-update nil t).
+        - name: "The Bufferlo Workspace Bleed (CRITICAL FIX)"
+          v2_error: >
+            V2 assumed projection-ibuffer would naturally respect bufferlo's workspace isolation.
+          v3_verified_physics: >
+            Upstream projection-ibuffer--filter-groups hardcodes a loop over the
+            global (buffer-list). This causes buffers from ALL bufferlo workspaces
+            to bleed into the current dashboard.
+          mathematically_superior_solution: >
+            We must inject an :around advice on projection-ibuffer--filter-groups
+            to dynamically swap (buffer-list) with (bufferlo-buffer-list) when
+            bufferlo-mode is active, strictly respecting workspace boundaries.
+        - name: "Empty Group Suppression"
+          answer: >
+            ibuffer-show-empty-filter-groups must be set to nil. Without this,
+            switching projects leaves ghost headers for projects with no open
+            buffers.
+        - name: "Human-Readable Sizes"
+          answer: >
+            The size column must be redefined via define-ibuffer-column to use
+            file-size-human-readable, converting raw byte counts into K/M/G
+            formats.
+        - name: "Visual Parity"
+          answer: >
+            nerd-icons-ibuffer is hooked into ibuffer-mode to provide the same
+            visual glyphs seen in vertico/marginalia and dirvish.
+    - id: 3
+      title: "Subsection 2: Project Management"
+      packages:
+        - name: "projection"
+          source: "MELPA"
+        - name: "projection-multi"
+          source: "MELPA"
+        - name: "projection-multi-embark"
+          source: "MELPA"
+      architectural_decisions:
+        - question: "Why projection over projectile?"
+          answer: >
+            projectile is a 6000-line monolith. projection is a lightweight,
+            pluggable extension layer atop Emacs' native project.el. It provides
+            the "batteries-included" features of Projectile (compilation commands,
+            ibuffer grouping, find-other-file) without overriding core Emacs APIs
+            or requiring a background indexing daemon.
+        - name: "Doom Emacs SPC p p Parity (Switch Project)"
+          details:
+            - "In Doom, SPC p p invokes projectile-switch-project."
+            - "Vanilla Solution: Route SPC p p to the native project-switch-project. Because projection extends project.el, it automatically inherits and manages the known projects list."
+        - name: "Enriching the Dispatch Menu (project-switch-commands)"
+          details:
+            - "Emacs 30/31 uses the project-switch-commands variable to populate the dispatch menu presented after selecting a project."
+            - "Mandatory Injection: You must inject consult-find, consult-ripgrep, and magit-project-status into this list so the user gets a rich, Doom-like action menu instead of just defaulting to project-find-file."
+          syntax: "(add-to-list 'project-switch-commands '(consult-ripgrep \"Ripgrep\") t)"
+        - name: "Doom Emacs SPC f p Parity (Find File in Emacs Config)"
+          details:
+            - "In Doom, SPC f p instantly searches the private config directory (~/.doom.d/)."
+            - "Vanilla Solution: Inject a custom O(1) wrapper function named ar/find-file-in-emacs-config. This function must temporarily let-bind default-directory to user-emacs-directory and invoke consult-find."
+        - name: "Multi-Target Compilation"
+          answer: >
+            projection-multi and projection-multi-embark ARE distinct MELPA packages
+            (unlike projection-ibuffer). They must be integrated with :ensure t to
+            allow interactive selection of compilation targets (e.g., CMake, Tox,
+            Make) via consult, completely replacing projectile-compile-project.
+    - id: 4
+      title: "Subsection 3: Workspaces"
+      packages:
+        - name: "bufferlo"
+          source: "GNU ELPA"
+      architectural_decisions:
+        - question: "Why bufferlo over persp-mode/perspective.el?"
+          answer: >
+            persp-mode relies on heavy, custom frame/window state tracking that
+            frequently clashes with popper, ace-window, and daemon client frames.
+            bufferlo is an official GNU ELPA package that leverages Emacs' native
+            tab-bar-mode (hiding the visual tabs) to provide mathematically
+            isolated buffer lists per workspace.
+        - name: "Session Persistence"
+          answer: >
+            bufferlo natively persists workspace layouts across daemon restarts,
+            fulfilling the requirement for complex, multi-day scientific writing
+            and programming workflows.
+        - name: "The consult-buffer Integration (CRITICAL CORRECTION FROM V1)"
+          v1_error: >
+            V1 suggested manually injecting custom bufferlo sources into
+            consult-buffer-sources.
+          v2_verified_physics: >
+            The upstream bufferlo documentation explicitly warns that manual
+            source injection can cause "consult narrowing keys interfering with
+            one another".
+          mathematically_superior_solution: >
+            bufferlo exposes a native filter function. You MUST simply set
+            (setq consult-buffer-list-function #'bufferlo-local-buffers). This
+            1-line configuration forces consult-buffer to strictly show
+            file-visiting buffers from the current workspace by default, entirely
+            solving the "buffer soup" problem without breaking Consult's
+            narrowing engine. This MUST be placed in a with-eval-after-load 'consult block.
+        - name: "Tab-Bar Abstraction"
+          answer: >
+            tab-bar-mode must be enabled but visually hidden (tab-bar-show nil).
+            bufferlo uses the underlying tab structures to maintain strict buffer
+            isolation.
+    - id: 5
+      title: "Cross-Subsection Integration (The Triad)"
+      intro: >
+        The true power of this architecture lies in how these three subsections
+        communicate:
+      integration_chain:
+        - step: "The Root Detection Chain"
+          description: >
+            When a file is opened, project.el (extended by projection) determines
+            the project root.
+        - step: "The Isolation Layer"
+          description: >
+            bufferlo intercepts buffer creation and assigns the buffer to the
+            active workspace's hidden tab.
+        - step: "The Visualization Layer"
+          description: >
+            When ibuffer is summoned, projection-ibuffer queries project.el for
+            the roots of all visible buffers (filtered by bufferlo's workspace
+            intersection advice) and dynamically generates the filter groups.
+        - step: "The Minibuffer Layer"
+          description: >
+            When consult-buffer is summoned, bufferlo-local-buffers filters the
+            candidates to the current workspace, while consult-dir uses
+            project.el to offer project roots as jump targets.
+        - step: "Dirvish Hook Excision"
+          description: >
+            The legacy persp-before-switch-functions hook in Dirvish MUST BE
+            PERMANENTLY EXCISED. bufferlo handles spatial isolation and window
+            management natively without requiring manual side-window teardowns.
+    - id: 6
+      title: "Global Configuration Integration (v0.10 config.org)"
+      intro: >
+        The next LLM session must understand how this triad impacts the rest of
+        the v0.10 configuration:
+      subsections:
+        - id: "A"
+          title: "Workflow Management (Dired, Dirvish, Treemacs)"
+          items:
+            - name: "Treemacs"
+              detail: >
+                treemacs-project-follow-mode relies entirely on project.el to
+                track the active project root. projection ensures this detection
+                is fast and accurate.
+            - name: "Dirvish/Dired"
+              detail: >
+                The custom ar/dired-strip-unsupported-ls-flags and project-dired
+                commands rely on project.el roots. The commented-out
+                persp-before-switch-functions hook in Dirvish MUST BE PERMANENTLY
+                EXCISED and replaced with bufferlo's native window management.
+            - name: "Ghostel (Terminal)"
+              detail: >
+                ghostel-project uses project.el to spawn terminals in the correct
+                project root. It must be added to project-switch-commands.
+        - id: "B"
+          title: "Completion Framework (Consult, Vertico, Marginalia)"
+          items:
+            - name: "consult-buffer"
+              detail: >
+                Must use (setq consult-buffer-list-function
+                #'bufferlo-local-buffers) in a with-eval-after-load 'consult
+                block within the bufferlo :config.
+            - name: "consult-dir"
+              detail: >
+                consult-dir-project-list-function should be mapped to pull from
+                project.el's known projects (managed by projection), bypassing
+                consult-projectile.
+            - name: "consult-ripgrep / consult-find"
+              detail: >
+                These natively use project-current to determine the search
+                boundary. projection ensures this boundary is correctly
+                identified.
+        - id: "C"
+          title: "Development Tools (LSP, Envrc, DAP)"
+          items:
+            - name: "envrc (Direnv)"
+              detail: >
+                The envrc package uses project.el to locate .envrc files when
+                project-root is detected.
+            - name: "lsp-mode"
+              detail: >
+                lsp-mode relies on project-current to determine the workspace
+                root for spawning language servers. projection's accurate root
+                detection prevents LSP from spawning in the wrong directory.
+        - id: "D"
+          title: "Keybindings (General.el Leader Paradigm)"
+          intro: >
+            The following Doom-style leader bindings must be routed via
+            ar/global-leader strictly outside the use-package blocks:
+          bindings:
+            - group: "SPC b"
+              label: "Buffers"
+              commands:
+                - "ibuffer"
+                - "consult-buffer"
+                - "kill-buffer"
+            - group: "SPC p"
+              label: "Projects"
+              commands:
+                - key: "p p"
+                  command: "project-switch-project"
+                - key: "p c"
+                  command: "projection-multi-compile"
+                - key: "p f"
+                  command: "project-find-file"
+                - key: "f p"
+                  command: "ar/find-file-in-emacs-config"
+            - group: "SPC TAB"
+              label: "Workspaces"
+              commands:
+                - "bufferlo-switch-to-buffer"
+                - "bufferlo-new-tab"
+                - "bufferlo-close-tab"
+    - id: 7
+      title: "Load-Order Physics & Elpaca Directives (Instructions for Next LLM)"
+      intro: >
+        When generating the #+begin_src emacs-lisp blocks for these subsections,
+        the next LLM must adhere to these strict load-order physics:
+      directives:
+        - number: 1
+          title: "project.el is Built-in"
+          detail: >
+            It does not need a use-package block, but projection must be loaded
+            :after project or explicitly required in :config to ensure its
+            extensions patch project.el correctly.
+        - number: 2
+          title: "bufferlo requires tab-bar"
+          detail: >
+            tab-bar-mode must be initialized (even if hidden via tab-bar-show
+            nil) before bufferlo attempts to manage workspaces.
+        - number: 3
+          title: "consult Integration Timing"
+          detail: >
+            The injection of (setq consult-buffer-list-function
+            #'bufferlo-local-buffers) MUST happen in a with-eval-after-load
+            'consult block within the bufferlo :config, otherwise the variable
+            will be unbound or overwritten by Consult's defaults.
+        - number: 4
+          title: "ibuffer Hook Timing & Redraw Trap"
+          detail: >
+            ibuffer-projection-set-filter-groups must be called via
+            ibuffer-mode-hook, not globally. Furthermore, because it lacks a
+            programmatic ibuffer-update call, the hook MUST include a manual
+            (ibuffer-update nil t) to force the UI to redraw.
+        - number: 5
+          title: "projection-ibuffer Bundled Reality"
+          detail: >
+            projection-ibuffer is NOT a standalone MELPA package. It is bundled
+            inside the projection repository. It MUST be declared with :ensure nil
+            and :after projection.
+        - number: 6
+          title: "The Bufferlo Workspace Intersection"
+          detail: >
+            An :around advice MUST be injected on projection-ibuffer--filter-groups
+            to swap (buffer-list) with (bufferlo-buffer-list) when bufferlo-mode
+            is active. This prevents cross-workspace buffer bleed.
+        - number: 7
+          title: "Header Status"
+          detail: >
+            Per system_prompt_protocol.yaml, all three headers (** TODO Buffer
+            Management, ** TODO Project Management, ** TODO Workspaces) MUST
+            remain TODO until the user explicitly issues the GREEN LIGHT and the
+            exact phrase "change status from TODO to DONE".
+        - number: 8
+          title: "No Package Merging"
+          detail: >
+            Each distinct package (ibuffer, nerd-icons-ibuffer, projection,
+            projection-multi, bufferlo) MUST have its own isolated use-package
+            block, even if they are conceptually grouped under the same Org
+            header.
+        - number: 9
+          title: "project-switch-commands Syntax"
+          detail: >
+            When adding commands to the project dispatch menu, use the exact
+            syntax: (add-to-list 'project-switch-commands '(consult-ripgrep
+            "Ripgrep") t).
+  footer: >
+    End of Architectural Blueprint v3. This document contains the verified,
+    hallucination-free structural logic required to generate the v0.10 Emacs
+    Lisp implementation for the Workflow Management Context Engine.
