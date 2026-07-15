@@ -1,0 +1,2312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Comprehensive interactive documentation of VS Code IDE features including LSP language intelligence and DAP debugging capabilities">
+    <meta name="keywords" content="VS Code, IDE, LSP, DAP, Language Server Protocol, Debug Adapter Protocol, documentation">
+    <title>VS Code IDE Features — Interactive Documentation</title>
+    
+    <style>
+        /* ========================================
+           CSS CUSTOM PROPERTIES - TOKYO NIGHT
+           ======================================== */
+        :root {
+            /* Core Palette */
+            --bg: #1a1b26;
+            --bg-dark: #16161e;
+            --bg-highlight: #292e42;
+            --bg-float: #1e2030;
+            --bg-visual: #282a36;
+            
+            /* Text */
+            --fg: #c0caf5;
+            --fg-dark: #a9b1d6;
+            --fg-gutter: #3b4261;
+            --comment: #565f89;
+            
+            /* Accent Colors */
+            --blue: #7aa2f7;
+            --cyan: #7dcfff;
+            --green: #9ece6a;
+            --magenta: #bb9af7;
+            --red: #f7768e;
+            --orange: #ff9e64;
+            --yellow: #e0af68;
+            --teal: #1abc9c;
+            --purple: #9d7cd8;
+            
+            /* Semantic Colors */
+            --info: var(--cyan);
+            --success: var(--green);
+            --warning: var(--orange);
+            --error: var(--red);
+            --accent: var(--blue);
+            --accent-secondary: var(--magenta);
+            
+            /* Spacing */
+            --space-xs: 0.25rem;
+            --space-sm: 0.5rem;
+            --space-md: 1rem;
+            --space-lg: 1.5rem;
+            --space-xl: 2rem;
+            --space-2xl: 3rem;
+            
+            /* Typography */
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+            
+            /* Borders */
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            
+            /* Shadows */
+            --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+            
+            /* Transitions */
+            --transition-fast: 150ms ease;
+            --transition-normal: 250ms ease;
+            --transition-slow: 400ms ease;
+            
+            /* Layout */
+            --sidebar-width: 280px;
+            --header-height: 400px;
+        }
+        
+        /* Light mode variables (optional toggle) */
+        [data-theme="light"] {
+            --bg: #f8f9fa;
+            --bg-dark: #ffffff;
+            --bg-highlight: #e9ecef;
+            --bg-float: #ffffff;
+            --fg: #212529;
+            --fg-dark: #495057;
+            --comment: #6c757d;
+        }
+        
+        /* ========================================
+           RESET & BASE STYLES
+           ======================================== */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: var(--space-xl);
+        }
+        
+        body {
+            font-family: var(--font-sans);
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--fg);
+            background: var(--bg);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* ========================================
+           LAYOUT STRUCTURE
+           ======================================== */
+        .app-container {
+            display: grid;
+            grid-template-columns: var(--sidebar-width) 1fr;
+            grid-template-rows: auto 1fr;
+            min-height: 100vh;
+        }
+        
+        /* Hero Header */
+        .hero-header {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg) 100%);
+            padding: var(--space-2xl);
+            border-bottom: 1px solid var(--fg-gutter);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(ellipse at 20% 50%, rgba(122, 162, 247, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 50%, rgba(187, 154, 247, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+        
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .hero-title {
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 700;
+            color: var(--fg);
+            margin-bottom: var(--space-md);
+            line-height: 1.2;
+        }
+        
+        .hero-title span {
+            background: linear-gradient(135deg, var(--blue) 0%, var(--magenta) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hero-subtitle {
+            font-size: 1.25rem;
+            color: var(--fg-dark);
+            max-width: 800px;
+            margin-bottom: var(--space-lg);
+        }
+        
+        .hero-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-md);
+            font-size: 0.875rem;
+            color: var(--comment);
+        }
+        
+        .hero-meta-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-xs);
+        }
+        
+        .hero-meta-item svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+        
+        /* Search Container */
+        .search-container {
+            margin-top: var(--space-xl);
+            max-width: 600px;
+        }
+        
+        .search-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: var(--space-md);
+            width: 20px;
+            height: 20px;
+            fill: var(--comment);
+            pointer-events: none;
+            transition: fill var(--transition-fast);
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: var(--space-md) var(--space-md) var(--space-md) 3rem;
+            font-size: 1rem;
+            font-family: var(--font-sans);
+            color: var(--fg);
+            background: var(--bg-float);
+            border: 2px solid var(--fg-gutter);
+            border-radius: var(--radius-md);
+            outline: none;
+            transition: all var(--transition-fast);
+        }
+        
+        .search-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(122, 162, 247, 0.2);
+        }
+        
+        .search-input:focus ~ .search-icon {
+            fill: var(--accent);
+        }
+        
+        .search-input::placeholder {
+            color: var(--comment);
+        }
+        
+        .search-clear {
+            position: absolute;
+            right: var(--space-md);
+            width: 20px;
+            height: 20px;
+            fill: var(--comment);
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity var(--transition-fast);
+        }
+        
+        .search-input:not(:placeholder-shown) ~ .search-clear {
+            opacity: 1;
+        }
+        
+        .search-clear:hover {
+            fill: var(--fg);
+        }
+        
+        .search-results-count {
+            margin-top: var(--space-sm);
+            font-size: 0.875rem;
+            color: var(--comment);
+            min-height: 1.5em;
+        }
+        
+        /* Sidebar Navigation */
+        .sidebar {
+            grid-column: 1;
+            grid-row: 2;
+            background: var(--bg-dark);
+            border-right: 1px solid var(--fg-gutter);
+            padding: var(--space-lg);
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--fg-gutter) transparent;
+        }
+        
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .sidebar::-webkit-scrollbar-thumb {
+            background: var(--fg-gutter);
+            border-radius: 3px;
+        }
+        
+        .sidebar-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--comment);
+            margin-bottom: var(--space-md);
+            padding-bottom: var(--space-sm);
+            border-bottom: 1px solid var(--fg-gutter);
+        }
+        
+        .toc-list {
+            list-style: none;
+        }
+        
+        .toc-item {
+            margin-bottom: var(--space-xs);
+        }
+        
+        .toc-link {
+            display: block;
+            padding: var(--space-xs) var(--space-sm);
+            color: var(--fg-dark);
+            text-decoration: none;
+            font-size: 0.875rem;
+            border-radius: var(--radius-sm);
+            border-left: 2px solid transparent;
+            transition: all var(--transition-fast);
+        }
+        
+        .toc-link:hover {
+            color: var(--fg);
+            background: var(--bg-highlight);
+        }
+        
+        .toc-link.active {
+            color: var(--accent);
+            border-left-color: var(--accent);
+            background: rgba(122, 162, 247, 0.1);
+        }
+        
+        .toc-link.sub-item {
+            padding-left: var(--space-lg);
+            font-size: 0.8125rem;
+        }
+        
+        .toc-badge {
+            display: inline-block;
+            font-size: 0.625rem;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: var(--space-xs);
+            vertical-align: middle;
+        }
+        
+        .toc-badge.lsp {
+            background: rgba(122, 162, 247, 0.2);
+            color: var(--blue);
+        }
+        
+        .toc-badge.dap {
+            background: rgba(247, 118, 142, 0.2);
+            color: var(--red);
+        }
+        
+        .toc-badge.chrome {
+            background: rgba(158, 206, 106, 0.2);
+            color: var(--green);
+        }
+        
+        /* Main Content */
+        .main-content {
+            grid-column: 2;
+            grid-row: 2;
+            padding: var(--space-2xl);
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        
+        /* Section Styles */
+        .doc-section {
+            margin-bottom: var(--space-2xl);
+            scroll-margin-top: var(--space-xl);
+        }
+        
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            margin-bottom: var(--space-lg);
+            padding-bottom: var(--space-md);
+            border-bottom: 2px solid var(--fg-gutter);
+        }
+        
+        .section-icon {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-highlight);
+            border-radius: var(--radius-md);
+        }
+        
+        .section-icon svg {
+            width: 24px;
+            height: 24px;
+        }
+        
+        .section-icon.lsp svg {
+            fill: var(--blue);
+        }
+        
+        .section-icon.dap svg {
+            fill: var(--red);
+        }
+        
+        .section-icon.chrome svg {
+            fill: var(--green);
+        }
+        
+        .section-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--fg);
+        }
+        
+        .section-count {
+            margin-left: auto;
+            font-size: 0.875rem;
+            color: var(--comment);
+            background: var(--bg-highlight);
+            padding: var(--space-xs) var(--space-sm);
+            border-radius: var(--radius-sm);
+        }
+        
+        .section-description {
+            color: var(--fg-dark);
+            margin-bottom: var(--space-lg);
+            line-height: 1.7;
+        }
+        
+        /* Feature Cards Grid */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: var(--space-lg);
+        }
+        
+        /* Feature Card */
+        .feature-card {
+            background: var(--bg-float);
+            border: 1px solid var(--fg-gutter);
+            border-radius: var(--radius-md);
+            padding: var(--space-lg);
+            transition: all var(--transition-normal);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--accent);
+            opacity: 0;
+            transition: opacity var(--transition-normal);
+        }
+        
+        .feature-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+        
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+        
+        .feature-card[data-category="dap"]::before {
+            background: var(--red);
+        }
+        
+        .feature-card[data-category="dap"]:hover {
+            border-color: var(--red);
+        }
+        
+        .feature-card[data-category="chrome"]::before {
+            background: var(--green);
+        }
+        
+        .feature-card[data-category="chrome"]:hover {
+            border-color: var(--green);
+        }
+        
+        .feature-card.hidden {
+            display: none;
+        }
+        
+        .feature-header {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-sm);
+            margin-bottom: var(--space-md);
+        }
+        
+        .feature-number {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--comment);
+            background: var(--bg-highlight);
+            padding: var(--space-xs) var(--space-sm);
+            border-radius: var(--radius-sm);
+            min-width: 32px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        
+        .feature-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--fg);
+            flex: 1;
+            line-height: 1.4;
+        }
+        
+        .feature-badges {
+            display: flex;
+            gap: var(--space-xs);
+            flex-shrink: 0;
+        }
+        
+        .badge {
+            font-size: 0.625rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        
+        .badge-lsp {
+            background: rgba(122, 162, 247, 0.2);
+            color: var(--blue);
+        }
+        
+        .badge-dap {
+            background: rgba(247, 118, 142, 0.2);
+            color: var(--red);
+        }
+        
+        .badge-chrome {
+            background: rgba(158, 206, 106, 0.2);
+            color: var(--green);
+        }
+        
+        .feature-body {
+            margin-top: var(--space-md);
+        }
+        
+        .feature-description {
+            color: var(--fg-dark);
+            font-size: 0.9375rem;
+            line-height: 1.6;
+            margin-bottom: var(--space-md);
+        }
+        
+        .feature-methods {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-xs);
+        }
+        
+        .method-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-xs);
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--cyan);
+            background: rgba(125, 207, 255, 0.1);
+            padding: var(--space-xs) var(--space-sm);
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(125, 207, 255, 0.2);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        
+        .method-badge:hover {
+            background: rgba(125, 207, 255, 0.2);
+            border-color: var(--cyan);
+        }
+        
+        .method-badge::after {
+            content: '⎘';
+            font-size: 0.625rem;
+            opacity: 0;
+            transition: opacity var(--transition-fast);
+        }
+        
+        .method-badge:hover::after {
+            opacity: 1;
+        }
+        
+        .method-badge.copied {
+            color: var(--green);
+            background: rgba(158, 206, 106, 0.2);
+            border-color: var(--green);
+        }
+        
+        .method-badge.copied::after {
+            content: '✓';
+            opacity: 1;
+        }
+        
+        /* Editor Chrome Table */
+        .chrome-table-container {
+            overflow-x: auto;
+            margin: var(--space-lg) 0;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--fg-gutter);
+        }
+        
+        .chrome-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9375rem;
+        }
+        
+        .chrome-table th,
+        .chrome-table td {
+            padding: var(--space-md);
+            text-align: left;
+            border-bottom: 1px solid var(--fg-gutter);
+        }
+        
+        .chrome-table th {
+            background: var(--bg-highlight);
+            font-weight: 600;
+            color: var(--fg);
+            position: sticky;
+            top: 0;
+        }
+        
+        .chrome-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .chrome-table tr:hover td {
+            background: rgba(122, 162, 247, 0.05);
+        }
+        
+        .chrome-table .lsp-yes {
+            color: var(--green);
+        }
+        
+        .chrome-table .lsp-no {
+            color: var(--comment);
+        }
+        
+        /* Filter Controls */
+        .filter-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-sm);
+            margin-bottom: var(--space-lg);
+            padding: var(--space-md);
+            background: var(--bg-float);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--fg-gutter);
+        }
+        
+        .filter-btn {
+            font-family: var(--font-sans);
+            font-size: 0.875rem;
+            padding: var(--space-xs) var(--space-md);
+            background: var(--bg-highlight);
+            color: var(--fg-dark);
+            border: 1px solid var(--fg-gutter);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        
+        .filter-btn:hover {
+            color: var(--fg);
+            border-color: var(--fg-dark);
+        }
+        
+        .filter-btn.active {
+            background: var(--accent);
+            color: var(--bg);
+            border-color: var(--accent);
+        }
+        
+        /* Back to Top Button */
+        .back-to-top {
+            position: fixed;
+            bottom: var(--space-xl);
+            right: var(--space-xl);
+            width: 48px;
+            height: 48px;
+            background: var(--accent);
+            color: var(--bg);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--transition-normal);
+            box-shadow: var(--shadow-md);
+            z-index: 100;
+        }
+        
+        .back-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .back-to-top:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .back-to-top svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+        }
+        
+        /* Footer */
+        .doc-footer {
+            grid-column: 1 / -1;
+            padding: var(--space-xl);
+            background: var(--bg-dark);
+            border-top: 1px solid var(--fg-gutter);
+            text-align: center;
+        }
+        
+        .footer-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .footer-sources {
+            font-size: 0.875rem;
+            color: var(--comment);
+            line-height: 1.8;
+        }
+        
+        .footer-sources a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        
+        .footer-sources a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: var(--space-xl);
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--bg-highlight);
+            color: var(--fg);
+            padding: var(--space-sm) var(--space-lg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--fg-gutter);
+            box-shadow: var(--shadow-md);
+            font-size: 0.875rem;
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--transition-normal);
+            z-index: 1000;
+        }
+        
+        .toast.visible {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: var(--space-2xl);
+            color: var(--comment);
+        }
+        
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: var(--space-md);
+            opacity: 0.5;
+        }
+        
+        .empty-state-text {
+            font-size: 1.125rem;
+        }
+        
+        /* Keyboard Shortcut Hint */
+        kbd {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            background: var(--bg-highlight);
+            border: 1px solid var(--fg-gutter);
+            border-radius: var(--radius-sm);
+            box-shadow: 0 2px 0 var(--fg-gutter);
+        }
+        
+        /* ========================================
+           RESPONSIVE DESIGN
+           ======================================== */
+        @media (max-width: 1024px) {
+            .app-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                grid-column: 1;
+                grid-row: auto;
+                position: static;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid var(--fg-gutter);
+            }
+            
+            .main-content {
+                grid-column: 1;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 640px) {
+            .hero-header {
+                padding: var(--space-lg);
+            }
+            
+            .hero-title {
+                font-size: 1.75rem;
+            }
+            
+            .hero-subtitle {
+                font-size: 1rem;
+            }
+            
+            .main-content {
+                padding: var(--space-lg);
+            }
+            
+            .section-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .section-count {
+                margin-left: 0;
+                margin-top: var(--space-sm);
+            }
+            
+            .feature-card {
+                padding: var(--space-md);
+            }
+        }
+        
+        /* ========================================
+           PRINT STYLES
+           ======================================== */
+        @media print {
+            .sidebar,
+            .search-container,
+            .filter-controls,
+            .back-to-top,
+            .toast {
+                display: none !important;
+            }
+            
+            .app-container {
+                display: block;
+            }
+            
+            .hero-header {
+                background: white !important;
+                color: black !important;
+                border-bottom: 2px solid #333;
+            }
+            
+            .hero-title,
+            .section-title,
+            .feature-title {
+                color: black !important;
+            }
+            
+            .feature-card {
+                break-inside: avoid;
+                border: 1px solid #ccc;
+                background: white !important;
+            }
+            
+            body {
+                background: white;
+                color: black;
+            }
+        }
+        
+        /* ========================================
+           ANIMATIONS
+           ======================================== */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .feature-card {
+            animation: fadeIn 0.3s ease forwards;
+        }
+        
+        /* Reduce motion for accessibility */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Hero Header -->
+        <header class="hero-header" role="banner">
+            <div class="hero-content">
+                <h1 class="hero-title">VS Code <span>IDE Features</span></h1>
+                <p class="hero-subtitle">
+                    An exhaustive reference of language intelligence and debugging capabilities 
+                    built on the Language Server Protocol (LSP) and Debug Adapter Protocol (DAP).
+                </p>
+                
+                <div class="hero-meta">
+                    <div class="hero-meta-item">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                        <span>73 Features Documented</span>
+                    </div>
+                    <div class="hero-meta-item">
+                        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+                        <span>Current as of July 2026</span>
+                    </div>
+                    <div class="hero-meta-item">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                        <span>Scope: LSP + DAP only (no AI/remote)</span>
+                    </div>
+                </div>
+                
+                <!-- Search -->
+                <div class="search-container">
+                    <div class="search-wrapper">
+                        <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                        <input 
+                            type="search" 
+                            class="search-input" 
+                            id="searchInput"
+                            placeholder="Search features, methods, or descriptions... (Press / to focus)"
+                            aria-label="Search documentation"
+                        >
+                        <svg class="search-clear" id="searchClear" viewBox="0 0 24 24" role="button" aria-label="Clear search"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    </div>
+                    <div class="search-results-count" id="searchResultsCount" aria-live="polite"></div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" role="navigation" aria-label="Table of Contents">
+            <h2 class="sidebar-title">Contents</h2>
+            <nav>
+                <ul class="toc-list" id="tocList">
+                    <li class="toc-item">
+                        <a href="#introduction" class="toc-link">Introduction</a>
+                    </li>
+                    <li class="toc-item">
+                        <a href="#part1" class="toc-link">
+                            Part 1: Language Intelligence
+                            <span class="toc-badge lsp">LSP</span>
+                        </a>
+                    </li>
+                    <li class="toc-item">
+                        <a href="#lsp-features" class="toc-link sub-item">LSP Features (33)</a>
+                    </li>
+                    <li class="toc-item">
+                        <a href="#editor-chrome" class="toc-link sub-item">
+                            Editor Chrome
+                            <span class="toc-badge chrome">UI</span>
+                        </a>
+                    </li>
+                    <li class="toc-item">
+                        <a href="#part2" class="toc-link">
+                            Part 2: Debugging
+                            <span class="toc-badge dap">DAP</span>
+                        </a>
+                    </li>
+                    <li class="toc-item">
+                        <a href="#dap-features" class="toc-link sub-item">DAP Features (32)</a>
+                    </li>
+                    <li class="toc-item">
+                        <a href="#sources" class="toc-link">Sources</a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main-content" role="main">
+            <!-- Introduction Section -->
+            <section class="doc-section" id="introduction">
+                <div class="section-header">
+                    <div class="section-icon lsp">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    </div>
+                    <h2 class="section-title">Introduction</h2>
+                </div>
+                <p class="section-description">
+                    VS Code's IDE capabilities are built on two protocols it originated as an editor client: 
+                    <strong>LSP (Language Server Protocol)</strong> for code intelligence, and 
+                    <strong>DAP (Debug Adapter Protocol)</strong> for debugging. Not every feature is available 
+                    for every language — it depends on whether the specific language server or debug adapter 
+                    implements that capability — but this is the full set VS Code itself supports as a client.
+                </p>
+            </section>
+            
+            <!-- Part 1: Language Intelligence -->
+            <section class="doc-section" id="part1">
+                <div class="section-header">
+                    <div class="section-icon lsp">
+                        <svg viewBox="0 0 24 24"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>
+                    </div>
+                    <h2 class="section-title">Part 1 — Language Intelligence</h2>
+                    <span class="section-count">33 features + Editor Chrome</span>
+                </div>
+                <p class="section-description">
+                    All language intelligence features backed by the Language Server Protocol (LSP). 
+                    These capabilities enable intelligent code editing through communication between 
+                    the editor client and language servers.
+                </p>
+                
+                <!-- Filter Controls -->
+                <div class="filter-controls" role="toolbar" aria-label="Filter features">
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="lsp">LSP-backed</button>
+                    <button class="filter-btn" data-filter="chrome">Editor Chrome</button>
+                </div>
+                
+                <!-- LSP Features Grid -->
+                <div id="lsp-features" class="features-grid" role="list">
+                    <!-- Feature 1 -->
+                    <article class="feature-card" data-category="lsp" data-search="intellisense code completion textDocument/completion completionItem/resolve autocomplete popup ghost text inline suggestions auto-import" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#1</span>
+                            <h3 class="feature-title">IntelliSense / code completion</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Context-aware autocomplete popup, ghost text (inline suggestions), auto-import on accept.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/completion">textDocument/completion</code>
+                                <code class="method-badge" data-copy="completionItem/resolve">completionItem/resolve</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 2 -->
+                    <article class="feature-card" data-category="lsp" data-search="hover info textDocument/hover tooltip type info docs signatures mouse-hover keyboard shortcut" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#2</span>
+                            <h3 class="feature-title">Hover info</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Tooltip with type info, docs, and signatures on mouse-hover or keyboard shortcut.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/hover">textDocument/hover</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 3 -->
+                    <article class="feature-card" data-category="lsp" data-search="signature help textDocument/signatureHelp parameter hints function call" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#3</span>
+                            <h3 class="feature-title">Signature help</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Parameter hints shown while typing inside a function call.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/signatureHelp">textDocument/signatureHelp</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 4 -->
+                    <article class="feature-card" data-category="lsp" data-search="go to definition textDocument/definition jump peek symbol defined" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#4</span>
+                            <h3 class="feature-title">Go to Definition</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Jump to (or peek) where a symbol is defined.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/definition">textDocument/definition</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 5 -->
+                    <article class="feature-card" data-category="lsp" data-search="go to declaration textDocument/declaration symbol declaration C/C++ headers" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#5</span>
+                            <h3 class="feature-title">Go to Declaration</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Jump to a symbol's declaration (distinct from definition in some languages, e.g. C/C++ headers).</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/declaration">textDocument/declaration</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 6 -->
+                    <article class="feature-card" data-category="lsp" data-search="go to type definition textDocument/typeDefinition type definition variable expression" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#6</span>
+                            <h3 class="feature-title">Go to Type Definition</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Jump to the type definition of a variable/expression.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/typeDefinition">textDocument/typeDefinition</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 7 -->
+                    <article class="feature-card" data-category="lsp" data-search="go to implementation textDocument/implementation concrete implementations interface abstract method" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#7</span>
+                            <h3 class="feature-title">Go to Implementation</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Jump to concrete implementations of an interface/abstract method.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/implementation">textDocument/implementation</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 8 -->
+                    <article class="feature-card" data-category="lsp" data-search="find all references textDocument/references usage symbol across project References panel" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#8</span>
+                            <h3 class="feature-title">Find All References</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Lists every usage of a symbol across the project in the References panel.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/references">textDocument/references</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 9 -->
+                    <article class="feature-card" data-category="lsp" data-search="document highlight textDocument/documentHighlight occurrences symbol under cursor current file" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#9</span>
+                            <h3 class="feature-title">Document Highlight</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Highlights all occurrences of the symbol under the cursor within the current file.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/documentHighlight">textDocument/documentHighlight</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 10 -->
+                    <article class="feature-card" data-category="lsp" data-search="document symbols outline view textDocument/documentSymbol tree view classes functions variables breadcrumb dropdown" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#10</span>
+                            <h3 class="feature-title">Document Symbols / Outline view</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Tree view of classes/functions/variables in the current file; also powers the breadcrumb dropdown.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/documentSymbol">textDocument/documentSymbol</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 11 -->
+                    <article class="feature-card" data-category="lsp" data-search="workspace symbol search workspace/symbol Ctrl+T Go to Symbol fuzzy search symbols project" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#11</span>
+                            <h3 class="feature-title">Workspace Symbol search</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Ctrl+T "Go to Symbol in Workspace" — fuzzy search symbols across the whole project.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="workspace/symbol">workspace/symbol</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 12 -->
+                    <article class="feature-card" data-category="lsp" data-search="code actions quick fixes refactorings textDocument/codeAction codeAction/resolve lightbulb menu extract method variable add missing import" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#12</span>
+                            <h3 class="feature-title">Code Actions (quick fixes & refactorings)</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Lightbulb menu: quick fixes, extract method/variable, add missing import, etc.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/codeAction">textDocument/codeAction</code>
+                                <code class="method-badge" data-copy="codeAction/resolve">codeAction/resolve</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 13 -->
+                    <article class="feature-card" data-category="lsp" data-search="code lens textDocument/codeLens codeLens/resolve inline actionable annotations above symbols reference Run Test Debug Test" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#13</span>
+                            <h3 class="feature-title">Code Lens</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Inline actionable annotations above symbols (e.g. "1 reference | Run Test | Debug Test").</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/codeLens">textDocument/codeLens</code>
+                                <code class="method-badge" data-copy="codeLens/resolve">codeLens/resolve</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 14 -->
+                    <article class="feature-card" data-category="lsp" data-search="document formatting whole file textDocument/formatting Format Document command" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#14</span>
+                            <h3 class="feature-title">Document Formatting (whole file)</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">"Format Document" command.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/formatting">textDocument/formatting</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 15 -->
+                    <article class="feature-card" data-category="lsp" data-search="range formatting textDocument/rangeFormatting Format Selection command" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#15</span>
+                            <h3 class="feature-title">Range Formatting</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">"Format Selection" command.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/rangeFormatting">textDocument/rangeFormatting</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 16 -->
+                    <article class="feature-card" data-category="lsp" data-search="on-type formatting textDocument/onTypeFormatting auto-reformats trigger characters" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#16</span>
+                            <h3 class="feature-title">On-type Formatting</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Auto-reformats as you type trigger characters like <kbd>}</kbd> or <kbd>;</kbd>.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/onTypeFormatting">textDocument/onTypeFormatting</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 17 -->
+                    <article class="feature-card" data-category="lsp" data-search="rename symbol textDocument/rename textDocument/prepareRename F2 project-wide safe rename references" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#17</span>
+                            <h3 class="feature-title">Rename Symbol</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">F2 — project-wide safe rename of a symbol and all its references.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/rename">textDocument/rename</code>
+                                <code class="method-badge" data-copy="textDocument/prepareRename">textDocument/prepareRename</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 18 -->
+                    <article class="feature-card" data-category="lsp" data-search="folding ranges textDocument/foldingRange gutter arrows collapse expand code blocks functions imports regions" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#18</span>
+                            <h3 class="feature-title">Folding Ranges</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Gutter arrows to collapse/expand code blocks, functions, imports, regions.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/foldingRange">textDocument/foldingRange</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 19 -->
+                    <article class="feature-card" data-category="lsp" data-search="selection range smart expand shrink textDocument/selectionRange Shift+Alt+Right Shift+Alt+Left syntactic scope" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#19</span>
+                            <h3 class="feature-title">Selection Range (smart expand/shrink)</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Shift+Alt+Right / Shift+Alt+Left grows/shrinks selection by syntactic scope.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/selectionRange">textDocument/selectionRange</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 20 -->
+                    <article class="feature-card" data-category="lsp" data-search="linked editing range textDocument/linkedEditingRange HTML JSX tag name matching pair" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#20</span>
+                            <h3 class="feature-title">Linked Editing Range</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Editing one HTML/JSX tag name automatically updates its matching pair.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/linkedEditingRange">textDocument/linkedEditingRange</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 21 -->
+                    <article class="feature-card" data-category="lsp" data-search="call hierarchy textDocument/prepareCallHierarchy callHierarchy/incomingCalls callHierarchy/outgoingCalls tree view calls function" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#21</span>
+                            <h3 class="feature-title">Call Hierarchy</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Tree view of what calls a function and what it calls.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/prepareCallHierarchy">textDocument/prepareCallHierarchy</code>
+                                <code class="method-badge" data-copy="callHierarchy/incomingCalls">callHierarchy/incomingCalls</code>
+                                <code class="method-badge" data-copy="callHierarchy/outgoingCalls">callHierarchy/outgoingCalls</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 22 -->
+                    <article class="feature-card" data-category="lsp" data-search="type hierarchy textDocument/prepareTypeHierarchy typeHierarchy/supertypes typeHierarchy/subtypes tree view supertypes subtypes" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#22</span>
+                            <h3 class="feature-title">Type Hierarchy</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Tree view of a type's supertypes and subtypes.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/prepareTypeHierarchy">textDocument/prepareTypeHierarchy</code>
+                                <code class="method-badge" data-copy="typeHierarchy/supertypes">typeHierarchy/supertypes</code>
+                                <code class="method-badge" data-copy="typeHierarchy/subtypes">typeHierarchy/subtypes</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 23 -->
+                    <article class="feature-card" data-category="lsp" data-search="semantic tokens semantic highlighting textDocument/semanticTokens type-aware syntax coloring TextMate grammars" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#23</span>
+                            <h3 class="feature-title">Semantic Tokens (semantic highlighting)</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Type-aware syntax coloring beyond what static TextMate grammars can do.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/semanticTokens/full">textDocument/semanticTokens/full</code>
+                                <code class="method-badge" data-copy="textDocument/semanticTokens/delta">.../delta</code>
+                                <code class="method-badge" data-copy="textDocument/semanticTokens/range">.../range</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 24 -->
+                    <article class="feature-card" data-category="lsp" data-search="inlay hints textDocument/inlayHint inlayHint/resolve inline grey annotations inferred types parameter names" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#24</span>
+                            <h3 class="feature-title">Inlay Hints</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Inline grey annotations showing inferred types, parameter names, etc.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/inlayHint">textDocument/inlayHint</code>
+                                <code class="method-badge" data-copy="inlayHint/resolve">inlayHint/resolve</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 25 -->
+                    <article class="feature-card" data-category="lsp" data-search="inline values textDocument/inlineValue variable values inline end-of-line debugger paused" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#25</span>
+                            <h3 class="feature-title">Inline Values</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Shows variable values inline at end-of-line while paused in the debugger.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/inlineValue">textDocument/inlineValue</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 26 -->
+                    <article class="feature-card" data-category="lsp" data-search="document links textDocument/documentLink documentLink/resolve Ctrl+click URLs file paths import references source comments" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#26</span>
+                            <h3 class="feature-title">Document Links</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Ctrl+click-able URLs, file paths, or import references inside source/comments.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/documentLink">textDocument/documentLink</code>
+                                <code class="method-badge" data-copy="documentLink/resolve">documentLink/resolve</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 27 -->
+                    <article class="feature-card" data-category="lsp" data-search="document color textDocument/documentColor textDocument/colorPresentation inline color swatches CSS picker" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#27</span>
+                            <h3 class="feature-title">Document Color</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Inline color swatches next to CSS-like color values, with a picker.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/documentColor">textDocument/documentColor</code>
+                                <code class="method-badge" data-copy="textDocument/colorPresentation">textDocument/colorPresentation</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 28 -->
+                    <article class="feature-card" data-category="lsp" data-search="diagnostics push model textDocument/publishDiagnostics server pushes errors warnings squiggles Problems panel" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#28</span>
+                            <h3 class="feature-title">Diagnostics (push model)</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Server pushes errors/warnings; shown as squiggles and in the Problems panel.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/publishDiagnostics">textDocument/publishDiagnostics</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 29 -->
+                    <article class="feature-card" data-category="lsp" data-search="diagnostics pull model textDocument/diagnostic workspace/diagnostic client requests diagnostics LSP 3.17 workspace-wide refresh" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#29</span>
+                            <h3 class="feature-title">Diagnostics (pull model)</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Client requests diagnostics on demand (LSP 3.17+), including workspace-wide refresh.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/diagnostic">textDocument/diagnostic</code>
+                                <code class="method-badge" data-copy="workspace/diagnostic">workspace/diagnostic</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 30 -->
+                    <article class="feature-card" data-category="lsp" data-search="moniker textDocument/moniker cross-repository symbol identity large-scale indexed code navigation GitHub" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#30</span>
+                            <h3 class="feature-title">Moniker</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Cross-repository symbol identity, mainly used for large-scale/indexed code navigation.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="textDocument/moniker">textDocument/moniker</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 31 -->
+                    <article class="feature-card" data-category="lsp" data-search="workspace file-operation hooks workspace/willRenameFiles didRenameFiles willDeleteFiles didDeleteFiles willCreateFiles didCreateFiles imports references renamed moved deleted Explorer" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#31</span>
+                            <h3 class="feature-title">Workspace file-operation hooks</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Automatically fixes up imports/references when files are renamed, moved, or deleted in the Explorer.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="workspace/willRenameFiles">workspace/willRenameFiles</code>
+                                <code class="method-badge" data-copy="workspace/didRenameFiles">didRenameFiles</code>
+                                <code class="method-badge" data-copy="workspace/willDeleteFiles">willDeleteFiles</code>
+                                <code class="method-badge" data-copy="workspace/didDeleteFiles">didDeleteFiles</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 32 -->
+                    <article class="feature-card" data-category="lsp" data-search="execute command workspace/executeCommand server-defined custom commands Command Palette Organize Imports" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#32</span>
+                            <h3 class="feature-title">Execute Command</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Server-defined custom commands surfaced in the Command Palette (e.g. "Organize Imports").</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="workspace/executeCommand">workspace/executeCommand</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- Feature 33 -->
+                    <article class="feature-card" data-category="lsp" data-search="notebook document support notebook methods LSP 3.17 language-server-aware editing Jupyter notebook cells" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#33</span>
+                            <h3 class="feature-title">Notebook Document support</h3>
+                            <div class="feature-badges"><span class="badge badge-lsp">LSP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Language-server-aware editing inside Jupyter-style notebook cells.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="notebook/*">Various notebook/* methods (LSP 3.17+)</code>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+                
+                <!-- Editor Chrome Section -->
+                <div id="editor-chrome" class="doc-section" style="margin-top: var(--space-2xl);">
+                    <h3 class="section-title" style="font-size: 1.25rem; margin-bottom: var(--space-md);">Editor Chrome Features</h3>
+                    <p class="section-description">
+                        VS Code UI conventions built around LSP data — some are direct UI treatments of an LSP response, 
+                        others are pure editor polish with no protocol request behind them.
+                    </p>
+                    
+                    <div class="chrome-table-container">
+                        <table class="chrome-table">
+                            <thead>
+                                <tr>
+                                    <th>Feature</th>
+                                    <th>LSP-backed?</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Peek Definition / Peek References</strong></td>
+                                    <td class="lsp-yes">✓ Yes</td>
+                                    <td>Shows the target inline in an expandable panel without switching editor tabs.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Breadcrumbs bar</strong></td>
+                                    <td class="lsp-yes">✓ Yes</td>
+                                    <td>Path › file › enclosing symbol navigation bar above the editor.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Problems panel</strong></td>
+                                    <td class="lsp-yes">✓ Yes</td>
+                                    <td>Centralized, filterable list of all errors/warnings across the project.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Sticky Scroll</strong></td>
+                                    <td class="lsp-no">✗ No</td>
+                                    <td>Pins the current enclosing function/class/block header at the top of the viewport while scrolling.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Bracket Pair Colorization</strong></td>
+                                    <td class="lsp-no">✗ No</td>
+                                    <td>Matches bracket pairs by color.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Minimap</strong></td>
+                                    <td class="lsp-no">✗ No</td>
+                                    <td>Miniature file overview on the right edge of the editor.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Multi-cursor editing</strong></td>
+                                    <td class="lsp-no">✗ No</td>
+                                    <td>Place and edit from multiple cursors simultaneously.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Quick Fix lightbulb</strong></td>
+                                    <td class="lsp-yes">✓ Yes</td>
+                                    <td>Visual indicator that code actions are available at the cursor.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Part 2: Debugging -->
+            <section class="doc-section" id="part2">
+                <div class="section-header">
+                    <div class="section-icon dap">
+                        <svg viewBox="0 0 24 24"><path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/></svg>
+                    </div>
+                    <h2 class="section-title">Part 2 — Debugging</h2>
+                    <span class="section-count">32 features</span>
+                </div>
+                <p class="section-description">
+                    All debugging features backed by the Debug Adapter Protocol (DAP). 
+                    These capabilities enable step-through debugging, breakpoints, variable inspection, 
+                    and runtime control through communication between the editor and debug adapters.
+                </p>
+                
+                <!-- DAP Features Grid -->
+                <div id="dap-features" class="features-grid" role="list">
+                    <!-- DAP Feature 1 -->
+                    <article class="feature-card" data-category="dap" data-search="launch attach configurations launch.json Run and Debug view configuration dropdown" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#1</span>
+                            <h3 class="feature-title">Launch/Attach configurations</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Run and Debug view, configuration dropdown.</p>
+                            <div class="feature-methods">
+                                <code class="method-badge" data-copy="launch.json">launch.json</code>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 2 -->
+                    <article class="feature-card" data-category="dap" data-search="line breakpoints click gutter line number" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#2</span>
+                            <h3 class="feature-title">Line breakpoints</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Click in the gutter next to a line number.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 3 -->
+                    <article class="feature-card" data-category="dap" data-search="conditional breakpoints expression-based right-click breakpoint Edit expression condition" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#3</span>
+                            <h3 class="feature-title">Conditional breakpoints</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Right-click a breakpoint → Edit Breakpoint → expression condition.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 4 -->
+                    <article class="feature-card" data-category="dap" data-search="hit-count breakpoints right-click breakpoint Edit hit count condition" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#4</span>
+                            <h3 class="feature-title">Hit-count breakpoints</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Right-click a breakpoint → Edit Breakpoint → hit count condition.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 5 -->
+                    <article class="feature-card" data-category="dap" data-search="triggered breakpoints armed after another breakpoint fires right-click gutter Add Triggered" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#5</span>
+                            <h3 class="feature-title">Triggered breakpoints</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Armed only after another breakpoint fires. Right-click gutter → Add Triggered Breakpoint.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 6 -->
+                    <article class="feature-card" data-category="dap" data-search="function breakpoints break function name no source line + button Breakpoints panel" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#6</span>
+                            <h3 class="feature-title">Function breakpoints</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Break by function name, no source line needed. "+" button in the Breakpoints panel.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 7 -->
+                    <article class="feature-card" data-category="dap" data-search="inline breakpoints column-specific multi-statement lines Shift+F9 minified dense code" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#7</span>
+                            <h3 class="feature-title">Inline breakpoints</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Column-specific, for multi-statement lines. Shift+F9, useful for minified/dense code.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 8 -->
+                    <article class="feature-card" data-category="dap" data-search="data breakpoints break variable value change read access right-click Variables view" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#8</span>
+                            <h3 class="feature-title">Data breakpoints</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Break on variable value change/read/access. Right-click a variable in the Variables view.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 9 -->
+                    <article class="feature-card" data-category="dap" data-search="logpoints log message without pausing execution right-click gutter Add Logpoint" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#9</span>
+                            <h3 class="feature-title">Logpoints</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Log a message without pausing execution. Right-click gutter → Add Logpoint.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 10 -->
+                    <article class="feature-card" data-category="dap" data-search="exception breakpoints checkboxes Breakpoints panel" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#10</span>
+                            <h3 class="feature-title">Exception breakpoints</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Checkboxes in the Breakpoints panel.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 11 -->
+                    <article class="feature-card" data-category="dap" data-search="continue pause Debug toolbar" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#11</span>
+                            <h3 class="feature-title">Continue / Pause</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Debug toolbar.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 12 -->
+                    <article class="feature-card" data-category="dap" data-search="step over F10" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#12</span>
+                            <h3 class="feature-title">Step Over</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">F10</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 13 -->
+                    <article class="feature-card" data-category="dap" data-search="step into F11" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#13</span>
+                            <h3 class="feature-title">Step Into</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">F11</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 14 -->
+                    <article class="feature-card" data-category="dap" data-search="step out Shift+F11" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#14</span>
+                            <h3 class="feature-title">Step Out</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Shift+F11</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 15 -->
+                    <article class="feature-card" data-category="dap" data-search="restart frame right-click frame Call Stack view" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#15</span>
+                            <h3 class="feature-title">Restart Frame</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Right-click a frame in the Call Stack view.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 16 -->
+                    <article class="feature-card" data-category="dap" data-search="stop disconnect Debug toolbar" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#16</span>
+                            <h3 class="feature-title">Stop / Disconnect</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Debug toolbar.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 17 -->
+                    <article class="feature-card" data-category="dap" data-search="call stack view multi-frame navigation CALL STACK panel" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#17</span>
+                            <h3 class="feature-title">Call Stack view</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">CALL STACK panel with multi-frame navigation.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 18 -->
+                    <article class="feature-card" data-category="dap" data-search="threads multi-thread stepping threads shown session Call Stack" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#18</span>
+                            <h3 class="feature-title">Threads, multi-thread stepping</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Threads shown under each session in the Call Stack view.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 19 -->
+                    <article class="feature-card" data-category="dap" data-search="multiple simultaneous debug sessions multi-target debugging sessions stacked Call Stack switchable" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#19</span>
+                            <h3 class="feature-title">Multiple simultaneous debug sessions</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Multi-target debugging. Sessions stacked in the Call Stack view, switchable.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 20 -->
+                    <article class="feature-card" data-category="dap" data-search="variables locals view expanding nested objects arrays VARIABLES panel" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#20</span>
+                            <h3 class="feature-title">Variables (Locals) view</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">VARIABLES panel, including expanding nested objects/arrays.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 21 -->
+                    <article class="feature-card" data-category="dap" data-search="set value variable mid-session right-click variable Set Value" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#21</span>
+                            <h3 class="feature-title">Set Value on a variable</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Right-click a variable → Set Value (mid-session).</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 22 -->
+                    <article class="feature-card" data-category="dap" data-search="copy value copy expression right-click variable Variables view" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#22</span>
+                            <h3 class="feature-title">Copy Value / Copy as Expression</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Right-click a variable in the Variables view.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 23 -->
+                    <article class="feature-card" data-category="dap" data-search="watch expressions WATCH panel add +" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#23</span>
+                            <h3 class="feature-title">Watch expressions</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">WATCH panel, add via "+".</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 24 -->
+                    <article class="feature-card" data-category="dap" data-search="debug console interactive evaluation autocomplete DEBUG CONSOLE panel" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#24</span>
+                            <h3 class="feature-title">Debug Console</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">DEBUG CONSOLE panel with interactive evaluation and autocomplete.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 25 -->
+                    <article class="feature-card" data-category="dap" data-search="loaded sources view LOADED SCRIPTS panel" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#25</span>
+                            <h3 class="feature-title">Loaded Sources view</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">LOADED SCRIPTS panel.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 26 -->
+                    <article class="feature-card" data-category="dap" data-search="disassembly view step through assembly source not available editor tab" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#26</span>
+                            <h3 class="feature-title">Disassembly View</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Step through assembly when source isn't available. Opens as an editor tab.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 27 -->
+                    <article class="feature-card" data-category="dap" data-search="inline variable value decorations stepping end-of-line ghost text editor paused" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#27</span>
+                            <h3 class="feature-title">Inline variable value decorations</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">End-of-line ghost text in the editor while execution is paused.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 28 -->
+                    <article class="feature-card" data-category="dap" data-search="preLaunchTask compile-before-debug preLaunchTask property launch.json tasks.json" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#28</span>
+                            <h3 class="feature-title">preLaunchTask / compile-before-debug</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">preLaunchTask property in launch.json, tied to tasks.json.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 29 -->
+                    <article class="feature-card" data-category="dap" data-search="hot code replace edit continue runtime-dependent automatic supported runtimes without restarting" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#29</span>
+                            <h3 class="feature-title">Hot code replace / Edit and Continue</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Runtime-dependent. Automatic for supported runtimes without restarting the session.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 30 -->
+                    <article class="feature-card" data-category="dap" data-search="run without debugging Run button Debug Run and Debug view" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#30</span>
+                            <h3 class="feature-title">Run without debugging</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">"Run" button alongside "Debug" in the Run and Debug view.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 31 -->
+                    <article class="feature-card" data-category="dap" data-search="breakpoints view centralized list all files BREAKPOINTS panel" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#31</span>
+                            <h3 class="feature-title">Breakpoints view</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">Centralized list across all files. BREAKPOINTS panel.</p>
+                        </div>
+                    </article>
+                    
+                    <!-- DAP Feature 32 -->
+                    <article class="feature-card" data-category="dap" data-search="multi-target debugging compound configurations compounds array launch.json launches several configs together" role="listitem">
+                        <header class="feature-header">
+                            <span class="feature-number">#32</span>
+                            <h3 class="feature-title">Multi-target debugging via compound configs</h3>
+                            <div class="feature-badges"><span class="badge badge-dap">DAP</span></div>
+                        </header>
+                        <div class="feature-body">
+                            <p class="feature-description">compounds array in launch.json, launches several configs together.</p>
+                        </div>
+                    </article>
+                </div>
+            </section>
+            
+            <!-- Sources Section -->
+            <section class="doc-section" id="sources">
+                <div class="section-header">
+                    <div class="section-icon lsp">
+                        <svg viewBox="0 0 24 24"><path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z"/></svg>
+                    </div>
+                    <h2 class="section-title">Sources</h2>
+                </div>
+                <p class="section-description">
+                    This documentation was compiled from official VS Code and protocol specifications, 
+                    current as of July 2026.
+                </p>
+                <div class="footer-sources">
+                    <p>
+                        <strong>Language Server Protocol:</strong><br>
+                        • VS Code Language Extensions API: <a href="https://code.visualstudio.com/api/language-extensions" target="_blank" rel="noopener">code.visualstudio.com/api/language-extensions</a><br>
+                        • LSP Specification 3.16–3.18: <a href="https://microsoft.github.io/language-server-protocol/" target="_blank" rel="noopener">microsoft/language-server-protocol</a>
+                    </p>
+                    <p style="margin-top: var(--space-md);">
+                        <strong>Debug Adapter Protocol:</strong><br>
+                        • VS Code Debugging Documentation: <a href="https://code.visualstudio.com/docs/debugtest/debugging" target="_blank" rel="noopener">code.visualstudio.com/docs/debugtest/debugging</a>
+                    </p>
+                </div>
+            </section>
+        </main>
+        
+        <!-- Footer -->
+        <footer class="doc-footer" role="contentinfo">
+            <div class="footer-content">
+                <p class="footer-sources">
+                    Compiled July 2026 • 73 features documented • Tokyo Night theme
+                </p>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- Back to Top Button -->
+    <button class="back-to-top" id="backToTop" aria-label="Back to top">
+        <svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>
+    </button>
+    
+    <!-- Toast Notification -->
+    <div class="toast" id="toast" role="alert" aria-live="assertive"></div>
+    
+    <script>
+        // ========================================
+        // SEARCH FUNCTIONALITY
+        // ========================================
+        const searchInput = document.getElementById('searchInput');
+        const searchClear = document.getElementById('searchClear');
+        const searchResultsCount = document.getElementById('searchResultsCount');
+        const featureCards = document.querySelectorAll('.feature-card');
+        
+        function performSearch() {
+            const query = searchInput.value.toLowerCase().trim();
+            let visibleCount = 0;
+            let totalCount = featureCards.length;
+            
+            featureCards.forEach(card => {
+                const searchData = card.getAttribute('data-search').toLowerCase();
+                const title = card.querySelector('.feature-title').textContent.toLowerCase();
+                const description = card.querySelector('.feature-description')?.textContent.toLowerCase() || '';
+                const methods = Array.from(card.querySelectorAll('.method-badge'))
+                    .map(badge => badge.getAttribute('data-copy') || '')
+                    .join(' ')
+                    .toLowerCase();
+                
+                const searchableText = `${searchData} ${title} ${description} ${methods}`;
+                
+                if (!query || searchableText.includes(query)) {
+                    card.classList.remove('hidden');
+                    visibleCount++;
+                } else {
+                    card.classList.add('hidden');
+                }
+            });
+            
+            // Update results count
+            if (query) {
+                searchResultsCount.textContent = `Showing ${visibleCount} of ${totalCount} features`;
+            } else {
+                searchResultsCount.textContent = '';
+            }
+            
+            // Show empty state if no results
+            const sections = document.querySelectorAll('.features-grid');
+            sections.forEach(section => {
+                const visibleCards = section.querySelectorAll('.feature-card:not(.hidden)');
+                const existingEmptyState = section.querySelector('.empty-state');
+                
+                if (visibleCards.length === 0 && query) {
+                    if (!existingEmptyState) {
+                        const emptyState = document.createElement('div');
+                        emptyState.className = 'empty-state';
+                        emptyState.innerHTML = `
+                            <div class="empty-state-icon">🔍</div>
+                            <p class="empty-state-text">No features match "${query}"</p>
+                        `;
+                        section.appendChild(emptyState);
+                    }
+                } else if (existingEmptyState) {
+                    existingEmptyState.remove();
+                }
+            });
+        }
+        
+        searchInput.addEventListener('input', performSearch);
+        
+        searchClear.addEventListener('click', () => {
+            searchInput.value = '';
+            performSearch();
+            searchInput.focus();
+        });
+        
+        // Keyboard shortcut: Press / to focus search
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '/' && document.activeElement !== searchInput) {
+                e.preventDefault();
+                searchInput.focus();
+            }
+            if (e.key === 'Escape' && document.activeElement === searchInput) {
+                searchInput.blur();
+                searchInput.value = '';
+                performSearch();
+            }
+        });
+        
+        // ========================================
+        // FILTER BUTTONS
+        // ========================================
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        
+        filterButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const filter = btn.getAttribute('data-filter');
+                
+                // Update active state
+                filterButtons.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                // Apply filter
+                featureCards.forEach(card => {
+                    const category = card.getAttribute('data-category');
+                    
+                    if (filter === 'all' || category === filter) {
+                        card.classList.remove('hidden');
+                    } else {
+                        card.classList.add('hidden');
+                    }
+                });
+            });
+        });
+        
+        // ========================================
+        // COPY TO CLIPBOARD
+        // ========================================
+        const methodBadges = document.querySelectorAll('.method-badge[data-copy]');
+        const toast = document.getElementById('toast');
+        
+        methodBadges.forEach(badge => {
+            badge.addEventListener('click', async () => {
+                const textToCopy = badge.getAttribute('data-copy');
+                
+                try {
+                    await navigator.clipboard.writeText(textToCopy);
+                    
+                    // Visual feedback
+                    badge.classList.add('copied');
+                    showToast(`Copied: ${textToCopy}`);
+                    
+                    setTimeout(() => {
+                        badge.classList.remove('copied');
+                    }, 2000);
+                } catch (err) {
+                    showToast('Failed to copy to clipboard', true);
+                }
+            });
+        });
+        
+        function showToast(message, isError = false) {
+            toast.textContent = message;
+            toast.style.borderColor = isError ? 'var(--error)' : 'var(--accent)';
+            toast.classList.add('visible');
+            
+            setTimeout(() => {
+                toast.classList.remove('visible');
+            }, 2500);
+        }
+        
+        // ========================================
+        // STICKY SIDEBAR - SCROLL SPY
+        // ========================================
+        const tocLinks = document.querySelectorAll('.toc-link');
+        const sections = document.querySelectorAll('.doc-section, #lsp-features, #dap-features, #editor-chrome');
+        
+        function updateActiveTocLink() {
+            const scrollPosition = window.scrollY + 100;
+            
+            let currentSection = '';
+            
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.offsetHeight;
+                
+                if (scrollPosition >= sectionTop && scrollPosition < sectionTop + sectionHeight) {
+                    currentSection = section.id;
+                }
+            });
+            
+            tocLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === `#${currentSection}`) {
+                    link.classList.add('active');
+                }
+            });
+        }
+        
+        window.addEventListener('scroll', updateActiveTocLink);
+        updateActiveTocLink(); // Initial call
+        
+        // ========================================
+        // BACK TO TOP BUTTON
+        // ========================================
+        const backToTop = document.getElementById('backToTop');
+        
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 500) {
+                backToTop.classList.add('visible');
+            } else {
+                backToTop.classList.remove('visible');
+            }
+        });
+        
+        backToTop.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+        
+        // ========================================
+        // SMOOTH SCROLL FOR TOC LINKS
+        // ========================================
+        tocLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                const href = link.getAttribute('href');
+                if (href.startsWith('#')) {
+                    e.preventDefault();
+                    const target = document.querySelector(href);
+                    if (target) {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }
+            });
+        });
+        
+        // ========================================
+        // KEYBOARD NAVIGATION HINT
+        // ========================================
+        console.log('%c📖 VS Code IDE Features Documentation', 'font-size: 16px; font-weight: bold; color: #7aa2f7;');
+        console.log('%cPress "/" to focus search, "Esc" to clear', 'color: #565f89;');
+    </script>
+</body>
+</html>

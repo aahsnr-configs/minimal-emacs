@@ -1,173 +1,363 @@
-metadata:
-  title: "Project State & Architectural Memory"
-  version: 24
-  date: "July 15, 2026"
-  emacs_target: "31.0.90 (PGTK, Native Comp)"
-  package_manager: "Elpaca v0.12"
-  config_version: "0.11"
-  last_updated_by: "AI Assistant"
-
-project_status:
-  overall_progress: >
-    The foundational layers (Core, Vim, Visuals, Interactive Buffers, AST/Structural Typing, 
-    Code Folding, Frame Chrome) are fully finalized. The Workflow Management Triad 
-    (Buffer Management, Project Management, Workspaces) has been architecturally designed 
-    and implemented to replace legacy `projectile` and `persp-mode`. 
-    Current focus is on verifying load-order physics, refining the Completion Framework, 
-    and tackling the Development Tools and Org Mode sections.
+project_state:
+  metadata:
+    title: Emacs Configuration Project State Checkpoint
+    version: 23
+    date: July 15, 2026
+  critical_instructions:
+    preamble: "Before generating any code, making suggestions, or answering questions, you MUST:"
+    steps:
+      - Read and ingest the attached `early-init.el.txt` file.
+      - Read and ingest the attached `config.org.txt` (or `config.org.new.txt`) file.
+      - "Read and ingest the attached `system_prompt_protocol.yaml` file to understand your strict operational boundaries, research mandates, and formatting rules."
+      - 'Read this `project-state.yaml` file to understand the architectural decisions, the massive "Editor Behaviour" restructuring, and current progress.'
+      - Read and ingest use_package.yaml to under how use-package configurations work.
+      - Acknowledge these rules and the current state.
+    greenlight_reminder: "STRICT GREENLIGHT PROTOCOL: Do not write any code or output any `#+begin_src` blocks until the user explicitly gives the signal to proceed."
+  core_architectural_rules:
+    - name: Strict Org-Mode Formatting
+      description: >
+        Zero Markdown syntax is allowed to bleed into Org-mode text or source blocks inside the `config.org` file.
+        Use `=code=` or `~code~` for inline code, `*bold*` for bold, `/italics/` for italics, and standard Org headings (`*`, `**`, `***`).
+    - name: Vanilla Emacs Paradigm
+      description: "Do not use Doom Emacs proprietary macros (e.g., `map!`, `defadvice!`, `use-package!`). Translate Doom-inspired logic into native Vanilla Emacs equivalents."
+    - name: Best Emacs Practices
+      description: "Prioritize idiomatic, modern, and verifiable best Emacs practices over legacy hacks or outdated wiki snippets."
+    - name: Keybinding Management & Leader Paradigm
+      description: >
+        1. Centralized Manager: `general.el` is the exclusive manager for global and local leader keybindings.
+        All `SPC` (global leader) and `SPC m` (local leader) bindings must be routed through custom `general` definers.
+        2. Doom Emacs Paradigm: Adhere to Doom Emacs mnemonic prefixes (e.g., `SPC b` for buffers, `SPC f` for files).
+        Always include `:wk` annotations for `which-key` discoverability.
+        3. `use-package :bind` Restriction: Native `:bind` is strictly reserved for simple global remaps (e.g., `[remap ...]`),
+        package-specific internal keymaps (e.g., `:map isearch-mode-map`), or core autoload triggers. It must never be used for `SPC` leader bindings.
+        4. Evil Structural Bindings: Operator-pending motions and text objects must be injected directly into Evil's internal C-level keymaps
+        (e.g., `evil-inner-text-objects-map`) via `define-key` or `evil-define-motion` in a `:config` block guarded by `:after evil`.
+        5. Minibuffer Preservation: Arrow keys are strictly preferred over `hjkl` in the minibuffer and completion maps to preserve the "type-to-filter" paradigm.
+        Never force `evil-normal-state` in the minibuffer.
+        6. Global Prefix Hygiene: Never bind raw `C-c <letter>` globally; reserve it for major modes. Use leader keys for global commands.
+    - name: Corfu Confinement
+      description: "`corfu` is strictly confined to buffer editing. It must never be enabled in the minibuffer, as it conflicts with `vertico`."
+    - name: Minibuffer Navigation
+      description: 'Arrow keys (`<up>`, `<down>`, `C-<up>`, `C-<down>`) are preferred over `hjkl` in the minibuffer and window management to preserve the "type-to-filter" paradigm and prevent Evil state conflicts.'
+    - name: Concise Documentation Protocol
+      description: "Documentation inside `config.org` must adhere to the strict Documentation Hierarchy defined in the system prompt protocol (Layman headers, Technical inline comments)."
+    - name: Pure Subheader Descriptions
+      description: "Subheader descriptions must strictly and exclusively describe what the specific package does in non-technical layman terms. Exclude workflow justifications, personal preferences, or architectural implementation details."
+    - name: Bundled Extensions
+      description: "Because `elpaca-use-package-by-default` is set to `t` globally, any `use-package` declaration for an extension bundled within a parent package's repository MUST explicitly include `:ensure nil`."
+    - name: List Formatting
+      description: "`:commands` lists must contain exactly one command per line. `dolist` iterables (such as mode lists) must contain exactly one item or mode per line."
+    - name: Elpaca Load-Order Physics
+      sub_rules:
+        - NEVER use `:hook (elpaca-after-init . mode)` or `:hook (after-init . mode)` to activate global minor modes.
+        - For built-in packages, invoke `(mode 1)` directly in `:config` (or `:init` if early interception is required) to eliminate artificial startup latency.
+        - Reserve `elpaca-after-init-hook` strictly for cross-package state initialization.
+    - name: Elpaca Package Management
+      description: >
+        Elpaca v0.12 is the exclusive asynchronous package manager. The `:ensure` 
+        keyword now accepts Elpaca recipe property lists (e.g., `:ensure (:host github :repo "user/repo")`)
+        instead of simple booleans or package names.
+    - name: Header Status Keywords
+      description: "NEVER add or change a section (`*`) or subsection (`**`) header to `DONE` unless the user explicitly states the phrase `change status from TODO to DONE`. Default to `TODO` or preserve the existing status."
+    - name: Emacs 31 Targeting
+      description: >
+        The configuration explicitly targets Emacs 31. The user is currently daily-driving the `emacs-pretest` package (v31.0.90) built with
+        `--with-native-compilation=aot` and `--with-pgtk`. Defensive guards (`fboundp`/`boundp`/version checks) should still wrap highly experimental APIs.
+        The MPS incremental/concurrent garbage collector (`igc`) remains deferred out of the Emacs 31 release cycle and must NOT be treated as an Emacs 31 feature.
+  editor_behaviour_paradigm:
+    summary: "In v5, the `Editor Behaviour` concept was massively restructured to become the centralized pillar for how Emacs renders, parses, and manipulates text and buffers. In v22, Group 7 is nearly fully finalized with only Link Hint remaining pending. Window Management and Workflow Management continue to make progress."
+    groups:
+      - id: 1
+        name: Visual Chrome & UI Overlays
+        status: FULLY FINALIZED
+      - id: 2
+        name: Interactive Buffers & Redisplay Physics
+        status: FULLY FINALIZED
+      - id: 3
+        name: AST Parsing & Structural Typing
+        status: FULLY FINALIZED
+      - id: 4
+        name: Code Folding & Region Concealment
+        status: FULLY FINALIZED
+      - id: 5
+        name: Spatial Alignment & Whitespace Hygiene
+        status: FULLY FINALIZED
+      - id: 6
+        name: Frame Chrome & Status Indicators
+        status: FULLY FINALIZED
+      - id: 7
+        name: Spatial Traversal & Inline Mutations
+        status: IN PROGRESS
+      - id: 8
+        name: Lexical Validation & Comparative Workflows
+        status: IN PROGRESS
+  negative_constraints:
+    - "No `smartparens` or `puni`: Regex-based pair tracking causes desyncs in complex strings/templates. Lisp-centric soft-deletion is irrelevant for Non-Lisp AST languages."
+    - "No `combobulate`: Fundamentally clashes with Evil's operator-pending grammar and causes keymap collisions."
+    - "No `tree-edit`: Relies on the legacy `elisp-tree-sitter` (`tsc`) engine and forked grammars, causing dual-engine memory bloat and fatal conflicts with native Emacs 30 `treesit`."
+    - "No `expand-region`: Replaced by `expreg`, which utilizes O(1) AST-aware pre-computation via native `treesit` instead of fragile regex/syntax-table heuristics."
+    - "No `stripspace`: Replaced by `ws-butler` to prevent Git diff pollution via modified-lines-only trimming."
+    - "No `kirigami.el` / `origami.el`: Heavy abstraction layers for folding. A custom transparent dispatcher is preferred for Vanilla Emacs."
+    - "No `completion-in-region-function` overrides (Corfu must remain strictly in-buffer)."
+    - "No `which-key` Embark Hacks (use `vertico-multiform` grid)."
+    - "No `consult-projectile` (obsolete)."
+    - "No Minibuffer Evil Normal State (breaks type-to-filter)."
+    - "No custom `RET` intercepts for comment continuation (use native `comment-indent-new-line`)."
+    - "No custom window movement Elisp functions (use native `windmove-wrap-around`)."
+    - "No Nerd Icons inside `prettify-symbols-alist`: Injecting PUA glyphs into buffer text causes mid-line font-fallback context switches and sub-pixel grid misalignments."
+    - "No `elpaca-after-init` hooks for built-in global minor modes (use direct `:config` invocation)."
+    - "No custom ElDoc backends for `show-paren` (use native Emacs 29+ `'overlay` engine)."
+    - "No treating the MPS incremental/concurrent garbage collector (`igc`) as an Emacs 31 feature."
+    - "No Package Merging: NEVER merge multiple distinct packages into a single `#+begin_src` block or a single subsection header."
+    - "No Scope Creep: NEVER modify, rewrite, or touch subsections, packages, or code blocks that were not explicitly tasked in the current prompt."
+    - "No Modular Eglot Stack for IDE Parity: Rejected the modular `eglot` + `flymake` + `dape` ecosystem in favor of the synergistic `lsp-mode` stack."
+    - "No Impure Descriptions: NEVER include workflow justifications or implementation details in subheader descriptions."
+    - "No Multi-line Lists: NEVER place multiple commands in `:commands ()` or multiple modes in `dolist` on the same line."
+    - "No Unauthorized Status Changes: NEVER change a header from `TODO` to `DONE` without the exact phrase `change status from TODO to DONE`."
+    - "No `:pin` or `:vc` Keywords: Elpaca manages its own sources and repositories natively via its recipe system. The traditional `package.el` `:pin` keyword and the Emacs 30 `:vc` keyword are obsolete and must never be used."
+    - "No Global `C-c <letter>` Bindings: Raw `C-c <letter>` is strictly reserved for major modes to prevent shadowing. Global commands must use leader keys (`SPC`)."
+    - "No Technical Jargon in Headers: Top-level and subheader descriptions must strictly use non-technical layman terms. Technical language is strictly confined to inline source code comments."
+    - "No Parametric Memory Reliance: NEVER rely on internal training data for Emacs Lisp API behaviors or core file locations. Training data is heavily polluted with outdated wiki pages. MUST use `web_search` and `web_extractor` to verify live source code."
+    - "No General.el Enclosure: NEVER place `general-define-key`, `ar/global-leader`, or `ar/local-leader` inside a `use-package` block. Doing so creates a deferred-registration trap where `which-key` annotations remain invisible until the package is manually invoked."
+    - "No Blind Legacy Fixes: NEVER assume an issue documented in a 3+ year old forum post or wiki still exists in Emacs 30/31 without live web verification. Inconclusive fixes MUST be wrapped in defensive runtime guards (`fboundp`, `boundp`)."
+  edge_cases_and_deferred_issues:
+    - "Dirvish Multi-frame Flicker: Patched via `define-advice` on `dirvish-pre-redisplay-h` to debounce redisplay hooks in Emacs 30+."
+    - "lsp-mode Org Element API Crash: Patched via `:around` advice in the `lsp-mode :init` block to prevent `cl-generic` corruption."
+    - "Emacs 31 Unreleased APIs: Features like `grep-edit-mode` must be wrapped in defensive runtime guards."
+    - "[v11 Correction] MPS Incremental GC (`igc`) Removed From Scope: Confirmed deferred out of Emacs 31 entirely."
+    - "`no-littering` API Typo: Fixed hallucinated `no-littering-expand-var-directory-name` to the correct `no-littering-expand-var-file-name`."
+    - "`treesit` Block Parenthesis Mismatch: Fixed an extra closing parenthesis in the `treesit--build-grammar` advice."
+    - "`treesit-fold` Ellipsis Injection: Upstream `treesit-fold` natively inherits Emacs' built-in `truncate-string-ellipsis`."
+    - "[v16 Resolution] Structural Nesting & Missing Packages: `Precision Editing` successfully promoted to top-level `*`. `Move Text` successfully re-injected into Group 5, finalizing the section."
+    - "[v16 Correction] Evil Easymotion API Hallucination: `evilem-create` crashes when wrapping native Avy commands (Avy inside Avy infinite loop via `evilem--collect`). Replaced with native `evil-define-motion` wrappers for operator-pending support."
+    - "Re-Builder `reb-copy` Hallucination: Confirmed via live Emacs `master` source code that `reb-copy` outputs double-escaped Elisp strings. Custom `ar/re-builder-copy-interactive` wrapper is mathematically required to strip quotes for CLI/query-replace parity."
+    - "Grep `grep-apply-setting` Physics: Replaced fragile `setq` template injection with `grep-apply-setting` to survive Emacs' internal `grep-compute-defaults` cycles. Dropped `<X>` from direct `rg` templates to prevent `--exclude` flag crashes."
+  architectural_decisions:
+    v10:
+      - Non-Lisp AST Stack Finalization (Group 3 Complete).
+      - "`evil-ts-obj` Transient Isolation (Pillar 4)."
+      - Code Folding Unification (Group 4 Complete).
+      - "Whitespace & Indentation Strategy (Group 5 Complete)."
+      - "`general.el` Eager Load-Order Physics."
+    v11:
+      - Protocol Fact-Audit (Emacs 31 Version Targeting).
+    v12:
+      - Frame Chrome & Status Indicators (Group 6 Complete).
+      - Non-Lisp AST Stack Guarding.
+    v13:
+      - State Generation & Protocol Audit.
+    v14:
+      - Emacs 31 Targeting & Build Flags Consolidation.
+      - Reference Cleanup.
+    v15:
+      - "IDE Stack Consolidation (LSP vs Eglot): Committed to `lsp-mode`."
+      - "Workspace Management Selection: Selected `bufferlo`."
+      - "Precision Editing (Group 7) Finalization: Finalized Avy/Expreg/Snipe stack."
+    v16:
+      - "Structural Realignment (Group 5 & 7): Promoted Precision Editing to top-level `*`. Re-injected Move Text, fully finalizing Group 5."
+      - "Evil Easymotion & Snipe Paradigm: Unified `gs` prefix for evil-easymotion, integrated evil-snipe transient map, and bypassed `evilem-create` infinite loop traps via native `evil-define-motion` wrappers."
+    v17:
+      - "Protocol Hardening: Enforced strict status-change locks (`change status from TODO to DONE`), single-line list formatting (`:commands`, `dolist`), and pure-functional subheader descriptions."
+      - "Precision Editing Progress: Finalized Evil Easymotion and Evil Snipe implementations in config.org."
+      - "Window Management: Finalized native Windmove wrap-around physics."
+    v18:
+      - "Package Management Migration: Officially transitioned from `package.el` to Elpaca v0.12. Deprecated `:pin` and `:vc` keywords in favor of Elpaca recipe plists. Updated `use-package-always-ensure` references to `elpaca-use-package-by-default`."
+    v19:
+      - "Keybinding Architecture Hardening: Formalized the Doom Emacs Leader Paradigm via `general.el`. Restricted `use-package :bind` strictly to remaps/internal maps. Mandated Evil C-level keymap injection for text objects. Enforced Minibuffer `hjkl` prohibition and Global `C-c` prefix hygiene."
+    v20:
+      - "Documentation Hierarchy Refinement: Enforced strict separation of concerns for config.org documentation. Top-level and subheader descriptions must now use non-technical layman terms to describe scope and purpose. Technical, programmer-centric language is strictly confined to 1-2 line inline comments inside source code blocks."
+      - "Precision Editing Progress: Finalized Ace Window, Anzu, Evil Anzu, Iedit, and Evil Multiedit."
+      - "Window Management Progress: Finalized Window Operations leader bindings."
+    v21:
+      - "Precision Editing Finalization: Finalized Grep (ripgrep integration + grep-edit-mode), Re-Builder (custom Transient menu + interactive regex export), and Avy Transient Menu (DRY scope dispatcher + spatial mutations dashboard). Link Hint remains the sole pending subsection in Group 7."
+      - "Protocol Hardening (v3): Enforced strict separation of layman headers vs technical inline comments. Mandated live web verification over parametric memory to prevent API hallucinations. Codified the General.el eager placement constraint to prevent deferred-registration traps."
+    v22:
+      - "State Synchronization & Config Audit: Aligned project state checkpoint with config.org v0.11. Mapped the massive TODO landscape for Org Mode, Completion Framework, Development Tools, and LaTeX. Formalized Workflow Management progress (Dired, Dirvish, Treemacs, Ibuffer finalized)."
+  pending_decisions_and_todos:
+    - "Project & Workspace Management: `bufferlo` and `projection` selected. Excise `projectile` / `persp-mode`."
+    - "Syntax Checking Transition: `flymake` to `flycheck`."
+    - "Debug Adapter Protocol: `dap-mode` with `transient`."
+    - "LaTeX / AUCTeX: Pending `preview-auto.el`, `cdlatex`, Bibliography."
+  overall_progress:
+    finalized:
+      - Core Emacs (13 subsections)
+      - Visual Chrome & UI Overlays (Group 1, 8 subsections)
+      - Interactive Buffers & Redisplay Physics (Group 2, 5 subsections)
+      - AST Parsing & Structural Typing (Group 3, 12 subsections)
+      - Code Folding & Region Concealment (Group 4)
+      - Spatial Alignment & Whitespace Hygiene (Group 5, 5/5 subsections)
+      - Frame Chrome & Status Indicators (Group 6, 8 subsections)
+      - Vim Emulation (12 subsections)
+      - General Keybindings (Centralized leader routing)
+    in_progress:
+      - "Precision Editing (Group 7: Avy, Evil Easymotion, Evil Snipe, Ace Window, Anzu, Evil Anzu, Iedit, Evil Multiedit, Grep, Re-Builder, Avy Transient Menu finalized. Pending: Link Hint)"
+      - "Window Management (Windmove, Window Operations finalized. Pending: Winner, Popper)"
+      - "Workflow Management (Dired, Dirvish, Treemacs, Buffer Management finalized. Pending: Project Management, Workspaces)"
+    untouched:
+      - Lexical Validation & Comparative Workflows (Group 8)
+      - Version Control
+      - Org Mode & Second Brain
+      - Completion Framework
+      - Development Tools
+      - Highlight TODOs
+      - Snippet Engine
+      - LaTeX Writing Environment
+      - Languages
+      - XML Document Viewer
+      - Study
+      - Misc (AI/LLM)
   immediate_structural_action_plan:
-    - "Finalize the Project Management and Workspaces subsections (mark as DONE upon user approval)."
-    - "Address the Completion Framework overlapping configurations (Vertico, Cape, Corfu)."
-    - "Implement Doom Emacs style keybindings across all sections."
-    - "Resolve Flycheck vs Flymake decision (currently leaning towards removing Flycheck due to Org-mode conflicts)."
-    - "Revisit header and subheader descriptions to ensure they accurately describe package functionality."
-
-finalized_sections:
-  - "Core Emacs (Bootstrap, Elpaca, Performance, Session, UTF-8)"
-  - "Vim Emulation (Evil, Collection, Commentary, Multiedit, Surround, etc.)"
-  - "General (Leader/Local Leader Keybinding Router)"
-  - "Visual Overlays (Themes, Icons, Fonts, Ligatures, Childframes)"
-  - "Interactive Buffers (Autorevert, Ghostel Terminal, Eshell, Smooth Scrolling)"
-  - "Structural Typing and Parsing (Treesit, Electric, Show Paren, Rainbow Delimiters, Expreg)"
-  - "Code Folding (Treesit-fold, Vimish-fold, Hideshow)"
-  - "Spatial Alignment & Whitespace Hygiene (Indent Bars, Ws-Butler, Dtrt Indent)"
-  - "Frame Chrome & Status Indicators (Line Numbers, Modeline, Dividers)"
-  - "Buffer Management (Ibuffer, Projection-Ibuffer, Buffer-Terminator) - Triad Part 1"
-
-pending_sections:
-  - "Project Management (project.el, projection, projection-multi) - Triad Part 2"
-  - "Workspaces (tab-bar, bufferlo) - Triad Part 3"
-  - "Precision Editing (Link Hint pending, Avy/Snipe/Ace finalized)"
-  - "Lexical Validation & Comparative Workflows (Jinx, Helpful, Ediff, Woman)"
-  - "Version Control (Magit, Forge, Diff-hl, Git-Timemachine)"
-  - "Org Mode & Second Brain (Denote, Org-GTD, Captures, Agenda)"
-  - "Completion Framework (Orderless, Vertico, Marginalia, Consult, Corfu, Cape, Dabbrev)"
-  - "Development Tools (LSP-mode, Apheleia, DAP/Flymake, Direnv, Eldoc)"
-  - "Highlight TODOs (hl-todo, magit-todos, consult-todo)"
-  - "Snippet Engine (Yasnippet, File Templates)"
-  - "LaTeX Writing Environment (AUCTeX, Preview, CDLaTeX)"
-  - "Languages (Nix, Bash, PlantUML, C/C++, Python, KDL, YAML, Markdown)"
-  - "XML Document Viewer"
-  - "Study (PDF Tools, Org-Noter)"
-  - "Window Management (Winner, Popper, Windmove)"
-  - "AI/LLM Integration"
-
-architectural_decisions:
-  triad_paradigm:
-    description: >
-      The Workflow Management Context Engine strictly replaces `projectile` and `persp-mode` 
-      with a synergistic triad:
-      1. Buffer Management: `ibuffer` + `projection-ibuffer` (bundled) + `buffer-terminator`.
-         Solved the "Redraw Trap" via manual `ibuffer-update` and "Workspace Bleed" via 
-         `cl-letf` shadowing of `buffer-list` with `bufferlo-buffer-list`.
-      2. Project Management: `project.el` (built-in) + `projection` + `projection-multi`.
-         Provides transient build menus and multi-target compilation without background daemons.
-      3. Workspaces: `tab-bar` (headless, `tab-bar-show nil`) + `bufferlo` (GNU ELPA).
-         Provides mathematically strict buffer isolation per workflow context and daemon-safe 
-         bookmark persistence.
-  elpaca_async_physics:
-    description: >
-      Elpaca v0.12 processes queues post-init. 
-      - `:ensure t` queues packages asynchronously.
-      - `:ensure nil` is MANDATORY for built-in packages (e.g., `ibuffer`, `project`) and 
-        bundled extensions (e.g., `projection-ibuffer`) to prevent MELPA query failures.
-      - `:wait t` on a recipe halts init-file reading at that exact boundary (acts as an 
-        inline `elpaca-wait`). Use sparingly (e.g., `general`, `no-littering`).
-      - `elpaca-after-init-hook` must be used instead of `after-init-hook` for any 
-        configuration requiring fully activated packages.
-  completion_framework:
-    description: >
-      Vertico + Consult + Marginalia + Corfu + Orderless + Cape.
-      - Corfu is STRICTLY confined to buffer editing. It MUST NEVER be enabled in the 
-        minibuffer (`global-corfu-minibuffer nil`), as it conflicts with Vertico.
-      - Orderless uses a custom "Tofu Dispatcher" to handle Consult's invisible Unicode 
-        disambiguation characters and file extensions.
-      - Cape uses a "Lean Pipeline Architecture" with defensive boundary guards 
-        (`cape-capf-inside-string`, `cape-capf-prefix-length`) to prevent micro-stutters.
-  general_el_placement:
-    description: >
-      All `general-define-key`, `ar/global-leader`, and `ar/local-leader` blocks MUST be 
-      evaluated eagerly at startup, entirely OUTSIDE `use-package` closures. Placing them 
-      inside deferred `:config` blocks creates a "deferred-registration trap" where 
-      `which-key` annotations remain invisible until the package is manually invoked.
-
-negative_constraints:
-  elpaca_and_packages:
-    - "NEVER use `:pin` for archive pinning. Elpaca's `:pin` means 'opt-out of updates'. Use recipe `:ref` or `:tag` for version locking."
-    - "NEVER use `:vc` alongside Elpaca. It invokes `package-vc.el` synchronously, causing double-management. Use Elpaca recipes instead."
-    - "NEVER rely on `package-quickstart`. It is inapplicable under Elpaca (`package-enable-at-startup nil`)."
-    - "NEVER omit `:ensure nil` for built-in or bundled packages."
-  completion_and_minibuffer:
-    - "NEVER route `completion-in-region-function` to `consult-completion-in-region`."
-    - "NEVER enable Corfu in the minibuffer."
-    - "NEVER force `evil-normal-state` in the minibuffer (breaks type-to-filter paradigm)."
-  configuration_and_style:
-    - "NEVER use Doom proprietary macros (`map!`, `defadvice!`, `use-package!`)."
-    - "NEVER use Chinese sources, blogs, forums, or documentation during web searches."
-    - "NEVER place `general.el` keybinding definitions inside `use-package` blocks."
-    - "NEVER change a header status from TODO to DONE without the exact phrase 'change status from TODO to DONE' or 'finalized'."
-    - "NEVER write paragraph-long, tutorial-style text inside `config.org`. Use the Documentation Hierarchy."
-
-edge_cases_and_deferred_issues:
-  - "Flycheck vs Flymake: Flycheck is currently messing with Org-mode editing. Decision pending on whether to fully replace with Flymake or isolate Flycheck."
-  - "lsp-org: Must be disabled and removed at all costs to prevent Org-mode AST corruption."
-  - "Org-Modern Sluggishness: Need to investigate Emacs 31 line-spacing notes and Bug#76390 to improve performance."
-  - "Dirvish Workspace Hook: The legacy `persp-before-switch-functions` hook in Dirvish has been excised. `bufferlo` handles spatial isolation natively."
-  - "Elpaca Native Comp: Need to verify if Elpaca byte-compiles and native-compiles all packages by default, and if leaving it to default is optimal."
-  - "Compile-Angel: Determine if `compile-angel` is still needed alongside Elpaca's native compilation."
-
-global_questions:
-  - "Can org-level variation only work for certain file and/or org buffers?"
-  - "Are there any other evil related packages that can be useful for my workflow?"
-  - "Is there a way to execute nerd-icons-install-fonts during initial emacs setup using elpaca?"
-  - "How do I get history evil commands in the echo area like doom emacs?"
-  - "How can I make the echo area useful? (Scheduled for the very end of the configuration)"
-  - "How to open links from org buffers by pressing enter and using the correct browser?"
-  - "Is it necessary to configure for my emacs configuration that is evil centric?"
-  - "Is there a chance that anzu and evil-anzu might collide with my lsp-mode configuration?"
-  - "If choosing the eglot ecosystem, do I strictly need eldoc-box to have lsp-ui-doc like features?"
-
-remaining_work_checklists:
-  urgent_and_important:
-    - "[ ] *Urgent*: I need to revisit the description of every header and subheader. They don't describe what the package actually does."
-    - "[ ] `Important`: Write a test org-mode file to practice all the writing practices in org buffers. Then determine what and how to optimize the writing workflow."
-    - "[ ] `Important`: When working on development tools, after finalizing development tools main section, ask qwen to review the completion framework again to make sure if there are any overlapping configurations that need to be integrated with each other like vertico, cape and corfu."
-    - "[ ] `Important`: For both Completion Framework and Development Tools sections, use doom emacs keybindings whereever possible."
-    - "[ ] `Important`: Determine all the related packages that are integrated together in the whole emacs config."
-    - "[ ] =Important=: add auto-tangle-mode package"
-    - "[ ] =Important=: Add the following packages: 1. denote-explore 2. flyover 3. auto-tangle-mode 4. treemacs-evil 5. treemacs-magit"
-    - "[ ] I also need interactive custom functions for .dir-locals.el"
-  general_tasks:
-    - "[ ] add a doom emacs style keybinding with SPC as leader in general.el for =org-babel-remove-result-one-or-many="
-    - "[ ] remove flycheck for now since messing with org-mode editing"
-    - "[ ] Illustrate a workflow using iedit and evil-multiedit"
-    - "[ ] customize org-agenda-finalize to customize org-agenda buffer"
-    - "[ ] Setup automatic pair generation for '**', '==', etc and make sure the cursor in insert mode is placed in the middle"
-    - "[ ] Determine if compile-angel is needed for elpaca?"
-    - "[ ] Determine if elpaca byte-compiles and native-compiles all packages. And is it okay to leave these settings to elpaca's default."
-    - "[ ] Pressing enter on a header should move a task from TODO to DONE like doom emacs does"
-    - "[ ] Add flyover package"
-    - "[ ] implement the email setup"
-    - "[ ] add more padding to emacs buffer"
-    - "[ ] add eval +overlay module packages from doom emacs into my vanilla emacs config"
-    - "[ ] go back to openrouter.ai for my corfu configuration."
-    - "[ ] make sure there are no modelines for popper and winne"
-    - "[ ] implement settings from eval-overlay.md"
-    - "[ ] recentf-mode not showing files in dashboard, but shows recent files in working buffers"
-    - "[ ] I don't want to see files enclosed with ** when I execute consult-buffer"
-    - "[ ] Add epithet and math-delimiters package from https://github.com/oantolin"
-    - "[ ] orderless only matches letters next to each other; I dont want that"
-    - "[ ] add keybindings for embark"
-    - "[ ] add lsp-ltex-plus"
-    - "[ ] lsp-mode ideas: 1. how would code lens be useful in python programming"
-
-resolved_errors_and_completed_tasks:
-  - "[X] move customs.el to var"
-  - "[X] move tree-sitter grammars to var/ or etc/"
-  - "[X] Mismatched bracket error in the new consult config"
-  - "[X] show-paren-mode should highlight matching brackets when cursor is inside that the bracket pair"
-  - "[X] **Urgent*: Update project-state.md file with tracking for TODOs, NOTEs, Remaining Work, and Questions."
-  - "[X] `Important`: package-quickstart, eln-cache/ should be in either var or etc"
-  - "[X] You are forbidden to chinese sources."
-  - "[X] Is it safe to use :demand t in solaire-mode? (Yes)"
-  - "[X] Symbol's value as variable is void: solaire-mode--set-explicitly."
+    - "Finalize Group 7: Proceed to Link Hint (the sole remaining package)."
+    - "Finalize Window Management: Proceed to Winner and Popper."
+    - "Finalize Workflow Management: Proceed to Project Management and Workspaces."
+    - "Next Steps: Proceed to Group 8 (Lexical Validation), Version Control, and Org Mode."
+  remaining_work_checklists:
+    - group: Spatial Traversal & Inline Mutations (Group 7)
+      tasks:
+        - status: done
+          description: "Avy: Finalized `at-full` paradigm, home-row routing, and `avy-isearch` (`M-j`) binding."
+        - status: done
+          description: "Evil Easymotion: Finalized unified `gs` prefix and native `evil-define-motion` wrappers."
+        - status: done
+          description: "Evil Snipe: Finalized transient injection and spatial jumps."
+        - status: done
+          description: "Ace Window: Finalized cross-window spatial jumps and dispatch actions."
+        - status: done
+          description: "Anzu & Evil Anzu: Finalized modeline match tracking and search integration."
+        - status: done
+          description: "Iedit & Evil Multiedit: Finalized localized multi-cursor refactoring and lexical engine wrapping."
+        - status: done
+          description: "Grep: Finalized ripgrep integration, `grep-apply-setting` physics, and `grep-edit-mode` Evil parity."
+        - status: done
+          description: "Re-Builder: Finalized interactive visual regex builder, custom Transient menu, and CLI export wrappers."
+        - status: done
+          description: "Avy Transient Menu: Finalized DRY scope dispatcher and spatial mutations dashboard."
+        - status: pending
+          description: "Link Hint: Route Avy-backed semantic link mutations."
+    - group: Window Management
+      tasks:
+        - status: done
+          description: "Windmove: Finalized native wrap-around physics."
+        - status: done
+          description: "Window Operations: Finalized centralized leader bindings for spatial traversal and splitting."
+        - status: pending
+          description: "Winner: Configure undo/redo window states."
+        - status: pending
+          description: "Popper: Configure popup management and echo dispatch."
+    - group: Workflow Management
+      tasks:
+        - status: done
+          description: "Dired & Dirvish: Finalized native directory editing and visual file manager with live previews."
+        - status: done
+          description: "Treemacs: Finalized persistent file and project explorer sidebar."
+        - status: done
+          description: "Buffer Management: Finalized Ibuffer dashboard, projection integration, and buffer-terminator."
+        - status: pending
+          description: "Project Management: Implement `projection` package and excise projectile glue code."
+        - status: pending
+          description: "Workspaces: Implement `bufferlo` package and wire consult-buffer sources."
+    - group: Lexical Validation & Comparative Workflows (Group 8)
+      tasks:
+        - status: pending
+          description: "Jinx: Migrate exclusions from `dict.txt` to an inline, case-insensitive Elisp list."
+        - status: pending
+          description: "Helpful: Integrate with the main development tools sections."
+        - status: pending
+          description: "Ediff: Finalize transient menu and vim-style navigation bindings."
+        - status: pending
+          description: "Woman: Extract system manpath directories for native Arch Linux manual integration."
+    - group: Global Remaining Work
+      tasks:
+        - status: done
+          description: "Fix `Precision Editing` header nesting anomaly in `config.org`."
+        - status: done
+          description: "Re-inject `Move Text` into `Spatial Alignment`."
+        - status: done
+          description: "Setup automatic pair generation for '**', '==', etc (Solved via O(1) multi-char prose formatter in Electric Pair)."
+        - status: done
+          description: "Move customs.el to var."
+        - status: done
+          description: "Move tree-sitter grammars to var/ or etc/."
+        - status: done
+          description: "Mismatched bracket error in the new consult config."
+        - status: done
+          description: "show-paren-mode should highlight matching brackets when cursor is inside that the bracket pair."
+        - status: done
+          description: "package-quickstart, eln-cache/ should be in either var or etc."
+        - status: pending
+          description: "Add a doom emacs style keybinding with SPC as leader in general.el for `org-babel-remove-result-one-or-many`."
+        - status: pending
+          description: "Remove flycheck for now since messing with org-mode editing."
+        - status: pending
+          description: "Illustrate a workflow using iedit and evil-multiedit."
+        - status: pending
+          description: "Customize org-agenda-finalize to customize org-agenda buffer."
+        - status: pending
+          description: "Setup automatic pair generation for '**', '==', etc and make sure the cursor in insert mode is placed in the middle."
+        - status: pending
+          description: "Determine if compile-angel is needed for elpaca."
+        - status: pending
+          description: "Determine if elpaca byte-compiles and native-compiles all packages."
+        - status: pending
+          description: "Pressing enter on a header should move a task from TODO to DONE like doom emacs does."
+        - status: pending
+          description: "Add flyover package."
+        - status: pending
+          description: "Implement the email setup."
+        - status: pending
+          description: "Add more padding to emacs buffer."
+        - status: pending
+          description: "Add eval +overlay module packages from doom emacs into my vanilla emacs config."
+        - status: pending
+          description: "Go back to openrouter.ai for my corfu configuration."
+        - status: pending
+          description: "Make sure there are no modelines for popper and winner."
+        - status: pending
+          description: "Implement settings from eval-overlay.md."
+        - status: pending
+          description: "Recentf-mode not showing files in dashboard, but shows recent files in working buffers."
+        - status: pending
+          description: "I don't want to see files enclosed with ** when I execute consult-buffer."
+        - status: pending
+          description: "Add epithet and math-delimiters package from https://github.com/oantolin."
+        - status: pending
+          description: "Orderless only matches letters next to each other; I dont want that."
+        - status: pending
+          description: "Add keybindings for embark."
+        - status: pending
+          description: "Add lsp-ltex-plus."
+        - status: pending
+          description: "`Important`: Write a test org-mode file to practice all the writing practices in org buffers."
+        - status: pending
+          description: "lsp-mode ideas: 1. how would code lens be useful in python programming."
+        - status: pending
+          description: "I also need interactive custom functions for .dir-locals.el."
+        - status: pending
+          description: "`Important`: Review completion framework again after finalizing development tools."
+        - status: pending
+          description: "`Important`: Use doom emacs keybindings wherever possible for Completion Framework and Development Tools."
+        - status: pending
+          description: "`Important`: Determine all the related packages that are integrated together in the whole emacs config."
+        - status: pending
+          description: "=Important=: add auto-tangle-mode package."
+        - status: pending
+          description: "=Important=: Add denote-explore, flyover, auto-tangle-mode, treemacs-evil, treemacs-magit."
+        - status: pending
+          description: "*Urgent*: Revisit the description of every header and subheader to ensure they describe what the package actually does."
+  global_questions:
+    - status: pending
+      question: "Can org-level variation only work for certain file and/or org buffers?"
+    - status: pending
+      question: "Are there any other evil related packages that can useful for my workflow?"
+    - status: done
+      question: "Execute nerd-icons-install-fonts during initial setup? (Answered: manual execution mandated)."
+    - status: done
+      question: "History evil commands in echo area? (Answered: Solved via `evil-ex-completion-map` arrow keys)."
+    - status: pending
+      question: "How to make the echo area useful?"
+    - status: pending
+      question: "How to open links from org buffers by pressing enter using correct browser?"
+    - status: pending
+      question: "Is it necessary to configure for my emacs configuration that is evil centric?"
+    - status: pending
+      question: "Is there a chance that anzu and evil-anzu might collide with my lsp-mode configuration?"

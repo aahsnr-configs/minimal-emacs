@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>lsp-stack.el — Development Stack Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #1a1b26;
+    --bg-dark: #13141c;
+    --bg-elevated: #1f2335;
+    --bg-highlight: #24283b;
+    --bg-select: #2a2f4a;
+    --border: #2a2e42;
+    --border-light: #3b4261;
+    --fg: #c0caf5;
+    --fg-dim: #9aa5ce;
+    --fg-muted: #8189b3;
+    --fg-faint: #414868;
+    --blue: #7aa2f7;
+    --cyan: #7dcfff;
+    --purple: #bb9af7;
+    --green: #9ece6a;
+    --teal: #73daca;
+    --orange: #ff9e64;
+    --yellow: #e0af68;
+    --red: #f7768e;
+
+    --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+    --sans: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+
+    --accent: var(--blue);
+  }
+
+  *{ box-sizing:border-box; }
+  ::selection{ background:var(--bg-select); color:var(--fg); }
+
+  html,body{
+    height:100%;
+    margin:0;
+    background:var(--bg);
+    color:var(--fg);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  button, input{ font-family:inherit; }
+
+  button:focus-visible, input:focus-visible, .outline-item:focus-visible, .tab:focus-visible{
+    outline:2px solid var(--cyan);
+    outline-offset:2px;
+    border-radius:4px;
+  }
+
+  .app{
+    display:flex;
+    flex-direction:column;
+    height:100vh;
+    height:100dvh;
+    overflow:hidden;
+  }
+
+  /* ---------- topbar ---------- */
+  .topbar{
+    flex:none;
+    display:flex;
+    align-items:center;
+    gap:16px;
+    padding:12px 20px;
+    background:var(--bg-dark);
+    border-bottom:1px solid var(--border);
+  }
+  .topbar .path{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--fg-muted);
+    white-space:nowrap;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .topbar .path .dot{
+    width:7px; height:7px; border-radius:50%;
+    background:var(--green);
+    box-shadow:0 0 6px var(--green);
+    flex:none;
+  }
+  .topbar h1{
+    font-family:var(--mono);
+    font-size:15px;
+    font-weight:600;
+    color:var(--fg);
+    margin:0;
+    white-space:nowrap;
+  }
+  .topbar h1 span{ color:var(--fg-muted); font-weight:400; }
+
+  .menu-toggle{
+    display:none;
+    background:none;
+    border:1px solid var(--border-light);
+    color:var(--fg-dim);
+    border-radius:6px;
+    width:32px; height:32px;
+    font-size:16px;
+    cursor:pointer;
+    flex:none;
+  }
+
+  .search-wrap{
+    margin-left:auto;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background:var(--bg-elevated);
+    border:1px solid var(--border-light);
+    border-radius:8px;
+    padding:6px 10px;
+    min-width:0;
+    width:min(360px, 40vw);
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .search-wrap:focus-within{
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  .search-wrap .prefix{
+    font-family:var(--mono);
+    color:var(--fg-muted);
+    font-size:13px;
+    flex:none;
+  }
+  .search-wrap input{
+    background:none;
+    border:none;
+    outline:none;
+    color:var(--fg);
+    font-size:13px;
+    font-family:var(--mono);
+    width:100%;
+    min-width:0;
+  }
+  .search-wrap input::placeholder{ color:var(--fg-muted); }
+  .search-wrap .kbd{
+    font-family:var(--mono);
+    font-size:10px;
+    color:var(--fg-muted);
+    border:1px solid var(--border-light);
+    border-radius:4px;
+    padding:1px 5px;
+    flex:none;
+  }
+  .search-clear{
+    background:none; border:none; color:var(--fg-muted);
+    cursor:pointer; font-size:14px; line-height:1; padding:0 2px;
+    display:none;
+  }
+  .search-wrap.has-value .search-clear{ display:block; }
+  .search-wrap.has-value .kbd{ display:none; }
+
+  /* ---------- buffer tabs ---------- */
+  .buffer-tabs{
+    flex:none;
+    display:flex;
+    gap:2px;
+    padding:0 14px;
+    background:var(--bg-dark);
+    border-bottom:1px solid var(--border);
+    overflow-x:auto;
+    scrollbar-width:none;
+  }
+  .buffer-tabs::-webkit-scrollbar{ display:none; }
+  .tab{
+    --tab-accent: var(--blue);
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+    background:none;
+    border:none;
+    border-bottom:2px solid transparent;
+    color:var(--fg-muted);
+    font-family:var(--mono);
+    font-size:13px;
+    padding:11px 16px 9px;
+    cursor:pointer;
+    white-space:nowrap;
+    transition:color .12s, background .12s;
+  }
+  .tab .dot{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--tab-accent);
+    opacity:.55;
+    transition:opacity .12s, box-shadow .12s;
+  }
+  .tab .n{ color:var(--fg-faint); font-size:11px; }
+  .tab:hover{ color:var(--fg-dim); background:rgba(255,255,255,.02); }
+  .tab.active{
+    color:var(--fg);
+    border-bottom-color:var(--tab-accent);
+    background:var(--bg);
+  }
+  .tab.active .dot{ opacity:1; box-shadow:0 0 6px var(--tab-accent); }
+  .tab.active .n{ color:var(--fg-muted); }
+
+  /* ---------- workspace ---------- */
+  .workspace{
+    flex:1;
+    display:flex;
+    min-height:0;
+    position:relative;
+  }
+
+  .outline{
+    flex:none;
+    width:236px;
+    background:var(--bg-dark);
+    border-right:1px solid var(--border);
+    overflow-y:auto;
+    padding:16px 0;
+  }
+  .outline-heading{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--fg-muted);
+    padding:0 18px 10px;
+  }
+  .outline-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    width:100%;
+    background:none;
+    border:none;
+    border-left:2px solid transparent;
+    color:var(--fg-dim);
+    font-family:var(--mono);
+    font-size:12.5px;
+    text-align:left;
+    padding:7px 16px 7px 16px;
+    cursor:pointer;
+    transition:background .12s, color .12s, border-color .12s;
+  }
+  .outline-item .glyph{ color:var(--fg-faint); flex:none; }
+  .outline-item .label{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .outline-item .count{ color:var(--fg-faint); font-size:11px; flex:none; }
+  .outline-item:hover{ background:var(--bg-highlight); color:var(--fg); }
+  .outline-item.current{
+    background:var(--bg-highlight);
+    color:var(--fg);
+    border-left-color:var(--accent);
+  }
+  .outline-item.current .glyph{ color:var(--accent); }
+
+  .content{
+    flex:1;
+    overflow-y:auto;
+    padding:32px 40px 80px;
+    min-width:0;
+  }
+
+  .pkg-header{
+    margin-bottom:28px;
+    padding-bottom:18px;
+    border-bottom:1px dashed var(--border-light);
+  }
+  .pkg-header .name{
+    font-family:var(--mono);
+    font-size:26px;
+    font-weight:700;
+    color:var(--fg);
+    margin:0 0 6px;
+    letter-spacing:-.01em;
+  }
+  .pkg-header .meta{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--fg-muted);
+    margin:0 0 16px;
+  }
+  .pkg-header .meta::before{ content:";; "; color:var(--fg-faint); }
+  .pkg-header .toolbar{
+    display:flex;
+    gap:10px;
+    align-items:center;
+  }
+  .pkg-header .toolbar button{
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--fg-dim);
+    background:var(--bg-elevated);
+    border:1px solid var(--border-light);
+    border-radius:6px;
+    padding:5px 10px;
+    cursor:pointer;
+    transition:border-color .12s, color .12s;
+  }
+  .pkg-header .toolbar button:hover{ border-color:var(--accent); color:var(--fg); }
+  .pkg-header .toolbar .stat{
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--fg-faint);
+  }
+
+  details.feature-section{
+    margin-bottom:6px;
+    border-radius:8px;
+  }
+  details.feature-section summary{
+    list-style:none;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 12px;
+    border-radius:8px;
+    transition:background .12s;
+  }
+  details.feature-section summary::-webkit-details-marker{ display:none; }
+  details.feature-section summary:hover{ background:var(--bg-highlight); }
+  details.feature-section summary .tri{
+    color:var(--accent);
+    font-size:10px;
+    transition:transform .15s;
+    flex:none;
+    width:10px;
+  }
+  details.feature-section[open] summary .tri{ transform:rotate(90deg); }
+  details.feature-section summary .sec-title{
+    font-family:var(--mono);
+    font-size:14.5px;
+    font-weight:600;
+    color:var(--fg);
+  }
+  details.feature-section summary .sec-count{
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--fg-muted);
+    margin-left:auto;
+  }
+
+  ul.feature-list{
+    list-style:none;
+    margin:2px 0 18px;
+    padding:2px 12px 4px 38px;
+  }
+  ul.feature-list li{
+    position:relative;
+    padding:6px 0 6px 16px;
+    font-size:14px;
+    line-height:1.55;
+    color:var(--fg-dim);
+    border-left:1px solid var(--border);
+  }
+  ul.feature-list li::before{
+    content:"▸";
+    position:absolute;
+    left:-6px;
+    top:6px;
+    color:var(--accent);
+    font-size:11px;
+    background:var(--bg);
+  }
+  ul.feature-list li code{
+    font-family:var(--mono);
+    font-size:.87em;
+    color:var(--cyan);
+    background:var(--bg-elevated);
+    border:1px solid var(--border-light);
+    padding:1px 5px;
+    border-radius:4px;
+    white-space:nowrap;
+  }
+  ul.feature-list li mark{
+    background:color-mix(in srgb, var(--yellow) 35%, transparent);
+    color:var(--fg);
+    border-radius:3px;
+    padding:0 1px;
+  }
+
+  /* search results view */
+  .search-pkg-group{ margin-bottom:30px; }
+  .search-pkg-group .grp-heading{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-family:var(--mono);
+    font-size:15px;
+    font-weight:700;
+    margin-bottom:10px;
+    padding-bottom:8px;
+    border-bottom:1px dashed var(--border-light);
+  }
+  .search-pkg-group .grp-heading .dot{
+    width:7px; height:7px; border-radius:50%;
+  }
+  .search-pkg-group .grp-heading .grp-count{
+    margin-left:auto;
+    color:var(--fg-muted);
+    font-size:12px;
+    font-weight:400;
+  }
+  .search-sec-label{
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--fg-muted);
+    text-transform:uppercase;
+    letter-spacing:.05em;
+    margin:14px 0 4px 4px;
+  }
+  .no-results{
+    font-family:var(--mono);
+    color:var(--fg-muted);
+    font-size:13.5px;
+    padding:40px 0;
+    text-align:center;
+  }
+  .no-results .big{ font-size:22px; display:block; margin-bottom:10px; }
+
+  /* ---------- modeline ---------- */
+  .modeline{
+    flex:none;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    padding:6px 16px;
+    background:var(--bg-elevated);
+    border-top:1px solid var(--border-light);
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--fg-dim);
+    overflow:hidden;
+    white-space:nowrap;
+  }
+  .modeline .seg{ display:flex; align-items:center; gap:6px; overflow:hidden; }
+  .modeline .seg.buf{ color:var(--bg-dark); background:var(--accent); padding:1px 8px; border-radius:3px; font-weight:600; flex:none; }
+  .modeline .seg .mode{ color:var(--purple); }
+  .modeline .sep{ color:var(--fg-faint); }
+  .modeline .current-section{
+    color:var(--fg-muted);
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .modeline .spacer{ flex:1; }
+  .modeline .cursor{
+    color:var(--accent);
+    animation:blink 1.1s steps(1) infinite;
+  }
+  @media (prefers-reduced-motion: reduce){
+    .modeline .cursor{ animation:none; }
+  }
+  @keyframes blink{ 50%{ opacity:0; } }
+
+  /* ---------- responsive ---------- */
+  .outline-scrim{
+    display:none;
+    position:fixed; inset:0;
+    background:rgba(0,0,0,.5);
+    z-index:15;
+  }
+
+  @media (max-width: 820px){
+    .menu-toggle{ display:block; }
+    .topbar h1 .full{ display:none; }
+    .topbar .path{ display:none; }
+    .search-wrap{ width:auto; flex:1; }
+    .outline{
+      position:fixed;
+      top:0; bottom:0; left:0;
+      transform:translateX(-100%);
+      transition:transform .2s ease;
+      z-index:20;
+      width:250px;
+      box-shadow:2px 0 20px rgba(0,0,0,.4);
+    }
+    .outline.open{ transform:translateX(0); }
+    .outline-scrim.show{ display:block; }
+    .content{ padding:22px 18px 70px; }
+    .pkg-header .name{ font-size:21px; }
+    ul.feature-list{ padding-left:26px; }
+    .modeline{ font-size:10px; gap:8px; }
+    .modeline .current-section{ display:none; }
+  }
+
+  /* scrollbars */
+  .outline::-webkit-scrollbar, .content::-webkit-scrollbar{ width:9px; }
+  .outline::-webkit-scrollbar-thumb, .content::-webkit-scrollbar-thumb{
+    background:var(--border-light); border-radius:5px;
+  }
+  .outline::-webkit-scrollbar-track, .content::-webkit-scrollbar-track{ background:transparent; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header class="topbar">
+    <button class="menu-toggle" id="menuToggle" aria-label="Toggle outline">≡</button>
+    <div class="path"><span class="dot"></span>~/.emacs.d/lsp-stack.el</div>
+    <h1><span class="full">Development Stack — </span>LSP Reference</h1>
+    <div class="search-wrap" id="searchWrap">
+      <span class="prefix">/</span>
+      <input id="searchInput" type="text" placeholder="search features…" autocomplete="off" spellcheck="false">
+      <span class="kbd">/</span>
+      <button class="search-clear" id="searchClear" aria-label="Clear search">✕</button>
+    </div>
+  </header>
+
+  <nav class="buffer-tabs" id="bufferTabs"></nav>
+
+  <div class="workspace">
+    <div class="outline-scrim" id="outlineScrim"></div>
+    <aside class="outline" id="outline"></aside>
+    <main class="content" id="content"></main>
+  </div>
+
+  <footer class="modeline" id="modeline"></footer>
+
+</div>
+
+<script>
+const DATA = {"packages": [{"name": "lsp-mode", "meta": "v10.0.0, latest release Apr 3, 2026", "sections": [{"title": "Core protocol/architecture", "items": ["Emacs client/library implementing the Language Server Protocol (LSP), fully featured for LSP v3.14+ (with 3.17 extensions like semantic tokens)", "Non-blocking, fully asynchronous JSON-RPC communication with language servers", "Client-server architecture; Emacs acts purely as the LSP client, a separate language server binary does the analysis", "Supports well over 100 languages/language-servers via dedicated `lsp-<language>.el` client files", "Auto-detects and auto-configures companion packages (`lsp-ui`, `company-mode`, etc.) unless `lsp-auto-configure` is set to nil", "`lsp-deferred` command to defer server startup/DidOpen notifications until the buffer becomes visible", "Multi-root / multi-folder workspace support (add/remove/blocklist project roots)", "Disconnect a buffer from its language server while keeping the server running", "Restart or shut down a language server session on demand", "Describe/inspect the current LSP session state", "Client/server protocol logging toggle for debugging", "File-watcher integration so servers are notified of external file system changes (configurable threshold)", "Remote development support (e.g., via TRAMP)", "Performance tuning guidance (increasing `gc-cons-threshold`, `read-process-output-max`, plist vs hash-table JSON parsing, etc.)", "Docker integration via the companion `lsp-docker` project for containerized language servers"]}, {"title": "Completion", "items": ["Completion-at-point integration exposing LSP-provided completion candidates", "Works with `company-mode` (`company-capf`) for a traditional completion popup", "Recommended tuning: `company-minimum-prefix-length 1`, `company-idle-delay 0.0`", "(Legacy `company-lsp` backend explicitly no longer supported/maintained)"]}, {"title": "Code navigation", "items": ["`lsp-find-definition` — jump to symbol definition", "`lsp-find-references` — list/jump to all references of a symbol", "Find implementations of a symbol", "Find type definitions of a symbol", "Find declarations of a symbol", "Find all workspace symbols matching a pattern", "Incoming call hierarchy view (via `lsp-treemacs`)", "Builtin `xref` integration (`M-.` / `xref-find-definitions`, `xref-find-references`)", "Tree-based navigation via `lsp-treemacs`", "Peek-style navigation via `lsp-ui` (definitions, references, implementations, workspace symbols)", "`helm-imenu`/builtin `imenu` code-outline browsing"]}, {"title": "Diagnostics/linting", "items": ["Real-time on-the-fly diagnostics rendered through `flycheck` (recommended) or `flymake` (Emacs >26, flymake ≥1.0.5)", "Project-wide/workspace error statistics shown directly in the modeline (`lsp-modeline-diagnostics-mode`)", "Configurable diagnostics scope: `:global`, `:workspace`, or `:file`", "Aggregated project-wide error list via `lsp-treemacs-errors-list`", "Diagnostics settings group covers severity display, filtering, and rendering behavior"]}, {"title": "Code actions", "items": ["Execute code actions on demand via `lsp-execute-code-action`", "Code actions surfaced directly in the modeline (`lsp-modeline-code-actions-mode`) — recommended UI", "Configurable modeline segments: count, icon, name in any combination", "Code actions also surfaced via `lsp-ui` sideline", "\"Organize imports\" code action shortcut (`source.organizeImports`)", "`fixAll` code action support, optionally auto-applied on save (`lsp-fix-all-on-save-list` scoping)"]}, {"title": "Code lens", "items": ["Inline code lens rendering when the server supports it (e.g., reference counts, run/test links)", "Toggle code-lens overlays on/off", "Click a lens using the `avy` package for quick activation"]}, {"title": "Headerline / breadcrumb", "items": ["`lsp-headerline-breadcrumb-mode` shows a breadcrumb bar at the top of the window", "Configurable breadcrumb segments: path-up-to-project, file, project, symbols (in any combination)", "Optional numeric labeling of breadcrumb symbol entries"]}, {"title": "Symbol highlighting", "items": ["Automatic highlighting of all occurrences of the symbol at point (read vs. write occurrences use distinct faces)", "Toggleable symbol highlighting minor mode", "Dedicated faces for \"read,\" \"write,\" and generic textual occurrences"]}, {"title": "Hover / documentation", "items": ["Built-in `eldoc-mode` integration showing one-line signature info in the minibuffer", "`lsp-describe-thing-at-point` for full hover documentation", "Signature help popup (triggered manually or by trigger characters like `(`), with `M-n`/`M-p` cycling between overloaded signatures", "Richer hover/documentation rendering via `lsp-ui-doc` child frames", "Clickable in-buffer links when the server supports `documentLink`"]}, {"title": "Formatting", "items": ["Whole-buffer formatting requested from the language server", "Region (or current-line) formatting", "On-type formatting triggered by specific characters (e.g., `}`, RET) — `lsp-enable-on-type-formatting`", "Format-on-save option, scoped per major mode via `lsp-format-buffer-on-save-list`", "Indent-size/tabs-vs-spaces control at the `lsp-mode` level (deeper formatter config is server-specific)"]}, {"title": "Renaming / editing", "items": ["`lsp-rename` — rename a symbol and all its references, with a dedicated highlighting face for the identifier being renamed", "`iedit` integration for interactive multi-cursor-style editing of symbols"]}, {"title": "Semantic tokens", "items": ["Implements LSP 3.17 semantic tokens for richer, server-driven syntax highlighting (supported by servers such as clangd and rust-analyzer)", "Dedicated semantic-tokens settings group"]}, {"title": "Folding, imenu, indentation", "items": ["Code folding support (toggle, configurable line limits, max folding ranges)", "Automatic `imenu` integration when the server provides `textDocument/documentSymbol`", "Region indentation driven by the server's formatting capability"]}, {"title": "Debugger integration", "items": ["Deep integration with `dap-mode` (Debug Adapter Protocol) for a full debugging experience from within `lsp-mode` workflows"]}, {"title": "Editor/ecosystem integrations", "items": ["Treemacs integration (`lsp-treemacs`) — tree views, error lists, call hierarchies", "Helm integration (`helm-lsp`) — workspace symbol search", "Ivy integration (`lsp-ivy`) — workspace symbol search", "Consult integration (`consult-lsp`)", "`which-key` integration for keybinding discovery (per-mode or global)", "`dired` integration", "`ido` integration", "Mouse support for LSP commands", "Almost-complete mnemonic keybinding scheme under a configurable prefix (default `s-l`), covering server lifecycle, navigation, hover, rename, code actions, peeking, and toggles", "`lsp-clients.json`/`lsp-doc.el`-driven auto-generated documentation for each language client"]}, {"title": "Language coverage", "items": ["Client definitions for well over 150 languages/tools (C/C++ via clangd/ccls, Python via pyright/pylsp/ruff/jedi, Rust via rust-analyzer, Go via gopls, Java via Eclipse JDT, TypeScript/JavaScript, Haskell, Scala/Metals, Elixir, Clojure, Dart/Flutter, Swift, Terraform, YAML, JSON, Docker, GraphQL, and dozens more), each independently configurable"]}]}, {"name": "lsp-ui", "meta": "", "sections": [{"title": "General", "items": ["UI companion package for `lsp-mode` providing \"higher level\" visual modules: sideline, peek, doc popovers, imenu, flycheck integration, and code lenses", "Automatically activated by `lsp-mode` out of the box unless `lsp-auto-configure` is nil — zero extra config required in the common case", "Installable via MELPA/`use-package`/`package-install`"]}, {"title": "lsp-ui-sideline", "items": ["Shows contextual information for the symbol(s) on the current line in the right margin/sideline", "Displays flycheck diagnostics inline in the sideline", "Displays available LSP code actions inline in the sideline", "Displays hover information inline in the sideline", "`lsp-ui-sideline-show-diagnostics` toggle for diagnostics display", "`lsp-ui-sideline-show-hover` toggle for hover display", "`lsp-ui-sideline-show-code-actions` toggle for code-action display", "`lsp-ui-sideline-update-mode` — choose whether sideline updates per-line or per-point-movement", "`lsp-ui-sideline-delay` — configurable delay (seconds) before the sideline appears", "`lsp-ui-sideline-diagnostic-max-lines` — control verbosity of multi-line diagnostic messages (helps prevent flicker)"]}, {"title": "lsp-ui-peek", "items": ["VSCode-style \"peek\" UI for inline, non-intrusive browsing of cross-references", "`lsp-ui-peek-find-definitions` — peek at definition(s) without leaving the current buffer", "`lsp-ui-peek-find-references` — peek at all references", "`lsp-ui-peek-find-implementation` — peek at implementations", "`lsp-ui-peek-find-workspace-symbol` — peek results for a workspace symbol search pattern", "`lsp-ui-peek-find-custom` — support for server-specific custom cross-reference requests (e.g., ccls's `$cquery/base`)", "Remappable over the standard `xref-find-definitions`/`xref-find-references` bindings (`M-.`/`M-?`)", "Window-local jump list dedicated to cross-references (`lsp-ui-peek-jump-backward` / `lsp-ui-peek-jump-forward`)", "`lsp-ui-peek-enable` toggle", "`lsp-ui-peek-show-directory` — optionally show each result's containing directory"]}, {"title": "lsp-ui-doc", "items": ["Shows object/symbol documentation at point in a child frame (posframe-style popover)", "Optional WebKit-rendered documentation widget for richer formatting", "Ability to focus/interact directly inside the doc child frame", "`lsp-ui-doc-enable` toggle", "`lsp-ui-doc-position` — display doc at top, bottom, or at-point", "`lsp-ui-doc-side` — display doc on the left or right", "`lsp-ui-doc-delay` — seconds before the doc popover appears", "`lsp-ui-doc-show-with-cursor` — trigger doc display by moving the cursor over a symbol", "`lsp-ui-doc-show-with-mouse` — trigger doc display by hovering the mouse over a symbol", "`lsp-ui-doc-include-signature` — include function/method signature in the popover", "`lsp-ui-doc-use-childframe` — toggle child-frame rendering vs. regular buffer", "Configurable border/alignment and winum-ignore behavior for the doc frame"]}, {"title": "lsp-ui-imenu", "items": ["Dedicated, navigable window listing all `imenu` entries (symbols) for the current buffer", "`lsp-ui-imenu-kind-position` — where to display each entry's \"kind\" (function, variable, class, etc.)", "`lsp-ui-imenu-buffer-position` — placement of the imenu window", "`lsp-ui-imenu-window-width` — set a fixed window width", "`lsp-ui-imenu-window-fix-width` — prevent the window from being resized by `balance-windows`", "Customizable mode-line format for the imenu buffer", "`lsp-ui-imenu-auto-refresh` — automatically refresh the list as the buffer changes", "`lsp-ui-imenu-refresh-delay` — delay before auto-refreshing"]}, {"title": "Flycheck integration", "items": ["Dedicated `lsp-ui-flycheck` module auto-loaded when `flycheck` is present, tying LSP diagnostics into flycheck's UI (list position, live reporting, etc.)"]}]}, {"name": "dap-mode", "meta": "Emacs client/library for the Debug Adapter Protocol", "sections": [{"title": "Core capabilities", "items": ["Full client implementation of Microsoft's Debug Adapter Protocol (DAP) — the debugging counterpart to LSP", "Works on top of `lsp-mode`'s `lsp.el` interface", "Launch and Attach debugging modes", "Breakpoints (set, toggle, delete, add at line)", "Conditional breakpoints (`dap-breakpoint-condition`)", "Hit-count/hit-condition breakpoints (`dap-breakpoint-hit-condition`)", "Logpoints — breakpoints that log a message instead of stopping (`dap-breakpoint-log-message`)", "Exception handling/breakpoints", "Pause and Continue execution control", "Step In / Step Over (Next) / Step Out execution control", "Call stack inspection and navigation", "Restart the current stack frame", "Thread inspection and switching between threads (`dap-switch-thread`)", "Stop a specific thread (`dap-stop-thread`)", "Multiple simultaneous debug sessions, with session switching (`dap-switch-session`)", "Switch the active stack frame (`dap-switch-stack-frame`)", "Evaluate arbitrary expressions (`dap-eval`)", "Evaluate a selected region as an expression (`dap-eval-region`)", "Evaluate the symbol/thing at point (`dap-eval-thing-at-point`)", "Disconnect from/cancel the current debug session", "Debug/run configuration templates, editable before running (`dap-debug-edit-template`)", "`dap-debug` — pick and start a registered debug configuration", "`dap-debug-last` — re-run the previous debug configuration", "`dap-debug-recent` — choose from recently used debug configurations", "Jump to the debug output buffer (`dap-go-to-output-buffer`)"]}, {"title": "launch.json support", "items": ["Native support for VSCode-style `launch.json` files, placed at the project root or `.vscode` directory", "Automatically populates the configuration picker from `launch.json` entries", "Supports `launch.json` variable substitution (VSCode-compatible variables reference)", "No extra setup required beyond dropping the file in place and running `dap-debug`"]}, {"title": "Pre-debug build/compile support", "items": ["`:dap-compilation` property (or `\"dap-compilation\"` in `launch.json`) runs a shell command that must succeed before the debug session starts", "`:dap-compilation-dir` controls the working directory for that compilation step"]}, {"title": "REPL / debug shell", "items": ["Interactive DAP debug REPL for executing commands while stopped at a breakpoint", "Standard Emacs shell ergonomics: command history, `C-p`/`C-n` history navigation", "Optional `company-mode` autocompletion inside the REPL"]}, {"title": "UI windows (dap-ui)", "items": ["Sessions view (`dap-ui-sessions`) listing active/terminated debug sessions", "Locals view (`dap-ui-locals`) showing local variables in the current frame", "Expressions/watch view (`dap-ui-expressions`), with add/remove watch expressions (`dap-ui-expressions-add` / `dap-ui-expressions-remove`)", "Breakpoints view (`dap-ui-breakpoints`) with its own keymap: jump to breakpoint (RET), delete under cursor (d), delete selected (D), mark/unmark/unmark-all (m/u/U)", "Loaded-sources view (`dap-ui-loaded-sources`)", "REPL window (`dap-ui-repl`)", "`dap-ui-controls-mode` — on-screen controls to manage the debug session", "`dap-tooltip-mode` — mouse-hover support while debugging"]}, {"title": "Hydra integration", "items": ["Built-in `dap-hydra` command console for quick access to common debugger actions", "Can auto-trigger the hydra whenever a breakpoint is hit (`dap-stopped-hook`)"]}, {"title": "Docker / containerized debugging", "items": ["`dap-docker-register` support for debugging inside Docker containers/images", "Configuration via `.dir-locals.el` or a dedicated `.lsp-docker.yml` file", "Shares configuration mechanics with the companion `lsp-docker` project", "(Network-based/remote debug-server connections are explicitly not yet supported by this Docker mechanism)"]}, {"title": "Language/debugger coverage", "items": ["Tested against and supports Java (via LSP Java auto-discovery), Python (debugpy), Ruby, Elixir, and LLDB (C/C++/Objective-C/Swift)", "Additional community-documented integrations for Node.js, Go (Delve), PHP (xdebug via vscode-php-debug), Firefox, Chrome/Edge, GDB/LLDB via `dap-gdb-lldb`, and more", "Automatic extension/debug-server installation helpers for several languages (e.g., `dap-ruby-setup`, `dap-go-setup`, `dap-chrome-setup`, `dap-firefox-setup`, `dap-gdb-lldb-setup`)", "Custom cross-reference/debug provider registration API for adding new debug servers (`dap-register-debug-provider`)"]}]}, {"name": "Flycheck", "meta": "v36.0, current stable", "sections": [{"title": "Core purpose", "items": ["Modern on-the-fly syntax checking extension for GNU Emacs, positioned as the successor/alternative to the built-in Flymake", "Delegates actual checking to external syntax-checking/linting programs or services (does not check code itself)", "Ships with support for 60+ programming languages and 100+ different syntax-checking tools out of the box", "Simple, documented interface for defining custom syntax checkers"]}, {"title": "Enabling / activation", "items": ["`flycheck-mode` — enable automatic syntax checking in the current buffer", "`global-flycheck-mode` — enable it in all buffers where checking is possible", "Global mode intentionally skips remote (TRAMP) files and encrypted files by default (for speed/security reasons), though it can be force-enabled manually", "`flycheck-global-modes` — include/exclude specific major modes from global activation"]}, {"title": "Automatic checking triggers", "items": ["`save` — check immediately after the buffer is saved", "`new-line` — check immediately after a newline is inserted", "`idle-change` — check a short, configurable delay after the last edit (`flycheck-idle-change-delay`)", "`idle-buffer-switch` — check a short, configurable delay after switching into the buffer (`flycheck-idle-buffer-switch-delay`), with control over intermediate-buffer checking behavior", "`mode-enabled` — check immediately when `flycheck-mode` is turned on", "Fully customizable trigger set via `flycheck-check-syntax-automatically`", "Manual, on-demand checking via `flycheck-buffer` (`C-c ! c`)"]}, {"title": "Syntax checker selection and chaining", "items": ["Automatic selection of the best-matching checker(s) for the current major mode from `flycheck-checkers`", "Checker chains — multiple checkers can run in sequence for one buffer (e.g., `emacs-lisp` → `emacs-lisp-checkdoc`; `python-mypy` → `python-flake8`)", "Manual checker selection for the current buffer (`flycheck-select-checker`, `C-c ! s`), with ability to revert to automatic selection", "Per-project checker enforcement via directory-local variables", "Disable specific checkers per buffer/project (`flycheck-disable-checker`, `C-c ! x`) and re-enable them", "Automatic self-disabling of checkers that fail to run (e.g., tool not installed), visible in the verification buffer", "Custom `:next-checkers` property (and `flycheck-add-next-checker` API) to define chain order, optionally gated by minimum error level", "In-Emacs documentation for any checker via `flycheck-describe-checker` (`C-c ! ?`)"]}, {"title": "Checker configuration", "items": ["Command-line flags exposed as ordinary customizable Emacs user options per checker", "Support for reading external configuration files per checker, with a configurable file-lookup strategy (absolute path → nearest ancestor directory → `$HOME`)", "Override the executable path used for any checker (`flycheck-set-checker-executable`) — useful for project-local tool installs (e.g., a linter inside `node_modules`)", "Recommended workflow of using Directory Variables to scope checker configuration per project"]}, {"title": "In-buffer error display", "items": ["Three built-in severity levels: `error`, `warning`, `info`", "Configurable in-buffer highlighting extent (`flycheck-highlighting-mode`): none, whole line, column-only, symbol (default), or full s-expression", "Configurable highlighting style (`flycheck-highlighting-style`): none, colored \"level-face\" underline, custom delimiter bracketing, or conditional style based on error span length", "Dedicated customizable faces per severity level for both underline and delimiter styles", "Fringe indicators (small arrow bitmaps) in the left or right fringe, colored by severity", "Margin indicators (using scalable `»` glyphs) as an alternative to fringe icons, with helper functions to auto-configure fringe/margin widths", "Multi-line error indication via hatch patterns (fringe) or vertical dots (margin)", "Customizable fringe bitmaps/margin symbols via `flycheck-redefine-standard-error-levels`", "Mode-line indicator showing Flycheck's current state and error/warning counts, fully customizable, including a custom \"all clear\" success indicator", "Error-count threshold protection (`flycheck-checker-error-threshold`) that discards and disables an overly noisy checker", "`flycheck-clear` (`C-c ! C`) to wipe all highlighting/indicators from the buffer, with a variant that also interrupts an in-progress check"]}, {"title": "Error list", "items": ["Dedicated, auto-updating error list buffer (`flycheck-list-errors` / `list-flycheck-errors`, `C-c ! l`) that follows the currently active \"source buffer\"", "Highlights the entry corresponding to the error at point in the source buffer", "Keybindings inside the list: jump to error (RET), next/previous error (n/p), explain error (e), filter by level (f), clear filter (F), sort by column (S), re-check and refresh (g), quit (q)", "Filter the list to hide errors below a chosen severity", "Sort by line, level, ID, or message/checker column, toggling ascending/descending", "Customizable window placement/sizing via `display-buffer-alist` (e.g., IDE-style bottom panel)"]}, {"title": "Error navigation and interaction", "items": ["Integrates with Emacs' standard `next-error`/`previous-error` (`M-g n` / `M-g p`), toggleable via `flycheck-standard-error-navigation`", "Independent navigation commands regardless of compilation-buffer precedence: `flycheck-next-error` / `flycheck-previous-error` (`C-c ! n` / `C-c ! p`), both accepting numeric prefix arguments, plus `flycheck-first-error`", "Minimum-severity filter for navigation (`flycheck-navigation-minimum-level`)", "Automatic display of the error(s) at point after a configurable delay (`flycheck-display-errors-delay`), toggleable (`flycheck-auto-display-errors-after-checking`)", "Customizable error-display function/backend (default shows in the echo area or a popped-up buffer; swappable, e.g., to only show when the error list is hidden)", "GUI mouse-hover tooltips showing error message(s)/IDs at a location, with a customizable tooltip-content function", "Errors from other files (e.g., a header included via `gcc`) surface in the error list and are anchored to the first line of the current buffer, with a configurable minimum severity for inclusion and an option to disable them entirely", "\"Explain error\" support (`flycheck-explain-error-at-point`, `C-c ! e`) for checkers that provide rich explanations (e.g., ESLint, stylelint, Rust/Cargo/Clippy, Pylint, Ruff, ShellCheck, markdownlint, Perl::Critic, rpmlint)", "Copy error message(s) at point to the kill ring (`flycheck-copy-errors-as-kill`, `C-c ! C-w`), with variants to copy including IDs or IDs-only"]}, {"title": "Ecosystem / extensibility", "items": ["Documented Developer's Guide for writing and registering new syntax checkers, including complex multi-step checkers", "Large recommended-extensions ecosystem for alternative error UIs (e.g., popup tooltips), per-language checker add-ons, and mode-line enhancements", "Detailed \"Flycheck versus Flymake\" comparison covering relation to core Emacs, automatic checking, checker definition/customization, executable handling, multiple-checkers-per-buffer support, error identifiers/explanations, indicator style, error parsing, message display, and current support status under both Eglot and `lsp-mode`", "Officially requires GNU Emacs 27.1+; works best on Unix-like systems (Windows is unofficially supported)"]}]}]};
+
+const ACCENTS = ['blue','purple','orange','red'];
+const ACCENT_HEX = {
+  blue: '#7aa2f7', purple: '#bb9af7', orange: '#ff9e64', red: '#f7768e'
+};
+
+let state = {
+  activeIndex: 0,
+  query: '',
+  currentSectionLabel: ''
+};
+
+const el = {
+  tabs: document.getElementById('bufferTabs'),
+  outline: document.getElementById('outline'),
+  content: document.getElementById('content'),
+  modeline: document.getElementById('modeline'),
+  searchInput: document.getElementById('searchInput'),
+  searchWrap: document.getElementById('searchWrap'),
+  searchClear: document.getElementById('searchClear'),
+  menuToggle: document.getElementById('menuToggle'),
+  outlineScrim: document.getElementById('outlineScrim'),
+};
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// turn `code` spans into <code>, safely, after escaping the rest
+function renderInline(raw){
+  const parts = raw.split('`');
+  let out = '';
+  parts.forEach((part, i) => {
+    if(i % 2 === 1){
+      out += '<code>' + escapeHtml(part) + '</code>';
+    } else {
+      out += escapeHtml(part);
+    }
+  });
+  return out;
+}
+
+// wraps case-insensitive matches of q in <mark>, operating on already-safe text (pre-inline-render)
+function withHighlight(raw, q){
+  if(!q) return renderInline(raw);
+  // do highlight on the raw markdown text first (outside backticks-aware pass is fine since
+  // we only insert <mark> around literal substrings, then run through inline code rendering)
+  const idx = raw.toLowerCase();
+  const needle = q.toLowerCase();
+  let result = '';
+  let cursor = 0;
+  let pos;
+  while((pos = idx.indexOf(needle, cursor)) !== -1){
+    result += raw.slice(cursor, pos);
+    result += '\u0001' + raw.slice(pos, pos + q.length) + '\u0002';
+    cursor = pos + q.length;
+  }
+  result += raw.slice(cursor);
+  let html = renderInline(result);
+  html = html.split('\u0001').join('<mark>').split('\u0002').join('</mark>');
+  return html;
+}
+
+function itemMatches(item, q){
+  return item.toLowerCase().includes(q.toLowerCase());
+}
+
+function totalItems(pkg){
+  return pkg.sections.reduce((n, s) => n + s.items.length, 0);
+}
+
+function buildTabs(){
+  el.tabs.innerHTML = '';
+  DATA.packages.forEach((pkg, i) => {
+    const accent = ACCENTS[i % ACCENTS.length];
+    const btn = document.createElement('button');
+    btn.className = 'tab' + (i === state.activeIndex && !state.query ? ' active' : '');
+    btn.style.setProperty('--tab-accent', ACCENT_HEX[accent]);
+    btn.innerHTML = `<span class="dot"></span>${escapeHtml(pkg.name)}<span class="n">${totalItems(pkg)}</span>`;
+    btn.addEventListener('click', () => {
+      state.activeIndex = i;
+      state.query = '';
+      el.searchInput.value = '';
+      updateSearchWrapState();
+      render();
+      el.content.scrollTop = 0;
+      closeOutlineDrawer();
+    });
+    el.tabs.appendChild(btn);
+  });
+}
+
+function currentAccent(){
+  return ACCENT_HEX[ACCENTS[state.activeIndex % ACCENTS.length]];
+}
+
+function buildOutlineNormal(){
+  const pkg = DATA.packages[state.activeIndex];
+  let html = `<div class="outline-heading">Outline — ${escapeHtml(pkg.name)}</div>`;
+  pkg.sections.forEach((sec, i) => {
+    const id = `sec-${state.activeIndex}-${i}`;
+    html += `<button class="outline-item" data-target="${id}">
+      <span class="glyph">•</span>
+      <span class="label">${escapeHtml(sec.title)}</span>
+      <span class="count">${sec.items.length}</span>
+    </button>`;
+  });
+  el.outline.innerHTML = html;
+  el.outline.querySelectorAll('.outline-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = document.getElementById(btn.dataset.target);
+      if(target){
+        if(target.tagName === 'DETAILS') target.open = true;
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      closeOutlineDrawer();
+    });
+  });
+}
+
+function buildOutlineSearch(matchesByPkg){
+  let html = `<div class="outline-heading">Matches</div>`;
+  matchesByPkg.forEach(({pkg, idx, count}) => {
+    if(count === 0) return;
+    const accent = ACCENT_HEX[ACCENTS[idx % ACCENTS.length]];
+    html += `<button class="outline-item" data-target="grp-${idx}">
+      <span class="glyph" style="color:${accent}">•</span>
+      <span class="label">${escapeHtml(pkg.name)}</span>
+      <span class="count">${count}</span>
+    </button>`;
+  });
+  if(matchesByPkg.every(m => m.count === 0)){
+    html += `<div style="padding:10px 16px; color:var(--fg-muted); font-family:var(--mono); font-size:12px;">no matches</div>`;
+  }
+  el.outline.innerHTML = html;
+  el.outline.querySelectorAll('.outline-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = document.getElementById(btn.dataset.target);
+      if(target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      closeOutlineDrawer();
+    });
+  });
+}
+
+function buildContentNormal(){
+  const pkg = DATA.packages[state.activeIndex];
+  document.documentElement.style.setProperty('--accent', currentAccent());
+
+  let html = `<div class="pkg-header">
+    <h2 class="name">${escapeHtml(pkg.name)}</h2>
+    ${pkg.meta ? `<p class="meta">${escapeHtml(pkg.meta)}</p>` : ''}
+    <div class="toolbar">
+      <button id="expandAll">expand-all</button>
+      <button id="collapseAll">collapse-all</button>
+      <span class="stat">${pkg.sections.length} sections · ${totalItems(pkg)} features</span>
+    </div>
+  </div>`;
+
+  pkg.sections.forEach((sec, i) => {
+    const id = `sec-${state.activeIndex}-${i}`;
+    html += `<details class="feature-section" id="${id}" open data-title="${escapeHtml(sec.title)}">
+      <summary><span class="tri">▶</span><span class="sec-title">${escapeHtml(sec.title)}</span><span class="sec-count">${sec.items.length}</span></summary>
+      <ul class="feature-list">
+        ${sec.items.map(it => `<li>${renderInline(it)}</li>`).join('')}
+      </ul>
+    </details>`;
+  });
+
+  el.content.innerHTML = html;
+
+  document.getElementById('expandAll').addEventListener('click', () => {
+    el.content.querySelectorAll('details.feature-section').forEach(d => d.open = true);
+  });
+  document.getElementById('collapseAll').addEventListener('click', () => {
+    el.content.querySelectorAll('details.feature-section').forEach(d => d.open = false);
+  });
+
+  setupScrollSpy();
+}
+
+function buildContentSearch(){
+  const q = state.query;
+  document.documentElement.style.setProperty('--accent', 'var(--yellow)');
+  let html = '';
+  let anyMatches = false;
+  const matchesByPkg = [];
+
+  DATA.packages.forEach((pkg, idx) => {
+    const accent = ACCENT_HEX[ACCENTS[idx % ACCENTS.length]];
+    let pkgCount = 0;
+    let body = '';
+    pkg.sections.forEach(sec => {
+      const matched = sec.items.filter(it => itemMatches(it, q));
+      if(matched.length === 0) return;
+      pkgCount += matched.length;
+      body += `<div class="search-sec-label">${escapeHtml(sec.title)}</div>
+        <ul class="feature-list">
+          ${matched.map(it => `<li>${withHighlight(it, q)}</li>`).join('')}
+        </ul>`;
+    });
+    matchesByPkg.push({ pkg, idx, count: pkgCount });
+    if(pkgCount > 0){
+      anyMatches = true;
+      html += `<div class="search-pkg-group" id="grp-${idx}">
+        <div class="grp-heading" style="color:${accent}">
+          <span class="dot" style="background:${accent}"></span>
+          ${escapeHtml(pkg.name)}
+          <span class="grp-count">${pkgCount} match${pkgCount === 1 ? '' : 'es'}</span>
+        </div>
+        ${body}
+      </div>`;
+    }
+  });
+
+  if(!anyMatches){
+    html = `<div class="no-results"><span class="big">∅</span>No features match “${escapeHtml(q)}”.<br>Try a shorter or different term.</div>`;
+  }
+
+  el.content.innerHTML = html;
+  buildOutlineSearch(matchesByPkg);
+  state.currentSectionLabel = anyMatches ? `${matchesByPkg.reduce((n,m)=>n+m.count,0)} matches` : 'no matches';
+  renderModeline();
+}
+
+let observer = null;
+function setupScrollSpy(){
+  if(observer) observer.disconnect();
+  const sections = el.content.querySelectorAll('details.feature-section');
+  observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if(entry.isIntersecting){
+        const id = entry.target.id;
+        el.outline.querySelectorAll('.outline-item').forEach(b => {
+          b.classList.toggle('current', b.dataset.target === id);
+        });
+        state.currentSectionLabel = entry.target.dataset.title;
+        renderModeline();
+      }
+    });
+  }, { root: el.content, rootMargin: '-10% 0px -75% 0px', threshold: 0 });
+  sections.forEach(s => observer.observe(s));
+}
+
+function renderModeline(){
+  const searching = !!state.query;
+  const pkg = DATA.packages[state.activeIndex];
+  const accent = searching ? 'var(--yellow)' : currentAccent();
+  el.modeline.innerHTML = `
+    <span class="seg buf" style="background:${accent}">${searching ? 'SEARCH' : escapeHtml(pkg.name)}</span>
+    <span class="seg mode">(LSP-Reference)</span>
+    <span class="sep">|</span>
+    <span class="current-section">${escapeHtml(state.currentSectionLabel || '')}</span>
+    <span class="spacer"></span>
+    <span class="seg">${searching ? `/${escapeHtml(state.query)}` : 'coding:utf-8'}</span>
+    <span class="cursor">▮</span>
+  `;
+}
+
+function updateSearchWrapState(){
+  el.searchWrap.classList.toggle('has-value', !!state.query);
+}
+
+function closeOutlineDrawer(){
+  el.outline.classList.remove('open');
+  el.outlineScrim.classList.remove('show');
+}
+
+function render(){
+  buildTabs();
+  if(state.query){
+    buildContentSearch();
+  } else {
+    const pkg = DATA.packages[state.activeIndex];
+    state.currentSectionLabel = pkg.sections[0] ? pkg.sections[0].title : '';
+    buildOutlineNormal();
+    buildContentNormal();
+    renderModeline();
+  }
+}
+
+// ---- events ----
+el.searchInput.addEventListener('input', (e) => {
+  state.query = e.target.value.trim();
+  updateSearchWrapState();
+  render();
+});
+
+el.searchClear.addEventListener('click', () => {
+  state.query = '';
+  el.searchInput.value = '';
+  updateSearchWrapState();
+  el.searchInput.focus();
+  render();
+});
+
+document.addEventListener('keydown', (e) => {
+  const tag = document.activeElement.tagName;
+  const isTyping = tag === 'INPUT' || tag === 'TEXTAREA';
+  if(e.key === '/' && !isTyping){
+    e.preventDefault();
+    el.searchInput.focus();
+  } else if(e.key === 'Escape'){
+    if(state.query){
+      state.query = '';
+      el.searchInput.value = '';
+      updateSearchWrapState();
+      render();
+    }
+    el.searchInput.blur();
+  }
+});
+
+el.menuToggle.addEventListener('click', () => {
+  el.outline.classList.toggle('open');
+  el.outlineScrim.classList.toggle('show');
+});
+el.outlineScrim.addEventListener('click', closeOutlineDrawer);
+
+render();
+</script>
+
+</body>
+</html>

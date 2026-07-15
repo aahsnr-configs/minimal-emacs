@@ -1,0 +1,99 @@
+emacs_31_features:
+  eglot:
+    documentation_renderer:
+      variable: eglot-documentation-renderer
+      status: confirmed
+      default: nil  # uses gfm-view-mode (markdown-mode package) if installed
+      note: replaces obsolete eglot-prefer-plaintext; markdown-ts-view-mode is an opt-in value, not the default
+    events_buffer_config:
+      old_variable: eglot-events-buffer-size  # deprecated
+      new_variable: eglot-events-buffer-config
+      status: confirmed
+    file_watch_limits:
+      variable: eglot-max-file-watches
+      status: confirmed
+      note: added in Eglot 1.22, limits file watches to prevent resource exhaustion
+    workspace_file_operations:
+      status: confirmed
+      note: Eglot now supports create/rename/delete file ops in workspace edits;
+            eglot-confirm-server-edits reworked for mixed operation types
+    advertise_cancellation:
+      variable: eglot-advertise-cancellation
+      status: confirmed
+      default: t
+    code_action_indications:
+      status: unverified
+      note: not found in NEWS.31 or GNU ELPA Eglot NEWS as of July 2026 — likely fabricated
+    call_and_type_hierarchies:
+      status: unverified
+      note: no evidence in primary sources — likely fabricated
+
+  eldoc:
+    help_at_pt:
+      variable: eldoc-help-at-pt
+      status: confirmed
+      description: >
+        Displays the 'help-at-pt-kbd-string' via ElDoc; an alternative to
+        'help-at-pt-display-when-idle'. Not a generic help-echo grabber as
+        originally described.
+    minor_mode_collapse:
+      variable: mode-line-collapse-minor-modes
+      status: confirmed
+      default: nil
+      note: collapses minor-mode lighters into a single mode-line button; can also be a list
+
+  tree_sitter:
+    auto_install_grammar:
+      variable: treesit-auto-install-grammar
+      status: confirmed
+      note: values include 'always, 'ask, 'ask-dir
+    enabled_modes:
+      variable: treesit-enabled-modes
+      status: confirmed
+      note: set to t to auto-remap major modes to their -ts-mode equivalents
+    markdown_ts_mode_overhaul:
+      status: partially_confirmed
+      confirmed_detail: markdown-ts-mode-install-parsers command exists; falls back to text-mode
+      unverified_detail: "Org-mode parity" folding and inline image/rich-media rendering — not found in NEWS.31
+
+  startup_and_config:
+    user_lisp_directory:
+      status: confirmed
+      note: >
+        A "user-lisp/" subdirectory in your config dir is recursively
+        byte-compiled, scraped for autoload cookies, and added to load-path
+        automatically. Disable via user-lisp-auto-scrape; relocate via
+        user-lisp-directory. Manual trigger: M-x prepare-user-lisp.
+    xterm_mouse_mode_default:
+      status: confirmed
+      note: enabled by default on compatible terminals; disable with (xterm-mouse-mode -1)
+
+  window_management:
+    layout_commands:
+      status: partially_inaccurate
+      corrected_keybindings:
+        - "C-x w t / C-x w r <left>/<right>": rotate the window layout
+        - "C-x w o <left>/<right>": rotate windows within the current layout
+        - "C-x w f <left>/<right>/<up>/<down>": flip the window layout
+      note: >
+        Originally listed function names (window-layout-transpose,
+        window-layout-rotate-clockwise, window-layout-flip-leftright,
+        window-layout-flip-topdown) and bindings (C-x w f h / C-x w f v)
+        do not match the actual NEWS.31 entry.
+
+  removals:
+    unexec_dumper:
+      status: confirmed
+      note: legacy unexec dumper (deprecated since Emacs 27) fully removed
+    legacy_ctags:
+      status: confirmed
+      note: old bundled ctags no longer built; use Universal Ctags, or 'etags --ctags' for old behavior
+
+  additional_confirmed_changes_not_in_original_doc:
+    completion_ui:
+      - completion-eager-display: eager-display of *Completions* buffer
+      - completion-eager-update: live-update *Completions* as you type
+      - minibuffer-visible-completions: new 'up-down value
+      - crm-prompt: configurable completing-read-multiple prompt format
+    org_mode: bundled Org bumped to v9.8
+    unicode: Unicode Standard 17.0 support added
