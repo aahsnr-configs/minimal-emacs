@@ -3756,9 +3756,9 @@ Provides a unified workspace engine for navigating, compiling, and managing code
   (project-vc-ignores '("node_modules/"
                         ".venv/"
                         "venv/"
-                        ".direnv/"
                         "__pycache__/"
                         "build/"
+                        ".direnv/"
                         "dist/"
                         "target/"
                         ".next/"
@@ -3811,6 +3811,8 @@ Bypasses the interactive `yes-or-no-p` prompt natively via the NO-CONFIRM argume
 #+end_src
 
 *** TODO Projection
+- [ ] What features does Projection add to project.el to mimic projectile
+
 =projection= extends the native workspace detector with Projectile-like abstractions. It injects project-specific buffer hooks, exposes transient menus for build systems, and enables intelligent file jumping across diverse language ecosystems.
 #+begin_src emacs-lisp
 (use-package projection
@@ -3881,11 +3883,17 @@ Bypasses the interactive `yes-or-no-p` prompt natively via the NO-CONFIRM argume
   "p c" '(projection-multi-compile :wk "Compile")
   "p C" '(projection-commands-build-project :wk "Build")
   "p t" '(projection-commands-test-project :wk "Test")
-  "p r" '(projection-commands-run-project :wk "Run")
+  "p r" '(project-query-replace-regexp :wk "Replace in project")
+  "p u" '(projection-commands-run-project :wk "Run project")
   "p g" '(projection-commands-configure-project :wk "Configure")
   "p i" '(project-forget-zombie-projects :wk "Invalidate cache")
   "p a" '(project-remember-project :wk "Add known project"))
 #+end_src
+
+
+
+
+
 
 
 ** TODO Workspaces
@@ -3903,6 +3911,8 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
   :config
   ;; Activate the native tab engine globally.
   (tab-bar-mode 1)
+  ;; Enable isolated window layout history per workspace (prevents winner-mode confusion).
+  (tab-bar-history-mode 1)
   ;; Ensure new frames also receive an isolated local scratch buffer.
   (add-hook 'after-make-frame-functions #'bufferlo-switch-to-local-scratch-buffer))
 #+end_src
@@ -3999,28 +4009,33 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
 =general.el= routes centralized leader keybindings for workspace operations, mirroring legacy `persp-mode` mnemonics mapped strictly to `bufferlo` and `tab-bar` APIs.
 #+begin_src emacs-lisp
 (ar/global-leader
-  "TAB"         '(:ignore t :wk "workspace")
-  "TAB TAB"     '(tab-bar-switch-to-recent-tab :wk "Switch/last workspace")
-  "TAB n"       '(tab-next :wk "Next workspace")
-  "TAB p"       '(tab-previous :wk "Previous workspace")
-  "TAB `"       '(tab-bar-switch-to-recent-tab :wk "Last workspace")
-  "TAB r"       '(tab-bar-rename-tab :wk "Rename workspace")
-  "TAB k"       '(bufferlo-tab-close-kill-buffers :wk "Kill workspace")
-  "TAB K"       '(tab-bar-close-other-tabs :wk "Kill other workspaces")
-  "TAB b"       '(bufferlo-switch-to-buffer :wk "Switch to buffer (local)")
-  "TAB B"       '(switch-to-buffer :wk "Switch buffer (global)")
-  "TAB a"       '(bufferlo-find-buffer-switch :wk "Import/Switch buffer")
-  "TAB A"       '(ar/workspace-set-buffer :wk "Set buffer (exclusive)")
-  "TAB x"       '(bufferlo-remove :wk "Remove buffer from workspace")
-  "TAB X"       '(ar/workspace-kill-other-buffers :wk "Kill other local buffers")
-  "TAB m"       '(bufferlo-ibuffer :wk "IBuffer (workspace-filtered)")
-  "TAB s"       '(:ignore t :wk "state")
-  "TAB s s"     '(bufferlo-bookmark-tab-save-current :wk "Save workspace state")
-  "TAB s l"     '(bufferlo-bookmark-tab-load-current :wk "Load/restore workspace state")
-  "TAB P"       '(:ignore t :wk "project")
-  "TAB P s"     '(ar/workspace-project-switch :wk "Switch project + isolate")
-  "TAB P p"     '(bufferlo-isolate-project :wk "Isolate workspace to project")
-  "TAB P k"     '(ar/workspace-project-kill :wk "Kill project + workspace"))
+  "TAB"     '(:ignore t :wk "workspace")
+  "TAB TAB" '(tab-switcher :wk "Switch/create workspace")
+  "TAB n"   '(tab-next :wk "Next workspace")
+  "TAB p"   '(tab-previous :wk "Previous workspace")
+  "TAB `"   '(tab-bar-switch-to-recent-tab :wk "Last workspace")
+  "TAB r"   '(tab-bar-rename-tab :wk "Rename workspace")
+  "TAB k"   '(bufferlo-tab-close-kill-buffers :wk "Kill workspace")
+  "TAB K"   '(tab-bar-close-other-tabs :wk "Kill other workspaces")
+
+  "TAB b"   '(bufferlo-switch-to-buffer :wk "Switch to buffer (local)")
+  "TAB B"   '(switch-to-buffer :wk "Switch buffer (global)")
+  "TAB a"   '(bufferlo-find-buffer-switch :wk "Add/Import buffer")
+  "TAB A"   '(ar/workspace-set-buffer :wk "Set buffer (exclusive)")
+  "TAB x"   '(bufferlo-remove :wk "Remove buffer from workspace")
+  "TAB X"   '(ar/workspace-kill-other-buffers :wk "Kill other local buffers")
+  "TAB m"   '(bufferlo-ibuffer :wk "IBuffer (workspace-filtered)")
+
+  "TAB s"   '(:ignore t :wk "state")
+  "TAB s s" '(bufferlo-bookmark-tab-save-current :wk "Save workspace state")
+  "TAB s l" '(bufferlo-bookmark-tab-load-current :wk "Load/restore workspace state")
+
+  "TAB P"   '(:ignore t :wk "project")
+  "TAB P s" '(ar/workspace-project-switch :wk "Switch project + isolate")
+  "TAB P p" '(bufferlo-isolate-project :wk "Isolate workspace to project")
+  "TAB P k" '(ar/workspace-project-kill :wk "Kill project + workspace")
+
+  "TAB l"   '(bufferlo-list-buffers :wk "List all local buffers"))
 #+end_src
 
 
