@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.11
+#+VERSION: 0.12
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -3570,7 +3570,7 @@ Provides a persistent file and project explorer sidebar for navigating directory
 #+end_src
 
 
-** DONE Buffer Management
+** TODO Buffer Management
 Provides a centralized dashboard and automated cleanup engine for viewing, filtering, and managing all open buffers across projects and workspaces.
 
 =ibuffer= provides a highly customizable dashboard for viewing, filtering, and managing open buffers with project and workspace awareness.
@@ -3722,9 +3722,10 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
 
 
 
+
+
 ** TODO Project Management
-- [ ] Revisit Consult and Embark config
-Provides a unified workspace engine for navigating, compiling, and managing code repositories. Replaces legacy external project managers with Emacs' native project detection, augmented by an abstraction layer that exposes transient build menus and multi-target compilation.
+Provides a unified workspace engine for navigating, compiling, and managing code repositories. Replaces legacy external project managers with Emacs' native C-level project detection, augmented by an abstraction layer that exposes transient build menus and multi-target compilation.
 
 =project= serves as the foundational, built-in workspace detector. It identifies repository boundaries, manages ignore patterns for massive monorepos, and routes project-scoped searches natively into the completion framework.
 #+begin_src emacs-lisp
@@ -3756,24 +3757,22 @@ Provides a unified workspace engine for navigating, compiling, and managing code
   ;; Display the entire transient menu immediately upon invoking the prefix.
   (project-switch-use-entire-map t)
   :config
-  ;; Wire native project.el into consult. Extracts root directory string safely,
-  ;; bypassing the `project-current` instance object to prevent type mismatches.
+  ;; Wire native project.el into consult. Extracts root directory string safely.
   (with-eval-after-load 'consult
     (setq consult-project-function
           (lambda (may-prompt)
             (when-let ((proj (project-current may-prompt)))
-              (project-root proj)))))
+              (project-root proj))))
+    ;; Enrich the native project dispatch menu with Doom-like actions.
+    (add-to-list 'project-switch-commands '(consult-find "Find file") t)
+    (add-to-list 'project-switch-commands '(consult-ripgrep "Ripgrep") t))
   ;; Wire project roots into consult-dir for spatial directory jumping.
   (with-eval-after-load 'consult-dir
     (setq consult-dir-project-list-function #'project-known-project-roots))
-  ;; Enrich the native project dispatch menu with Doom-like actions.
-  (with-eval-after-load 'consult
-    (add-to-list 'project-switch-commands '(consult-find "Find file") t)
-    (add-to-list 'project-switch-commands '(consult-ripgrep "Ripgrep") t))
+  ;; Magit integration for project dispatch menu.
   (with-eval-after-load 'magit
     (add-to-list 'project-switch-commands '(magit-project-status "Magit") t)))
 #+end_src
-
 
 =Custom Utilities= provide O(1) wrapper functions for rapid configuration navigation and frictionless workspace teardown, mirroring Doom Emacs muscle memory.
 #+begin_src emacs-lisp
@@ -3790,7 +3789,6 @@ Bypasses the interactive `yes-or-no-p` prompt natively via the NO-CONFIRM argume
   (interactive)
   (project-kill-buffers t))
 #+end_src
-
 
 =projection= extends the native workspace detector with Projectile-like abstractions. It injects project-specific buffer hooks, exposes transient menus for build systems, and enables intelligent file jumping across diverse language ecosystems.
 #+begin_src emacs-lisp
@@ -3851,7 +3849,7 @@ Bypasses the interactive `yes-or-no-p` prompt natively via the NO-CONFIRM argume
   "p"   '(:ignore t :wk "project")
   "p p" '(project-switch-project :wk "Switch project")
   "p f" '(project-find-file :wk "Find file")
-  "p b" '(project-switch-to-buffer :wk "Switch buffer")
+  "p b" '(consult-project-buffer :wk "Project buffers")
   "p s" '(consult-ripgrep :wk "Search project")
   "p d" '(project-dired :wk "Dired root")
   "p e" '(project-eshell :wk "Eshell")
@@ -3862,26 +3860,29 @@ Bypasses the interactive `yes-or-no-p` prompt natively via the NO-CONFIRM argume
   "p C" '(projection-commands-build-project :wk "Build")
   "p t" '(projection-commands-test-project :wk "Test")
   "p r" '(projection-commands-run-project :wk "Run")
-  "p g" '(projection-commands-configure-project :wk "Configure"))
+  "p g" '(projection-commands-configure-project :wk "Configure")
+  "p i" '(project-forget-zombie-projects :wk "Invalidate cache")
+  "p a" '(project-remember-project :wk "Add known project"))
 #+end_src
-
 
 
 ** TODO Workspaces
 Provides mathematically strict buffer isolation per workflow context. Replaces legacy workspace managers with a headless native tab-bar engine augmented by an isolation layer that intercepts buffer creation and persists complex layouts across daemon restarts.
 
-=tab-bar= serves as the foundational, built-in workspace container. It is configured headlessly to provide structural boundaries without rendering visual UI chrome.
+=tab-bar= serves as the foundational, built-in workspace container. It is configured headlessly to provide structural boundaries without rendering visual UI chrome, while spawning isolated scratch buffers for every new workspace.
 #+begin_src emacs-lisp
 (use-package tab-bar
   :ensure nil
   :custom
   ;; Hide UI chrome to maintain a minimalist aesthetic while preserving structural boundaries.
   (tab-bar-show nil)
-  ;; Default to a standard scratch buffer for newly created workspaces.
-  (tab-bar-new-tab-choice t)
+  ;; Spawn a dedicated, isolated scratch buffer for every new workspace (Doom parity).
+  (tab-bar-new-tab-choice #'bufferlo-create-local-scratch-buffer)
   :config
   ;; Activate the native tab engine globally.
-  (tab-bar-mode 1))
+  (tab-bar-mode 1)
+  ;; Ensure new frames also receive an isolated local scratch buffer.
+  (add-hook 'after-make-frame-functions #'bufferlo-switch-to-local-scratch-buffer))
 #+end_src
 
 =bufferlo= extends the native tab container with strict buffer isolation, workspace-aware minibuffer interception, and lightweight bookmark persistence.
@@ -3889,6 +3890,11 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
 (use-package bufferlo
   :after tab-bar
   :custom
+  ;; CRITICAL: Must be set before `bufferlo-mode` activates.
+  ;; Forces Emacs' C-level buffer cycling (next-buffer/previous-buffer) to respect strict tab boundaries.
+  (bufferlo-prefer-local-buffers 'tabs)
+  ;; Daemon-safe auto-save: flushes workspace layouts every 5 minutes to prevent data loss on SIGKILL/OOM.
+  (bufferlo-bookmarks-auto-save-interval 300)
   ;; Persist workspace layouts across daemon restarts via native Emacs bookmarks.
   (bufferlo-bookmarks-save-at-emacs-exit 'all)
   (bufferlo-bookmarks-load-at-emacs-startup 'all)
@@ -3902,11 +3908,21 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
                              "^\\*tramp/.*\\*$"
                              "^\\*eldoc\\*$"
                              "^ "))
-  ;; Doom Parity: Kill modified buffers without remorse on workspace teardown.
-  (bufferlo-kill-modified-buffers-policy 'kill-modified)
+  ;; Doom Parity: Protect unsaved code from accidental data loss, but aggressively kill ephemeral buffers.
+  (bufferlo-kill-modified-buffers-policy 'retain-modified-kill-without-file-name)
   ;; Suppress confirmation prompts for frictionless workspace destruction.
   (bufferlo-close-tab-kill-buffers-prompt nil)
   (bufferlo-kill-buffers-prompt nil)
+  ;; Prevent save-place-mode and bufferlo from fighting over cursor restoration.
+  (bufferlo-bookmark-inhibit-bookmark-point t)
+  ;; Spawn a placeholder buffer if a file was deleted externally, preventing workspace load crashes.
+  (bufferlo-bookmark-tab-failed-buffer-policy 'placeholder)
+  ;; Filter bookmark persistence to exclude noise but include terminal states.
+  (bufferlo-bookmark-buffers-exclude-filters '("^\\*Messages\\*$"
+                                               "^\\*Completions\\*$"))
+  (bufferlo-bookmark-buffers-include-filters '("^\\*shell\\*$"
+                                               "^\\*eshell\\*$"
+                                               "^\\*ghostel\\*$"))
   :config
   ;; Activate the core isolation engine.
   (bufferlo-mode 1)
@@ -3917,21 +3933,83 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
     (setq consult-buffer-list-function #'bufferlo-local-buffers)))
 #+end_src
 
-=general.el= routes centralized leader keybindings for workspace operations, mirroring Doom Emacs mnemonics for spatial navigation, buffer switching, and project isolation.
+=Custom Workspace Utilities= provide O(1) wrappers for Doom Emacs perspective muscle memory, bridging the gap between `persp-mode` semantics and `bufferlo`'s tab-bar physics.
 #+begin_src emacs-lisp
-(ar/global-leader
-  "TAB"         '(:ignore t :wk "workspace")
-  "TAB b"       '(bufferlo-switch-to-buffer :wk "Switch buffer (local)")
-  "TAB n"       '(tab-new :wk "New workspace")
-  "TAB c"       '(bufferlo-tab-close-kill-buffers :wk "Close workspace")
-  "TAB p"       '(bufferlo-isolate-project :wk "Isolate project")
-  "TAB r"       '(bufferlo-bookmark-tab-save-current :wk "Save workspace")
-  "TAB l"       '(bufferlo-bookmark-tab-load-current :wk "Load workspace")
-  "TAB ."       '(tab-switcher :wk "Switcher")
-  "TAB <right>" '(tab-next :wk "Next workspace")
-  "TAB <left>"  '(tab-previous :wk "Previous workspace"))
+(defun ar/workspace-set-buffer (buffer)
+  "Switch to BUFFER and remove it from all other workspaces."
+  (interactive (list (read-buffer "Set buffer (exclusive): ")))
+  (let ((buf (get-buffer buffer)))
+    (when buf
+      (switch-to-buffer buf)
+      ;; Iterate all frames and tabs to strip the buffer from other workspaces.
+      (dolist (frame (frame-list))
+        (dolist (tab (funcall tab-bar-tabs-function frame))
+          (unless (eq tab (bufferlo--current-tab))
+            (setf (alist-get 'buffer-list tab)
+                  (delq buf (alist-get 'buffer-list tab)))
+            (setf (alist-get 'buried-buffer-list tab)
+                  (delq buf (alist-get 'buried-buffer-list tab)))))))))
+
+(defun ar/workspace-kill-other-buffers ()
+  "Kill all local buffers in the current workspace except the current one."
+  (interactive)
+  (let ((current (current-buffer))
+        (killed 0))
+    (dolist (buf (bufferlo-buffer-list))
+      (unless (eq buf current)
+        (when (kill-buffer buf)
+          (cl-incf killed))))
+    (message "Killed %d local buffer(s)" killed)))
+
+(defun ar/workspace-project-switch ()
+  "Switch project and isolate workspace to the new project."
+  (interactive)
+  (call-interactively #'project-switch-project)
+  (when (project-current)
+    (bufferlo-isolate-project)))
+
+(defun ar/workspace-project-kill ()
+  "Kill project buffers and close the current workspace."
+  (interactive)
+  (let ((pr (project-current)))
+    (when pr
+      (project-kill-buffers t pr)))
+  (bufferlo-tab-close-kill-buffers))
 #+end_src
 
+=general.el= routes centralized leader keybindings for workspace operations, mirroring legacy `persp-mode` mnemonics mapped strictly to `bufferlo` and `tab-bar` APIs.
+#+begin_src emacs-lisp
+(ar/global-leader
+  "TAB"     '(:ignore t :wk "workspace")
+  "TAB TAB" '(tab-bar-switch-to-recent-tab :wk "Switch/last workspace")
+  "TAB n"   '(tab-next :wk "Next workspace")
+  "TAB p"   '(tab-previous :wk "Previous workspace")
+  "TAB `"   '(tab-bar-switch-to-recent-tab :wk "Last workspace")
+  "TAB r"   '(tab-bar-rename-tab :wk "Rename workspace")
+  "TAB k"   '(bufferlo-tab-close-kill-buffers :wk "Kill workspace")
+  "TAB K"   '(tab-bar-close-other-tabs :wk "Kill other workspaces")
+
+  "TAB b"   '(bufferlo-switch-to-buffer :wk "Switch to buffer (local)")
+  "TAB B"   '(switch-to-buffer :wk "Switch buffer (global)")
+  "TAB a"   '(bufferlo-switch-to-buffer :wk "Add buffer to workspace")
+  "TAB A"   '(ar/workspace-set-buffer :wk "Set buffer (exclusive)")
+  "TAB i"   '(bufferlo-find-buffer :wk "Import/Find buffer")
+  "TAB x"   '(bufferlo-remove :wk "Remove buffer from workspace")
+  "TAB X"   '(ar/workspace-kill-other-buffers :wk "Kill other local buffers")
+
+  "TAB m"   '(bufferlo-ibuffer :wk "IBuffer (workspace-filtered)")
+
+  "TAB s"   '(:ignore t :wk "state")
+  "TAB s s" '(bufferlo-bookmark-tab-save-current :wk "Save workspace state")
+  "TAB s l" '(bufferlo-bookmark-tab-load-current :wk "Load/restore workspace state")
+
+  "TAB P"   '(:ignore t :wk "project")
+  "TAB P s" '(ar/workspace-project-switch :wk "Switch project + isolate")
+  "TAB P p" '(bufferlo-isolate-project :wk "Isolate workspace to project")
+  "TAB P k" '(ar/workspace-project-kill :wk "Kill project + workspace")
+
+  "TAB l"   '(bufferlo-list-buffers :wk "List all local buffers"))
+#+end_src
 
 
 * TODO Version Control
@@ -9487,44 +9565,6 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
   "i" '(:ignore t :wk "insert")
   "i s" '(consult-yasnippet :wk "Snippet")
   "i u" '(insert-char :wk "Unicode char"))
-
-;; TODO Replace with persp-mode alternative
-;; (ar/global-leader
-;;   ;; Core perspective management (SPC TAB)
-;;   "TAB"     '(:ignore t :wk "perspective")
-;;   "TAB TAB" '(persp-switch :wk "Switch/create perspective")
-;;   "TAB n"   '(persp-next :wk "Next perspective")
-;;   "TAB p"   '(persp-prev :wk "Previous perspective")
-;;   "TAB `"   '(ar/persp-switch-last :wk "Last perspective")
-;;   "TAB r"   '(persp-rename :wk "Rename perspective")
-;;   "TAB k"   '(persp-kill :wk "Kill perspective")
-;;   "TAB K"   '(ar/persp-kill-others :wk "Kill other perspectives")
-
-;;   ;; Buffer management within perspectives
-;;   "TAB b"   '(persp-switch-to-buffer :wk "Switch to buffer")
-;;   "TAB B"   '(switch-to-buffer :wk "Switch buffer (all persp)")
-;;   "TAB a"   '(persp-add-buffer :wk "Add buffer")
-;;   "TAB A"   '(ar/persp-set-buffer :wk "Set buffer (remove from others)")
-;;   "TAB i"   '(persp-import-buffers :wk "Import buffer from perspective")
-;;   "TAB x"   '(persp-remove-buffer :wk "Remove buffer")
-;;   "TAB X"   '(ar/persp-kill-other-buffers :wk "Kill other buffers")
-
-;;   ;; IBuffer integration
-;;   "TAB m"   '(ar/persp-ibuffer :wk "IBuffer (perspective-filtered)")
-
-;;   ;; State management
-;;   "TAB s"   '(:ignore t :wk "state")
-;;   "TAB s s" '(persp-save-state-to-file :wk "Save state")
-;;   "TAB s l" '(persp-load-state-from-file :wk "Load/restore state")
-
-;;   ;; Project integration
-;;   "TAB P"   '(:ignore t :wk "project")
-;;   "TAB P s" '(ar/persp-project-switch :wk "Switch project + perspective")
-;;   "TAB P p" '(ar/persp-project-perspective :wk "Perspective for project")
-;;   "TAB P k" '(ar/persp-project-kill :wk "Kill project + perspective")
-
-;;   ;; Utilities
-;;   "TAB l"   '(ar/persp-list-all-buffers :wk "List all buffers/perspectives"))
 
 ;; Macro operations (SPC @)
 (ar/global-leader
