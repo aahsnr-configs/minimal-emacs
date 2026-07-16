@@ -8469,10 +8469,6 @@ TODO: =Deal with later=
 ** TODO Python
 TODO: =Add flycheck=
 #+begin_src emacs-lisp
-(use-package lsp-pyrefly
-  :vc (:url "https://github.com/indigoviolet/lsp-pyrefly")
-  :after lsp-mode)
-
 (use-package python
   :ensure nil
   :custom
