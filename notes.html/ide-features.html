@@ -1,0 +1,4220 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Emacs IDE — IntelliSense</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.18/index.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #1a1b26;
+        --bg-2: #16161e;
+        --surface: #24283b;
+        --surface-2: #1f2335;
+        --surface-hover: #292e42;
+        --border: #2f3348;
+        --border-strong: #414868;
+        --text: #c0caf5;
+        --text-dim: #9aa5ce;
+        --text-muted: #565f89;
+        --blue: #7aa2f7;
+        --purple: #bb9af7;
+        --cyan: #7dcfff;
+        --green: #9ece6a;
+        --red: #f7768e;
+        --yellow: #e0af68;
+        --orange: #ff9e64;
+        --code-bg: #15161e;
+        --sidebar-w: 240px;
+        --sidebar-collapsed: 64px;
+        --topbar-h: 56px;
+        --transition-speed: 0.3s;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-size: 15px;
+        line-height: 1.65;
+        color: var(--text);
+        background: var(--bg);
+        background-image:
+          radial-gradient(
+            ellipse at top left,
+            rgba(122, 162, 247, 0.08),
+            transparent 50%
+          ),
+          radial-gradient(
+            ellipse at bottom right,
+            rgba(187, 154, 247, 0.05),
+            transparent 50%
+          );
+        background-attachment: fixed;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+      ::-webkit-scrollbar-track {
+        background: var(--bg);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--surface-hover);
+        border-radius: 5px;
+        border: 2px solid var(--bg);
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--border-strong);
+      }
+      a {
+        color: var(--blue);
+        text-decoration: none;
+        transition: color 0.2s;
+      }
+      a:hover {
+        color: var(--cyan);
+      }
+      :focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 2px;
+        border-radius: 4px;
+      }
+      /* Inline code */
+      code:not([class*="language-"]) {
+        font-family: inherit;
+        font-size: 0.88em;
+        background: var(--code-bg);
+        color: var(--cyan);
+        padding: 2px 6px;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        white-space: nowrap;
+      }
+      kbd {
+        font-family: inherit;
+        font-size: 0.82em;
+        background: var(--surface-2);
+        color: var(--text);
+        padding: 2px 7px;
+        border-radius: 4px;
+        border: 1px solid var(--border-strong);
+        border-bottom-width: 2px;
+        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+      }
+      /* ============ SIDEBAR ============ */
+      .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: var(--sidebar-w);
+        background: rgba(22, 22, 30, 0.95);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        z-index: 100;
+        transition:
+          width var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1),
+          transform var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .sidebar.collapsed {
+        width: var(--sidebar-collapsed);
+      }
+      .sidebar-head {
+        height: var(--topbar-h);
+        padding: 0 18px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-bottom: 1px solid var(--border);
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      .sidebar-head svg {
+        width: 22px;
+        height: 22px;
+        color: var(--blue);
+        flex-shrink: 0;
+      }
+      .sidebar.collapsed .sidebar-head {
+        justify-content: center;
+        padding: 0;
+      }
+      .sidebar.collapsed .sidebar-head .brand {
+        display: none;
+      }
+      .sidebar-nav {
+        flex: 1;
+        padding: 8px 0;
+        overflow-y: auto;
+      }
+      .nav {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 18px;
+        width: 100%;
+        background: none;
+        border: none;
+        border-left: 3px solid transparent;
+        color: var(--text-dim);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        text-align: left;
+        white-space: nowrap;
+        transition: all 0.2s;
+        position: relative;
+      }
+      .nav svg {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+      }
+      .nav:hover {
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+      }
+      .nav.active {
+        color: var(--blue);
+        background: linear-gradient(
+          90deg,
+          rgba(122, 162, 247, 0.12),
+          transparent
+        );
+        border-left-color: var(--blue);
+      }
+      /* Sidebar Tooltips when collapsed */
+      .sidebar.collapsed .nav {
+        justify-content: center;
+        padding: 12px 0;
+        border-left-width: 2px;
+      }
+      .sidebar.collapsed .nav.active {
+        padding-left: 0;
+      }
+      .sidebar.collapsed .nav-label {
+        display: none;
+      }
+      .sidebar.collapsed .nav:hover::after {
+        content: attr(data-tip);
+        position: absolute;
+        left: calc(100% + 10px);
+        top: 50%;
+        transform: translateY(-50%);
+        background: var(--surface-hover);
+        color: var(--text);
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        border: 1px solid var(--border-strong);
+        white-space: nowrap;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        z-index: 200;
+        pointer-events: none;
+      }
+      .sidebar-foot {
+        padding: 8px 0;
+        border-top: 1px solid var(--border);
+      }
+      /* ============ TOPBAR ============ */
+      .topbar {
+        position: fixed;
+        top: 0;
+        right: 0;
+        left: var(--sidebar-w);
+        height: var(--topbar-h);
+        background: rgba(26, 27, 38, 0.85);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 28px;
+        z-index: 90;
+        transition:
+          left var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1),
+          opacity 0.25s ease,
+          transform 0.25s ease;
+      }
+      .sidebar.collapsed ~ .topbar {
+        left: var(--sidebar-collapsed);
+      }
+      .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        min-width: 0; /* Prevents flex blowout */
+      }
+      .hamburger {
+        display: none;
+        background: transparent;
+        border: none;
+        color: var(--text);
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 4px;
+      }
+      .hamburger:hover {
+        color: var(--blue);
+      }
+      .crumbs {
+        font-size: 12px;
+        color: var(--text-muted);
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .crumbs .s {
+        opacity: 0.5;
+      }
+      .crumbs .cur {
+        color: var(--text);
+        font-weight: 500;
+      }
+      .icon-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border);
+        color: var(--text-dim);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        flex-shrink: 0;
+      }
+      .icon-btn:hover {
+        color: var(--blue);
+        border-color: var(--blue);
+        background: rgba(122, 162, 247, 0.1);
+      }
+      .icon-btn svg {
+        width: 15px;
+        height: 15px;
+      }
+      /* ============ MAIN ============ */
+      .main {
+        margin-left: var(--sidebar-w);
+        margin-top: var(--topbar-h);
+        padding: 27px;
+        max-width: 1200px;
+        transition:
+          margin-left var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1),
+          padding 0.3s,
+          max-width 0.3s;
+      }
+      .sidebar.collapsed ~ .main {
+        margin-left: var(--sidebar-collapsed);
+      }
+      /* Focus Mode */
+      body.focus .sidebar {
+        transform: translateX(-100%);
+      }
+      body.focus .topbar {
+        transform: translateY(-100%);
+        opacity: 0;
+      }
+      body.focus .main {
+        margin-left: 0;
+        margin-top: 0;
+        padding: 40px 27px;
+        max-width: 860px;
+        margin: 0 auto;
+      }
+      .focus-hint {
+        position: fixed;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-20px);
+        background: rgba(36, 40, 59, 0.9);
+        backdrop-filter: blur(8px);
+        border: 1px solid var(--border-strong);
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 12px;
+        color: var(--text-dim);
+        opacity: 0;
+        pointer-events: none;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        z-index: 200;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      }
+      body.focus .focus-hint {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+      /* ============ PAGE HEADER ============ */
+      .page-head {
+        margin-bottom: 32px;
+      }
+      .title-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 8px;
+      }
+      .title-row h1 {
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        color: var(--text);
+        line-height: 1.2;
+      }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--green);
+        background: rgba(158, 206, 106, 0.1);
+        border: 1px solid rgba(158, 206, 106, 0.3);
+        padding: 4px 10px;
+        border-radius: 12px;
+      }
+      .status::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 8px rgba(158, 206, 106, 0.5);
+      }
+      .category {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--purple);
+        margin-bottom: 20px;
+      }
+      .parity {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        background: rgba(122, 162, 247, 0.06);
+        border: 1px solid rgba(122, 162, 247, 0.15);
+        padding: 10px 16px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        font-size: 13px;
+        color: var(--text-dim);
+        line-height: 1.4;
+      }
+      .parity b {
+        background: var(--blue);
+        color: var(--bg);
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .meta-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        padding: 12px 18px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 13px;
+      }
+      .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .meta-item .k {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+      }
+      .meta-item code {
+        font-size: 12.5px;
+        display: inline-flex;
+        align-items: center;
+      }
+      /* Custom styles for arrows */
+      .route-arrow {
+        font-size: 1.5em; /* 50% larger */
+        margin: 0 6px;
+        line-height: 0;
+        transform: translateY(-1px); /* Ensure optical centering */
+      }
+      .meta-sep {
+        color: var(--border-strong);
+      }
+      /* ============ ACCORDIONS ============ */
+      .acc {
+        background: rgba(36, 40, 59, 0.3);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        margin-bottom: 12px;
+        overflow: hidden;
+        transition:
+          border-color 0.2s,
+          background 0.2s;
+      }
+      .acc:hover {
+        border-color: var(--border-strong);
+        background: rgba(36, 40, 59, 0.5);
+      }
+      .acc-head {
+        width: 100%;
+        padding: 16px 22px;
+        background: transparent;
+        border: none;
+        border-left: 3px solid transparent;
+        color: var(--text);
+        font: inherit;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-align: left;
+        transition: all 0.2s;
+      }
+      .acc-head:hover {
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .acc-head.open {
+        border-left-color: var(--blue);
+        background: linear-gradient(
+          90deg,
+          rgba(122, 162, 247, 0.08),
+          transparent 70%
+        );
+      }
+      .acc-head .t {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .acc-head .ic {
+        color: var(--text-muted);
+        width: 18px;
+        height: 18px;
+        transition: color 0.2s;
+      }
+      .acc-head.open .ic {
+        color: var(--blue);
+      }
+      .chev {
+        width: 18px;
+        height: 18px;
+        color: var(--text-muted);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .acc-head.open .chev {
+        transform: rotate(180deg);
+        color: var(--blue);
+      }
+      .acc-body {
+        display: grid;
+        grid-template-rows: 0fr;
+        transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .acc-body.open {
+        grid-template-rows: 1fr;
+      }
+      .acc-body > div {
+        overflow: hidden;
+      }
+      .acc-inner {
+        padding: 18px 22px;
+      }
+      /* ============ SECTION TITLE ============ */
+      .sec-title {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        margin: 24px 0 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .sec-title:first-child {
+        margin-top: 0;
+      }
+      .sec-title::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+      }
+      /* ============ TABLES ============ */
+      .tbl-wrap {
+        overflow-x: auto;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--surface-2);
+        margin-bottom: 8px;
+      }
+      .tbl {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13.5px;
+        min-width: 500px;
+      }
+      .tbl th {
+        text-align: left;
+        padding: 12px 16px;
+        background: rgba(0, 0, 0, 0.25);
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        border-bottom: 1px solid var(--border);
+      }
+      .tbl td {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border);
+        color: var(--text-dim);
+        vertical-align: top;
+        line-height: 1.55;
+      }
+      .tbl tr:last-child td {
+        border-bottom: none;
+      }
+      .tbl tr:hover td {
+        background: rgba(255, 255, 255, 0.02);
+        color: var(--text);
+      }
+      .tbl td:first-child {
+        color: var(--text);
+        font-weight: 500;
+      }
+      .tbl code {
+        font-size: 12.5px;
+      }
+      /* ============ GRIDS (Stack, Eco, VS, Enh) ============ */
+      .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+      }
+      /* Stack Cards */
+      .stack-card {
+        display: flex;
+        gap: 16px;
+        padding: 16px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        transition: all 0.2s;
+      }
+      .stack-card:hover {
+        border-color: var(--blue);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+      .stack-ic {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        flex-shrink: 0;
+        background: rgba(122, 162, 247, 0.1);
+        color: var(--blue);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .stack-ic svg {
+        width: 20px;
+        height: 20px;
+      }
+      .stack-ct {
+        flex: 1;
+        min-width: 0;
+      }
+      .stack-name {
+        font-size: 14.5px;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 2px;
+      }
+      .stack-role {
+        font-size: 10.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--cyan);
+        margin-bottom: 8px;
+      }
+      .stack-desc {
+        font-size: 13px;
+        color: var(--text-dim);
+        line-height: 1.55;
+      }
+      /* Eco Cards */
+      .eco-card {
+        padding: 16px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        transition: all 0.2s;
+      }
+      .eco-card:hover {
+        border-color: var(--blue);
+      }
+      .eco-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .eco-ic {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        flex-shrink: 0;
+        background: rgba(122, 162, 247, 0.1);
+        color: var(--blue);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .eco-ic svg {
+        width: 18px;
+        height: 18px;
+      }
+      .eco-name {
+        font-size: 14.5px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .eco-sub {
+        font-size: 10.5px;
+        font-weight: 700;
+        color: var(--cyan);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .eco-desc {
+        font-size: 13px;
+        color: var(--text-dim);
+        line-height: 1.55;
+      }
+      /* ============ CODE WINDOW ============ */
+      .code-win {
+        background: var(--code-bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      }
+      .code-head {
+        background: #11121a;
+        padding: 12px 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--border);
+      }
+      .dots {
+        display: flex;
+        gap: 6px;
+      }
+      .dots span {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+      }
+      .dots span:nth-child(1) {
+        background: #ff5f56;
+      }
+      .dots span:nth-child(2) {
+        background: #ffbd2e;
+      }
+      .dots span:nth-child(3) {
+        background: #27c93f;
+      }
+      .fname {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-muted);
+        margin-left: 14px;
+      }
+      .copy {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border);
+        color: var(--text-dim);
+        padding: 6px 12px;
+        border-radius: 6px;
+        font: inherit;
+        font-size: 11.5px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+      }
+      .copy:hover {
+        color: var(--blue);
+        border-color: var(--blue);
+        background: rgba(122, 162, 247, 0.1);
+      }
+      .copy svg {
+        width: 14px;
+        height: 14px;
+      }
+      .copy.copied {
+        color: var(--green);
+        border-color: var(--green);
+        background: rgba(158, 206, 106, 0.1);
+      }
+      code[class*="language-"],
+      pre[class*="language-"] {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13.5px;
+        line-height: 1.6;
+        color: #a9b1d6;
+        background: var(--code-bg);
+        text-shadow: none;
+      }
+      pre[class*="language-"] {
+        padding: 20px 24px;
+        margin: 0;
+        overflow-x: auto;
+      }
+      .token.comment {
+        color: #565f89;
+        font-style: italic;
+      }
+      .token.keyword,
+      .token.atrule {
+        color: #bb9af7;
+      }
+      .token.function,
+      .token.class-name {
+        color: #7aa2f7;
+      }
+      .token.string,
+      .token.builtin {
+        color: #9ece6a;
+      }
+      .token.number,
+      .token.boolean {
+        color: #ff9e64;
+      }
+      .token.punctuation {
+        color: #9abdf5;
+      }
+      .token.operator {
+        color: #89ddff;
+      }
+      /* ============ COMPARISON CARDS ============ */
+      .vs-card {
+        padding: 20px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--surface-2);
+      }
+      .vs-card h4 {
+        font-size: 14.5px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--border);
+      }
+      .vs-card.ok {
+        border-color: rgba(158, 206, 106, 0.3);
+        background: linear-gradient(
+          135deg,
+          rgba(158, 206, 106, 0.06),
+          var(--surface-2) 70%
+        );
+      }
+      .vs-card.ok h4 {
+        color: var(--green);
+      }
+      .vs-card.no {
+        border-color: rgba(247, 118, 142, 0.3);
+        background: linear-gradient(
+          135deg,
+          rgba(247, 118, 142, 0.06),
+          var(--surface-2) 70%
+        );
+      }
+      .vs-card.no h4 {
+        color: var(--red);
+      }
+      .vs-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+      }
+      .vs-row {
+        display: grid;
+        grid-template-columns: 100px 1fr;
+        gap: 16px;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+      .vs-row:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+      }
+      .vs-row .lab {
+        color: var(--text);
+        font-weight: 600;
+        font-size: 12.5px;
+      }
+      .vs-row .val {
+        color: var(--text-dim);
+      }
+      /* ============ ENHANCEMENT CARDS ============ */
+      .enh-card {
+        padding: 16px 20px;
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        border-top: 3px solid var(--accent, var(--blue));
+      }
+      .enh-card.g {
+        --accent: var(--green);
+      }
+      .enh-card.p {
+        --accent: var(--purple);
+      }
+      .enh-card.y {
+        --accent: var(--yellow);
+      }
+      .enh-title {
+        font-size: 14.5px;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 8px;
+      }
+      .enh-desc {
+        font-size: 13px;
+        color: var(--text-dim);
+        line-height: 1.55;
+      }
+      /* ============ RESPONSIVE (MOBILE) ============ */
+      .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        z-index: 95;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s;
+      }
+      @media (max-width: 900px) {
+        .grid-2 {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 768px) {
+        .hamburger {
+          display: block;
+        }
+        .sidebar {
+          transform: translateX(-100%);
+          width: 260px;
+          border-right: 1px solid var(--border-strong);
+        }
+        .sidebar.mobile-open {
+          transform: translateX(0);
+        }
+        .overlay.active {
+          opacity: 1;
+          pointer-events: auto;
+        }
+        .topbar {
+          left: 0;
+          padding: 0 16px;
+        }
+        .sidebar.collapsed ~ .topbar {
+          left: 0;
+        }
+        .main,
+        .sidebar.collapsed ~ .main {
+          margin-left: 0;
+          padding: 16px 11px;
+        }
+        .meta-bar {
+          flex-direction: column;
+          gap: 8px;
+        }
+        .title-row h1 {
+          font-size: 24px;
+        }
+        body.focus .main {
+          padding: 16px 11px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="overlay" id="overlay" aria-hidden="true"></div>
+    <div class="focus-hint" id="focusHint" aria-live="polite">
+      <kbd>ESC</kbd> <span>Exit Focus Mode</span>
+    </div>
+    <aside class="sidebar" id="sb" aria-label="Main Navigation">
+      <div class="sidebar-head">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
+        <span class="brand">Emacs IDE</span>
+      </div>
+      <nav class="sidebar-nav" aria-label="Sidebar Menu">
+        <button
+          class="nav active"
+          data-tip="IntelliSense"
+          data-target="intellisense"
+          aria-current="page"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24A2.5 2.5 0 0 1 9.5 2z"
+            />
+            <path
+              d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24A2.5 2.5 0 0 0 14.5 2z"
+            />
+          </svg>
+          <span class="nav-label">IntelliSense</span>
+        </button>
+        <button class="nav" data-tip="Hover Info" data-target="hover-info">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4M12 8h.01" />
+          </svg>
+          <span class="nav-label">Hover Info</span>
+        </button>
+        <button
+          class="nav"
+          data-tip="Signature Help"
+          data-target="signature-help"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+            />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+          <span class="nav-label">Signature Help</span>
+        </button>
+        <button class="nav" data-tip="Definition" data-target="definition">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <span class="nav-label">Definition</span>
+        </button>
+        <button class="nav" data-tip="Code Actions" data-target="code-actions">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"
+            />
+          </svg>
+          <span class="nav-label">Code Actions</span>
+        </button>
+      </nav>
+      <div class="sidebar-foot">
+        <button
+          class="nav"
+          id="sbToggle"
+          data-tip="Toggle Sidebar"
+          aria-label="Toggle Sidebar"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <line x1="9" y1="3" x2="9" y2="21" />
+          </svg>
+          <span class="nav-label">Collapse Menu</span>
+        </button>
+      </div>
+    </aside>
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger" id="mobileMenuBtn" aria-label="Open Menu">
+          <svg
+            viewBox="0 0 24 24"
+            width="24"
+            height="24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <div class="crumbs" aria-label="Breadcrumb">
+          <span>Docs</span><span class="s" aria-hidden="true">/</span>
+          <span>Completion &amp; Intelligence</span
+          ><span class="s" aria-hidden="true">/</span>
+          <span class="cur" aria-current="page">IntelliSense</span>
+        </div>
+      </div>
+      <button
+        class="icon-btn"
+        id="focusBtn"
+        title="Toggle Focus Mode (ESC)"
+        aria-label="Toggle Focus Mode"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+        </svg>
+      </button>
+    </header>
+    <main class="main" id="main-content">
+      <!-- INTELLISENSE SECTION -->
+      <section id="intellisense" class="feature-page">
+        <header class="page-head">
+          <div class="title-row">
+            <h1>IntelliSense / Code Completion</h1>
+            <span class="status" role="status">Working</span>
+          </div>
+          <div class="category">Completion &amp; Intelligence</div>
+          <div class="parity">
+            <b>VS Code Parity</b>
+            <span
+              >Autocomplete popup · ghost text · auto-imports · fuzzy
+              filtering</span
+            >
+          </div>
+          <div class="meta-bar">
+            <div class="meta-item">
+              <span class="k">LSP</span>
+              <code>textDocument/completion</code>
+              <span class="meta-sep" aria-hidden="true">·</span>
+              <code>completionItem/resolve</code>
+            </div>
+            <div class="meta-item">
+              <span class="k">Routing</span>
+              <code
+                >eglot<span class="route-arrow">→</span>capf<span
+                  class="route-arrow"
+                  >→</span
+                >cape<span class="route-arrow">→</span>corfu</code
+              >
+            </div>
+          </div>
+        </header>
+        <article class="acc">
+          <button
+            class="acc-head open"
+            aria-expanded="true"
+            aria-controls="sect-overview"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+              </svg>
+              Feature Overview
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body open" id="sect-overview" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="sec-title">Behavioral Parity Matrix</div>
+                <div class="tbl-wrap">
+                  <table class="tbl">
+                    <thead>
+                      <tr>
+                        <th>VS Code Behavior</th>
+                        <th>Emacs Equivalent</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Autocomplete popup on typing</td>
+                        <td>
+                          <code>corfu-auto t</code> with
+                          <code>corfu-auto-delay 0.2</code>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Ghost text (inline preview)</td>
+                        <td>
+                          <code>corfu-candidate-overlay-mode</code> renders
+                          dimmed text in-buffer
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Auto-import on accept</td>
+                        <td>
+                          <code>eglot</code> processes
+                          <code>additionalTextEdits</code> on
+                          <code>corfu-insert</code>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Fuzzy / Substring filtering</td>
+                        <td>
+                          <code>orderless</code> matching styles
+                          (space-separated components)
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Snippet integration</td>
+                        <td>
+                          <code>yasnippet-capf</code> merged into pipeline via
+                          <code>cape</code>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Documentation on hover</td>
+                        <td>
+                          <code>corfu-popupinfo</code> (<kbd>M-h</kbd>) triggers
+                          <code>completionItem/resolve</code>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Icons in autocomplete list</td>
+                        <td>
+                          <code>nerd-icons-corfu</code> injects glyphs into the
+                          Corfu margin
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Dismiss on Escape</td>
+                        <td>
+                          <code>corfu-quit</code> bound to <kbd>ESC</kbd> in
+                          <code>corfu-map</code>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="sect-ecosystem"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path
+                  d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+                />
+              </svg>
+              Ecosystem Integration
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="sect-ecosystem" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="grid-2">
+                  <div class="eco-card">
+                    <div class="eco-top">
+                      <div class="eco-ic">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                          />
+                        </svg>
+                      </div>
+                      <div>
+                        <div class="eco-name">cape</div>
+                        <div class="eco-sub">Backend Merger</div>
+                      </div>
+                    </div>
+                    <p class="eco-desc">
+                      Merges <code>eglot</code> with <code>dabbrev</code> and
+                      <code>file</code>. Uses
+                      <code>cape-wrap-nonexclusive</code> so LSP doesn't shadow
+                      local words.
+                    </p>
+                  </div>
+                  <div class="eco-card">
+                    <div class="eco-top">
+                      <div
+                        class="eco-ic"
+                        style="
+                          background: rgba(187, 154, 247, 0.1);
+                          color: var(--purple);
+                        "
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          aria-hidden="true"
+                        >
+                          <circle cx="11" cy="11" r="8" />
+                          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div class="eco-name">orderless</div>
+                        <div class="eco-sub">Filtering Engine</div>
+                      </div>
+                    </div>
+                    <p class="eco-desc">
+                      Typing <code>get usr</code> matches
+                      <code>get_current_user</code> because orderless matches
+                      space-separated components anywhere.
+                    </p>
+                  </div>
+                  <div class="eco-card">
+                    <div class="eco-top">
+                      <div
+                        class="eco-ic"
+                        style="
+                          background: rgba(125, 207, 255, 0.1);
+                          color: var(--cyan);
+                        "
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          aria-hidden="true"
+                        >
+                          <rect x="2" y="7" width="20" height="14" rx="2" />
+                          <path
+                            d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"
+                          />
+                        </svg>
+                      </div>
+                      <div>
+                        <div class="eco-name">vertico</div>
+                        <div class="eco-sub">Minibuffer UI</div>
+                      </div>
+                    </div>
+                    <p class="eco-desc">
+                      Handles minibuffer completion.
+                      <code>global-corfu-minibuffer nil</code> ensures they
+                      never fight for UI control.
+                    </p>
+                  </div>
+                  <div class="eco-card">
+                    <div class="eco-top">
+                      <div
+                        class="eco-ic"
+                        style="
+                          background: rgba(224, 175, 104, 0.1);
+                          color: var(--yellow);
+                        "
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                          />
+                          <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div class="eco-name">yasnippet</div>
+                        <div class="eco-sub">Snippet Injection</div>
+                      </div>
+                    </div>
+                    <p class="eco-desc">
+                      Injected via <code>yasnippet-capf</code>, allowing
+                      tab-completion of functions and local snippets from one
+                      menu.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="sect-stack"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path
+                  d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                />
+              </svg>
+              Implementation Stack
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="sect-stack" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="grid-2">
+                  <div class="stack-card">
+                    <div class="stack-ic">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M12 1v6m0 6v6" />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">eglot</div>
+                      <div class="stack-role">LSP Client</div>
+                      <div class="stack-desc">
+                        Built-in. Drives completion, injects candidates, handles
+                        just-in-time docstrings &amp; auto-imports.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="stack-card">
+                    <div
+                      class="stack-ic"
+                      style="
+                        background: rgba(187, 154, 247, 0.1);
+                        color: var(--purple);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <path d="M9 9h6v6H9z" />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">corfu</div>
+                      <div class="stack-role">UI Engine</div>
+                      <div class="stack-desc">
+                        Renders the minimal, high-performance child-frame popup
+                        using native completion APIs.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="stack-card">
+                    <div
+                      class="stack-ic"
+                      style="
+                        background: rgba(125, 207, 255, 0.1);
+                        color: var(--cyan);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path d="M4 6h16M4 12h16M4 18h10" />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">cape</div>
+                      <div class="stack-role">Backend Merger</div>
+                      <div class="stack-desc">
+                        Merges LSP candidates with local Dabbrev, File, and
+                        Snippets via non-exclusive wrappers.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="stack-card">
+                    <div
+                      class="stack-ic"
+                      style="
+                        background: rgba(158, 206, 106, 0.1);
+                        color: var(--green);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">orderless</div>
+                      <div class="stack-role">Filtering</div>
+                      <div class="stack-desc">
+                        Provides space-separated, out-of-order fuzzy filtering
+                        for the candidate list.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="stack-card">
+                    <div
+                      class="stack-ic"
+                      style="
+                        background: rgba(224, 175, 104, 0.1);
+                        color: var(--yellow);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path d="M4 7h16M4 12h10M4 17h16" />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">corfu-candidate-overlay</div>
+                      <div class="stack-role">Ghost Text</div>
+                      <div class="stack-desc">
+                        Draws an inline, dimmed preview of the selected
+                        candidate directly in the buffer.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="stack-card">
+                    <div
+                      class="stack-ic"
+                      style="
+                        background: rgba(255, 158, 100, 0.1);
+                        color: var(--orange);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="4" />
+                        <path
+                          d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41"
+                        />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">nerd-icons-corfu</div>
+                      <div class="stack-role">Icons</div>
+                      <div class="stack-desc">
+                        Injects LSP symbol icons into the Corfu margin for VS
+                        Code visual parity.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="sect-commands"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+                <path
+                  d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+                />
+              </svg>
+              Commands &amp; Keybindings
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="sect-commands" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="tbl-wrap">
+                  <table class="tbl">
+                    <thead>
+                      <tr>
+                        <th>Action</th>
+                        <th>Command</th>
+                        <th>Keybinding</th>
+                        <th>Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Trigger completion</td>
+                        <td><code>completion-at-point</code></td>
+                        <td><kbd>TAB</kbd> / <kbd>C-SPC</kbd></td>
+                        <td>
+                          Indents if unaligned, triggers popup if aligned.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Next candidate</td>
+                        <td><code>corfu-next</code></td>
+                        <td><kbd>TAB</kbd> / <kbd>C-n</kbd></td>
+                        <td>Cycles forward.</td>
+                      </tr>
+                      <tr>
+                        <td>Previous candidate</td>
+                        <td><code>corfu-previous</code></td>
+                        <td><kbd>S-TAB</kbd> / <kbd>C-p</kbd></td>
+                        <td>Cycles backward.</td>
+                      </tr>
+                      <tr>
+                        <td>Insert candidate</td>
+                        <td><code>corfu-insert</code></td>
+                        <td><kbd>RET</kbd></td>
+                        <td>Commits, triggering auto-imports via eglot.</td>
+                      </tr>
+                      <tr>
+                        <td>Toggle documentation</td>
+                        <td><code>corfu-popupinfo-toggle</code></td>
+                        <td><kbd>M-h</kbd></td>
+                        <td>Shows/hides completionItem/resolve docstring.</td>
+                      </tr>
+                      <tr>
+                        <td>Quick select (insert)</td>
+                        <td><code>corfu-quick-insert</code></td>
+                        <td><kbd>M-q</kbd></td>
+                        <td>Avy-style 1-2 char jump to insert candidate.</td>
+                      </tr>
+                      <tr>
+                        <td>Exit completion</td>
+                        <td><code>corfu-quit</code></td>
+                        <td><kbd>ESC</kbd> / <kbd>C-g</kbd></td>
+                        <td>Cancels popup without inserting.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="sect-config"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+              Configuration
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="sect-config" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="code-win">
+                  <div class="code-head">
+                    <div style="display: flex; align-items: center">
+                      <div class="dots" aria-hidden="true">
+                        <span></span><span></span><span></span>
+                      </div>
+                      <span class="fname">init-completion.el</span>
+                    </div>
+                    <button
+                      class="copy"
+                      aria-label="Copy code snippet"
+                      onclick="copyCode(this)"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <rect x="9" y="9" width="13" height="13" rx="2" />
+                        <path
+                          d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                        />
+                      </svg>
+                      Copy
+                    </button>
+                  </div>
+                  <pre><code class="language-lisp">;; ==========================================
+;; 1. EGLOT (LSP Completion Backend)
+;; ==========================================
+(use-package eglot
+  :ensure nil
+  :custom
+  (eglot-completion-at-point t))
+;; ==========================================
+;; 2. CORFU (In-Buffer Completion UI)
+;; ==========================================
+(use-package corfu
+  :init (global-corfu-mode)
+  :custom
+  (global-corfu-minibuffer nil)
+  (corfu-auto t)
+  (corfu-auto-delay 0.2)
+  (corfu-auto-prefix 2)
+  (corfu-preselect 'prompt)
+  :bind (:map corfu-map
+         ("TAB" . corfu-next)
+         ("RET" . corfu-insert)
+         ("&lt;escape&gt;" . corfu-quit)))</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="sect-arch"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path
+                  d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"
+                />
+              </svg>
+              Architecture &amp; Enhancements
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="sect-arch" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="sec-title">Why This Approach?</div>
+                <div class="grid-2" style="margin-bottom: 24px">
+                  <div class="vs-card ok">
+                    <h4>✓ corfu + eglot · Chosen</h4>
+                    <div class="vs-list">
+                      <div class="vs-row">
+                        <span class="lab">Architecture</span
+                        ><span class="val"
+                          >Uses native <code>completion-at-point</code> APIs and
+                          child-frames.</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">Performance</span
+                        ><span class="val"
+                          >Exponentially lighter; zero main-thread blocking
+                          during typing.</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">Filtering</span
+                        ><span class="val"
+                          >Integrates with <code>orderless</code> for
+                          out-of-order fuzzy matching.</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">Emacs 31</span
+                        ><span class="val"
+                          >Leverages native TTY child-frames and PGTK Wayland
+                          fixes.</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                  <div class="vs-card no">
+                    <h4>✕ company + lsp-mode · Rejected</h4>
+                    <div class="vs-list">
+                      <div class="vs-row">
+                        <span class="lab">Architecture</span
+                        ><span class="val"
+                          >Custom overlay engine and heavy workspace
+                          management.</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">Performance</span
+                        ><span class="val"
+                          >Prone to micro-stutters and "stutter-and-vanish"
+                          popup bugs.</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">Filtering</span
+                        ><span class="val"
+                          >Requires <code>company-flx</code>; struggles with
+                          space-separated queries.</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">Protocol</span
+                        ><span class="val"
+                          >Breaks the <code>eglot</code>-only stack
+                          mandate.</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="sec-title">Emacs 31 Specific Enhancements</div>
+                <div class="grid-2">
+                  <div class="enh-card g">
+                    <div class="enh-title">TTY Child-Frame Support</div>
+                    <p class="enh-desc">
+                      Introduces <code>tty-tip-mode</code> and native TTY
+                      child-frames. Allows <code>corfu</code> to render
+                      perfectly in terminals like Ghostty or Kitty.
+                    </p>
+                  </div>
+                  <div class="enh-card p">
+                    <div class="enh-title">PGTK Wayland Fixes</div>
+                    <p class="enh-desc">
+                      Child-frame positioning is now pixel-accurate. Eliminates
+                      the "drifting popup" bug, ensuring Corfu anchors to the
+                      cursor baseline.
+                    </p>
+                  </div>
+                  <div
+                    class="enh-card y"
+                    style="
+                      grid-column: 1 / -1;
+                      max-width: 50%;
+                      justify-self: center;
+                    "
+                  >
+                    <div class="enh-title">Eager Display API</div>
+                    <p class="enh-desc">
+                      <code>completion-eager-display</code> ensures the native
+                      <code>*Completions*</code> fallback appears immediately if
+                      Corfu is bypassed.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <!-- HOVER INFO SECTION -->
+      <section id="hover-info" class="feature-page" style="display: none">
+        <header class="page-head">
+          <div class="title-row">
+            <h1>Hover Info</h1>
+            <span class="status" role="status">Working</span>
+          </div>
+          <div class="category">Completion &amp; Intelligence</div>
+          <div class="parity">
+            <b>VS Code Parity</b>
+            <span
+              >Tooltip with type info, docs, and signatures on mouse-hover or
+              keyboard shortcut</span
+            >
+          </div>
+          <div class="meta-bar">
+            <div class="meta-item">
+              <span class="k">LSP</span>
+              <code>textDocument/hover</code>
+            </div>
+            <div class="meta-item">
+              <span class="k">Routing</span>
+              <code
+                >eglot<span class="route-arrow">→</span>eldoc<span
+                  class="route-arrow"
+                  >→</span
+                >ephemeral buffer</code
+              >
+            </div>
+          </div>
+        </header>
+        <article class="acc">
+          <button
+            class="acc-head open"
+            aria-expanded="true"
+            aria-controls="hover-sect-overview"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+              </svg>
+              Feature Overview
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body open" id="hover-sect-overview" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="sec-title">Behavioral Parity Matrix</div>
+                <div class="tbl-wrap">
+                  <table class="tbl">
+                    <thead>
+                      <tr>
+                        <th>VS Code Behavior</th>
+                        <th>Emacs Equivalent</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Hover tooltip on cursor idle</td>
+                        <td>
+                          <code>eldoc</code> with
+                          <code>eldoc-idle-delay 0.5</code> triggers
+                          <code>textDocument/hover</code>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Mouse hover shows tooltip</td>
+                        <td>
+                          <code>eldoc-help-at-pt t</code> surfaces info on
+                          cursor movement
+                        </td>
+                      </tr>
+                      <tr>
+                        <td><kbd>K</kbd> key shows hover (Vim)</td>
+                        <td>
+                          <kbd>K</kbd> bound to <code>eldoc</code> in Evil
+                          normal state
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Rich markdown rendering</td>
+                        <td>
+                          <code>markdown-ts-mode</code> fontifies
+                          <code>*eldoc*</code> ephemeral buffer
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Long docs in side panel</td>
+                        <td>
+                          <code>eldoc-echo-area-prefer-doc-buffer t</code>
+                          routes to <code>*eldoc*</code> buffer
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Scroll long documentation</td>
+                        <td>
+                          <kbd>C-M-v</kbd> / <kbd>C-M-S-v</kbd> scroll the
+                          <code>*eldoc*</code> buffer
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Hover on completion candidate</td>
+                        <td>
+                          <code>corfu-popupinfo-toggle</code> (<kbd>M-h</kbd>)
+                          shows <code>completionItem/resolve</code> docs
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Signature help in tooltip</td>
+                        <td>
+                          <code>eldoc</code> natively merges
+                          <code>textDocument/signatureHelp</code> with hover
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Type info + docstring combined</td>
+                        <td>
+                          <code>eglot</code> merges both payloads into single
+                          eldoc response
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="hover-sect-ecosystem"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path
+                  d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+                />
+              </svg>
+              Ecosystem Integration
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="hover-sect-ecosystem" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="grid-2">
+                  <div class="eco-card">
+                    <div class="eco-top">
+                      <div class="eco-ic">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          aria-hidden="true"
+                        >
+                          <circle cx="12" cy="12" r="3" />
+                          <path d="M12 1v6m0 6v6" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div class="eco-name">eglot</div>
+                        <div class="eco-sub">LSP Client</div>
+                      </div>
+                    </div>
+                    <p class="eco-desc">
+                      Automatically injects
+                      <code>eglot-hover-eldoc-function</code> into
+                      <code>eldoc-documentation-functions</code> when a buffer
+                      is LSP-managed.
+                    </p>
+                  </div>
+                  <div class="eco-card">
+                    <div class="eco-top">
+                      <div
+                        class="eco-ic"
+                        style="
+                          background: rgba(187, 154, 247, 0.1);
+                          color: var(--purple);
+                        "
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                          />
+                          <polyline points="14 2 14 8 20 8" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div class="eco-name">eldoc</div>
+                        <div class="eco-sub">Documentation Router</div>
+                      </div>
+                    </div>
+                    <p class="eco-desc">
+                      Serves as the unified router — aggregating LSP hover,
+                      Elisp docstrings, and <code>help-at-point</code> into a
+                      single echo-area / ephemeral-buffer pipeline.
+                    </p>
+                  </div>
+                  <div class="eco-card">
+                    <div class="eco-top">
+                      <div
+                        class="eco-ic"
+                        style="
+                          background: rgba(125, 207, 255, 0.1);
+                          color: var(--cyan);
+                        "
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          aria-hidden="true"
+                        >
+                          <rect x="3" y="3" width="18" height="18" rx="2" />
+                          <path d="M9 9h6v6H9z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div class="eco-name">corfu-popupinfo</div>
+                        <div class="eco-sub">Candidate Hover</div>
+                      </div>
+                    </div>
+                    <p class="eco-desc">
+                      Handles completion-candidate-level documentation (via
+                      <code>completionItem/resolve</code>), keeping candidate
+                      hover separate from symbol hover.
+                    </p>
+                  </div>
+                  <div class="eco-card">
+                    <div class="eco-top">
+                      <div
+                        class="eco-ic"
+                        style="
+                          background: rgba(158, 206, 106, 0.1);
+                          color: var(--green);
+                        "
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          aria-hidden="true"
+                        >
+                          <path
+                            d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                          />
+                        </svg>
+                      </div>
+                      <div>
+                        <div class="eco-name">treesit</div>
+                        <div class="eco-sub">Markdown Fontification</div>
+                      </div>
+                    </div>
+                    <p class="eco-desc">
+                      Enables <code>markdown-ts-mode</code> fontification inside
+                      the <code>*eldoc*</code> buffer, providing
+                      syntax-highlighted code blocks in hover documentation.
+                    </p>
+                  </div>
+                  <div class="eco-card">
+                    <div class="eco-top">
+                      <div
+                        class="eco-ic"
+                        style="
+                          background: rgba(224, 175, 104, 0.1);
+                          color: var(--yellow);
+                        "
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          aria-hidden="true"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <path d="M12 8v4l3 3" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div class="eco-name">which-key</div>
+                        <div class="eco-sub">Priority Management</div>
+                      </div>
+                    </div>
+                    <p class="eco-desc">
+                      Echo-area priority is preserved —
+                      <code>eldoc</code> yields to <code>which-key</code> popups
+                      to prevent documentation from clobbering keybinding hints.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="hover-sect-stack"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path
+                  d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                />
+              </svg>
+              Implementation Stack
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="hover-sect-stack" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="grid-2">
+                  <div class="stack-card">
+                    <div class="stack-ic">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M12 1v6m0 6v6" />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">eglot</div>
+                      <div class="stack-role">LSP Client</div>
+                      <div class="stack-desc">
+                        Built-in. Drives <code>textDocument/hover</code>,
+                        returns Markdown payloads natively.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="stack-card">
+                    <div
+                      class="stack-ic"
+                      style="
+                        background: rgba(187, 154, 247, 0.1);
+                        color: var(--purple);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                        />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">eldoc</div>
+                      <div class="stack-role">Documentation Engine</div>
+                      <div class="stack-desc">
+                        Built-in. Renders hover payloads in the echo area or
+                        ephemeral <code>*eldoc*</code> buffer.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="stack-card">
+                    <div
+                      class="stack-ic"
+                      style="
+                        background: rgba(125, 207, 255, 0.1);
+                        color: var(--cyan);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                        />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">markdown-ts-mode</div>
+                      <div class="stack-role">Markdown Rendering</div>
+                      <div class="stack-desc">
+                        Built-in. Provides rich tree-sitter markdown
+                        fontification inside the ephemeral buffer.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="stack-card">
+                    <div
+                      class="stack-ic"
+                      style="
+                        background: rgba(158, 206, 106, 0.1);
+                        color: var(--green);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <path d="M9 9h6v6H9z" />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">corfu-popupinfo</div>
+                      <div class="stack-role">Candidate-Level Hover</div>
+                      <div class="stack-desc">
+                        Bundled with corfu. Shows
+                        <code>completionItem/resolve</code> docs adjacent to the
+                        completion popup.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="stack-card">
+                    <div
+                      class="stack-ic"
+                      style="
+                        background: rgba(224, 175, 104, 0.1);
+                        color: var(--yellow);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 16v-4M12 8h.01" />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">help-at-point-kbd-string</div>
+                      <div class="stack-role">Mouse Integration</div>
+                      <div class="stack-desc">
+                        Built-in. Surfaces hover info on cursor hover via
+                        <code>eldoc-help-at-pt</code>.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="hover-sect-commands"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+                <path
+                  d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+                />
+              </svg>
+              Commands &amp; Keybindings
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="hover-sect-commands" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="tbl-wrap">
+                  <table class="tbl">
+                    <thead>
+                      <tr>
+                        <th>Action</th>
+                        <th>Command</th>
+                        <th>Keybinding</th>
+                        <th>Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Hover at point (keyboard)</td>
+                        <td><code>eldoc</code></td>
+                        <td><kbd>K</kbd> (Evil normal)</td>
+                        <td>
+                          Shows type info / docstring for symbol under cursor.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Help at point</td>
+                        <td><code>help-at-point</code></td>
+                        <td><kbd>C-h .</kbd></td>
+                        <td>
+                          Native Emacs help surfacing via
+                          <code>eldoc-help-at-pt</code>.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Toggle candidate docs</td>
+                        <td><code>corfu-popupinfo-toggle</code></td>
+                        <td><kbd>M-h</kbd> (in <code>corfu-map</code>)</td>
+                        <td>
+                          Shows/hides doc popup for selected completion
+                          candidate.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Scroll doc buffer</td>
+                        <td><code>scroll-other-window</code></td>
+                        <td><kbd>C-M-v</kbd></td>
+                        <td>
+                          Scrolls the <code>*eldoc*</code> ephemeral buffer when
+                          doc exceeds echo area.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Scroll doc buffer (back)</td>
+                        <td><code>scroll-other-window-down</code></td>
+                        <td><kbd>C-M-S-v</kbd></td>
+                        <td>Reverse scroll for long documentation.</td>
+                      </tr>
+                      <tr>
+                        <td>Force hover refresh</td>
+                        <td><code>eglot-signature-eldoc-bar</code></td>
+                        <td>—</td>
+                        <td>
+                          Re-queries <code>textDocument/hover</code> on demand.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="hover-sect-config"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+              Configuration
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="hover-sect-config" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="code-win">
+                  <div class="code-head">
+                    <div style="display: flex; align-items: center">
+                      <div class="dots" aria-hidden="true">
+                        <span></span><span></span><span></span>
+                      </div>
+                      <span class="fname">init-hover.el</span>
+                    </div>
+                    <button
+                      class="copy"
+                      aria-label="Copy code snippet"
+                      onclick="copyCode(this)"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <rect x="9" y="9" width="13" height="13" rx="2" />
+                        <path
+                          d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                        />
+                      </svg>
+                      Copy
+                    </button>
+                  </div>
+                  <pre><code class="language-lisp">;; ==========================================
+;; 2. ELDOC CORE (Emacs Native Rendering)
+;; ==========================================
+(use-package eldoc
+  :ensure nil
+  :custom
+  ;; Surface `help-at-point-kbd-string` through the eldoc pipeline.
+  (eldoc-help-at-pt t)
+  ;; Prefer the ephemeral `*eldoc*` buffer over the echo area
+  ;; when documentation exceeds a single line.
+  (eldoc-echo-area-prefer-doc-buffer t)
+  (eldoc-echo-area-use-multiline-p t)
+  (eldoc-idle-delay 0.5)
+  :config
+  (global-eldoc-mode 1))
+
+;; ==========================================
+;; 3. CORFU-POPUPINFO (Candidate-Level Hover)
+;; ==========================================
+(use-package corfu-popupinfo
+  :ensure nil
+  :after corfu
+  :bind (:map corfu-map
+         ("M-h" . corfu-popupinfo-toggle))
+  :config
+  (corfu-popupinfo-mode 1)
+  ;; Documentation is ONLY shown on manual trigger (M-h).
+  (setq corfu-popupinfo-delay nil))
+
+;; ==========================================
+;; 4. GENERAL.EL KEYBINDINGS
+;; ==========================================
+(general-define-key
+  :states 'normal
+  "K" #'eldoc)</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="hover-sect-arch"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path
+                  d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"
+                />
+              </svg>
+              Architecture &amp; Enhancements
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="hover-sect-arch" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="sec-title">Why This Approach?</div>
+                <div class="grid-2" style="margin-bottom: 24px">
+                  <div class="vs-card ok">
+                    <h4>✓ eldoc native · Chosen</h4>
+                    <div class="vs-list">
+                      <div class="vs-row">
+                        <span class="lab">Coupling</span
+                        ><span class="val"
+                          >Works with <i>any</i> eldoc backend (eglot, native
+                          elisp).</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">Protocol</span
+                        ><span class="val"
+                          >Honors the <code>eglot</code>-only stack
+                          mandate.</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">Integration</span
+                        ><span class="val"
+                          >Native ephemeral buffer with
+                          <code>markdown-ts-mode</code> rendering.</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">Performance</span
+                        ><span class="val"
+                          >Zero additional packages, echo-area fast path.</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                  <div class="vs-card no">
+                    <h4>✕ lsp-ui-doc / eldoc-box · Rejected</h4>
+                    <div class="vs-list">
+                      <div class="vs-row">
+                        <span class="lab">Coupling</span
+                        ><span class="val"
+                          >Hard-bound to <code>lsp-mode</code> or requires
+                          child-frame overhead.</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">Protocol</span
+                        ><span class="val"
+                          >Requires forbidden <code>lsp-mode</code> ecosystem or
+                          third-party dependencies.</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">Integration</span
+                        ><span class="val"
+                          >No integration with Emacs native eldoc
+                          enhancements.</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">Performance</span
+                        ><span class="val"
+                          >Child-frame latency on every hover / rendering
+                          overhead.</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="sec-title">Emacs 31 Specific Enhancements</div>
+                <div class="grid-2">
+                  <div class="enh-card g">
+                    <div class="enh-title">eldoc-help-at-pt (NEW)</div>
+                    <p class="enh-desc">
+                      Surfaces <code>help-at-point-kbd-string</code> through the
+                      eldoc pipeline, enabling hover-style information on cursor
+                      movement without third-party packages.
+                    </p>
+                  </div>
+                  <div class="enh-card p">
+                    <div class="enh-title">
+                      eldoc-echo-area-prefer-doc-buffer (NEW)
+                    </div>
+                    <p class="enh-desc">
+                      When documentation exceeds the echo area, Emacs 31
+                      automatically routes the payload to an ephemeral
+                      <code>*eldoc*</code> buffer rendered with
+                      <code>markdown-ts-mode</code>.
+                    </p>
+                  </div>
+                  <div class="enh-card y">
+                    <div class="enh-title">markdown-ts-mode Integration</div>
+                    <p class="enh-desc">
+                      Emacs 31's native tree-sitter markdown mode fontifies the
+                      ephemeral <code>*eldoc*</code> buffer, providing rich code
+                      blocks and syntax highlighting inside hover documentation.
+                    </p>
+                  </div>
+                  <div class="enh-card g">
+                    <div class="enh-title">TTY-Safe Rendering</div>
+                    <p class="enh-desc">
+                      Unlike child-frame-based solutions
+                      (<code>eldoc-box</code>, <code>lsp-ui-doc</code>), the
+                      ephemeral buffer approach degrades gracefully to TTY
+                      frames, ensuring documentation is accessible over SSH.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+      <section
+        id="hover-info-childframe-parity"
+        class="feature-page"
+        style="display: none"
+      >
+        <header class="page-head">
+          <div class="title-row">
+            <h1>Hover Info (Childframe Parity)</h1>
+            <span class="status" role="status">Working</span>
+          </div>
+          <div class="category">Completion &amp; Intelligence</div>
+          <div class="parity">
+            <b>VS Code Parity</b>
+            <span
+              >Floating tooltip with rich markdown, type info, and signatures on
+              mouse-hover or keyboard shortcut</span
+            >
+          </div>
+          <div class="meta-bar">
+            <div class="meta-item">
+              <span class="k">LSP</span>
+              <code>textDocument/hover</code>
+            </div>
+            <div class="meta-item">
+              <span class="k">Routing</span>
+              <code
+                >eglot<span class="route-arrow">→</span>eldoc<span
+                  class="route-arrow"
+                  >→</span
+                >eldoc-box / *eldoc*</code
+              >
+            </div>
+          </div>
+        </header>
+
+        <article class="acc">
+          <button
+            class="acc-head open"
+            aria-expanded="true"
+            aria-controls="childframe-sect-overview"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+              </svg>
+              Feature Overview
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div
+            class="acc-body open"
+            id="childframe-sect-overview"
+            role="region"
+          >
+            <div>
+              <div class="acc-inner">
+                <div class="sec-title">Behavioral Parity Matrix</div>
+                <div class="tbl-wrap">
+                  <table class="tbl">
+                    <thead>
+                      <tr>
+                        <th>VS Code Behavior</th>
+                        <th>Emacs Equivalent</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Floating tooltip on cursor idle</td>
+                        <td>
+                          <code>eldoc-box-hover-at-point-mode</code> spawns
+                          childframe after <code>eldoc-idle-delay</code>.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Rich markdown rendering</td>
+                        <td>
+                          <code>markdown-ts-mode</code> fontifies code blocks
+                          inside the <code>eldoc-box</code> childframe.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Tooltip disappears on cursor move</td>
+                        <td>
+                          <code>eldoc-box-clear-after-use t</code> destroys the
+                          childframe instantly.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Single-line hints in status bar</td>
+                        <td>
+                          <code>eldoc-box-only-multi-line t</code> keeps
+                          1-liners in the echo area.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Scroll long documentation</td>
+                        <td>
+                          <kbd>C-M-v</kbd> / <kbd>C-M-S-v</kbd> scrolls the
+                          <code>eldoc-box</code> childframe window.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Hover on completion candidate</td>
+                        <td>
+                          <code>corfu-popupinfo-toggle</code> (<kbd>M-h</kbd>)
+                          spawns a childframe for
+                          <code>completionItem/resolve</code>.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Works over SSH / Terminal</td>
+                        <td>
+                          Emacs
+                          <code>eldoc-echo-area-prefer-doc-buffer</code> routes
+                          to <code>*eldoc*</code> buffer natively.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="childframe-sect-stack"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path
+                  d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                />
+              </svg>
+              Implementation Stack
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="childframe-sect-stack" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="grid-2">
+                  <div class="stack-card">
+                    <div class="stack-ic">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M12 1v6m0 6v6" />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">eglot</div>
+                      <div class="stack-role">LSP Client</div>
+                      <div class="stack-desc">
+                        Drives <code>textDocument/hover</code>, returning
+                        Markdown payloads natively via
+                        <code>eglot-hover-eldoc-function</code>.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="stack-card">
+                    <div
+                      class="stack-ic"
+                      style="
+                        background: rgba(187, 154, 247, 0.1);
+                        color: var(--purple);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                        />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">eldoc</div>
+                      <div class="stack-role">Documentation Router</div>
+                      <div class="stack-desc">
+                        Aggregates hover payloads and routes them to the active
+                        display backend (childframe or TTY).
+                      </div>
+                    </div>
+                  </div>
+                  <div class="stack-card">
+                    <div
+                      class="stack-ic"
+                      style="
+                        background: rgba(125, 207, 255, 0.1);
+                        color: var(--cyan);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <path d="M9 9h6v6H9z" />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">eldoc-box</div>
+                      <div class="stack-role">GUI Rendering Engine</div>
+                      <div class="stack-desc">
+                        Spawns a floating childframe anchored to the cursor,
+                        rendering rich markdown without shifting buffer text.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="stack-card">
+                    <div
+                      class="stack-ic"
+                      style="
+                        background: rgba(158, 206, 106, 0.1);
+                        color: var(--green);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                        />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">markdown-ts-mode</div>
+                      <div class="stack-role">Markdown Fontification</div>
+                      <div class="stack-desc">
+                        Provides C-level tree-sitter syntax highlighting for
+                        code blocks inside the hover tooltip.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="childframe-sect-commands"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+                <path
+                  d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+                />
+              </svg>
+              Commands &amp; Keybindings
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="childframe-sect-commands" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="tbl-wrap">
+                  <table class="tbl">
+                    <thead>
+                      <tr>
+                        <th>Action</th>
+                        <th>Command</th>
+                        <th>Keybinding</th>
+                        <th>Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Hover at point (keyboard)</td>
+                        <td><code>eldoc</code></td>
+                        <td><kbd>K</kbd> (Evil normal)</td>
+                        <td>
+                          Triggers <code>textDocument/hover</code> and spawns
+                          the childframe.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Help at point</td>
+                        <td><code>help-at-point</code></td>
+                        <td><kbd>C-h .</kbd></td>
+                        <td>
+                          Native Emacs help surfacing via
+                          <code>eldoc-help-at-pt</code>.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Scroll hover tooltip</td>
+                        <td><code>eldoc-box-scroll-up/down</code></td>
+                        <td><kbd>C-M-v</kbd> / <kbd>C-M-S-v</kbd></td>
+                        <td>
+                          Scrolls the childframe when docstrings exceed the
+                          viewport.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Toggle candidate docs</td>
+                        <td><code>corfu-popupinfo-toggle</code></td>
+                        <td><kbd>M-h</kbd> (in <code>corfu-map</code>)</td>
+                        <td>
+                          Shows/hides childframe docs for the active completion
+                          candidate.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="childframe-sect-config"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+              Configuration
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="childframe-sect-config" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="code-win">
+                  <div class="code-head">
+                    <div style="display: flex; align-items: center">
+                      <div class="dots" aria-hidden="true">
+                        <span></span><span></span><span></span>
+                      </div>
+                      <span class="fname">init-hover-childframe.el</span>
+                    </div>
+                    <button
+                      class="copy"
+                      aria-label="Copy code snippet"
+                      onclick="copyCode(this)"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <rect x="9" y="9" width="13" height="13" rx="2" />
+                        <path
+                          d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                        />
+                      </svg>
+                      Copy
+                    </button>
+                  </div>
+                  <pre><code class="language-lisp">;; ==========================================
+;; 1. ELDOC-BOX (GUI Childframe Hover)
+;; ==========================================
+(use-package eldoc-box
+  :ensure t
+  :after eglot
+  :custom
+  (eldoc-box-clear-after-use t)
+  (eldoc-box-only-multi-line t)
+  (eldoc-box-offset '(10 10 10))
+  :custom-face
+  (eldoc-box-border ((t (:background "#292e42"))))
+  (eldoc-box-default-face ((t (:background "#1a1b26" :foreground "#c0caf5"))))
+  :config
+  (eldoc-box-hover-at-point-mode 1))
+
+;; ==========================================
+;; 2. ELDOC CORE (TTY Fallback & Routing)
+;; ==========================================
+(use-package eldoc
+  :ensure nil
+  :custom
+  (eldoc-help-at-pt t)
+  (eldoc-echo-area-prefer-doc-buffer t)
+  (eldoc-echo-area-use-multiline-p t)
+  (eldoc-idle-delay 0.5)
+  :config
+  (global-eldoc-mode 1))</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="childframe-sect-arch"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path
+                  d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"
+                />
+              </svg>
+              Architecture &amp; Enhancements
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="childframe-sect-arch" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="sec-title">Why This Approach?</div>
+                <div class="grid-2" style="margin-bottom: 24px">
+                  <div class="vs-card ok">
+                    <h4>✓ eldoc-box · Chosen</h4>
+                    <div class="vs-list">
+                      <div class="vs-row">
+                        <span class="lab">Rendering</span
+                        ><span class="val"
+                          >Childframe (Floating GUI window).</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">UI Physics</span
+                        ><span class="val"
+                          >Floats above text; zero layout shift.</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">Use Case</span
+                        ><span class="val"
+                          >Hover Info (VS Code Tooltip parity).</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                  <div class="vs-card no">
+                    <h4>✕ peek · Rejected for Hover</h4>
+                    <div class="vs-list">
+                      <div class="vs-row">
+                        <span class="lab">Rendering</span
+                        ><span class="val">Overlay (Inline buffer shift).</span>
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">UI Physics</span
+                        ><span class="val"
+                          >Shifts buffer text down; causes redisplay
+                          jitter.</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">Use Case</span
+                        ><span class="val"
+                          >Peek Definition (VS Code Alt+F12 panel).</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="sec-title">Emacs 31 Specific Enhancements</div>
+                <div class="grid-2">
+                  <div class="enh-card g">
+                    <div class="enh-title">PGTK Child-Frame Pixel Accuracy</div>
+                    <p class="enh-desc">
+                      Emacs 31 fixes severe child-frame positioning bugs on
+                      Wayland (PGTK builds). <code>eldoc-box</code> tooltips now
+                      anchor perfectly to the cursor baseline without drifting
+                      or clipping off-screen under GNOME/mutter.
+                    </p>
+                  </div>
+                  <div class="enh-card p">
+                    <div class="enh-title">Native TTY Degradation</div>
+                    <p class="enh-desc">
+                      If <code>eldoc-box</code> detects a TTY frame, Emacs 31's
+                      native
+                      <code>eldoc-echo-area-prefer-doc-buffer</code> seamlessly
+                      intercepts the payload and routes it to a split
+                      <code>*eldoc*</code> buffer, ensuring hover info is never
+                      lost over SSH.
+                    </p>
+                  </div>
+                  <div class="enh-card y">
+                    <div class="enh-title">markdown-ts-mode Integration</div>
+                    <p class="enh-desc">
+                      Emacs 31's native tree-sitter markdown mode fontifies the
+                      childframe buffer at C-speed, providing syntax-highlighted
+                      code blocks inside the hover tooltip without requiring the
+                      heavy <code>markdown-mode</code> package.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section id="signature-help" class="feature-page" style="display: none">
+        <header class="page-head">
+          <div class="title-row">
+            <h1>Signature Help</h1>
+            <span class="status" role="status">Working</span>
+          </div>
+          <div class="category">Completion &amp; Intelligence</div>
+          <div class="parity">
+            <b>VS Code Parity</b>
+            <span
+              >Floating parameter hints highlighting the active argument while
+              typing inside a function call</span
+            >
+          </div>
+          <div class="meta-bar">
+            <div class="meta-item">
+              <span class="k">LSP</span>
+              <code>textDocument/signatureHelp</code>
+            </div>
+            <div class="meta-item">
+              <span class="k">Routing</span>
+              <code
+                >eglot<span class="route-arrow">→</span>eldoc<span
+                  class="route-arrow"
+                  >→</span
+                >echo area / *eldoc*</code
+              >
+            </div>
+          </div>
+        </header>
+
+        <article class="acc">
+          <button
+            class="acc-head open"
+            aria-expanded="true"
+            aria-controls="sig-sect-overview"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+              </svg>
+              Feature Overview
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body open" id="sig-sect-overview" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="sec-title">Behavioral Parity Matrix</div>
+                <div class="tbl-wrap">
+                  <table class="tbl">
+                    <thead>
+                      <tr>
+                        <th>VS Code Behavior</th>
+                        <th>Emacs Equivalent</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Auto-trigger on <kbd>(</kbd> or <kbd>,</kbd></td>
+                        <td>
+                          <code>eglot</code> registers trigger characters;
+                          <code>eldoc</code> fires on
+                          <code>post-command-hook</code>.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Highlights active parameter</td>
+                        <td>
+                          <code>eglot</code> applies
+                          <code>eldoc-highlight-function-argument</code> face to
+                          the active parameter index.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Cycles through overloads</td>
+                        <td>
+                          <code>eldoc</code> natively supports multiple
+                          signatures; <kbd>C-h .</kbd> or arrow keys can cycle
+                          if the server returns an array.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Floating tooltip for long signatures</td>
+                        <td>
+                          Emacs
+                          <code>eldoc-echo-area-prefer-doc-buffer t</code>
+                          routes long signatures to the
+                          <code>*eldoc*</code> buffer without shifting layouts.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Manual trigger shortcut</td>
+                        <td>
+                          <kbd>C-h .</kbd> (<code>help-at-point</code>) or
+                          <kbd>K</kbd> (<code>eldoc</code>).
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Dismiss on cursor move</td>
+                        <td>
+                          <code>eldoc</code> automatically clears the echo area
+                          or hides the ephemeral buffer when leaving the
+                          callable scope.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="sig-sect-stack"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path
+                  d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                />
+              </svg>
+              Implementation Stack
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="sig-sect-stack" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="grid-2">
+                  <div class="stack-card">
+                    <div class="stack-ic">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M12 1v6m0 6v6" />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">eglot</div>
+                      <div class="stack-role">LSP Client</div>
+                      <div class="stack-desc">
+                        Intercepts trigger characters, queries
+                        <code>textDocument/signatureHelp</code>, and parses the
+                        active parameter index.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="stack-card">
+                    <div
+                      class="stack-ic"
+                      style="
+                        background: rgba(187, 154, 247, 0.1);
+                        color: var(--purple);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                        />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">eldoc</div>
+                      <div class="stack-role">Documentation Router</div>
+                      <div class="stack-desc">
+                        Aggregates the signature payload and routes it to the
+                        echo area or ephemeral buffer.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="stack-card">
+                    <div
+                      class="stack-ic"
+                      style="
+                        background: rgba(125, 207, 255, 0.1);
+                        color: var(--cyan);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                        />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">markdown-ts-mode</div>
+                      <div class="stack-role">Rendering Engine</div>
+                      <div class="stack-desc">
+                        Highlights the active parameter and fontifies code
+                        blocks in the <code>*eldoc*</code> buffer.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="stack-card">
+                    <div
+                      class="stack-ic"
+                      style="
+                        background: rgba(158, 206, 106, 0.1);
+                        color: var(--green);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <path d="M9 9h6v6H9z" />
+                      </svg>
+                    </div>
+                    <div class="stack-ct">
+                      <div class="stack-name">
+                        eldoc-documentation-functions
+                      </div>
+                      <div class="stack-role">Trigger Mechanism</div>
+                      <div class="stack-desc">
+                        <code>eglot</code> injects
+                        <code>eglot-signature-eldoc-function</code> into this
+                        hook, triggering automatically on
+                        <code>post-command-hook</code>.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="sig-sect-commands"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+                <path
+                  d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+                />
+              </svg>
+              Commands &amp; Keybindings
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="sig-sect-commands" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="tbl-wrap">
+                  <table class="tbl">
+                    <thead>
+                      <tr>
+                        <th>Action</th>
+                        <th>Command</th>
+                        <th>Keybinding</th>
+                        <th>Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Manual signature trigger</td>
+                        <td><code>eldoc</code></td>
+                        <td><kbd>C-h .</kbd> / <kbd>K</kbd></td>
+                        <td>
+                          Forces a <code>textDocument/signatureHelp</code> query
+                          if the automatic trigger was missed.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Scroll long signature</td>
+                        <td><code>scroll-other-window</code></td>
+                        <td><kbd>C-M-v</kbd></td>
+                        <td>
+                          Scrolls the <code>*eldoc*</code> ephemeral buffer when
+                          a signature exceeds the echo area.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Scroll signature (back)</td>
+                        <td><code>scroll-other-window-down</code></td>
+                        <td><kbd>C-M-S-v</kbd></td>
+                        <td>
+                          Reverse scroll for massive C++/Rust generic
+                          signatures.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Help at point</td>
+                        <td><code>help-at-point</code></td>
+                        <td><kbd>C-h .</kbd></td>
+                        <td>
+                          Native Emacs help surfacing that integrates with eldoc
+                          payloads.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="sig-sect-config"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+              Configuration
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="sig-sect-config" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="code-win">
+                  <div class="code-head">
+                    <div style="display: flex; align-items: center">
+                      <div class="dots" aria-hidden="true">
+                        <span></span><span></span><span></span>
+                      </div>
+                      <span class="fname">init-signature.el</span>
+                    </div>
+                    <button
+                      class="copy"
+                      aria-label="Copy code snippet"
+                      onclick="copyCode(this)"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <rect x="9" y="9" width="13" height="13" rx="2" />
+                        <path
+                          d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                        />
+                      </svg>
+                      Copy
+                    </button>
+                  </div>
+                  <pre><code class="language-lisp">;; ==========================================
+;; 1. ELDOC CORE (Signature & Hover Routing)
+;; ==========================================
+(use-package eldoc
+  :ensure nil
+  :custom
+  ;; When a signature exceeds the echo area, automatically route it
+  ;; to the ephemeral `*eldoc*` buffer instead of expanding the echo area.
+  (eldoc-echo-area-prefer-doc-buffer t)
+  (eldoc-echo-area-use-multiline-p t)
+  (eldoc-idle-delay 0.5)
+  (eldoc-help-at-pt t)
+  :config
+  ;; Enable eldoc globally. eglot-managed buffers automatically inject
+  ;; `eglot-signature-eldoc-function` into `eldoc-documentation-functions`.
+  (global-eldoc-mode 1))</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="acc">
+          <button
+            class="acc-head"
+            aria-expanded="false"
+            aria-controls="sig-sect-arch"
+          >
+            <span class="t">
+              <svg
+                class="ic"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path
+                  d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"
+                />
+              </svg>
+              Architecture &amp; Enhancements
+            </span>
+            <svg
+              class="chev"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          <div class="acc-body" id="sig-sect-arch" role="region">
+            <div>
+              <div class="acc-inner">
+                <div class="sec-title">Why This Approach?</div>
+                <div class="grid-2" style="margin-bottom: 24px">
+                  <div class="vs-card ok">
+                    <h4>✓ eldoc native · Chosen</h4>
+                    <div class="vs-list">
+                      <div class="vs-row">
+                        <span class="lab">Coupling</span
+                        ><span class="val"
+                          >Works with any eldoc backend (eglot, native
+                          elisp).</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">UI Physics</span
+                        ><span class="val"
+                          >Echo area (fast) or ephemeral buffer (no layout
+                          shift).</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">Performance</span
+                        ><span class="val"
+                          >Zero additional packages, native C-level echo
+                          area.</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                  <div class="vs-card no">
+                    <h4>✕ lsp-ui-sideline · Rejected</h4>
+                    <div class="vs-list">
+                      <div class="vs-row">
+                        <span class="lab">Coupling</span
+                        ><span class="val"
+                          >Hard-bound to lsp-mode ecosystem.</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">UI Physics</span
+                        ><span class="val"
+                          >Renders in margins/sidelines (causes text
+                          shifting).</span
+                        >
+                      </div>
+                      <div class="vs-row">
+                        <span class="lab">Performance</span
+                        ><span class="val"
+                          >High redisplay overhead on every keystroke.</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="sec-title">Emacs 31 Specific Enhancements</div>
+                <div class="grid-2">
+                  <div class="enh-card g">
+                    <div class="enh-title">
+                      eldoc-echo-area-prefer-doc-buffer (NEW)
+                    </div>
+                    <p class="enh-desc">
+                      In older Emacs versions, long C++ template signatures
+                      would truncate or force the echo area to expand to 5+
+                      lines, causing severe UI jitter. Emacs 31 routes oversized
+                      signatures to a dedicated, scrollable
+                      <code>*eldoc*</code> buffer.
+                    </p>
+                  </div>
+                  <div class="enh-card p">
+                    <div class="enh-title">markdown-ts-mode Integration</div>
+                    <p class="enh-desc">
+                      When signatures are routed to the
+                      <code>*eldoc*</code> buffer, Emacs 31's native tree-sitter
+                      markdown mode fontifies any code blocks or type
+                      annotations embedded in the signature documentation at
+                      C-speed.
+                    </p>
+                  </div>
+                  <div class="enh-card y">
+                    <div class="enh-title">
+                      elisp-eldoc-funcall-with-docstring
+                    </div>
+                    <p class="enh-desc">
+                      For Emacs Lisp buffers, Emacs 31's native eldoc engine now
+                      merges the function signature with its docstring in a
+                      single, highly optimized payload, reducing the need for
+                      separate hover queries.
+                    </p>
+                  </div>
+                  <div class="enh-card g">
+                    <div class="enh-title">TTY-Safe Degradation</div>
+                    <p class="enh-desc">
+                      Unlike child-frame-based signature widgets,
+                      <code>eldoc</code> degrades gracefully to the echo area or
+                      standard window splits over SSH/TTY, ensuring signature
+                      help is always accessible in terminal environments.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lisp.min.js"></script>
+    <script>
+      // Desktop Sidebar Toggle
+      const sb = document.getElementById("sb");
+      document.getElementById("sbToggle").addEventListener("click", () => {
+        sb.classList.toggle("collapsed");
+      });
+
+      // Mobile Menu Handling
+      const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+      const overlay = document.getElementById("overlay");
+      mobileMenuBtn.addEventListener("click", () => {
+        sb.classList.add("mobile-open");
+        overlay.classList.add("active");
+      });
+      overlay.addEventListener("click", () => {
+        sb.classList.remove("mobile-open");
+        overlay.classList.remove("active");
+      });
+
+      // Accordion Logic (with ARIA state management)
+      document.querySelectorAll(".acc-head").forEach((head) => {
+        head.addEventListener("click", () => {
+          const body = head.nextElementSibling;
+          const isExpanded = head.getAttribute("aria-expanded") === "true";
+          head.classList.toggle("open");
+          body.classList.toggle("open");
+          head.setAttribute("aria-expanded", !isExpanded);
+        });
+      });
+
+      // Focus Mode (Hides UI, doesn't force accordion states)
+      const fb = document.getElementById("focusBtn");
+      function toggleFocus() {
+        document.body.classList.toggle("focus");
+      }
+      fb.addEventListener("click", toggleFocus);
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && document.body.classList.contains("focus")) {
+          toggleFocus();
+        }
+      });
+
+      // Robust Clipboard Copy (Iframe safe fallback)
+      function copyCode(btn) {
+        const codeEl = btn.closest(".code-win").querySelector("code");
+        const text = codeEl.innerText;
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.top = "0";
+        textArea.style.left = "0";
+        textArea.style.width = "2em";
+        textArea.style.height = "2em";
+        textArea.style.padding = "0";
+        textArea.style.border = "none";
+        textArea.style.outline = "none";
+        textArea.style.boxShadow = "none";
+        textArea.style.background = "transparent";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+          const successful = document.execCommand("copy");
+          if (successful) {
+            triggerCopySuccess(btn);
+          } else {
+            console.warn("Fallback copy command was unsuccessful");
+          }
+        } catch (err) {
+          console.error("Fallback: Oops, unable to copy", err);
+        }
+        document.body.removeChild(textArea);
+      }
+      function triggerCopySuccess(btn) {
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied`;
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.innerHTML = originalHTML;
+          btn.classList.remove("copied");
+        }, 1800);
+      }
+
+      // ==========================================
+      // SIDEBAR NAVIGATION & SECTION SWITCHING
+      // ==========================================
+      const navButtons = document.querySelectorAll(".sidebar-nav .nav");
+      const sections = document.querySelectorAll(".feature-page");
+      const breadcrumbCur = document.querySelector(".crumbs .cur");
+
+      navButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          // Update active nav styling
+          navButtons.forEach((b) => {
+            b.classList.remove("active");
+            b.removeAttribute("aria-current");
+          });
+          btn.classList.add("active");
+          btn.setAttribute("aria-current", "page");
+
+          // Show/hide sections based on data-target
+          const targetId = btn.getAttribute("data-target");
+          if (targetId) {
+            sections.forEach((sec) => {
+              if (sec.id === targetId) {
+                sec.style.display = "block";
+              } else {
+                sec.style.display = "none";
+              }
+            });
+
+            // Update breadcrumb text
+            if (breadcrumbCur) {
+              breadcrumbCur.textContent = btn.getAttribute("data-tip");
+            }
+          }
+
+          // Close mobile menu if open
+          if (sb.classList.contains("mobile-open")) {
+            sb.classList.remove("mobile-open");
+            overlay.classList.remove("active");
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
