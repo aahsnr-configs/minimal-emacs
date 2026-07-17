@@ -1,0 +1,1869 @@
+Filename: rename-symbol.html
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Emacs IDE — Rename Symbol</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.18/index.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="shared-styles.css" />
+  </head>
+  <body>
+    <div class="overlay" id="overlay" aria-hidden="true"></div>
+    <div class="focus-hint" id="focusHint" aria-live="polite">
+      <kbd>ESC</kbd> <span>Exit Focus Mode</span>
+    </div>
+    <aside class="sidebar" id="sb" aria-label="Main Navigation">
+      <div class="sidebar-head">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
+        <span class="brand">Emacs IDE</span>
+      </div>
+      <nav class="sidebar-nav" aria-label="Sidebar Menu">
+        <button class="nav" data-tip="IntelliSense">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24A2.5 2.5 0 0 1 9.5 2z"
+            />
+            <path
+              d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24A2.5 2.5 0 0 0 14.5 2z"
+            />
+          </svg>
+          <span class="nav-label">IntelliSense</span>
+        </button>
+        <button class="nav" data-tip="Hover Info">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4M12 8h.01" />
+          </svg>
+          <span class="nav-label">Hover Info</span>
+        </button>
+        <button class="nav" data-tip="Signature Help">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+            />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+          <span class="nav-label">Signature Help</span>
+        </button>
+        <button class="nav" data-tip="Definition">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <span class="nav-label">Definition</span>
+        </button>
+        <button class="nav active" data-tip="Code Actions" aria-current="page">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"
+            />
+          </svg>
+          <span class="nav-label">Code Actions</span>
+        </button>
+      </nav>
+      <div class="sidebar-foot">
+        <button
+          class="nav"
+          id="sbToggle"
+          data-tip="Toggle Sidebar"
+          aria-label="Toggle Sidebar"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <line x1="9" y1="3" x2="9" y2="21" />
+          </svg>
+          <span class="nav-label">Collapse Menu</span>
+        </button>
+      </div>
+    </aside>
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger" id="mobileMenuBtn" aria-label="Open Menu">
+          <svg
+            viewBox="0 0 24 24"
+            width="24"
+            height="24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <div class="crumbs" aria-label="Breadcrumb">
+          <span>Docs</span><span class="s" aria-hidden="true">/</span>
+          <span>Code Actions &amp; Refactoring</span
+          ><span class="s" aria-hidden="true">/</span>
+          <span class="cur" aria-current="page">Rename Symbol</span>
+        </div>
+      </div>
+      <button
+        class="icon-btn"
+        id="focusBtn"
+        title="Toggle Focus Mode (ESC)"
+        aria-label="Toggle Focus Mode"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+        </svg>
+      </button>
+    </header>
+    <main class="main" id="main-content">
+      <header class="page-head">
+        <div class="title-row">
+          <h1>Rename Symbol</h1>
+          <span class="status" role="status">Working</span>
+        </div>
+        <div class="category">Code Actions &amp; Refactoring</div>
+        <div class="parity">
+          <b>VS Code Parity</b>
+          <span>F2 (Rename) across the entire workspace</span>
+        </div>
+        <div class="meta-bar">
+          <div class="meta-item">
+            <span class="k">LSP</span>
+            <code>textDocument/prepareRename</code>
+            <span class="meta-sep" aria-hidden="true">·</span>
+            <code>textDocument/rename</code>
+          </div>
+          <div class="meta-item">
+            <span class="k">Routing</span>
+            <code
+              >eglot<span class="route-arrow">→</span>eglot-rename<span
+                class="route-arrow"
+                >→</span
+              >workspace/applyEdit</code
+            >
+          </div>
+        </div>
+      </header>
+      <article class="acc">
+        <button
+          class="acc-head open"
+          aria-expanded="true"
+          aria-controls="sect-overview"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+            </svg>
+            Feature Overview
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body open" id="sect-overview" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="sec-title">Behavioral Parity Matrix</div>
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>VS Code Behavior</th>
+                      <th>Emacs 31 Equivalent</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><kbd>F2</kbd> prompts for new name</td>
+                      <td>
+                        <kbd>F2</kbd> or <kbd>SPC c r</kbd> invokes
+                        <code>eglot-rename</code> with <code>read-string</code>.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Validates rename target first</td>
+                      <td>
+                        <code>eglot</code> automatically sends
+                        <code>textDocument/prepareRename</code> before
+                        prompting.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Renames across all project files</td>
+                      <td>
+                        <code>eglot</code> processes the
+                        <code>workspace/applyEdit</code> payload, opening and
+                        modifying files as needed.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Preserves undo history</td>
+                      <td>
+                        Native Emacs undo handles the multi-file edits cleanly.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Fails gracefully on invalid targets</td>
+                      <td>
+                        <code>eglot</code> displays a user-friendly error if
+                        <code>prepareRename</code> rejects the location (e.g.,
+                        renaming a keyword).
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-ecosystem"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path
+                d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+              />
+            </svg>
+            Ecosystem Integration
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-ecosystem" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="grid-2">
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div class="eco-ic">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M12 1v6m0 6v6" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">eglot</div>
+                      <div class="eco-sub">LSP Client</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    Natively manages the entire rename lifecycle, from
+                    validation to multi-file application via
+                    <code>workspace/applyEdit</code>.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(187, 154, 247, 0.1);
+                        color: var(--purple);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <path
+                          d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">general.el</div>
+                      <div class="eco-sub">Keybindings</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    Eagerly registers the <kbd>F2</kbd> and
+                    <kbd>SPC c r</kbd> leader bindings, ensuring the command is
+                    instantly available in all <code>eglot</code>-managed
+                    buffers without deferred-registration traps.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(125, 207, 255, 0.1);
+                        color: var(--cyan);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">apheleia</div>
+                      <div class="eco-sub">Post-Rename Formatting</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    If the rename operation modifies files, saving those files
+                    will naturally trigger <code>apheleia</code> to format them,
+                    ensuring the refactored code adheres to project styling
+                    rules.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-stack"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+              />
+            </svg>
+            Implementation Stack
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-stack" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="grid-2">
+                <div class="stack-card">
+                  <div class="stack-ic">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M12 1v6m0 6v6" />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">eglot</div>
+                    <div class="stack-role">LSP Client</div>
+                    <div class="stack-desc">
+                      Built-in. Drives <code>textDocument/prepareRename</code>
+                      (to validate the rename target) and
+                      <code>textDocument/rename</code> (to apply the AST-aware
+                      workspace edit).
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="
+                      background: rgba(187, 154, 247, 0.1);
+                      color: var(--purple);
+                    "
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                      />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">lsp-workspace-edit (via eglot)</div>
+                    <div class="stack-role">Workspace Edit Engine</div>
+                    <div class="stack-desc">
+                      Safely applies multi-file text edits, preserving undo
+                      history and file state.
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="
+                      background: rgba(125, 207, 255, 0.1);
+                      color: var(--cyan);
+                    "
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path d="M4 6h16M4 12h16M4 18h10" />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">read-string</div>
+                    <div class="stack-role">User Prompt</div>
+                    <div class="stack-desc">
+                      Prompts for the new symbol name in the minibuffer,
+                      defaulting to the current symbol at point.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-commands"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path
+                d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+              />
+            </svg>
+            Commands &amp; Keybindings
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-commands" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>Action</th>
+                      <th>Command</th>
+                      <th>Keybinding</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Rename symbol</td>
+                      <td><code>eglot-rename</code></td>
+                      <td><kbd>F2</kbd> / <kbd>SPC c r</kbd></td>
+                      <td>
+                        Prompts for new name and applies project-wide rename.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Prepare rename (internal)</td>
+                      <td><code>eglot--prepare-rename</code></td>
+                      <td>—</td>
+                      <td>
+                        Automatically invoked by <code>eglot-rename</code> to
+                        check if the symbol is valid for renaming.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-config"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
+            </svg>
+            Configuration
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-config" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="code-win">
+                <div class="code-head">
+                  <div style="display: flex; align-items: center">
+                    <div class="dots" aria-hidden="true">
+                      <span></span><span></span><span></span>
+                    </div>
+                    <span class="fname">init-rename.el</span>
+                  </div>
+                  <button
+                    class="copy"
+                    aria-label="Copy code snippet"
+                    onclick="copyCode(this)"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <rect x="9" y="9" width="13" height="13" rx="2" />
+                      <path
+                        d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                      />
+                    </svg>
+                    Copy
+                  </button>
+                </div>
+                <pre><code class="language-lisp">;; ==========================================
+;; EGLOT RENAME (Built-in)
+;; ==========================================
+;; eglot natively provides `eglot-rename`, which safely renames symbols
+;; across the entire project using LSP `textDocument/rename`.
+;; No explicit configuration is needed beyond the base `eglot` setup.
+
+;; ==========================================
+;; GENERAL.EL KEYBINDINGS (registered eagerly)
+;; ==========================================
+(ar/global-leader
+  "c" '(:ignore t :wk "code")
+  "c r" '(eglot-rename :wk "Rename symbol"))
+
+;; Standard F2 binding for universal rename parity
+(general-define-key
+  :states '(normal visual)
+  "F2" #'eglot-rename)</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-arch"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"
+              />
+            </svg>
+            Architecture &amp; Enhancements
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-arch" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="sec-title">Why This Approach?</div>
+              <div class="grid-2" style="margin-bottom: 24px">
+                <div class="vs-card ok">
+                  <h4>✓ eglot native · Chosen</h4>
+                  <div class="vs-list">
+                    <div class="vs-row">
+                      <span class="lab">Coupling</span>
+                      <span class="val"
+                        >Works exclusively with <code>eglot</code>.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Protocol</span>
+                      <span class="val"
+                        >Honors the <code>eglot</code>-only stack mandate.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Safety</span>
+                      <span class="val"
+                        >Relies on the language server's AST to guarantee only
+                        valid references are renamed.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Dependencies</span>
+                      <span class="val"
+                        >Zero. Built directly into <code>eglot.el</code>.</span
+                      >
+                    </div>
+                  </div>
+                </div>
+                <div class="vs-card no">
+                  <h4>✕ lsp-mode / lsp-ui · Rejected</h4>
+                  <div class="vs-list">
+                    <div class="vs-row">
+                      <span class="lab">Coupling</span>
+                      <span class="val"
+                        >Hard-bound to the
+                        <code>lsp-mode</code> ecosystem.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Protocol</span>
+                      <span class="val"
+                        >Requires forbidden
+                        <code>lsp-mode</code> ecosystem.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Safety</span>
+                      <span class="val"
+                        >Same, but carries the heavy
+                        <code>lsp-mode</code> overhead.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Dependencies</span>
+                      <span class="val"
+                        >Requires <code>lsp-mode</code> and its complex
+                        workspace management.</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="sec-title">Emacs 31 Specific Enhancements</div>
+              <div class="grid-2">
+                <div class="enh-card g">
+                  <div class="enh-title">Robust Workspace Edits</div>
+                  <p class="enh-desc">
+                    Emacs 31's refined <code>eglot</code> implementation handles
+                    complex <code>WorkspaceEdit</code> payloads (including file
+                    creation, deletion, and renaming alongside text edits) with
+                    improved stability and fewer edge-case crashes compared to
+                    older versions.
+                  </p>
+                </div>
+                <div class="enh-card p">
+                  <div class="enh-title">Seamless xref Integration</div>
+                  <p class="enh-desc">
+                    While rename is a write operation, any subsequent navigation
+                    (like jumping to a renamed file) benefits from Emacs 31's
+                    enhanced <code>xref</code> history and
+                    <code>xref-mouse-mode</code>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </main>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lisp.min.js"></script>
+    <script src="shared-scripts.js"></script>
+  </body>
+</html>
+```
+
+Filename: folding-ranges.html
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Emacs IDE — Folding Ranges</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.18/index.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="shared-styles.css" />
+  </head>
+  <body>
+    <div class="overlay" id="overlay" aria-hidden="true"></div>
+    <div class="focus-hint" id="focusHint" aria-live="polite">
+      <kbd>ESC</kbd> <span>Exit Focus Mode</span>
+    </div>
+    <aside class="sidebar" id="sb" aria-label="Main Navigation">
+      <div class="sidebar-head">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
+        <span class="brand">Emacs IDE</span>
+      </div>
+      <nav class="sidebar-nav" aria-label="Sidebar Menu">
+        <button class="nav" data-tip="IntelliSense">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24A2.5 2.5 0 0 1 9.5 2z"
+            />
+            <path
+              d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24A2.5 2.5 0 0 0 14.5 2z"
+            />
+          </svg>
+          <span class="nav-label">IntelliSense</span>
+        </button>
+        <button class="nav" data-tip="Hover Info">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4M12 8h.01" />
+          </svg>
+          <span class="nav-label">Hover Info</span>
+        </button>
+        <button class="nav" data-tip="Signature Help">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+            />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+          <span class="nav-label">Signature Help</span>
+        </button>
+        <button class="nav" data-tip="Definition">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <span class="nav-label">Definition</span>
+        </button>
+        <button class="nav active" data-tip="Code Actions" aria-current="page">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"
+            />
+          </svg>
+          <span class="nav-label">Code Actions</span>
+        </button>
+      </nav>
+      <div class="sidebar-foot">
+        <button
+          class="nav"
+          id="sbToggle"
+          data-tip="Toggle Sidebar"
+          aria-label="Toggle Sidebar"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <line x1="9" y1="3" x2="9" y2="21" />
+          </svg>
+          <span class="nav-label">Collapse Menu</span>
+        </button>
+      </div>
+    </aside>
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger" id="mobileMenuBtn" aria-label="Open Menu">
+          <svg
+            viewBox="0 0 24 24"
+            width="24"
+            height="24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <div class="crumbs" aria-label="Breadcrumb">
+          <span>Docs</span><span class="s" aria-hidden="true">/</span>
+          <span>Formatting &amp; Editing</span
+          ><span class="s" aria-hidden="true">/</span>
+          <span class="cur" aria-current="page">Folding Ranges</span>
+        </div>
+      </div>
+      <button
+        class="icon-btn"
+        id="focusBtn"
+        title="Toggle Focus Mode (ESC)"
+        aria-label="Toggle Focus Mode"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+        </svg>
+      </button>
+    </header>
+    <main class="main" id="main-content">
+      <header class="page-head">
+        <div class="title-row">
+          <h1>Folding Ranges</h1>
+          <span class="status" role="status">Working</span>
+        </div>
+        <div class="category">Formatting &amp; Editing</div>
+        <div class="parity">
+          <b>VS Code Parity</b>
+          <span
+            >Gutter arrows to collapse/expand code blocks, functions, imports,
+            regions</span
+          >
+        </div>
+        <div class="meta-bar">
+          <div class="meta-item">
+            <span class="k">LSP</span>
+            <code>textDocument/foldingRange</code>
+            <span class="meta-sep" aria-hidden="true">·</span>
+            <span style="color: var(--text-dim); font-size: 12px"
+              >(Explicitly bypassed)</span
+            >
+          </div>
+          <div class="meta-item">
+            <span class="k">Routing</span>
+            <code
+              >treesit-fold<span class="route-arrow">→</span>hideshow<span
+                class="route-arrow"
+                >→</span
+              >vimish-fold</code
+            >
+          </div>
+        </div>
+      </header>
+      <article class="acc">
+        <button
+          class="acc-head open"
+          aria-expanded="true"
+          aria-controls="sect-overview"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+            </svg>
+            Feature Overview
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body open" id="sect-overview" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="sec-title">Behavioral Parity Matrix</div>
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>VS Code Behavior</th>
+                      <th>Emacs 31 Equivalent</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Click gutter arrow to fold/unfold</td>
+                      <td>
+                        <code>treesit-fold</code> fringe indicators or
+                        <code>hideshow</code> margin clicks.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><kbd>Ctrl+K Ctrl+0</kbd> (Fold all)</td>
+                      <td><kbd>zM</kbd> (<code>ar/fold-close-all</code>).</td>
+                    </tr>
+                    <tr>
+                      <td><kbd>Ctrl+K Ctrl+J</kbd> (Unfold all)</td>
+                      <td><kbd>zR</kbd> (<code>ar/fold-open-all</code>).</td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <kbd>Ctrl+Shift+[</kbd> / <kbd>]</kbd> (Fold/Unfold)
+                      </td>
+                      <td>
+                        <kbd>zc</kbd> / <kbd>zo</kbd> (<code
+                          >ar/fold-close</code
+                        >
+                        / <code>ar/fold-open</code>).
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Fold arbitrary visual selection</td>
+                      <td>
+                        <kbd>zf</kbd> (<code>evil-vimish-fold/create</code>).
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>See hidden line count in gutter</td>
+                      <td>
+                        <code>ar/hs-overlay-line-count</code> renders
+                        <code>↴ [X lines]</code> natively.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Indentation-based folding (Python/YAML)</td>
+                      <td>
+                        Emacs 31's <code>hs-indentation-mode</code> handles this
+                        natively without regex hacks.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-ecosystem"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path
+                d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+              />
+            </svg>
+            Ecosystem Integration
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-ecosystem" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="grid-2">
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div class="eco-ic">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">treesit</div>
+                      <div class="eco-sub">AST Foundation</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    Provides the foundational AST that
+                    <code>treesit-fold</code> queries, ensuring folding
+                    boundaries align perfectly with syntactic scopes.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(187, 154, 247, 0.1);
+                        color: var(--purple);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">evil</div>
+                      <div class="eco-sub">Modal Integration</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    <code>evil-vimish-fold</code> maps standard Vim folding
+                    motions (<kbd>zf</kbd>, <kbd>zo</kbd>, <kbd>zc</kbd>) to the
+                    native folding engine, preserving muscle memory.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(125, 207, 255, 0.1);
+                        color: var(--cyan);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <path
+                          d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">general.el</div>
+                      <div class="eco-sub">Keybindings</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    Eagerly registers the <kbd>za</kbd>, <kbd>zo</kbd>,
+                    <kbd>zc</kbd> dispatcher bindings at startup, ensuring they
+                    are available globally without deferred-registration traps.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(247, 118, 142, 0.1);
+                        color: var(--red);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">too-long-file-p</div>
+                      <div class="eco-sub">Performance Guard</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    All folding minor modes are guarded by this custom function,
+                    preventing Emacs from attempting to parse and fold massive
+                    files which would otherwise freeze the main thread.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-stack"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+              />
+            </svg>
+            Implementation Stack
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-stack" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="grid-2">
+                <div class="stack-card">
+                  <div class="stack-ic">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                      />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">treesit-fold</div>
+                    <div class="stack-role">Primary AST Engine</div>
+                    <div class="stack-desc">
+                      Provides intelligent, structural code folding by directly
+                      querying the tree-sitter syntax tree, ensuring 100%
+                      accuracy for functions, classes, and blocks.
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="
+                      background: rgba(187, 154, 247, 0.1);
+                      color: var(--purple);
+                    "
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path d="M4 6h16M4 12h16M4 18h10" />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">hideshow</div>
+                    <div class="stack-role">Native Fallback</div>
+                    <div class="stack-desc">
+                      Built-in. Emacs 31 introduces native support for
+                      tree-sitter modes via the new <code>list</code> thing,
+                      alongside new commands like <code>hs-cycle</code> and
+                      <code>hs-indentation-mode</code>.
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="
+                      background: rgba(125, 207, 255, 0.1);
+                      color: var(--cyan);
+                    "
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <path d="M9 9h6v6H9z" />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">vimish-fold</div>
+                    <div class="stack-role">Visual Region Fallback</div>
+                    <div class="stack-desc">
+                      Allows arbitrary visual region folding (like VS Code's
+                      <kbd>Ctrl+K Ctrl+0</kbd>), caching fold state persistently
+                      across sessions.
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="
+                      background: rgba(158, 206, 106, 0.1);
+                      color: var(--green);
+                    "
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 2v20M2 12h20" />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">Native Fringes / Margins</div>
+                    <div class="stack-role">Indicator Rendering</div>
+                    <div class="stack-desc">
+                      Emacs 31's refined <code>hs-indicator-type</code> and
+                      <code>treesit-fold-indicators-priority</code> ensure
+                      clean, non-intrusive gutter arrows.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-commands"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path
+                d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+              />
+            </svg>
+            Commands &amp; Keybindings
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-commands" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>Action</th>
+                      <th>Command</th>
+                      <th>Keybinding</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Toggle fold at point</td>
+                      <td><code>ar/fold-toggle</code></td>
+                      <td><kbd>za</kbd></td>
+                      <td>
+                        Intelligent dispatcher: tries
+                        <code>treesit-fold</code>, then <code>hideshow</code>,
+                        then <code>vimish-fold</code>.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Open fold at point</td>
+                      <td><code>ar/fold-open</code></td>
+                      <td><kbd>zo</kbd></td>
+                      <td>Reveals the hidden block.</td>
+                    </tr>
+                    <tr>
+                      <td>Close fold at point</td>
+                      <td><code>ar/fold-close</code></td>
+                      <td><kbd>zc</kbd></td>
+                      <td>Conceals the block.</td>
+                    </tr>
+                    <tr>
+                      <td>Open all folds</td>
+                      <td><code>ar/fold-open-all</code></td>
+                      <td><kbd>zR</kbd></td>
+                      <td>Expands the entire buffer.</td>
+                    </tr>
+                    <tr>
+                      <td>Close all folds</td>
+                      <td><code>ar/fold-close-all</code></td>
+                      <td><kbd>zM</kbd></td>
+                      <td>Collapses all top-level blocks.</td>
+                    </tr>
+                    <tr>
+                      <td>Create visual fold</td>
+                      <td><code>evil-vimish-fold/create</code></td>
+                      <td><kbd>zf</kbd></td>
+                      <td>Folds the currently selected visual region.</td>
+                    </tr>
+                    <tr>
+                      <td>Delete visual fold</td>
+                      <td><code>vimish-fold-delete</code></td>
+                      <td><kbd>zd</kbd></td>
+                      <td>Removes the fold at point.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-config"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
+            </svg>
+            Configuration
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-config" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="code-win">
+                <div class="code-head">
+                  <div style="display: flex; align-items: center">
+                    <div class="dots" aria-hidden="true">
+                      <span></span><span></span><span></span>
+                    </div>
+                    <span class="fname">init-folding.el</span>
+                  </div>
+                  <button
+                    class="copy"
+                    aria-label="Copy code snippet"
+                    onclick="copyCode(this)"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <rect x="9" y="9" width="13" height="13" rx="2" />
+                      <path
+                        d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                      />
+                    </svg>
+                    Copy
+                  </button>
+                </div>
+                <pre><code class="language-lisp">;; ==========================================
+;; 1. TREESIT-FOLD (Primary AST-Aware Engine)
+;; ==========================================
+(use-package treesit-fold
+  :if (treesit-available-p)
+  :defer t
+  :hook ((prog-mode text-mode conf-mode) . ar/treesit-fold-maybe-enable)
+  :init
+  (defun ar/treesit-fold-maybe-enable ()
+    (unless (derived-mode-p 'lisp-mode 'emacs-lisp-mode 'lisp-interaction-mode 'lisp-data-mode)
+      (treesit-fold-mode 1)))
+  :config
+  (global-treesit-fold-indicators-mode 1)
+  (setq treesit-fold-indicators-priority -1)
+  (define-advice treesit-fold-mode (:before-while (&optional arg) guard-large-files)
+    (or (and arg (&lt; (prefix-numeric-value arg) 1))
+        (not (too-long-file-p)))))
+
+;; ==========================================
+;; 2. HIDESHOW (Emacs 31 Enhanced Native Fallback)
+;; ==========================================
+(use-package hideshow
+  :ensure nil
+  :defer t
+  :commands (hs-toggle-hiding hs-hide-block hs-show-block hs-hide-all hs-show-all)
+  :config
+  (setq hs-hide-comments-when-hiding-all nil
+        hs-set-up-overlay #'ar/hs-overlay-line-count)
+  (define-advice hs-minor-mode (:before-while (&optional arg) guard-large-files)
+    (or (and arg (&lt; (prefix-numeric-value arg) 1))
+        (not (too-long-file-p))))
+  (unless (assq 't hs-special-modes-alist)
+    (setq hs-special-modes-alist
+          (append hs-special-modes-alist
+                  '((t "{{{" "}}}" nil nil))))))
+
+;; ==========================================
+;; 3. VIMISH-FOLD (Visual Region Fallback)
+;; ==========================================
+(use-package vimish-fold
+  :defer t
+  :after evil
+  :init
+  (setq vimish-fold-dir (no-littering-expand-var-file-name "vimish-fold/")
+        vimish-fold-indication-mode 'right-fringe)
+  :config
+  (vimish-fold-global-mode 1))
+
+(use-package evil-vimish-fold
+  :defer t
+  :after vimish-fold
+  :init
+  (setq evil-vimish-fold-mode-lighter " ↴"
+        evil-vimish-fold-target-modes '(prog-mode conf-mode text-mode))
+  :config
+  (global-evil-vimish-fold-mode 1))
+
+;; ==========================================
+;; 4. UNIFIED DISPATCHER &amp; KEYBINDINGS
+;; ==========================================
+(defun ar/hs-overlay-line-count (ov)
+  "Append hidden line count to the native ellipsis for visual feedback."
+  (when (eq 'code (overlay-get ov 'hs))
+    (let* ((start (overlay-start ov))
+           (end (overlay-end ov))
+           (lines (count-lines start end)))
+      (overlay-put ov 'display
+                   (format "%s [%d lines]" truncate-string-ellipsis lines)))))
+
+(defun ar/fold-toggle ()
+  (interactive)
+  (cond ((bound-and-true-p treesit-fold-mode) (treesit-fold-toggle))
+        ((bound-and-true-p outline-minor-mode) (outline-cycle))
+        ((bound-and-true-p hs-minor-mode) (hs-toggle-hiding))
+        ((fboundp 'vimish-fold-toggle)
+         (condition-case nil (vimish-fold-toggle)
+           (error (user-error "No foldable region at point"))))
+        (t (user-error "No foldable region at point"))))
+
+(general-define-key
+  :states 'motion
+  "za" #'ar/fold-toggle
+  "zo" #'ar/fold-open
+  "zc" #'ar/fold-close
+  "zR" #'ar/fold-open-all
+  "zM" #'ar/fold-close-all
+  "zf" #'evil-vimish-fold/create
+  "zF" #'evil-vimish-fold/create-line
+  "zd" #'vimish-fold-delete
+  "zE" #'vimish-fold-delete-all)</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-arch"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"
+              />
+            </svg>
+            Architecture &amp; Enhancements
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-arch" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="sec-title">Why This Approach?</div>
+              <div class="grid-2" style="margin-bottom: 24px">
+                <div class="vs-card ok">
+                  <h4>✓ Native treesit-fold + hideshow · Chosen</h4>
+                  <div class="vs-list">
+                    <div class="vs-row">
+                      <span class="lab">Latency</span>
+                      <span class="val"
+                        ><b>0ms.</b> Queries the local C-level AST
+                        instantly.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Accuracy</span>
+                      <span class="val"
+                        ><b>Perfect.</b> Tree-sitter understands the exact
+                        syntactic scope of every block.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Protocol</span>
+                      <span class="val"
+                        >Honors the <code>eglot</code>-only stack mandate by
+                        bypassing unnecessary LSP UI features.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Visual Polish</span>
+                      <span class="val"
+                        >Custom <code>ar/hs-overlay-line-count</code> appends
+                        <code>[X lines]</code> to the ellipsis.</span
+                      >
+                    </div>
+                  </div>
+                </div>
+                <div class="vs-card no">
+                  <h4>✕ LSP foldingRange · Rejected</h4>
+                  <div class="vs-list">
+                    <div class="vs-row">
+                      <span class="lab">Latency</span>
+                      <span class="val"
+                        ><b>High.</b> Requires a synchronous network roundtrip
+                        to the LSP server on file open.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Accuracy</span>
+                      <span class="val"
+                        ><b>Variable.</b> Depends entirely on the language
+                        server's implementation.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Protocol</span>
+                      <span class="val"
+                        >Adds redundant network overhead for a feature Emacs
+                        handles natively.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Visual Polish</span>
+                      <span class="val"
+                        >Generic, uncustomizable server-provided ranges.</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="sec-title">Emacs 31 Specific Enhancements</div>
+              <div class="grid-2">
+                <div class="enh-card g">
+                  <div class="enh-title">Tree-Sitter hideshow Integration</div>
+                  <p class="enh-desc">
+                    Tree-sitter enabled modes now properly support
+                    <code>hs-minor-mode</code> via the new
+                    <code>list</code> thing, allowing <code>hideshow</code> to
+                    fold structural blocks with C-level precision.
+                  </p>
+                </div>
+                <div class="enh-card p">
+                  <div class="enh-title">New hideshow Commands</div>
+                  <p class="enh-desc">
+                    Emacs 31 introduces <code>hs-cycle</code> (toggle between
+                    folded, unfolded, and children-only states) and
+                    <code>hs-toggle-all</code> for rapid buffer-wide state
+                    changes.
+                  </p>
+                </div>
+                <div class="enh-card y">
+                  <div class="enh-title">hs-indentation-mode</div>
+                  <p class="enh-desc">
+                    Provides robust, indentation-based folding for languages
+                    like Python and YAML, replacing fragile regex-based
+                    fallbacks.
+                  </p>
+                </div>
+                <div class="enh-card g">
+                  <div class="enh-title">treesit-fold Fringe Priority</div>
+                  <p class="enh-desc">
+                    The configuration explicitly sets
+                    <code>treesit-fold-indicators-priority</code> to
+                    <code>-1</code>, ensuring folding arrows render behind
+                    <code>diff-hl</code> and <code>flymake</code> indicators,
+                    preventing visual clutter in the left margin.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </main>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lisp.min.js"></script>
+    <script src="shared-scripts.js"></script>
+  </body>
+</html>
+```

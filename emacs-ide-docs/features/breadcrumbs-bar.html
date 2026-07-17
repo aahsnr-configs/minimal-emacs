@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Emacs IDE — Go to Definition</title>
+    <title>Emacs IDE — Breadcrumbs Bar</title>
     <link
       href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.18/index.min.css"
       rel="stylesheet"
@@ -146,9 +146,9 @@
         </button>
         <div class="crumbs" aria-label="Breadcrumb">
           <span>Docs</span><span class="s" aria-hidden="true">/</span>
-          <span>Navigation &amp; Code Jumping</span
+          <span>Navigation &amp; Visual Enhancements</span
           ><span class="s" aria-hidden="true">/</span>
-          <span class="cur" aria-current="page">Go to Definition</span>
+          <span class="cur" aria-current="page">Breadcrumbs Bar</span>
         </div>
       </div>
       <button
@@ -171,26 +171,30 @@
     <main class="main" id="main-content">
       <header class="page-head">
         <div class="title-row">
-          <h1>Go to Definition</h1>
+          <h1>Breadcrumbs Bar</h1>
           <span class="status" role="status">Working</span>
         </div>
-        <div class="category">Navigation &amp; Code Jumping</div>
+        <div class="category">Navigation &amp; Visual Enhancements</div>
         <div class="parity">
           <b>VS Code Parity</b>
-          <span>F12 to jump, Ctrl+Click to jump, Alt+F12 to peek inline</span>
+          <span
+            >Top navigation bar showing Project › Directory › File.ts › Class ›
+            Method</span
+          >
         </div>
         <div class="meta-bar">
           <div class="meta-item">
             <span class="k">LSP</span>
-            <code>textDocument/definition</code>
+            <code>textDocument/documentSymbol</code>
           </div>
           <div class="meta-item">
             <span class="k">Routing</span>
             <code
-              >eglot<span class="route-arrow">→</span>xref<span
+              >eglot<span class="route-arrow">→</span>imenu<span
                 class="route-arrow"
                 >→</span
-              >consult-xref OR peek</code
+              >breadcrumb<span class="route-arrow">→</span
+              >header-line-format</code
             >
           </div>
         </div>
@@ -242,52 +246,46 @@
                   </thead>
                   <tbody>
                     <tr>
-                      <td><kbd>F12</kbd> jumps to definition</td>
+                      <td>Shows <code>src › utils › helpers.ts</code></td>
                       <td>
-                        <kbd>M-.</kbd> or <kbd>g d</kbd>
-                        (<code>xref-find-definitions</code>)
+                        <code>breadcrumb-project-crumbs</code> renders the
+                        relative file path.
                       </td>
                     </tr>
                     <tr>
-                      <td>Ctrl+Click jumps to definition</td>
+                      <td>Shows <code>Class › Method › Block</code></td>
                       <td>
-                        <kbd>C-&lt;mouse-1&gt;</kbd> via Emacs 31
-                        <code>global-xref-mouse-mode</code>
+                        <code>breadcrumb-imenu-crumbs</code> renders the nested
+                        <code>eglot</code> document symbols.
                       </td>
                     </tr>
                     <tr>
-                      <td>Alt+F12 peeks definition inline</td>
+                      <td>Located above the editor</td>
                       <td>
-                        <kbd>SPC c p d</kbd> (<code>peek-xref-definition</code>)
-                        via <code>peek</code> package
+                        Routed to <code>header-line-format</code> instead of
+                        <code>mode-line-format</code>.
                       </td>
                     </tr>
                     <tr>
-                      <td>Dropdown for multiple definitions</td>
+                      <td>Updates as cursor moves</td>
                       <td>
-                        <code>consult-xref</code> intercepts
-                        <code>xref-show-definitions-function</code>
+                        <code>breadcrumb-idle-delay</code> (0.3s) debounces the
+                        <code>imenu</code> re-evaluation.
                       </td>
                     </tr>
                     <tr>
-                      <td>Live preview in dropdown</td>
+                      <td>Clickable segments to jump</td>
                       <td>
-                        <code>consult-xref</code> + <code>vertico</code> live
-                        buffer previews
+                        Can be extended with <code>header-line</code> keymaps,
+                        or users can rely on <kbd>M-g M-i</kbd>
+                        (<code>imenu</code>).
                       </td>
                     </tr>
                     <tr>
-                      <td>Alt+Left returns to origin</td>
+                      <td>Truncates long paths intelligently</td>
                       <td>
-                        <kbd>M-,</kbd> or <kbd>g ,</kbd>
-                        (<code>xref-go-back</code>)
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Open in split window</td>
-                      <td>
-                        <kbd>C-x 4 .</kbd>
-                        (<code>xref-find-definitions-other-window</code>)
+                        <code>breadcrumb-*-max-length</code> ensures the header
+                        line never overflows the frame.
                       </td>
                     </tr>
                   </tbody>
@@ -354,10 +352,10 @@
                     </div>
                   </div>
                   <p class="eco-desc">
-                    Automatically registers <code>eglot-xref-backend</code> in
-                    <code>xref-backend-functions</code> for managed buffers,
-                    routing <kbd>M-.</kbd> to
-                    <code>textDocument/definition</code>.
+                    Automatically populates
+                    <code>imenu-create-index-function</code> with LSP document
+                    symbols, which <code>breadcrumb</code> consumes without any
+                    manual bridging.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -376,18 +374,19 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <path d="M4 6h16M4 12h16M4 18h10" />
+                        <path
+                          d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                        />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">consult</div>
-                      <div class="eco-sub">Preview Engine</div>
+                      <div class="eco-name">project.el</div>
+                      <div class="eco-sub">Path Resolution</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    <code>consult-xref</code> intercepts the xref display
-                    functions to provide vertico-powered previews for ambiguous
-                    definition targets.
+                    Provides the root-relative file path crumbs, ensuring
+                    monorepo paths are displayed concisely and accurately.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -406,21 +405,21 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <path
-                          d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-                        />
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">treesit</div>
-                      <div class="eco-sub">Fallback Parser</div>
+                      <div class="eco-name">consult</div>
+                      <div class="eco-sub">Interactive Counterpart</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    For non-LSP buffers (or when eglot is disconnected),
-                    <code>treesit</code> modes provide fallback definition
-                    jumping via <code>treesit-thing</code> navigation or
-                    <code>imenu</code> integration.
+                    While <code>breadcrumb</code> provides the visual trail,
+                    <code>consult-eglot-symbols</code> (<kbd>SPC c s</kbd>)
+                    provides the interactive counterpart, allowing users to
+                    fuzzy-search the exact same document symbol tree with live
+                    buffer previews.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -439,19 +438,20 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                        <path d="M9 9h6v6H9z" />
+                        <path d="M12 2v20M2 12h20" />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">peek</div>
-                      <div class="eco-sub">Inline Overlay</div>
+                      <div class="eco-name">doom-modeline</div>
+                      <div class="eco-sub">UI Harmony</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    Provides the inline overlay engine for "Peek Definition"
-                    workflows, keeping the user's spatial context intact without
-                    switching tabs.
+                    By routing breadcrumbs to the
+                    <code>header-line-format</code>, the bottom mode line
+                    remains uncluttered, allowing <code>doom-modeline</code> to
+                    focus on Git status, LSP diagnostics, and Python environment
+                    indicators.
                   </p>
                 </div>
               </div>
@@ -512,9 +512,10 @@
                     <div class="stack-name">eglot</div>
                     <div class="stack-role">LSP Client</div>
                     <div class="stack-desc">
-                      Built-in. Drives <code>textDocument/definition</code> and
-                      injects the location payload into the native
-                      <code>xref</code> framework.
+                      Built-in. Queries
+                      <code>textDocument/documentSymbol</code> and populates the
+                      native <code>imenu--index-alist</code>
+                      with rich, nested region information.
                     </div>
                   </div>
                 </div>
@@ -533,15 +534,19 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <path d="M4 6h16M4 12h16M4 18h10" />
+                      <path
+                        d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                      />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">xref</div>
-                    <div class="stack-role">Navigation Framework</div>
+                    <div class="stack-name">breadcrumb</div>
+                    <div class="stack-role">Breadcrumb Engine</div>
                     <div class="stack-desc">
-                      Built-in. Manages location abstraction, shared history
-                      ring, and cross-buffer jumping.
+                      GNU ELPA package authored by the creator of
+                      <code>eglot</code>. Reads the <code>imenu</code> tree and
+                      <code>project.el</code> path to render concise, cached
+                      navigation crumbs.
                     </div>
                   </div>
                 </div>
@@ -560,17 +565,16 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <circle cx="11" cy="11" r="8" />
-                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <path d="M9 9h6v6H9z" />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">consult-xref</div>
-                    <div class="stack-role">Preview Engine</div>
+                    <div class="stack-name">header-line-format</div>
+                    <div class="stack-role">Rendering Surface</div>
                     <div class="stack-desc">
-                      Intercepts <code>xref-show-definitions-function</code> to
-                      render a vertico-powered dropdown with live buffer
-                      previews.
+                      Displays the crumbs at the top of the window, keeping the
+                      mode line free for status and diagnostic info.
                     </div>
                   </div>
                 </div>
@@ -589,45 +593,17 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <path d="M9 9h6v6H9z" />
-                    </svg>
-                  </div>
-                  <div class="stack-ct">
-                    <div class="stack-name">peek</div>
-                    <div class="stack-role">Inline Peek</div>
-                    <div class="stack-desc">
-                      Renders the definition inline below the cursor using
-                      overlays without switching tabs (Alt+F12 parity).
-                    </div>
-                  </div>
-                </div>
-                <div class="stack-card">
-                  <div
-                    class="stack-ic"
-                    style="
-                      background: rgba(224, 175, 104, 0.1);
-                      color: var(--yellow);
-                    "
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      aria-hidden="true"
-                    >
                       <circle cx="12" cy="12" r="10" />
                       <path d="M12 8v4l3 3" />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">xref-mouse-mode</div>
-                    <div class="stack-role">Mouse Integration</div>
+                    <div class="stack-name">Internal caching</div>
+                    <div class="stack-role">Performance Guard</div>
                     <div class="stack-desc">
-                      Emacs 31 NEW. Binds <kbd>C-&lt;mouse-1&gt;</kbd> to
-                      <code>xref-find-definitions-at-mouse</code>, enabling
-                      native Ctrl+Click jumps.
+                      Prevents over-calling
+                      <code>imenu--make-index-alist</code>, avoiding main-thread
+                      blocking when the LSP server is contacted.
                     </div>
                   </div>
                 </div>
@@ -684,51 +660,30 @@
                   </thead>
                   <tbody>
                     <tr>
-                      <td>Jump to definition</td>
-                      <td><code>xref-find-definitions</code></td>
-                      <td><kbd>M-.</kbd> / <kbd>g d</kbd></td>
+                      <td>Toggle global breadcrumbs</td>
+                      <td><code>breadcrumb-mode</code></td>
+                      <td><kbd>SPC t b</kbd></td>
                       <td>
-                        Jumps to target; opens
-                        <code>consult-xref</code> dropdown if ambiguous.
+                        Enables/disables the breadcrumb rendering globally.
                       </td>
                     </tr>
                     <tr>
-                      <td>Jump to definition (mouse)</td>
-                      <td><code>xref-find-definitions-at-mouse</code></td>
-                      <td><kbd>C-&lt;mouse-1&gt;</kbd></td>
+                      <td>Jump to enclosing symbol</td>
+                      <td><code>imenu</code></td>
+                      <td><kbd>M-g M-i</kbd></td>
                       <td>
-                        Emacs 31 NEW — Ctrl+Click parity via
-                        <code>global-xref-mouse-mode</code>.
+                        Native Emacs fallback to jump to any symbol listed in
+                        the breadcrumb trail.
                       </td>
                     </tr>
                     <tr>
-                      <td>Peek definition (inline)</td>
-                      <td><code>peek-xref-definition</code></td>
-                      <td><kbd>SPC c p d</kbd></td>
+                      <td>Fuzzy jump to symbol</td>
+                      <td><code>consult-eglot-symbols</code></td>
+                      <td><kbd>SPC c s</kbd></td>
                       <td>
-                        Shows target in an inline overlay panel (requires
-                        <code>peek</code> package).
+                        Provides a searchable, live-preview dropdown of the same
+                        document symbols.
                       </td>
-                    </tr>
-                    <tr>
-                      <td>Go back (history)</td>
-                      <td><code>xref-go-back</code></td>
-                      <td><kbd>M-,</kbd> / <kbd>g ,</kbd></td>
-                      <td>
-                        Returns to the exact cursor position before the jump.
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Go forward (history)</td>
-                      <td><code>xref-go-forward</code></td>
-                      <td>—</td>
-                      <td>Reverses <code>xref-go-back</code>.</td>
-                    </tr>
-                    <tr>
-                      <td>Find definitions (other window)</td>
-                      <td><code>xref-find-definitions-other-window</code></td>
-                      <td><kbd>C-x 4 .</kbd></td>
-                      <td>Opens definition in a horizontal split.</td>
                     </tr>
                   </tbody>
                 </table>
@@ -777,7 +732,7 @@
                     <div class="dots" aria-hidden="true">
                       <span></span><span></span><span></span>
                     </div>
-                    <span class="fname">init-xref.el</span>
+                    <span class="fname">init-breadcrumbs.el</span>
                   </div>
                   <button
                     class="copy"
@@ -800,43 +755,38 @@
                   </button>
                 </div>
                 <pre><code class="language-lisp">;; ==========================================
-;; 1. XREF &amp; CONSULT INTEGRATION (Preview Engine)
+;; BREADCRUMB (Header-line Navigation)
 ;; ==========================================
-(use-package xref
-  :ensure nil
+(use-package breadcrumb
+  :ensure t
+  :hook (prog-mode . breadcrumb-mode)
   :custom
-  ;; Emacs 31 NEW: Enable Ctrl+Click jump-to-definition globally.
-  ;; Binds `C-&lt;down-mouse-1&gt;` to `xref-find-definitions-at-mouse`.
+  ;; Maximum length of the imenu (symbol) breadcrumb before truncation.
+  (breadcrumb-imenu-max-length 80)
+  ;; Maximum length of the project (file path) breadcrumb.
+  (breadcrumb-project-max-length 60)
+  ;; Separator between crumb segments (mimicking VS Code's " › ").
+  (breadcrumb-imenu-crumb-separator " › ")
+  (breadcrumb-project-crumb-separator " / ")
+  ;; Idle delay before recomputing the imenu tree (prevents LSP spam).
+  (breadcrumb-idle-delay 0.3)
   :config
-  (global-xref-mouse-mode 1)
-  ;; Route xref location prompts through Consult for live previews.
-  (setq xref-show-xrefs-function #'consult-xref
-        xref-show-definitions-function #'consult-xref))
+  ;; Route the breadcrumbs to the header-line instead of the mode-line.
+  ;; This keeps the bottom mode line clean for doom-modeline diagnostics.
+  (setq header-line-format
+        '(:eval (when (and (bound-and-true-p breadcrumb-mode)
+                           (project-current))
+                  ;; Combine project path and imenu symbol path
+                  (list (breadcrumb-project-crumbs)
+                        "  "
+                        (breadcrumb-imenu-crumbs))))))
 
 ;; ==========================================
-;; 2. PEEK PACKAGE (Inline Definition Panel)
+;; GENERAL.EL KEYBINDINGS (registered eagerly)
 ;; ==========================================
-(use-package peek
-  :ensure (peek :host sourcehut :repo "~meow_king/peek")
-  :commands (peek-xref-definition peek-overlay-dwim)
-  :custom
-  (peek-mode-enable-eldoc t)        ;; show eldoc inside peek panel
-  (peek-definition-function #'xref-find-definitions)
-  :config
-  (global-peek-mode 1))
-
-;; ==========================================
-;; 3. GENERAL.EL KEYBINDINGS (registered eagerly)
-;; ==========================================
-(general-define-key
-  :states 'motion
-  "g d" #'xref-find-definitions
-  "g ," #'xref-go-back)
-
 (ar/global-leader
-  "c" '(:ignore t :wk "code")
-  "c p" '(:ignore t :wk "peek")
-  "c p d" '(peek-xref-definition :wk "Peek definition"))</code></pre>
+  "t" '(:ignore t :wk "toggle")
+  "t b" '(breadcrumb-mode :wk "Toggle breadcrumbs"))</code></pre>
               </div>
             </div>
           </div>
@@ -880,108 +830,143 @@
               <div class="sec-title">Why This Approach?</div>
               <div class="grid-2" style="margin-bottom: 24px">
                 <div class="vs-card ok">
-                  <h4>✓ xref + consult-xref · Chosen</h4>
+                  <h4>✓ breadcrumb + eglot (chosen)</h4>
                   <div class="vs-list">
                     <div class="vs-row">
-                      <span class="lab">Coupling</span>
+                      <span class="lab">LSP client coupling</span>
                       <span class="val"
-                        >Works with <i>any</i> xref backend (eglot, dumb-jump,
-                        etags).</span
+                        >Works seamlessly with built-in
+                        <code>eglot</code>.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Protocol</span>
+                      <span class="lab">Protocol compliance</span>
                       <span class="val"
                         >Honors the <code>eglot</code>-only stack mandate.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Preview</span>
+                      <span class="lab">Author synergy</span>
                       <span class="val"
-                        ><code>consult-xref</code> leverages
-                        <code>vertico</code> for fuzzy filtering and live
-                        previews.</span
+                        >Maintained by the <code>eglot</code> author, ensuring
+                        perfect API alignment.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Mouse</span>
+                      <span class="lab">Performance</span>
                       <span class="val"
-                        >Native Emacs 31 <code>xref-mouse-mode</code> (zero
-                        dependencies).</span
+                        >Aggressive caching prevents redundant
+                        <code>documentSymbol</code> network requests.</span
                       >
                     </div>
                   </div>
                 </div>
                 <div class="vs-card no">
-                  <h4>✕ lsp-ui-peek / lsp-mode · Rejected</h4>
+                  <h4>✕ lsp-mode headerline (rejected)</h4>
                   <div class="vs-list">
                     <div class="vs-row">
-                      <span class="lab">Coupling</span>
+                      <span class="lab">LSP client coupling</span>
                       <span class="val"
                         >Hard-bound to the
                         <code>lsp-mode</code> ecosystem.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Protocol</span>
+                      <span class="lab">Protocol compliance</span>
                       <span class="val"
                         >Requires the forbidden
                         <code>lsp-mode</code> ecosystem.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Preview</span>
+                      <span class="lab">Author synergy</span>
                       <span class="val"
-                        >Custom child-frame pipeline with heavy rendering
-                        overhead.</span
+                        >Maintained separately, often lagging behind core LSP
+                        spec changes.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Mouse</span>
+                      <span class="lab">Performance</span>
                       <span class="val"
-                        >Requires custom mouse-click advice.</span
+                        >Known to trigger heavy, synchronous LSP queries on
+                        every cursor move.</span
                       >
                     </div>
                   </div>
                 </div>
               </div>
               <div class="sec-title">Emacs 31 Specific Enhancements</div>
-              <div class="grid-2">
+              <div class="grid-2" style="margin-bottom: 24px">
                 <div class="enh-card g">
-                  <div class="enh-title">xref-mouse-mode (NEW)</div>
+                  <div class="enh-title">Eglot Imenu Enrichment</div>
                   <p class="enh-desc">
-                    Emacs 31 introduces native mouse-driven code navigation.
-                    Enabling <code>global-xref-mouse-mode</code> binds
-                    <kbd>C-&lt;down-mouse-1&gt;</kbd> to xref jumps, perfectly
-                    mirroring VS Code's Ctrl+Click convention.
+                    As of <code>eglot</code> 1.14+, managed buffers receive
+                    extra region info added to the <code>imenu</code> index,
+                    allowing <code>breadcrumb</code> to show "richer", deeply
+                    nested paths (e.g., <code>Namespace › Class › Method</code>)
+                    rather than flat lists.
                   </p>
                 </div>
                 <div class="enh-card p">
-                  <div class="enh-title">Editable Xref Buffers</div>
+                  <div class="enh-title">Treesit Integration</div>
                   <p class="enh-desc">
-                    Emacs 31's <code>xref-change-to-xref-edit-mode</code> (bound
-                    to <kbd>e</kbd> in <code>*xref*</code> buffers) turns
-                    reference lists into writable surfaces for bulk mutation.
+                    In Emacs 31, <code>eglot</code>'s imenu population works
+                    seamlessly alongside native <code>treesit</code> modes. This
+                    ensures that the breadcrumb trail accurately reflects the
+                    AST structure even if the LSP server temporarily lags or
+                    disconnects.
                   </p>
                 </div>
                 <div class="enh-card y">
-                  <div class="enh-title">consult-xref synergy</div>
+                  <div class="enh-title">Zero Network Redundancy</div>
                   <p class="enh-desc">
-                    Ambiguous definitions (e.g., C++ overloaded functions,
-                    TypeScript union types) are presented in a highly
-                    performant, searchable Vertico dropdown with instant buffer
-                    previews.
+                    <code>breadcrumb</code>'s internal caching strategy
+                    (<code>bc--ipath-plain-cache</code>) ensures that moving the
+                    cursor around does not spam the LSP server with
+                    <code>textDocument/documentSymbol</code> requests,
+                    preserving the 60fps typing experience.
                   </p>
                 </div>
-                <div class="enh-card g">
-                  <div class="enh-title">peek package integration</div>
-                  <p class="enh-desc">
-                    The <code>peek</code> package hooks directly into the
-                    <code>xref</code> framework via
-                    <code>peek-definition-function</code>, allowing it to
-                    intercept payloads and render them as inline overlays.
-                  </p>
-                </div>
+              </div>
+              <div class="sec-title">Troubleshooting</div>
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>Issue</th>
+                      <th>Cause &amp; Solution</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Breadcrumbs Not Appearing</td>
+                      <td>
+                        Verify Project Context: <code>breadcrumb-mode</code>
+                        conservatively activates only in buffers where
+                        <code>project-current</code> returns a valid project
+                        root. Ensure your project has a
+                        <code>.git</code> directory or a
+                        <code>pyproject.toml</code>/<code>package.json</code>
+                        at the root. Check Eglot Connection: Ensure
+                        <code>eglot</code> is actively connected. Run
+                        <kbd>M-x eglot-describe-connection</kbd> to verify the
+                        server is running and providing
+                        <code>documentSymbol</code> capabilities.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Breadcrumbs Feel Laggy</td>
+                      <td>
+                        If the breadcrumb updates cause noticeable stutter,
+                        increase the <code>breadcrumb-idle-delay</code> from
+                        <code>0.3</code> to <code>0.5</code> or
+                        <code>1.0</code>. This gives the LSP server more time to
+                        respond to <code>imenu</code> requests without blocking
+                        the main thread during rapid cursor movement.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

@@ -1,0 +1,2003 @@
+Filename: multi-cursor-editing.html
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Emacs IDE — Multi-Cursor Editing</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.18/index.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="shared-styles.css" />
+  </head>
+  <body>
+    <div class="overlay" id="overlay" aria-hidden="true"></div>
+    <div class="focus-hint" id="focusHint" aria-live="polite">
+      <kbd>ESC</kbd> <span>Exit Focus Mode</span>
+    </div>
+    <aside class="sidebar" id="sb" aria-label="Main Navigation">
+      <div class="sidebar-head">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
+        <span class="brand">Emacs IDE</span>
+      </div>
+      <nav class="sidebar-nav" aria-label="Sidebar Menu">
+        <button class="nav" data-tip="IntelliSense">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24A2.5 2.5 0 0 1 9.5 2z"
+            />
+            <path
+              d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24A2.5 2.5 0 0 0 14.5 2z"
+            />
+          </svg>
+          <span class="nav-label">IntelliSense</span>
+        </button>
+        <button class="nav" data-tip="Hover Info">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4M12 8h.01" />
+          </svg>
+          <span class="nav-label">Hover Info</span>
+        </button>
+        <button class="nav" data-tip="Signature Help">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+            />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+          <span class="nav-label">Signature Help</span>
+        </button>
+        <button class="nav" data-tip="Definition">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <span class="nav-label">Definition</span>
+        </button>
+        <button class="nav active" data-tip="Code Actions" aria-current="page">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"
+            />
+          </svg>
+          <span class="nav-label">Code Actions</span>
+        </button>
+      </nav>
+      <div class="sidebar-foot">
+        <button
+          class="nav"
+          id="sbToggle"
+          data-tip="Toggle Sidebar"
+          aria-label="Toggle Sidebar"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <line x1="9" y1="3" x2="9" y2="21" />
+          </svg>
+          <span class="nav-label">Collapse Menu</span>
+        </button>
+      </div>
+    </aside>
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger" id="mobileMenuBtn" aria-label="Open Menu">
+          <svg
+            viewBox="0 0 24 24"
+            width="24"
+            height="24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <div class="crumbs" aria-label="Breadcrumb">
+          <span>Docs</span><span class="s" aria-hidden="true">/</span>
+          <span>Precision Editing</span
+          ><span class="s" aria-hidden="true">/</span>
+          <span class="cur" aria-current="page">Multi-Cursor Editing</span>
+        </div>
+      </div>
+      <button
+        class="icon-btn"
+        id="focusBtn"
+        title="Toggle Focus Mode (ESC)"
+        aria-label="Toggle Focus Mode"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+        </svg>
+      </button>
+    </header>
+    <main class="main" id="main-content">
+      <header class="page-head">
+        <div class="title-row">
+          <h1>Multi-Cursor Editing</h1>
+          <span class="status" role="status">Working</span>
+        </div>
+        <div class="category">Precision Editing</div>
+        <div class="parity">
+          <b>VS Code Parity</b>
+          <span
+            >Alt+Click (arbitrary), Ctrl+D (next occurrence), Ctrl+Shift+L (all
+            occurrences), Alt+Shift+Down (column selection)</span
+          >
+        </div>
+        <div class="meta-bar">
+          <div class="meta-item">
+            <span class="k">LSP</span>
+            <span style="color: var(--text-dim); font-size: 12px"
+              >N/A (Local buffer manipulation)</span
+            >
+          </div>
+          <div class="meta-item">
+            <span class="k">Routing</span>
+            <code
+              >iedit<span class="route-arrow">→</span>evil-multiedit<span
+                class="route-arrow"
+                >→</span
+              >evil-mc</code
+            >
+          </div>
+        </div>
+      </header>
+      <article class="acc">
+        <button
+          class="acc-head open"
+          aria-expanded="true"
+          aria-controls="sect-overview"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+            </svg>
+            Feature Overview
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body open" id="sect-overview" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="sec-title">Behavioral Parity Matrix</div>
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>VS Code Behavior</th>
+                      <th>Emacs 31 Equivalent</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><kbd>Alt+Click</kbd> to place cursors anywhere</td>
+                      <td>
+                        <kbd>C-S-&lt;mouse-1&gt;</kbd>
+                        (<code>evil-mc-make-cursor-here</code>).
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><kbd>Ctrl+D</kbd> to select next occurrence</td>
+                      <td>
+                        <kbd>M-d</kbd>
+                        (<code>evil-multiedit-match-symbol-and-next</code>).
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><kbd>Ctrl+Shift+L</kbd> to select all occurrences</td>
+                      <td>
+                        <kbd>M-D</kbd> (<code>evil-multiedit-match-all</code>).
+                      </td>
+                    </tr>
+                    <tr>
+                      <td><kbd>Alt+Shift+Down</kbd> for column selection</td>
+                      <td>
+                        <kbd>C-S-&lt;down&gt;</kbd> in visual state
+                        (<code>evil-mc-make-cursor-in-next-line</code>).
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Type/delete simultaneously at all cursors</td>
+                      <td>
+                        Native behavior of both <code>iedit</code> and
+                        <code>evil-mc</code>.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        Execute <code>ciw</code> or <code>daw</code> at all
+                        cursors
+                      </td>
+                      <td>
+                        Natively supported by <code>evil-mc</code>'s fake cursor
+                        engine.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <kbd>Esc</kbd> or <kbd>C-g</kbd> to exit multi-cursor
+                      </td>
+                      <td>
+                        <kbd>C-g</kbd> cleanly invokes
+                        <code>evil-mc-undo-all-cursors</code> or
+                        <code>evil-normal-state</code>.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-ecosystem"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path
+                d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+              />
+            </svg>
+            Ecosystem Integration
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-ecosystem" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="grid-2">
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div class="eco-ic">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path d="M12 2v20M2 12h20" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">evil</div>
+                      <div class="eco-sub">Modal Engine</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    <code>evil-mc</code> hooks directly into Evil's command
+                    loop, ensuring that macros (<kbd>@</kbd>), registers, and
+                    operators function identically to single-cursor editing.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(187, 154, 247, 0.1);
+                        color: var(--purple);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <path
+                          d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">general.el</div>
+                      <div class="eco-sub">Keybindings</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    The <kbd>C-S-&lt;down&gt;</kbd> and
+                    <kbd>C-S-&lt;up&gt;</kbd> bindings are strictly confined to
+                    <code>visual</code> state, preventing accidental activation
+                    during normal typing.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(125, 207, 255, 0.1);
+                        color: var(--cyan);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M12 1v6m0 6v6" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">eglot</div>
+                      <div class="eco-sub">LSP Coexistence</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    For project-wide symbol renaming, this multi-cursor setup is
+                    intentionally bypassed in favor of
+                    <code>eglot-rename</code> (<kbd>SPC c r</kbd>), which safely
+                    updates cross-file references.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(158, 206, 106, 0.1);
+                        color: var(--green);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">undo-fu</div>
+                      <div class="eco-sub">History Management</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    Multi-cursor edits are treated as a single atomic operation,
+                    allowing an entire multi-line insertion to be undone with a
+                    single <kbd>u</kbd> press.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-stack"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+              />
+            </svg>
+            Implementation Stack
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-stack" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="grid-2">
+                <div class="stack-card">
+                  <div class="stack-ic">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                      />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">iedit</div>
+                    <div class="stack-role">Foundation Engine</div>
+                    <div class="stack-desc">
+                      GNU ELPA. Provides the core mechanism for highlighting and
+                      synchronizing mutations across multiple instances of a
+                      symbol or region.
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="
+                      background: rgba(187, 154, 247, 0.1);
+                      color: var(--purple);
+                    "
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M8 12h8M12 8v8" />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">evil-multiedit</div>
+                    <div class="stack-role">Symbol-Based Editing</div>
+                    <div class="stack-desc">
+                      Wraps <code>iedit</code> in a dedicated Evil state,
+                      mapping explicit Vim-mnemonics for rapid cursor
+                      accumulation and bulk mutation.
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="
+                      background: rgba(125, 207, 255, 0.1);
+                      color: var(--cyan);
+                    "
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="4" />
+                      <path
+                        d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41"
+                      />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">evil-mc</div>
+                    <div class="stack-role">Arbitrary Placement</div>
+                    <div class="stack-desc">
+                      Creates true, Evil-native fake cursors that flawlessly
+                      execute standard Evil motions and operators across all
+                      points simultaneously.
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="
+                      background: rgba(158, 206, 106, 0.1);
+                      color: var(--green);
+                    "
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path d="M4 6h16M4 12h16M4 18h10" />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">Evil integration hooks</div>
+                    <div class="stack-role">State Management</div>
+                    <div class="stack-desc">
+                      Ensures clean exit to <code>evil-normal-state</code> upon
+                      aborting multi-cursor operations, preventing modal
+                      corruption.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-commands"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path
+                d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+              />
+            </svg>
+            Commands &amp; Keybindings
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-commands" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>Action</th>
+                      <th>Command</th>
+                      <th>Keybinding</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Add cursor on click</td>
+                      <td><code>evil-mc-make-cursor-here</code></td>
+                      <td><kbd>C-S-&lt;mouse-1&gt;</kbd></td>
+                      <td>
+                        VS Code parity: click anywhere to place an arbitrary
+                        cursor.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Edit lines in rectangle</td>
+                      <td><code>evil-mc-make-cursor-in-next-line</code></td>
+                      <td><kbd>C-S-&lt;down&gt;</kbd> (visual)</td>
+                      <td>
+                        Adds a cursor to each line in the active visual
+                        rectangle.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Mark next occurrence</td>
+                      <td><code>evil-multiedit-match-symbol-and-next</code></td>
+                      <td><kbd>M-d</kbd></td>
+                      <td>
+                        Evil-native: adds the next occurrence of the current
+                        symbol.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Mark all occurrences</td>
+                      <td><code>evil-multiedit-match-all</code></td>
+                      <td><kbd>M-D</kbd></td>
+                      <td>Evil-native: adds all occurrences in the buffer.</td>
+                    </tr>
+                    <tr>
+                      <td>Exit multi-cursor mode</td>
+                      <td><code>evil-mc-undo-all-cursors</code></td>
+                      <td><kbd>C-g</kbd> or <kbd>RET</kbd></td>
+                      <td>Exits multi-cursor mode, leaving a single cursor.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-config"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
+            </svg>
+            Configuration
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-config" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="code-win">
+                <div class="code-head">
+                  <div style="display: flex; align-items: center">
+                    <div class="dots" aria-hidden="true">
+                      <span></span><span></span><span></span>
+                    </div>
+                    <span class="fname">init-multi-cursor.el</span>
+                  </div>
+                  <button
+                    class="copy"
+                    aria-label="Copy code snippet"
+                    onclick="copyCode(this)"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <rect x="9" y="9" width="13" height="13" rx="2" />
+                      <path
+                        d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                      />
+                    </svg>
+                    Copy
+                  </button>
+                </div>
+                <pre><code class="language-lisp">;; ==========================================
+ ;; 1. IEDIT (Foundation Engine)
+ ;; ==========================================
+ (use-package iedit
+   :defer t
+   :commands (iedit-mode iedit-rectangle-mode)
+   :custom
+   ;; Prevent iedit from accidentally matching substrings of larger words.
+   (iedit-match-subword t))
+ ;; ==========================================
+ ;; 2. EVIL MULTIEDIT (Symbol-Based Editing)
+ ;; ==========================================
+ (use-package evil-multiedit
+   :defer t
+   :after (evil iedit)
+   :commands (evil-multiedit-match-symbol-and-next
+              evil-multiedit-match-all
+              evil-multiedit-toggle-or-restrict-region)
+   :custom-face
+   ;; Tokyo Night synergy: Distinct background for active multi-cursor regions.
+   (evil-multiedit-match-face ((t (:background "#bb9af7" :foreground "#1a1b26" :weight bold))))
+   :config
+   ;; Register default Evil keybindings (e.g., M-d for next, M-D for all).
+   (evil-multiedit-default-keybinds)
+   ;; Ensure clean exit to normal state when multi-edit is aborted.
+   (add-hook 'evil-multiedit-exit-hook #'evil-normal-state))
+ ;; ==========================================
+ ;; 3. EVIL MC (Arbitrary &amp; Rectangular Placement)
+ ;; ==========================================
+ (use-package evil-mc
+   :defer t
+   :after evil
+   :commands (evil-mc-make-and-goto-next-match
+              evil-mc-make-and-goto-prev-match
+              evil-mc-make-all-cursors
+              evil-mc-undo-all-cursors)
+   :custom
+   ;; Disable the default cursor blink to prevent visual distraction.
+   (evil-mc-cursor-default-state 'bar)
+   :config
+   (global-evil-mc-mode 1)
+   ;; VS Code Parity: Allow Ctrl+Shift+Click to place arbitrary cursors.
+   (global-set-key (kbd "C-S-&lt;mouse-1&gt;") #'evil-mc-make-cursor-here)
+   ;; Rectangular multi-cursor (VS Code Alt+Shift+Down parity).
+   (general-define-key
+    :states 'visual
+    "C-S-&lt;down&gt;" #'evil-mc-make-cursor-in-next-line
+    "C-S-&lt;up&gt;" #'evil-mc-make-cursor-in-prev-line)
+   ;; Safe exit: C-g terminates multi-cursors and returns to a single cursor.
+   (define-key evil-mc-key-map (kbd "C-g") #'evil-mc-undo-all-cursors))</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-arch"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"
+              />
+            </svg>
+            Architecture &amp; Enhancements
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-arch" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="sec-title">Why This Approach?</div>
+              <div class="grid-2" style="margin-bottom: 24px">
+                <div class="vs-card ok">
+                  <h4>✓ evil-mc + evil-multiedit · Chosen</h4>
+                  <div class="vs-list">
+                    <div class="vs-row">
+                      <span class="lab">Evil Operator Support</span>
+                      <span class="val"
+                        >Flawless. Commands like <code>daw</code>,
+                        <code>ciw</code> execute perfectly across all
+                        cursors.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Separation of Concerns</span>
+                      <span class="val"
+                        ><code>evil-multiedit</code> handles symbol matching;
+                        <code>evil-mc</code> handles arbitrary placement.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Undo History</span>
+                      <span class="val"
+                        ><code>evil-mc</code> groups multi-cursor edits into a
+                        single, clean undo step natively.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Protocol Compliance</span>
+                      <span class="val"
+                        >Honors the <code>eglot</code>-only stack mandate for
+                        project-wide operations.</span
+                      >
+                    </div>
+                  </div>
+                </div>
+                <div class="vs-card no">
+                  <h4>✕ multiple-cursors · Rejected</h4>
+                  <div class="vs-list">
+                    <div class="vs-row">
+                      <span class="lab">Evil Operator Support</span>
+                      <span class="val"
+                        >Fragile. Requires complex advice to trick it into
+                        respecting Evil's modal grammar.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Separation of Concerns</span>
+                      <span class="val"
+                        >Attempts to do both but fails at symbol matching and
+                        struggles with Evil integration.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Undo History</span>
+                      <span class="val"
+                        >Frequently fragments the undo tree, making
+                        <kbd>u</kbd> behave erratically.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Protocol Compliance</span>
+                      <span class="val">N/A</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="sec-title">Emacs 31 Specific Enhancements</div>
+              <div class="grid-2" style="margin-bottom: 24px">
+                <div class="enh-card g">
+                  <div class="enh-title">Native Rectangle Synergy</div>
+                  <p class="desc">
+                    <code>evil-mc</code> integrates flawlessly with Emacs 31's
+                    refined rectangle mark (<kbd>C-x SPC</kbd>), allowing a
+                    drawn rectangle to be instantly converted to multiple
+                    cursors via visual state bindings.
+                  </p>
+                </div>
+                <div class="enh-card p">
+                  <div class="enh-title">Evil State Guards</div>
+                  <p class="desc">
+                    The <code>evil-multiedit-exit-hook</code> and
+                    <code>evil-mc-key-map</code> explicitly restore
+                    <code>evil-normal-state</code>, preventing the "stuck in
+                    insert state" bug that plagued older vanilla Emacs
+                    configurations.
+                  </p>
+                </div>
+                <div class="enh-card y">
+                  <div class="enh-title">Subword Matching</div>
+                  <p class="desc">
+                    <code>iedit-match-subword</code> is enabled by default,
+                    ensuring that editing <code>myVariable</code> does not
+                    accidentally match <code>myVariableName</code> unless
+                    intended, providing surgical precision.
+                  </p>
+                </div>
+              </div>
+              <div class="sec-title">Troubleshooting</div>
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>Issue</th>
+                      <th>Cause &amp; Solution</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Cursors Disappear or Behave Erratically</td>
+                      <td>
+                        Ensure <code>iedit</code> and <code>evil-mc</code> are
+                        not activated simultaneously in the same buffer. Use
+                        <code>evil-multiedit</code> for symbol-based tasks and
+                        <code>evil-mc</code> for arbitrary/rectangular tasks. If
+                        corrupted, press <kbd>C-g</kbd> twice to forcefully
+                        reset the buffer state.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Mouse Click Adds Cursor but Doesn't Type</td>
+                      <td>
+                        Verify that <code>global-evil-mc-mode</code> is active.
+                        The <code>global-set-key</code> for
+                        <kbd>C-S-&lt;mouse-1&gt;</kbd> relies on the minor mode
+                        being globally enabled to intercept and process the fake
+                        cursor creation.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Evil State Conflicts on Exit</td>
+                      <td>
+                        If stuck in <code>insert-state</code> after pressing
+                        <kbd>C-g</kbd>, the exit hooks may not have fired. This
+                        is resolved by the explicit
+                        <code
+                          >(add-hook 'evil-multiedit-exit-hook
+                          #'evil-normal-state)</code
+                        >
+                        and
+                        <code
+                          >(define-key evil-mc-key-map (kbd "C-g")
+                          #'evil-mc-undo-all-cursors)</code
+                        >
+                        guards in the configuration.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </main>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lisp.min.js"></script>
+    <script src="shared-scripts.js"></script>
+  </body>
+</html>
+```
+
+Filename: quick-fix-lightbulb.html
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Emacs IDE — Quick Fix Lightbulb</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.18/index.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="shared-styles.css" />
+  </head>
+  <body>
+    <div class="overlay" id="overlay" aria-hidden="true"></div>
+    <div class="focus-hint" id="focusHint" aria-live="polite">
+      <kbd>ESC</kbd> <span>Exit Focus Mode</span>
+    </div>
+    <aside class="sidebar" id="sb" aria-label="Main Navigation">
+      <div class="sidebar-head">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
+        <span class="brand">Emacs IDE</span>
+      </div>
+      <nav class="sidebar-nav" aria-label="Sidebar Menu">
+        <button class="nav" data-tip="IntelliSense">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24A2.5 2.5 0 0 1 9.5 2z"
+            />
+            <path
+              d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24A2.5 2.5 0 0 0 14.5 2z"
+            />
+          </svg>
+          <span class="nav-label">IntelliSense</span>
+        </button>
+        <button class="nav" data-tip="Hover Info">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4M12 8h.01" />
+          </svg>
+          <span class="nav-label">Hover Info</span>
+        </button>
+        <button class="nav" data-tip="Signature Help">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+            />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+          <span class="nav-label">Signature Help</span>
+        </button>
+        <button class="nav" data-tip="Definition">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <span class="nav-label">Definition</span>
+        </button>
+        <button class="nav active" data-tip="Code Actions" aria-current="page">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"
+            />
+          </svg>
+          <span class="nav-label">Code Actions</span>
+        </button>
+      </nav>
+      <div class="sidebar-foot">
+        <button
+          class="nav"
+          id="sbToggle"
+          data-tip="Toggle Sidebar"
+          aria-label="Toggle Sidebar"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <line x1="9" y1="3" x2="9" y2="21" />
+          </svg>
+          <span class="nav-label">Collapse Menu</span>
+        </button>
+      </div>
+    </aside>
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger" id="mobileMenuBtn" aria-label="Open Menu">
+          <svg
+            viewBox="0 0 24 24"
+            width="24"
+            height="24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <div class="crumbs" aria-label="Breadcrumb">
+          <span>Docs</span><span class="s" aria-hidden="true">/</span>
+          <span>Code Actions &amp; Refactoring</span
+          ><span class="s" aria-hidden="true">/</span>
+          <span class="cur" aria-current="page">Quick Fix Lightbulb</span>
+        </div>
+      </div>
+      <button
+        class="icon-btn"
+        id="focusBtn"
+        title="Toggle Focus Mode (ESC)"
+        aria-label="Toggle Focus Mode"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+        </svg>
+      </button>
+    </header>
+    <main class="main" id="main-content">
+      <header class="page-head">
+        <div class="title-row">
+          <h1>Quick Fix Lightbulb</h1>
+          <span class="status" role="status">Working</span>
+        </div>
+        <div class="category">Code Actions &amp; Refactoring</div>
+        <div class="parity">
+          <b>VS Code Parity</b>
+          <span
+            >Gutter lightbulb icon indicating available code actions or quick
+            fixes</span
+          >
+        </div>
+        <div class="meta-bar">
+          <div class="meta-item">
+            <span class="k">LSP</span>
+            <code>textDocument/codeAction</code>
+          </div>
+          <div class="meta-item">
+            <span class="k">Routing</span>
+            <code
+              >eglot<span class="route-arrow">→</span
+              >eglot-code-action-indications<span class="route-arrow">→</span
+              >margin/eldoc-hint rendering</code
+            >
+          </div>
+        </div>
+      </header>
+      <article class="acc">
+        <button
+          class="acc-head open"
+          aria-expanded="true"
+          aria-controls="sect-overview"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+            </svg>
+            Feature Overview
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body open" id="sect-overview" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="sec-title">Behavioral Parity Matrix</div>
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>VS Code Behavior</th>
+                      <th>Emacs 31 Equivalent</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Lightbulb icon appears in gutter</td>
+                      <td>
+                        <code>eglot-code-action-indications</code> set to
+                        <code>margin</code> renders the indicator in the left
+                        fringe.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Indicator disappears when no actions exist</td>
+                      <td>
+                        <code>eglot</code> automatically clears the margin
+                        indicator when <code>textDocument/codeAction</code>
+                        returns empty.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Click indicator to open actions</td>
+                      <td>
+                        Emacs 31 <code>eglot-code-actions-at-mouse</code> allows
+                        invoking the menu by clicking the diagnostic or
+                        indicator.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Fallback hint in status area</td>
+                      <td>
+                        <code>eldoc-hint</code> in
+                        <code>eglot-code-action-indications</code> surfaces a
+                        subtle hint in the echo area.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>No lag or stutter while typing</td>
+                      <td>
+                        Idle delay and debouncing prevent the LSP server from
+                        being spammed on every keystroke.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-ecosystem"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path
+                d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+              />
+            </svg>
+            Ecosystem Integration
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-ecosystem" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="grid-2">
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div class="eco-ic">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M12 1v6m0 6v6" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">eglot</div>
+                      <div class="eco-sub">LSP Client</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    Natively queries <code>textDocument/codeAction</code> and
+                    handles the <code>codeAction/resolve</code> lifecycle,
+                    applying the resulting <code>WorkspaceEdit</code> safely.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(187, 154, 247, 0.1);
+                        color: var(--purple);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">vertico / consult</div>
+                      <div class="eco-sub">UI Engine</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    Intercepts the <code>completing-read</code> prompt to
+                    provide a vertically scrolling, fuzzy-filterable list with
+                    live buffer previews, making it easy to distinguish between
+                    similar refactoring options.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(125, 207, 255, 0.1);
+                        color: var(--cyan);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">apheleia</div>
+                      <div class="eco-sub">Formatting Synergy</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    Often used in tandem; while <code>eglot</code> handles
+                    semantic refactoring (e.g., "Extract Method"),
+                    <code>apheleia</code> ensures the resulting code is
+                    instantly formatted on save without blocking the editor.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(158, 206, 106, 0.1);
+                        color: var(--green);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <path
+                          d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">general.el</div>
+                      <div class="eco-sub">Keybindings</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    Eagerly registers the <kbd>SPC c a</kbd> leader binding,
+                    ensuring the command is instantly available without waiting
+                    for package lazy-loading.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-stack"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+              />
+            </svg>
+            Implementation Stack
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-stack" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="grid-2">
+                <div class="stack-card">
+                  <div class="stack-ic">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M12 1v6m0 6v6" />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">eglot</div>
+                    <div class="stack-role">LSP Client</div>
+                    <div class="stack-desc">
+                      Built-in. Queries <code>textDocument/codeAction</code> on
+                      cursor idle and evaluates available actions.
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="
+                      background: rgba(187, 154, 247, 0.1);
+                      color: var(--purple);
+                    "
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="4" />
+                      <path
+                        d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41"
+                      />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">eglot-code-action-indications</div>
+                    <div class="stack-role">Indicator Engine</div>
+                    <div class="stack-desc">
+                      Natively renders visual cues in the left margin or via
+                      ElDoc hints when actions are present.
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="
+                      background: rgba(125, 207, 255, 0.1);
+                      color: var(--cyan);
+                    "
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"
+                      />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">eglot-code-action-indicator</div>
+                    <div class="stack-role">Visual Glyph</div>
+                    <div class="stack-desc">
+                      Customizable string or glyph (e.g., "💡" or "⚡") used as
+                      the visual marker.
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="
+                      background: rgba(158, 206, 106, 0.1);
+                      color: var(--green);
+                    "
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 8v4l3 3" />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">Idle delay integration</div>
+                    <div class="stack-role">Performance Guard</div>
+                    <div class="stack-desc">
+                      Debounces the code action query to prevent main-thread
+                      blocking during rapid cursor movement.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-commands"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path
+                d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+              />
+            </svg>
+            Commands &amp; Keybindings
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-commands" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>Action</th>
+                      <th>Command</th>
+                      <th>Keybinding</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Invoke code actions</td>
+                      <td><code>eglot-code-actions</code></td>
+                      <td><kbd>SPC c a</kbd> / <kbd>C-.</kbd></td>
+                      <td>
+                        Opens the searchable menu of all available actions at
+                        point.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Toggle margin indicator</td>
+                      <td><code>eglot-code-action-indications</code></td>
+                      <td>—</td>
+                      <td>
+                        Configured via <code>setq</code> to show in
+                        <code>margin</code>, <code>eldoc-hint</code>, or both.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-config"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
+            </svg>
+            Configuration
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-config" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="code-win">
+                <div class="code-head">
+                  <div style="display: flex; align-items: center">
+                    <div class="dots" aria-hidden="true">
+                      <span></span><span></span><span></span>
+                    </div>
+                    <span class="fname">init-quick-fix-lightbulb.el</span>
+                  </div>
+                  <button
+                    class="copy"
+                    aria-label="Copy code snippet"
+                    onclick="copyCode(this)"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <rect x="9" y="9" width="13" height="13" rx="2" />
+                      <path
+                        d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                      />
+                    </svg>
+                    Copy
+                  </button>
+                </div>
+                <pre><code class="language-lisp">;; ==========================================
+ ;; QUICK FIX LIGHTBULB (Built-in Eglot)
+ ;; ==========================================
+ (use-package eglot
+   :ensure nil
+   :custom
+   ;; Emacs 31 NEW: Control where the lightbulb indicator appears.
+   ;; 'margin renders in the left gutter; 'eldoc-hint shows in the echo area.
+   (eglot-code-action-indications '(margin eldoc-hint))
+   ;; The actual glyph used as the indicator.
+   ;; Defaults to a lightbulb emoji, but a simpler Unicode character (e.g., "⚡")
+   ;; prevents rendering glitches in specific terminals or tree-sitter modes.
+   (eglot-code-action-indicator "💡")
+   :config
+   ;; Ensure code actions integrate cleanly with consult/vertico for live preview.
+   (when (boundp 'eglot-extend-to-xref)
+     (setq eglot-extend-to-xref t)))
+ ;; ==========================================
+ ;; GENERAL.EL KEYBINDINGS (registered eagerly)
+ ;; ==========================================
+ (ar/global-leader
+   "c" '(:ignore t :wk "code")
+   "c a" '(eglot-code-actions :wk "Code actions (lightbulb)"))</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-arch"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"
+              />
+            </svg>
+            Architecture &amp; Enhancements
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-arch" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="sec-title">Why This Approach?</div>
+              <div class="grid-2" style="margin-bottom: 24px">
+                <div class="vs-card ok">
+                  <h4>✓ eglot native · Chosen</h4>
+                  <div class="vs-list">
+                    <div class="vs-row">
+                      <span class="lab">LSP client coupling</span>
+                      <span class="val"
+                        >Works exclusively with <code>eglot</code>.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Protocol compliance</span>
+                      <span class="val"
+                        >Honors the <code>eglot</code>-only stack mandate.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">UI Physics</span>
+                      <span class="val"
+                        >Native margin or ElDoc rendering with zero layout
+                        shift.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Performance</span>
+                      <span class="val"
+                        >Zero additional packages; leverages native Emacs
+                        completion and margin APIs.</span
+                      >
+                    </div>
+                  </div>
+                </div>
+                <div class="vs-card no">
+                  <h4>✕ lsp-ui-sideline · Rejected</h4>
+                  <div class="vs-list">
+                    <div class="vs-row">
+                      <span class="lab">LSP client coupling</span>
+                      <span class="val"
+                        >Hard-bound to the
+                        <code>lsp-mode</code> ecosystem.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Protocol compliance</span>
+                      <span class="val"
+                        >Requires the forbidden
+                        <code>lsp-mode</code> ecosystem.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">UI Physics</span>
+                      <span class="val"
+                        >Heavy sideline rendering engine that shifts text and
+                        causes redisplay jitter.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Performance</span>
+                      <span class="val"
+                        >Child-frame overhead and complex sideline
+                        management.</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="sec-title">Emacs 31 Specific Enhancements</div>
+              <div class="grid-2" style="margin-bottom: 24px">
+                <div class="enh-card g">
+                  <div class="enh-title">
+                    eglot-code-action-indications (NEW)
+                  </div>
+                  <p class="desc">
+                    Emacs 31 introduces native visual indication of available
+                    code actions directly within <code>eglot</code>. The
+                    variable accepts a list of valid symbols:
+                    <code>margin</code> (renders in the left margin),
+                    <code>eldoc-hint</code> (renders via ElDoc), or
+                    <code>mode-line</code>.
+                  </p>
+                </div>
+                <div class="enh-card p">
+                  <div class="enh-title">eglot-code-action-indicator (NEW)</div>
+                  <p class="desc">
+                    Customizable string or glyph used as the visual indicator.
+                    While the default is a lightbulb emoji, it can be safely
+                    swapped for a simpler Unicode character (like
+                    <code>⚡</code>) to prevent rendering glitches in specific
+                    tree-sitter modes or TTY environments.
+                  </p>
+                </div>
+                <div class="enh-card y">
+                  <div class="enh-title">
+                    Enhanced completing-read Integration
+                  </div>
+                  <p class="desc">
+                    Emacs 31's refined <code>eglot</code> pipelines ensure that
+                    complex code actions (which require
+                    <code>codeAction/resolve</code>
+                    network calls) are handled asynchronously, preventing
+                    main-thread blocking while the action menu populates.
+                  </p>
+                </div>
+              </div>
+              <div class="sec-title">Troubleshooting</div>
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>Issue</th>
+                      <th>Cause &amp; Solution</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Indicator Causes Terminal Rendering Glitches</td>
+                      <td>
+                        If the default lightbulb emoji causes display corruption
+                        in a TTY or specific terminal emulator, change
+                        <code>eglot-code-action-indicator</code> to a standard
+                        ASCII or simple Unicode character like
+                        <code>"*"</code> or <code>"⚡"</code>.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Indicator Feels Laggy</td>
+                      <td>
+                        If the indicator appears slowly, the language server
+                        might be slow to respond to
+                        <code>textDocument/codeAction</code>. Ensure
+                        <code>eglot</code>'s idle delay is not set too low, or
+                        consider disabling the <code>margin</code> indication
+                        and relying solely on <code>eldoc-hint</code> to reduce
+                        rendering overhead.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Indicator Persists After Actions Are Resolved</td>
+                      <td>
+                        Ensure <code>eglot</code> is actively managing the
+                        buffer. If the indicator gets stuck, manually trigger
+                        <kbd>M-x eglot-code-actions</kbd> to force a state
+                        refresh, or restart the server via
+                        <kbd>M-x eglot-reconnect</kbd>.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </main>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lisp.min.js"></script>
+    <script src="shared-scripts.js"></script>
+  </body>
+</html>
+```

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Emacs IDE — Go to Definition</title>
+    <title>Emacs IDE — Code Actions</title>
     <link
       href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.18/index.min.css"
       rel="stylesheet"
@@ -78,7 +78,7 @@
           </svg>
           <span class="nav-label">Signature Help</span>
         </button>
-        <button class="nav active" data-tip="Definition" aria-current="page">
+        <button class="nav" data-tip="Definition">
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -91,7 +91,7 @@
           </svg>
           <span class="nav-label">Definition</span>
         </button>
-        <button class="nav" data-tip="Code Actions">
+        <button class="nav active" data-tip="Code Actions" aria-current="page">
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -146,9 +146,9 @@
         </button>
         <div class="crumbs" aria-label="Breadcrumb">
           <span>Docs</span><span class="s" aria-hidden="true">/</span>
-          <span>Navigation &amp; Code Jumping</span
+          <span>Code Actions &amp; Refactoring</span
           ><span class="s" aria-hidden="true">/</span>
-          <span class="cur" aria-current="page">Go to Definition</span>
+          <span class="cur" aria-current="page">Code Actions</span>
         </div>
       </div>
       <button
@@ -171,26 +171,31 @@
     <main class="main" id="main-content">
       <header class="page-head">
         <div class="title-row">
-          <h1>Go to Definition</h1>
+          <h1>Code Actions (Quick Fixes &amp; Refactorings)</h1>
           <span class="status" role="status">Working</span>
         </div>
-        <div class="category">Navigation &amp; Code Jumping</div>
+        <div class="category">Code Actions &amp; Refactoring</div>
         <div class="parity">
           <b>VS Code Parity</b>
-          <span>F12 to jump, Ctrl+Click to jump, Alt+F12 to peek inline</span>
+          <span
+            >Ctrl+. lightbulb menu, inline quick fixes, and refactoring
+            options</span
+          >
         </div>
         <div class="meta-bar">
           <div class="meta-item">
             <span class="k">LSP</span>
-            <code>textDocument/definition</code>
+            <code>textDocument/codeAction</code>
+            <span class="meta-sep" aria-hidden="true">·</span>
+            <code>codeAction/resolve</code>
           </div>
           <div class="meta-item">
             <span class="k">Routing</span>
             <code
-              >eglot<span class="route-arrow">→</span>xref<span
+              >eglot<span class="route-arrow">→</span>eglot-code-actions<span
                 class="route-arrow"
                 >→</span
-              >consult-xref OR peek</code
+              >completing-read (Vertico/Consult)</code
             >
           </div>
         </div>
@@ -242,52 +247,54 @@
                   </thead>
                   <tbody>
                     <tr>
-                      <td><kbd>F12</kbd> jumps to definition</td>
+                      <td><kbd>Ctrl+.</kbd> opens quick fix menu</td>
                       <td>
-                        <kbd>M-.</kbd> or <kbd>g d</kbd>
-                        (<code>xref-find-definitions</code>)
+                        <kbd>SPC c a</kbd> (<code>eglot-code-actions</code>)
+                        opens Vertico-powered action menu.
                       </td>
                     </tr>
                     <tr>
-                      <td>Ctrl+Click jumps to definition</td>
+                      <td>Lightbulb icon in gutter</td>
                       <td>
-                        <kbd>C-&lt;mouse-1&gt;</kbd> via Emacs 31
-                        <code>global-xref-mouse-mode</code>
+                        Emacs 31 <code>eglot-code-action-indications</code>
+                        renders 💡 in the left margin.
                       </td>
                     </tr>
                     <tr>
-                      <td>Alt+F12 peeks definition inline</td>
+                      <td>"Organize Imports" shortcut</td>
                       <td>
-                        <kbd>SPC c p d</kbd> (<code>peek-xref-definition</code>)
-                        via <code>peek</code> package
+                        <kbd>SPC c i</kbd>
+                        (<code>eglot-code-action-organize-imports</code>).
                       </td>
                     </tr>
                     <tr>
-                      <td>Dropdown for multiple definitions</td>
+                      <td>Action menu filters by type (Quick Fix, Refactor)</td>
                       <td>
-                        <code>consult-xref</code> intercepts
-                        <code>xref-show-definitions-function</code>
+                        <code>vertico</code> allows instant fuzzy filtering
+                        (e.g., typing <code>fix</code> or
+                        <code>refactor</code>).
                       </td>
                     </tr>
                     <tr>
-                      <td>Live preview in dropdown</td>
+                      <td>Live preview of the proposed change</td>
                       <td>
-                        <code>consult-xref</code> + <code>vertico</code> live
-                        buffer previews
+                        <code>consult</code> integration provides live buffer
+                        preview of the action's effect.
                       </td>
                     </tr>
                     <tr>
-                      <td>Alt+Left returns to origin</td>
+                      <td>Click lightbulb to open actions</td>
                       <td>
-                        <kbd>M-,</kbd> or <kbd>g ,</kbd>
-                        (<code>xref-go-back</code>)
+                        Emacs 31 <code>eglot-code-actions-at-mouse</code> (click
+                        diagnostic with <kbd>mouse-2</kbd>).
                       </td>
                     </tr>
                     <tr>
-                      <td>Open in split window</td>
+                      <td>Workspace-level commands</td>
                       <td>
-                        <kbd>C-x 4 .</kbd>
-                        (<code>xref-find-definitions-other-window</code>)
+                        <kbd>SPC c x</kbd>
+                        (<code>eglot-execute-command</code>) surfaces
+                        server-defined palette entries.
                       </td>
                     </tr>
                   </tbody>
@@ -354,10 +361,9 @@
                     </div>
                   </div>
                   <p class="eco-desc">
-                    Automatically registers <code>eglot-xref-backend</code> in
-                    <code>xref-backend-functions</code> for managed buffers,
-                    routing <kbd>M-.</kbd> to
-                    <code>textDocument/definition</code>.
+                    Natively queries <code>textDocument/codeAction</code> and
+                    handles the <code>codeAction/resolve</code> lifecycle,
+                    applying the resulting <code>WorkspaceEdit</code> safely.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -376,18 +382,19 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <path d="M4 6h16M4 12h16M4 18h10" />
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">consult</div>
-                      <div class="eco-sub">Preview Engine</div>
+                      <div class="eco-name">vertico / consult</div>
+                      <div class="eco-sub">UI Engine</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    <code>consult-xref</code> intercepts the xref display
-                    functions to provide vertico-powered previews for ambiguous
-                    definition targets.
+                    Intercepts the <code>completing-read</code> prompt to
+                    provide a vertically scrolling, fuzzy-filterable list with
+                    live buffer previews.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -407,20 +414,19 @@
                         aria-hidden="true"
                       >
                         <path
-                          d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                          d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
                         />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">treesit</div>
-                      <div class="eco-sub">Fallback Parser</div>
+                      <div class="eco-name">apheleia</div>
+                      <div class="eco-sub">Post-Refactor Formatting</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    For non-LSP buffers (or when eglot is disconnected),
-                    <code>treesit</code> modes provide fallback definition
-                    jumping via <code>treesit-thing</code> navigation or
-                    <code>imenu</code> integration.
+                    Often used in tandem; while <code>eglot</code> handles
+                    semantic refactoring, <code>apheleia</code> ensures the
+                    resulting code is instantly formatted on save.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -439,19 +445,21 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                        <path d="M9 9h6v6H9z" />
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <path
+                          d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+                        />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">peek</div>
-                      <div class="eco-sub">Inline Overlay</div>
+                      <div class="eco-name">general.el</div>
+                      <div class="eco-sub">Keybindings</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    Provides the inline overlay engine for "Peek Definition"
-                    workflows, keeping the user's spatial context intact without
-                    switching tabs.
+                    Eagerly registers the <kbd>SPC c a</kbd> and
+                    <kbd>SPC c i</kbd> leader bindings, ensuring the commands
+                    are instantly available without waiting for lazy-loading.
                   </p>
                 </div>
               </div>
@@ -512,9 +520,9 @@
                     <div class="stack-name">eglot</div>
                     <div class="stack-role">LSP Client</div>
                     <div class="stack-desc">
-                      Built-in. Drives <code>textDocument/definition</code> and
-                      injects the location payload into the native
-                      <code>xref</code> framework.
+                      Built-in. Queries <code>textDocument/codeAction</code> at
+                      point and resolves complex actions via
+                      <code>codeAction/resolve</code>.
                     </div>
                   </div>
                 </div>
@@ -533,15 +541,18 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <path d="M4 6h16M4 12h16M4 18h10" />
+                      <path
+                        d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"
+                      />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">xref</div>
-                    <div class="stack-role">Navigation Framework</div>
+                    <div class="stack-name">eglot-code-actions</div>
+                    <div class="stack-role">Action Router</div>
                     <div class="stack-desc">
-                      Built-in. Manages location abstraction, shared history
-                      ring, and cross-buffer jumping.
+                      Presents available actions (quick fixes, refactors, source
+                      actions) in a searchable <code>completing-read</code>
+                      menu.
                     </div>
                   </div>
                 </div>
@@ -565,12 +576,11 @@
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">consult-xref</div>
-                    <div class="stack-role">Preview Engine</div>
+                    <div class="stack-name">vertico / consult</div>
+                    <div class="stack-role">UI Engine</div>
                     <div class="stack-desc">
-                      Intercepts <code>xref-show-definitions-function</code> to
-                      render a vertico-powered dropdown with live buffer
-                      previews.
+                      Provides fuzzy filtering, candidate grouping, and live
+                      preview of the code action context.
                     </div>
                   </div>
                 </div>
@@ -589,45 +599,19 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <path d="M9 9h6v6H9z" />
+                      <circle cx="12" cy="12" r="4" />
+                      <path
+                        d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41"
+                      />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">peek</div>
-                    <div class="stack-role">Inline Peek</div>
+                    <div class="stack-name">eglot-code-action-indications</div>
+                    <div class="stack-role">Visual Indicator</div>
                     <div class="stack-desc">
-                      Renders the definition inline below the cursor using
-                      overlays without switching tabs (Alt+F12 parity).
-                    </div>
-                  </div>
-                </div>
-                <div class="stack-card">
-                  <div
-                    class="stack-ic"
-                    style="
-                      background: rgba(224, 175, 104, 0.1);
-                      color: var(--yellow);
-                    "
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      aria-hidden="true"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <path d="M12 8v4l3 3" />
-                    </svg>
-                  </div>
-                  <div class="stack-ct">
-                    <div class="stack-name">xref-mouse-mode</div>
-                    <div class="stack-role">Mouse Integration</div>
-                    <div class="stack-desc">
-                      Emacs 31 NEW. Binds <kbd>C-&lt;mouse-1&gt;</kbd> to
-                      <code>xref-find-definitions-at-mouse</code>, enabling
-                      native Ctrl+Click jumps.
+                      Emacs 31 NEW. Renders the "lightbulb" indicator in the
+                      left margin or inline near the cursor when actions are
+                      available.
                     </div>
                   </div>
                 </div>
@@ -684,51 +668,48 @@
                   </thead>
                   <tbody>
                     <tr>
-                      <td>Jump to definition</td>
-                      <td><code>xref-find-definitions</code></td>
-                      <td><kbd>M-.</kbd> / <kbd>g d</kbd></td>
+                      <td>Invoke code actions</td>
+                      <td><code>eglot-code-actions</code></td>
+                      <td><kbd>SPC c a</kbd> / <kbd>C-.</kbd></td>
                       <td>
-                        Jumps to target; opens
-                        <code>consult-xref</code> dropdown if ambiguous.
+                        Opens the searchable menu of all available actions at
+                        point.
                       </td>
                     </tr>
                     <tr>
-                      <td>Jump to definition (mouse)</td>
-                      <td><code>xref-find-definitions-at-mouse</code></td>
-                      <td><kbd>C-&lt;mouse-1&gt;</kbd></td>
+                      <td>Organize imports</td>
+                      <td><code>eglot-code-action-organize-imports</code></td>
+                      <td><kbd>SPC c i</kbd></td>
                       <td>
-                        Emacs 31 NEW — Ctrl+Click parity via
-                        <code>global-xref-mouse-mode</code>.
+                        Direct shortcut for the most common source action.
                       </td>
                     </tr>
                     <tr>
-                      <td>Peek definition (inline)</td>
-                      <td><code>peek-xref-definition</code></td>
-                      <td><kbd>SPC c p d</kbd></td>
-                      <td>
-                        Shows target in an inline overlay panel (requires
-                        <code>peek</code> package).
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Go back (history)</td>
-                      <td><code>xref-go-back</code></td>
-                      <td><kbd>M-,</kbd> / <kbd>g ,</kbd></td>
-                      <td>
-                        Returns to the exact cursor position before the jump.
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Go forward (history)</td>
-                      <td><code>xref-go-forward</code></td>
+                      <td>Quick fix (diagnostic)</td>
+                      <td><code>eglot-code-action-quickfix</code></td>
                       <td>—</td>
-                      <td>Reverses <code>xref-go-back</code>.</td>
+                      <td>
+                        Filters the code action menu to show only quick fixes
+                        for the current diagnostic.
+                      </td>
                     </tr>
                     <tr>
-                      <td>Find definitions (other window)</td>
-                      <td><code>xref-find-definitions-other-window</code></td>
-                      <td><kbd>C-x 4 .</kbd></td>
-                      <td>Opens definition in a horizontal split.</td>
+                      <td>Execute server command</td>
+                      <td><code>eglot-execute-command</code></td>
+                      <td><kbd>SPC c x</kbd></td>
+                      <td>
+                        Runs workspace-level commands surfaced by the server
+                        (e.g., "Restart Server").
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Toggle lightbulb indicator</td>
+                      <td><code>eglot-code-action-indications</code></td>
+                      <td>—</td>
+                      <td>
+                        Configured via <code>setq</code> to show in
+                        <code>margin</code>, <code>eldoc-hint</code>, or both.
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -777,7 +758,7 @@
                     <div class="dots" aria-hidden="true">
                       <span></span><span></span><span></span>
                     </div>
-                    <span class="fname">init-xref.el</span>
+                    <span class="fname">init-code-actions.el</span>
                   </div>
                   <button
                     class="copy"
@@ -800,43 +781,36 @@
                   </button>
                 </div>
                 <pre><code class="language-lisp">;; ==========================================
-;; 1. XREF &amp; CONSULT INTEGRATION (Preview Engine)
+;; EGLOT CODE ACTIONS (Built-in)
 ;; ==========================================
-(use-package xref
+(use-package eglot
   :ensure nil
   :custom
-  ;; Emacs 31 NEW: Enable Ctrl+Click jump-to-definition globally.
-  ;; Binds `C-&lt;down-mouse-1&gt;` to `xref-find-definitions-at-mouse`.
+  ;; Emacs 31 NEW: Control where the lightbulb indicator appears.
+  ;; - 'margin: Renders indicator in the left margin (VS Code parity)
+  ;; - 'eldoc-hint: Renders indicator inline near the point via ElDoc
+  ;; Both can be enabled simultaneously for maximum visibility.
+  (eglot-code-action-indications '(margin eldoc-hint))
+  ;; The actual glyph/string used as the indicator.
+  ;; Defaults to a lightbulb emoji, but can be changed to a simpler Unicode
+  ;; character (e.g., "⚡" or "✦") if the emoji causes rendering glitches
+  ;; in specific tree-sitter modes or terminal emulators.
+  (eglot-code-action-indicator "💡")
   :config
-  (global-xref-mouse-mode 1)
-  ;; Route xref location prompts through Consult for live previews.
-  (setq xref-show-xrefs-function #'consult-xref
-        xref-show-definitions-function #'consult-xref))
+  ;; Ensure eglot's code actions integrate cleanly with consult/vertico
+  ;; for live preview and fuzzy filtering.
+  (when (boundp 'eglot-extend-to-xref)
+    (setq eglot-extend-to-xref t)))
 
 ;; ==========================================
-;; 2. PEEK PACKAGE (Inline Definition Panel)
+;; GENERAL.EL KEYBINDINGS (registered eagerly)
 ;; ==========================================
-(use-package peek
-  :ensure (peek :host sourcehut :repo "~meow_king/peek")
-  :commands (peek-xref-definition peek-overlay-dwim)
-  :custom
-  (peek-mode-enable-eldoc t)        ;; show eldoc inside peek panel
-  (peek-definition-function #'xref-find-definitions)
-  :config
-  (global-peek-mode 1))
-
-;; ==========================================
-;; 3. GENERAL.EL KEYBINDINGS (registered eagerly)
-;; ==========================================
-(general-define-key
-  :states 'motion
-  "g d" #'xref-find-definitions
-  "g ," #'xref-go-back)
-
+;; Placed entirely outside use-package to prevent deferred-registration traps.
 (ar/global-leader
   "c" '(:ignore t :wk "code")
-  "c p" '(:ignore t :wk "peek")
-  "c p d" '(peek-xref-definition :wk "Peek definition"))</code></pre>
+  "c a" '(eglot-code-actions :wk "Code actions (lightbulb)")
+  "c i" '(eglot-code-action-organize-imports :wk "Organize imports")
+  "c x" '(eglot-execute-command :wk "Execute server command"))</code></pre>
               </div>
             </div>
           </div>
@@ -880,13 +854,12 @@
               <div class="sec-title">Why This Approach?</div>
               <div class="grid-2" style="margin-bottom: 24px">
                 <div class="vs-card ok">
-                  <h4>✓ xref + consult-xref · Chosen</h4>
+                  <h4>✓ eglot native · Chosen</h4>
                   <div class="vs-list">
                     <div class="vs-row">
                       <span class="lab">Coupling</span>
                       <span class="val"
-                        >Works with <i>any</i> xref backend (eglot, dumb-jump,
-                        etags).</span
+                        >Works exclusively with <code>eglot</code>.</span
                       >
                     </div>
                     <div class="vs-row">
@@ -896,24 +869,23 @@
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Preview</span>
+                      <span class="lab">UI Physics</span>
                       <span class="val"
-                        ><code>consult-xref</code> leverages
-                        <code>vertico</code> for fuzzy filtering and live
-                        previews.</span
+                        >Native <code>completing-read</code> menu + Emacs 31
+                        margin indicators.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Mouse</span>
+                      <span class="lab">Performance</span>
                       <span class="val"
-                        >Native Emacs 31 <code>xref-mouse-mode</code> (zero
-                        dependencies).</span
+                        >Zero additional packages; leverages native Emacs
+                        completion.</span
                       >
                     </div>
                   </div>
                 </div>
                 <div class="vs-card no">
-                  <h4>✕ lsp-ui-peek / lsp-mode · Rejected</h4>
+                  <h4>✕ lsp-ui-sideline · Rejected</h4>
                   <div class="vs-list">
                     <div class="vs-row">
                       <span class="lab">Coupling</span>
@@ -930,16 +902,17 @@
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Preview</span>
+                      <span class="lab">UI Physics</span>
                       <span class="val"
-                        >Custom child-frame pipeline with heavy rendering
-                        overhead.</span
+                        >Heavy sideline rendering engine that shifts text and
+                        causes redisplay jitter.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Mouse</span>
+                      <span class="lab">Performance</span>
                       <span class="val"
-                        >Requires custom mouse-click advice.</span
+                        >Child-frame overhead and complex sideline
+                        management.</span
                       >
                     </div>
                   </div>
@@ -948,38 +921,48 @@
               <div class="sec-title">Emacs 31 Specific Enhancements</div>
               <div class="grid-2">
                 <div class="enh-card g">
-                  <div class="enh-title">xref-mouse-mode (NEW)</div>
+                  <div class="enh-title">
+                    eglot-code-action-indications (NEW)
+                  </div>
                   <p class="enh-desc">
-                    Emacs 31 introduces native mouse-driven code navigation.
-                    Enabling <code>global-xref-mouse-mode</code> binds
-                    <kbd>C-&lt;down-mouse-1&gt;</kbd> to xref jumps, perfectly
-                    mirroring VS Code's Ctrl+Click convention.
+                    Emacs 31 introduces native visual indication of available
+                    code actions directly within <code>eglot</code>. The
+                    variable accepts a list of symbols:
+                    <code>margin</code> (renders in the left margin),
+                    <code>eldoc-hint</code> (renders via ElDoc), or
+                    <code>mode-line</code>. This completely eliminates the need
+                    for third-party sideline packages.
                   </p>
                 </div>
                 <div class="enh-card p">
-                  <div class="enh-title">Editable Xref Buffers</div>
+                  <div class="enh-title">eglot-code-action-indicator (NEW)</div>
                   <p class="enh-desc">
-                    Emacs 31's <code>xref-change-to-xref-edit-mode</code> (bound
-                    to <kbd>e</kbd> in <code>*xref*</code> buffers) turns
-                    reference lists into writable surfaces for bulk mutation.
+                    Customizable string/glyph used as the visual indicator.
+                    While the default is a lightbulb emoji, it can be safely
+                    swapped for a simpler Unicode character (like
+                    <code>⚡</code>) to prevent rendering glitches in specific
+                    tree-sitter modes or TTY environments.
                   </p>
                 </div>
                 <div class="enh-card y">
-                  <div class="enh-title">consult-xref synergy</div>
+                  <div class="enh-title">
+                    Enhanced completing-read Integration
+                  </div>
                   <p class="enh-desc">
-                    Ambiguous definitions (e.g., C++ overloaded functions,
-                    TypeScript union types) are presented in a highly
-                    performant, searchable Vertico dropdown with instant buffer
-                    previews.
+                    Emacs 31's refined <code>xref</code> and
+                    <code>eglot</code> pipelines ensure that complex code
+                    actions (which require <code>codeAction/resolve</code>
+                    network calls) are handled asynchronously, preventing
+                    main-thread blocking while the action menu populates.
                   </p>
                 </div>
                 <div class="enh-card g">
-                  <div class="enh-title">peek package integration</div>
+                  <div class="enh-title">Mouse Integration</div>
                   <p class="enh-desc">
-                    The <code>peek</code> package hooks directly into the
-                    <code>xref</code> framework via
-                    <code>peek-definition-function</code>, allowing it to
-                    intercept payloads and render them as inline overlays.
+                    <code>eglot-code-actions-at-mouse</code> allows invoking the
+                    code action menu directly by clicking on a diagnostic
+                    squiggle with <kbd>mouse-2</kbd>, matching VS Code's
+                    click-to-fix paradigm.
                   </p>
                 </div>
               </div>

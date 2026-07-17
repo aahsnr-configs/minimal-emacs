@@ -1,0 +1,1853 @@
+Filename: semantic-tokens.html
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Emacs IDE — Semantic Tokens</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.18/index.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="shared-styles.css" />
+  </head>
+  <body>
+    <div class="overlay" id="overlay" aria-hidden="true"></div>
+    <div class="focus-hint" id="focusHint" aria-live="polite">
+      <kbd>ESC</kbd> <span>Exit Focus Mode</span>
+    </div>
+    <aside class="sidebar" id="sb" aria-label="Main Navigation">
+      <div class="sidebar-head">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
+        <span class="brand">Emacs IDE</span>
+      </div>
+      <nav class="sidebar-nav" aria-label="Sidebar Menu">
+        <button class="nav active" data-tip="IntelliSense" aria-current="page">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24A2.5 2.5 0 0 1 9.5 2z"
+            />
+            <path
+              d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24A2.5 2.5 0 0 0 14.5 2z"
+            />
+          </svg>
+          <span class="nav-label">IntelliSense</span>
+        </button>
+        <button class="nav" data-tip="Hover Info">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4M12 8h.01" />
+          </svg>
+          <span class="nav-label">Hover Info</span>
+        </button>
+        <button class="nav" data-tip="Signature Help">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+            />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+          <span class="nav-label">Signature Help</span>
+        </button>
+        <button class="nav" data-tip="Definition">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <span class="nav-label">Definition</span>
+        </button>
+        <button class="nav" data-tip="Code Actions">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"
+            />
+          </svg>
+          <span class="nav-label">Code Actions</span>
+        </button>
+      </nav>
+      <div class="sidebar-foot">
+        <button
+          class="nav"
+          id="sbToggle"
+          data-tip="Toggle Sidebar"
+          aria-label="Toggle Sidebar"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <line x1="9" y1="3" x2="9" y2="21" />
+          </svg>
+          <span class="nav-label">Collapse Menu</span>
+        </button>
+      </div>
+    </aside>
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger" id="mobileMenuBtn" aria-label="Open Menu">
+          <svg
+            viewBox="0 0 24 24"
+            width="24"
+            height="24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <div class="crumbs" aria-label="Breadcrumb">
+          <span>Docs</span><span class="s" aria-hidden="true">/</span>
+          <span>Completion &amp; Intelligence</span
+          ><span class="s" aria-hidden="true">/</span>
+          <span class="cur" aria-current="page">Semantic Tokens</span>
+        </div>
+      </div>
+      <button
+        class="icon-btn"
+        id="focusBtn"
+        title="Toggle Focus Mode (ESC)"
+        aria-label="Toggle Focus Mode"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+        </svg>
+      </button>
+    </header>
+    <main class="main" id="main-content">
+      <header class="page-head">
+        <div class="title-row">
+          <h1>Semantic Tokens (Semantic Highlighting)</h1>
+          <span class="status" role="status">Working</span>
+        </div>
+        <div class="category">Completion &amp; Intelligence</div>
+        <div class="parity">
+          <b>VS Code Parity</b>
+          <span
+            >Type-aware syntax coloring beyond what static TextMate grammars can
+            do</span
+          >
+        </div>
+        <div class="meta-bar">
+          <div class="meta-item">
+            <span class="k">LSP</span>
+            <code>textDocument/semanticTokens/full</code>
+            <span class="meta-sep" aria-hidden="true">·</span>
+            <code>range</code>
+            <span class="meta-sep" aria-hidden="true">·</span>
+            <code>delta</code>
+          </div>
+          <div class="meta-item">
+            <span class="k">Routing</span>
+            <code
+              >eglot<span class="route-arrow">→</span
+              >eglot-semantic-tokens-mode<span class="route-arrow">→</span
+              >native font-lock / treesit</code
+            >
+          </div>
+        </div>
+      </header>
+      <article class="acc">
+        <button
+          class="acc-head open"
+          aria-expanded="true"
+          aria-controls="sect-overview"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+            </svg>
+            Feature Overview
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body open" id="sect-overview" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="sec-title">Behavioral Parity Matrix</div>
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>VS Code Behavior</th>
+                      <th>Emacs 31 Equivalent</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Type-aware syntax coloring</td>
+                      <td>
+                        <code>eglot-semantic-tokens-mode</code> applies faces
+                        based on LSP token types (e.g., distinguishing a
+                        <code>parameter</code> from a
+                        <code>local variable</code>).
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Delta updates on edit</td>
+                      <td>
+                        Eglot natively requests
+                        <code>textDocument/semanticTokens/delta</code> to
+                        minimize network payload and main-thread blocking.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Range requests on scroll</td>
+                      <td>
+                        Eglot requests
+                        <code>textDocument/semanticTokens/range</code> for
+                        visible regions only, optimizing performance in massive
+                        files.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Customizable token colors</td>
+                      <td>
+                        <code>eglot-semantic-faces</code> customization group
+                        allows mapping specific LSP modifiers (e.g.,
+                        <code>readonly</code>, <code>deprecated</code>) to Tokyo
+                        Night palette faces.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Fallback to structural highlighting</td>
+                      <td>
+                        If the LSP server is slow or disconnects,
+                        <code>treesit</code> (level 4) maintains perfect,
+                        zero-latency structural syntax highlighting.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-ecosystem"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path
+                d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+              />
+            </svg>
+            Ecosystem Integration
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-ecosystem" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="grid-2">
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div class="eco-ic">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M12 1v6m0 6v6" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">eglot</div>
+                      <div class="eco-sub">LSP Client</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    Natively handles the negotiation of
+                    <code>semanticTokensProvider</code> capabilities during the
+                    LSP initialization handshake.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(187, 154, 247, 0.1);
+                        color: var(--purple);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">treesit</div>
+                      <div class="eco-sub">Baseline Highlighting</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    Provides the foundational
+                    <code>treesit-font-lock-level 4</code> highlighting,
+                    ensuring that even if semantic tokens are disabled, the
+                    buffer remains beautifully and accurately highlighted.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(125, 207, 255, 0.1);
+                        color: var(--cyan);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path d="M12 2v20M2 12h20" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">doom-themes</div>
+                      <div class="eco-sub">Visual Styling</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    The Tokyo Night theme can be extended to map specific
+                    <code>eglot-semantic-*</code> faces to the palette's neon
+                    accents, creating a cohesive, type-aware visual experience.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(158, 206, 106, 0.1);
+                        color: var(--green);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">apheleia</div>
+                      <div class="eco-sub">Formatting Synergy</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    Formatting operations do not disrupt semantic token
+                    overlays, as Eglot efficiently recalculates token positions
+                    post-edit via delta requests.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-stack"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+              />
+            </svg>
+            Implementation Stack
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-stack" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="grid-2">
+                <div class="stack-card">
+                  <div class="stack-ic">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M12 1v6m0 6v6" />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">eglot</div>
+                    <div class="stack-role">LSP Client</div>
+                    <div class="stack-desc">
+                      Built-in. Negotiates
+                      <code>semanticTokensProvider</code> capabilities and
+                      requests token payloads via full, range, or delta methods.
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="
+                      background: rgba(187, 154, 247, 0.1);
+                      color: var(--purple);
+                    "
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <path d="M9 9h6v6H9z" />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">eglot-semantic-tokens-mode</div>
+                    <div class="stack-role">Semantic Engine</div>
+                    <div class="stack-desc">
+                      Built-in Eglot minor mode that applies LSP semantic token
+                      types and modifiers to the buffer using text properties.
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="
+                      background: rgba(125, 207, 255, 0.1);
+                      color: var(--cyan);
+                    "
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                      />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">treesit</div>
+                    <div class="stack-role">Baseline Highlighting</div>
+                    <div class="stack-desc">
+                      Built-in. Provides fast, C-level structural syntax
+                      highlighting. Semantic tokens augment this baseline rather
+                      than replacing it.
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="
+                      background: rgba(158, 206, 106, 0.1);
+                      color: var(--green);
+                    "
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="4" />
+                      <path
+                        d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41"
+                      />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">eglot-semantic-faces</div>
+                    <div class="stack-role">Face Customization</div>
+                    <div class="stack-desc">
+                      Customization group allowing users to map specific LSP
+                      token types (e.g., <code>variable.readonly</code>) to
+                      Emacs faces.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-commands"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path
+                d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+              />
+            </svg>
+            Commands &amp; Keybindings
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-commands" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>Action</th>
+                      <th>Command</th>
+                      <th>Keybinding</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Toggle semantic tokens</td>
+                      <td><code>eglot-semantic-tokens-mode</code></td>
+                      <td><kbd>SPC t s</kbd></td>
+                      <td>
+                        Enables/disables LSP semantic highlighting for the
+                        current buffer.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Customize token faces</td>
+                      <td><code>customize-group</code></td>
+                      <td>
+                        <kbd>M-x customize-group RET eglot-semantic-faces</kbd>
+                      </td>
+                      <td>
+                        Adjust colors for specific token types (e.g.,
+                        parameters, macros).
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Toggle inlay hints (companion)</td>
+                      <td><code>eglot-inlay-hints-mode</code></td>
+                      <td><kbd>SPC t h</kbd></td>
+                      <td>
+                        Often used alongside semantic tokens for full type-aware
+                        annotation.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-config"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
+            </svg>
+            Configuration
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-config" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="code-win">
+                <div class="code-head">
+                  <div style="display: flex; align-items: center">
+                    <div class="dots" aria-hidden="true">
+                      <span></span><span></span><span></span>
+                    </div>
+                    <span class="fname">init-semantic-tokens.el</span>
+                  </div>
+                  <button
+                    class="copy"
+                    aria-label="Copy code snippet"
+                    onclick="copyCode(this)"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <rect x="9" y="9" width="13" height="13" rx="2" />
+                      <path
+                        d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                      />
+                    </svg>
+                    Copy
+                  </button>
+                </div>
+                <pre><code class="language-lisp">;; ==========================================
+;; EGLOT SEMANTIC TOKENS (Built-in)
+;; ==========================================
+(use-package eglot
+  :ensure nil
+  :hook ((prog-mode . eglot-ensure))
+  :config
+  ;; Semantic tokens are enabled by default in modern Eglot if the server supports them.
+  ;; We explicitly ensure the mode is active and configure it to augment, not replace, treesit.
+  (add-hook 'eglot-managed-mode-hook
+            (lambda ()
+              ;; Enable semantic tokens for enhanced type-aware highlighting
+              (eglot-semantic-tokens-mode 1)))
+  ;; Optional: Fine-tune which token types/modifiers are considered for performance.
+  ;; By default, Eglot respects the server's legend, but you can filter if needed.
+  ;; (setq eglot-semantic-token-types '(variable parameter function method))
+  )
+
+;; ==========================================
+;; TREESIT BASELINE (Emacs 31 Native)
+;; ==========================================
+;; Ensure treesit provides the foundational structural highlighting.
+;; Semantic tokens will layer on top of this for type-specific nuances.
+(setq treesit-font-lock-level 4) ;; Maximum structural decoration</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-arch"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"
+              />
+            </svg>
+            Architecture &amp; Enhancements
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-arch" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="sec-title">Why This Approach?</div>
+              <div class="grid-2" style="margin-bottom: 24px">
+                <div class="vs-card ok">
+                  <h4>✓ eglot native · Chosen</h4>
+                  <div class="vs-list">
+                    <div class="vs-row">
+                      <span class="lab">Coupling</span>
+                      <span class="val"
+                        >Works exclusively with built-in
+                        <code>eglot</code>.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Protocol</span>
+                      <span class="val"
+                        >Honors the <code>eglot</code>-only stack mandate.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Performance</span>
+                      <span class="val"
+                        >Leverages Emacs 31's optimized text property
+                        application; defers to <code>treesit</code> for
+                        baseline.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Emacs 31 Synergy</span>
+                      <span class="val"
+                        >Natively integrates with
+                        <code>treesit-font-lock-level 4</code>, allowing LSP to
+                        augment structural highlighting.</span
+                      >
+                    </div>
+                  </div>
+                </div>
+                <div class="vs-card no">
+                  <h4>✕ lsp-mode semantic highlighting · Rejected</h4>
+                  <div class="vs-list">
+                    <div class="vs-row">
+                      <span class="lab">Coupling</span>
+                      <span class="val"
+                        >Hard-bound to the
+                        <code>lsp-mode</code> ecosystem.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Protocol</span>
+                      <span class="val"
+                        >Requires forbidden
+                        <code>lsp-mode</code> ecosystem.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Performance</span>
+                      <span class="val"
+                        >Historically heavy; applies full buffer fontification
+                        independently, causing micro-stutters.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Emacs 31 Synergy</span>
+                      <span class="val"
+                        >Often overrides or conflicts with native tree-sitter
+                        fontification rules.</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="sec-title">Emacs 31 Specific Enhancements</div>
+              <div class="grid-2">
+                <div class="enh-card g">
+                  <div class="enh-title">eglot-semantic-tokens-mode (NEW)</div>
+                  <p class="enh-desc">
+                    Officially integrated into Eglot, this minor mode provides
+                    enhanced syntax highlighting based on the language server's
+                    semantic analysis, going beyond traditional
+                    regular-expression-based fontification.
+                  </p>
+                </div>
+                <div class="enh-card p">
+                  <div class="enh-title">treesit Augmentation</div>
+                  <p class="enh-desc">
+                    Emacs 31's <code>treesit</code> engine provides a robust,
+                    C-level baseline. Eglot's semantic tokens are designed to
+                    augment this baseline, applying specific faces without
+                    stripping the underlying structural tree-sitter highlights.
+                  </p>
+                </div>
+                <div class="enh-card y">
+                  <div class="enh-title">Delta &amp; Range Optimization</div>
+                  <p class="enh-desc">
+                    Modern Eglot implementations efficiently handle
+                    <code>semanticTokens/delta</code> and
+                    <code>semanticTokens/range</code> requests, ensuring that
+                    typing or scrolling in large files does not trigger
+                    full-buffer re-highlighting network requests.
+                  </p>
+                </div>
+                <div class="enh-card g">
+                  <div class="enh-title">Face Customization Group</div>
+                  <p class="enh-desc">
+                    The <code>eglot-semantic-faces</code> group allows precise
+                    control over how token types (e.g., <code>namespace</code>,
+                    <code>type</code>) and modifiers (e.g.,
+                    <code>declaration</code>, <code>readonly</code>) are
+                    rendered, enabling perfect alignment with the Tokyo Night
+                    theme.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </main>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lisp.min.js"></script>
+    <script src="shared-scripts.js"></script>
+  </body>
+</html>
+```
+
+Filename: inlay-hints.html
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Emacs IDE — Inlay Hints</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.18/index.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="shared-styles.css" />
+  </head>
+  <body>
+    <div class="overlay" id="overlay" aria-hidden="true"></div>
+    <div class="focus-hint" id="focusHint" aria-live="polite">
+      <kbd>ESC</kbd> <span>Exit Focus Mode</span>
+    </div>
+    <aside class="sidebar" id="sb" aria-label="Main Navigation">
+      <div class="sidebar-head">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
+        <span class="brand">Emacs IDE</span>
+      </div>
+      <nav class="sidebar-nav" aria-label="Sidebar Menu">
+        <button class="nav active" data-tip="IntelliSense" aria-current="page">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24A2.5 2.5 0 0 1 9.5 2z"
+            />
+            <path
+              d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24A2.5 2.5 0 0 0 14.5 2z"
+            />
+          </svg>
+          <span class="nav-label">IntelliSense</span>
+        </button>
+        <button class="nav" data-tip="Hover Info">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4M12 8h.01" />
+          </svg>
+          <span class="nav-label">Hover Info</span>
+        </button>
+        <button class="nav" data-tip="Signature Help">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+            />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+          <span class="nav-label">Signature Help</span>
+        </button>
+        <button class="nav" data-tip="Definition">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <span class="nav-label">Definition</span>
+        </button>
+        <button class="nav" data-tip="Code Actions">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"
+            />
+          </svg>
+          <span class="nav-label">Code Actions</span>
+        </button>
+      </nav>
+      <div class="sidebar-foot">
+        <button
+          class="nav"
+          id="sbToggle"
+          data-tip="Toggle Sidebar"
+          aria-label="Toggle Sidebar"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <line x1="9" y1="3" x2="9" y2="21" />
+          </svg>
+          <span class="nav-label">Collapse Menu</span>
+        </button>
+      </div>
+    </aside>
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger" id="mobileMenuBtn" aria-label="Open Menu">
+          <svg
+            viewBox="0 0 24 24"
+            width="24"
+            height="24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <div class="crumbs" aria-label="Breadcrumb">
+          <span>Docs</span><span class="s" aria-hidden="true">/</span>
+          <span>Completion &amp; Intelligence</span
+          ><span class="s" aria-hidden="true">/</span>
+          <span class="cur" aria-current="page">Inlay Hints</span>
+        </div>
+      </div>
+      <button
+        class="icon-btn"
+        id="focusBtn"
+        title="Toggle Focus Mode (ESC)"
+        aria-label="Toggle Focus Mode"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          aria-hidden="true"
+        >
+          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+        </svg>
+      </button>
+    </header>
+    <main class="main" id="main-content">
+      <header class="page-head">
+        <div class="title-row">
+          <h1>Inlay Hints</h1>
+          <span class="status" role="status">Working</span>
+        </div>
+        <div class="category">Completion &amp; Intelligence</div>
+        <div class="parity">
+          <b>VS Code Parity</b>
+          <span
+            >Inline grey annotations showing inferred types, parameter names,
+            etc.</span
+          >
+        </div>
+        <div class="meta-bar">
+          <div class="meta-item">
+            <span class="k">LSP</span>
+            <code>textDocument/inlayHint</code>
+            <span class="meta-sep" aria-hidden="true">·</span>
+            <code>inlayHint/resolve</code>
+          </div>
+          <div class="meta-item">
+            <span class="k">Routing</span>
+            <code
+              >eglot<span class="route-arrow">→</span
+              >eglot-inlay-hints-mode<span class="route-arrow">→</span>native
+              buffer overlays</code
+            >
+          </div>
+        </div>
+      </header>
+      <article class="acc">
+        <button
+          class="acc-head open"
+          aria-expanded="true"
+          aria-controls="sect-overview"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+            </svg>
+            Feature Overview
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body open" id="sect-overview" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="sec-title">Behavioral Parity Matrix</div>
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>VS Code Behavior</th>
+                      <th>Emacs 31 Equivalent</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Inline grey text for parameter names</td>
+                      <td>
+                        <code>eglot-inlay-hint-parameter-face</code> renders
+                        recessive, italicized parameter names.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Inline type annotations for variables</td>
+                      <td>
+                        <code>eglot-inlay-hint-type-face</code> renders inferred
+                        types adjacent to declarations.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Hints disappear when typing in the hint location</td>
+                      <td>
+                        <code>eglot</code> automatically clears and re-requests
+                        hints on buffer modification.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Click/hover to see full resolved hint</td>
+                      <td>
+                        <code>eglot</code> natively triggers
+                        <code>inlayHint/resolve</code> when the cursor rests on
+                        or interacts with the hint overlay.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Toggle hints via command palette</td>
+                      <td>
+                        <kbd>SPC t h</kbd> (<code>eglot-inlay-hints-mode</code>)
+                        or <kbd>M-x global-eglot-inlay-hints-mode</kbd>.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Respects variable-pitch fonts</td>
+                      <td>
+                        Emacs 31's overlay renderer correctly calculates spacing
+                        even when mixing monospaced code with variable-pitch
+                        hint text.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-ecosystem"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path
+                d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+              />
+            </svg>
+            Ecosystem Integration
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-ecosystem" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="grid-2">
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div class="eco-ic">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M12 1v6m0 6v6" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">eglot</div>
+                      <div class="eco-sub">LSP Client</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    Natively handles the entire lifecycle of inlay hints, from
+                    capability negotiation during initialization to overlay
+                    cleanup on buffer kill.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(187, 154, 247, 0.1);
+                        color: var(--purple);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">treesit</div>
+                      <div class="eco-sub">Font-lock Priority</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    Inlay hint overlays are applied with a lower priority than
+                    <code>treesit</code> font-lock, ensuring that primary syntax
+                    highlighting always takes visual precedence.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(125, 207, 255, 0.1);
+                        color: var(--cyan);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path d="M12 2v20M2 12h20" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">doom-themes</div>
+                      <div class="eco-sub">Visual Styling</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    The custom face definitions seamlessly inherit the Tokyo
+                    Night <code>shadow</code> and specific accent colors,
+                    maintaining a cohesive, professional IDE aesthetic.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="
+                        background: rgba(158, 206, 106, 0.1);
+                        color: var(--green);
+                      "
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <path
+                          d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">general.el</div>
+                      <div class="eco-sub">Keybindings</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    The <kbd>SPC t h</kbd> keybinding provides a consistent,
+                    mnemonic toggle for inlay hints across all programming
+                    buffers, aligning with Doom Emacs muscle memory.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-stack"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+              />
+            </svg>
+            Implementation Stack
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-stack" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="grid-2">
+                <div class="stack-card">
+                  <div class="stack-ic">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M12 1v6m0 6v6" />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">eglot</div>
+                    <div class="stack-role">LSP Client</div>
+                    <div class="stack-desc">
+                      Built-in. Negotiates <code>inlayHintProvider</code>
+                      capabilities and requests hint payloads via
+                      <code>textDocument/inlayHint</code> and
+                      <code>inlayHint/resolve</code>.
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="
+                      background: rgba(187, 154, 247, 0.1);
+                      color: var(--purple);
+                    "
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <path d="M9 9h6v6H9z" />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">eglot-inlay-hints-mode</div>
+                    <div class="stack-role">Rendering Engine</div>
+                    <div class="stack-desc">
+                      Built-in minor mode that applies hint text as
+                      <code>before-string</code> or <code>after-string</code>
+                      overlays directly in the buffer.
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="
+                      background: rgba(125, 207, 255, 0.1);
+                      color: var(--cyan);
+                    "
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="4" />
+                      <path
+                        d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41"
+                      />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">eglot-inlay-hint-* faces</div>
+                    <div class="stack-role">Visual Styling</div>
+                    <div class="stack-desc">
+                      Dedicated faces for different hint kinds (e.g.,
+                      <code>eglot-inlay-hint-type-face</code>) allowing precise
+                      theme integration.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-commands"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path
+                d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+              />
+            </svg>
+            Commands &amp; Keybindings
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-commands" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>Action</th>
+                      <th>Command</th>
+                      <th>Keybinding</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Toggle inlay hints</td>
+                      <td><code>eglot-inlay-hints-mode</code></td>
+                      <td><kbd>SPC t h</kbd></td>
+                      <td>
+                        Enables/disables inline annotations for the current
+                        buffer.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Toggle globally</td>
+                      <td><code>global-eglot-inlay-hints-mode</code></td>
+                      <td>—</td>
+                      <td>
+                        Enables inlay hints across all
+                        <code>eglot</code>-managed buffers.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Resolve hint details</td>
+                      <td><code>eglot-inlay-hint-resolve</code></td>
+                      <td>—</td>
+                      <td>
+                        Triggered automatically by <code>eglot</code> when
+                        hovering or interacting with a hint.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-config"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
+            </svg>
+            Configuration
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-config" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="code-win">
+                <div class="code-head">
+                  <div style="display: flex; align-items: center">
+                    <div class="dots" aria-hidden="true">
+                      <span></span><span></span><span></span>
+                    </div>
+                    <span class="fname">init-inlay-hints.el</span>
+                  </div>
+                  <button
+                    class="copy"
+                    aria-label="Copy code snippet"
+                    onclick="copyCode(this)"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <rect x="9" y="9" width="13" height="13" rx="2" />
+                      <path
+                        d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                      />
+                    </svg>
+                    Copy
+                  </button>
+                </div>
+                <pre><code class="language-lisp">;; ==========================================
+;; EGLOT INLAY HINTS (Built-in)
+;; ==========================================
+(use-package eglot
+  :ensure nil
+  :hook ((prog-mode . eglot-ensure))
+  :config
+  ;; Enable inlay hints globally for all eglot-managed buffers.
+  ;; Can be toggled per-buffer via `eglot-inlay-hints-mode' or `SPC t h`.
+  (global-eglot-inlay-hints-mode 1)
+  ;; ==========================================
+  ;; VISUAL STYLING (Tokyo Night Synergy)
+  ;; ==========================================
+  ;; Inlay hints should be recessive to avoid competing with primary syntax highlighting.
+  (custom-set-faces
+   '(eglot-inlay-hint-face ((t (:inherit shadow :height 0.9 :slant italic))))
+   '(eglot-inlay-hint-type-face ((t (:inherit shadow :foreground "#73daca" :height 0.9 :slant italic))))
+   '(eglot-inlay-hint-parameter-face ((t (:inherit shadow :foreground "#bb9af7" :height 0.9 :slant italic))))))</code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="acc">
+        <button
+          class="acc-head"
+          aria-expanded="false"
+          aria-controls="sect-arch"
+        >
+          <span class="t">
+            <svg
+              class="ic"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"
+              />
+            </svg>
+            Architecture &amp; Enhancements
+          </span>
+          <svg
+            class="chev"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+        <div class="acc-body" id="sect-arch" role="region">
+          <div>
+            <div class="acc-inner">
+              <div class="sec-title">Why This Approach?</div>
+              <div class="grid-2" style="margin-bottom: 24px">
+                <div class="vs-card ok">
+                  <h4>✓ eglot native · Chosen</h4>
+                  <div class="vs-list">
+                    <div class="vs-row">
+                      <span class="lab">Coupling</span>
+                      <span class="val"
+                        >Works exclusively with built-in
+                        <code>eglot</code>.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Protocol</span>
+                      <span class="val"
+                        >Honors the <code>eglot</code>-only stack mandate.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Rendering Physics</span>
+                      <span class="val"
+                        >Uses native Emacs <code>before-string</code> /
+                        <code>after-string</code> text properties, ensuring
+                        seamless integration with <code>treesit</code>.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Performance</span>
+                      <span class="val"
+                        >Lightweight overlay application; defers
+                        <code>inlayHint/resolve</code> network calls until
+                        explicitly needed.</span
+                      >
+                    </div>
+                  </div>
+                </div>
+                <div class="vs-card no">
+                  <h4>✕ lsp-mode / lsp-ui · Rejected</h4>
+                  <div class="vs-list">
+                    <div class="vs-row">
+                      <span class="lab">Coupling</span>
+                      <span class="val"
+                        >Hard-bound to the
+                        <code>lsp-mode</code> ecosystem.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Protocol</span>
+                      <span class="val"
+                        >Requires forbidden
+                        <code>lsp-mode</code> ecosystem.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Rendering Physics</span>
+                      <span class="val"
+                        >Historically relied on complex, fragile overlay
+                        management that could conflict with native
+                        font-lock.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Performance</span>
+                      <span class="val"
+                        >Aggressive background resolution can cause main-thread
+                        micro-stutters on slower servers.</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="sec-title">Emacs 31 Specific Enhancements</div>
+              <div class="grid-2">
+                <div class="enh-card g">
+                  <div class="enh-title">Variable-Pitch Font Support</div>
+                  <p class="enh-desc">
+                    Emacs 31's <code>eglot</code> overlay renderer has been
+                    explicitly optimized to calculate bounding boxes and spacing
+                    correctly when <code>variable-pitch-mode</code> is active,
+                    preventing misaligned hint text.
+                  </p>
+                </div>
+                <div class="enh-card p">
+                  <div class="enh-title">Granular Face Customization</div>
+                  <p class="enh-desc">
+                    Upstream <code>eglot</code> now exposes distinct faces for
+                    different hint kinds
+                    (<code>eglot-inlay-hint-type-face</code>,
+                    <code>eglot-inlay-hint-parameter-face</code>), allowing
+                    users to color-code hints without resorting to fragile
+                    regex-based font-lock hacks.
+                  </p>
+                </div>
+                <div class="enh-card y">
+                  <div class="enh-title">Efficient inlayHint/resolve</div>
+                  <p class="enh-desc">
+                    <code>eglot</code> intelligently batches and debounces
+                    <code>inlayHint/resolve</code> requests, ensuring that
+                    hovering over or interacting with a hint does not spam the
+                    language server, preserving the 60fps typing experience.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </main>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lisp.min.js"></script>
+    <script src="shared-scripts.js"></script>
+  </body>
+</html>
+```

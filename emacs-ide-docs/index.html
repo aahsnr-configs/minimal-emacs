@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Emacs IDE — Feature Index</title>
+    <link href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.18/index.min.css" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #1a1b26; --surface: #24283b; --surface-2: #1f2335; --border: #2f3348;
+        --text: #c0caf5; --text-dim: #9aa5ce; --blue: #7aa2f7; --purple: #bb9af7;
+        --cyan: #7dcfff; --green: #9ece6a;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: "JetBrains Mono", monospace; background: var(--bg); color: var(--text);
+        padding: 40px; line-height: 1.6; max-width: 1200px; margin: 0 auto;
+      }
+      h1 { font-size: 28px; margin-bottom: 8px; }
+      .subtitle { color: var(--text-dim); margin-bottom: 32px; }
+      .category-title {
+        font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em;
+        color: var(--purple); margin: 32px 0 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px;
+      }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+      .card {
+        background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+        padding: 20px; text-decoration: none; color: var(--text); transition: all 0.2s;
+        display: flex; flex-direction: column; gap: 8px;
+      }
+      .card:hover { border-color: var(--blue); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+      .card h3 { font-size: 16px; color: var(--blue); }
+      .card p { font-size: 13px; color: var(--text-dim); }
+      .badge {
+        display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase;
+        color: var(--green); background: rgba(158, 206, 106, 0.1); border: 1px solid rgba(158, 206, 106, 0.3);
+        padding: 2px 8px; border-radius: 12px; width: fit-content;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Emacs IDE Documentation</h1>
+    <p class="subtitle">Complete index of all IDE features. Generated on 2026-07-17 10:05.</p>
+    <h2 class="category-title">Code Actions &amp; Refactoring</h2><div class="grid">
+
+                <a href="features/code-actions.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Code Actions (Quick Fixes &amp;amp; Refactorings)</h3>
+                    <p>Emacs IDE — Code Actions</p>
+                </a>
+            
+
+                <a href="features/execute-command.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Execute Command</h3>
+                    <p>Emacs IDE — Execute Command</p>
+                </a>
+            
+
+                <a href="features/quick-fix-lightbulb.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Quick Fix Lightbulb</h3>
+                    <p>Emacs IDE — Quick Fix Lightbulb</p>
+                </a>
+            
+
+                <a href="features/rename-symbol.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Rename Symbol</h3>
+                    <p>Emacs IDE — Rename Symbol</p>
+                </a>
+            
+</div>
+<h2 class="category-title">Completion &amp; Intelligence</h2><div class="grid">
+
+                <a href="features/hover-info-native.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Hover Info</h3>
+                    <p>Emacs IDE — Hover Info</p>
+                </a>
+            
+
+                <a href="features/hover-info-childframe.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Hover Info (Childframe Parity)</h3>
+                    <p>Emacs IDE — Hover Info (Childframe)</p>
+                </a>
+            
+
+                <a href="features/inlay-hints.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Inlay Hints</h3>
+                    <p>Emacs IDE — Inlay Hints</p>
+                </a>
+            
+
+                <a href="features/intellisense.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>IntelliSense / Code Completion</h3>
+                    <p>Emacs IDE — IntelliSense</p>
+                </a>
+            
+
+                <a href="features/semantic-tokens.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Semantic Tokens (Semantic Highlighting)</h3>
+                    <p>Emacs IDE — Semantic Tokens</p>
+                </a>
+            
+
+                <a href="features/signature-help.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Signature Help</h3>
+                    <p>Emacs IDE — Signature Help</p>
+                </a>
+            
+</div>
+<h2 class="category-title">Diagnostics &amp; Debugging</h2><div class="grid">
+
+                <a href="features/inline-values.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Inline Values (Debugger)</h3>
+                    <p>Emacs IDE — Inline Values (Debugger)</p>
+                </a>
+            
+</div>
+<h2 class="category-title">Diagnostics &amp; Symbols</h2><div class="grid">
+
+                <a href="features/diagnostics-pull.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Diagnostics (Pull Model)</h3>
+                    <p>Emacs IDE — Diagnostics (Pull Model)</p>
+                </a>
+            
+
+                <a href="features/diagnostics-push.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Diagnostics (Push Model)</h3>
+                    <p>Emacs IDE — Diagnostics (Push Model)</p>
+                </a>
+            
+
+                <a href="features/document-symbols.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Document Symbols / Outline View</h3>
+                    <p>Emacs IDE — Document Symbols</p>
+                </a>
+            
+
+                <a href="features/problems-panel.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Problems Panel</h3>
+                    <p>Emacs IDE — Problems Panel</p>
+                </a>
+            
+
+                <a href="features/workspace-symbol-search.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Workspace Symbol Search</h3>
+                    <p>Emacs IDE — Workspace Symbol Search</p>
+                </a>
+            
+</div>
+<h2 class="category-title">Formatting &amp; Editing</h2><div class="grid">
+
+                <a href="features/document-formatting.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Document Formatting (Whole File)</h3>
+                    <p>Emacs IDE — Document Formatting</p>
+                </a>
+            
+
+                <a href="features/folding-ranges.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Folding Ranges</h3>
+                    <p>Emacs IDE — Folding Ranges</p>
+                </a>
+            
+
+                <a href="features/on-type-formatting.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>On-type Formatting</h3>
+                    <p>Emacs IDE — On-type Formatting</p>
+                </a>
+            
+
+                <a href="features/range-formatting.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Range Formatting (Format Selection)</h3>
+                    <p>Emacs IDE — Range Formatting</p>
+                </a>
+            
+
+                <a href="features/selection-range.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Selection Range (Smart Expand/Shrink)</h3>
+                    <p>Emacs IDE — Selection Range</p>
+                </a>
+            
+</div>
+<h2 class="category-title">Navigation &amp; Code Jumping</h2><div class="grid">
+
+                <a href="features/call-hierarchy.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Call Hierarchy</h3>
+                    <p>Emacs IDE — Call Hierarchy</p>
+                </a>
+            
+
+                <a href="features/find-all-references.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Find All References</h3>
+                    <p>Emacs IDE — Find All References</p>
+                </a>
+            
+
+                <a href="features/go-to-declaration.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Go to Declaration</h3>
+                    <p>Emacs IDE — Go to Declaration</p>
+                </a>
+            
+
+                <a href="features/go-to-definition.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Go to Definition</h3>
+                    <p>Emacs IDE — Go to Definition</p>
+                </a>
+            
+
+                <a href="features/go-to-implementation.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Go to Implementation</h3>
+                    <p>Emacs IDE — Go to Implementation</p>
+                </a>
+            
+
+                <a href="features/go-to-type-definition.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Go to Type Definition</h3>
+                    <p>Emacs IDE — Go to Type Definition</p>
+                </a>
+            
+
+                <a href="features/moniker.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Moniker</h3>
+                    <p>Emacs IDE — Moniker</p>
+                </a>
+            
+
+                <a href="features/peek-definition.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Peek Definition / Peek References</h3>
+                    <p>Emacs IDE — Peek Definition</p>
+                </a>
+            
+
+                <a href="features/type-hierarchy.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Type Hierarchy</h3>
+                    <p>Emacs IDE — Type Hierarchy</p>
+                </a>
+            
+</div>
+<h2 class="category-title">Navigation &amp; Visual Enhancements</h2><div class="grid">
+
+                <a href="features/breadcrumbs-bar.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Breadcrumbs Bar</h3>
+                    <p>Emacs IDE — Breadcrumbs Bar</p>
+                </a>
+            
+
+                <a href="features/document-highlight.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Document Highlight</h3>
+                    <p>Emacs IDE — Document Highlight</p>
+                </a>
+            
+
+                <a href="features/sticky-scroll.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Sticky Scroll</h3>
+                    <p>Emacs IDE — Sticky Scroll</p>
+                </a>
+            
+</div>
+<h2 class="category-title">Precision Editing</h2><div class="grid">
+
+                <a href="features/multi-cursor-editing.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Multi-Cursor Editing</h3>
+                    <p>Emacs IDE — Multi-Cursor Editing</p>
+                </a>
+            
+</div>
+<h2 class="category-title">Visual Enhancements</h2><div class="grid">
+
+                <a href="features/bracket-colorization.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Bracket Pair Colorization</h3>
+                    <p>Emacs IDE — Bracket Colorization</p>
+                </a>
+            
+
+                <a href="features/document-color.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Document Color</h3>
+                    <p>Emacs IDE — Document Color</p>
+                </a>
+            
+
+                <a href="features/document-links.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Document Links</h3>
+                    <p>Emacs IDE — Document Links</p>
+                </a>
+            
+
+                <a href="features/minimap.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Minimap</h3>
+                    <p>Emacs IDE — Minimap</p>
+                </a>
+            
+</div>
+<h2 class="category-title">Visual Enhancements / Editing</h2><div class="grid">
+
+                <a href="features/linked-editing-range.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Linked Editing Range (Auto Rename Tag)</h3>
+                    <p>Emacs IDE — Linked Editing Range</p>
+                </a>
+            
+</div>
+<h2 class="category-title">Workspace &amp; Files</h2><div class="grid">
+
+                <a href="features/file-operation-hooks.html" class="card">
+                    <span class="badge">Working</span>
+                    <h3>Workspace File-Operation Hooks</h3>
+                    <p>Emacs IDE — File-Operation Hooks</p>
+                </a>
+            
+</div>
+  </body>
+</html>

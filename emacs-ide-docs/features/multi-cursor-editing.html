@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Emacs IDE — Go to Definition</title>
+    <title>Emacs IDE — Multi-Cursor Editing</title>
     <link
       href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.18/index.min.css"
       rel="stylesheet"
@@ -78,7 +78,7 @@
           </svg>
           <span class="nav-label">Signature Help</span>
         </button>
-        <button class="nav active" data-tip="Definition" aria-current="page">
+        <button class="nav" data-tip="Definition">
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -91,7 +91,7 @@
           </svg>
           <span class="nav-label">Definition</span>
         </button>
-        <button class="nav" data-tip="Code Actions">
+        <button class="nav active" data-tip="Code Actions" aria-current="page">
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -146,9 +146,9 @@
         </button>
         <div class="crumbs" aria-label="Breadcrumb">
           <span>Docs</span><span class="s" aria-hidden="true">/</span>
-          <span>Navigation &amp; Code Jumping</span
+          <span>Precision Editing</span
           ><span class="s" aria-hidden="true">/</span>
-          <span class="cur" aria-current="page">Go to Definition</span>
+          <span class="cur" aria-current="page">Multi-Cursor Editing</span>
         </div>
       </div>
       <button
@@ -171,26 +171,31 @@
     <main class="main" id="main-content">
       <header class="page-head">
         <div class="title-row">
-          <h1>Go to Definition</h1>
+          <h1>Multi-Cursor Editing</h1>
           <span class="status" role="status">Working</span>
         </div>
-        <div class="category">Navigation &amp; Code Jumping</div>
+        <div class="category">Precision Editing</div>
         <div class="parity">
           <b>VS Code Parity</b>
-          <span>F12 to jump, Ctrl+Click to jump, Alt+F12 to peek inline</span>
+          <span
+            >Alt+Click (arbitrary), Ctrl+D (next occurrence), Ctrl+Shift+L (all
+            occurrences), Alt+Shift+Down (column selection)</span
+          >
         </div>
         <div class="meta-bar">
           <div class="meta-item">
             <span class="k">LSP</span>
-            <code>textDocument/definition</code>
+            <span style="color: var(--text-dim); font-size: 12px"
+              >N/A (Local buffer manipulation)</span
+            >
           </div>
           <div class="meta-item">
             <span class="k">Routing</span>
             <code
-              >eglot<span class="route-arrow">→</span>xref<span
+              >iedit<span class="route-arrow">→</span>evil-multiedit<span
                 class="route-arrow"
                 >→</span
-              >consult-xref OR peek</code
+              >evil-mc</code
             >
           </div>
         </div>
@@ -242,52 +247,57 @@
                   </thead>
                   <tbody>
                     <tr>
-                      <td><kbd>F12</kbd> jumps to definition</td>
+                      <td><kbd>Alt+Click</kbd> to place cursors anywhere</td>
                       <td>
-                        <kbd>M-.</kbd> or <kbd>g d</kbd>
-                        (<code>xref-find-definitions</code>)
+                        <kbd>C-S-&lt;mouse-1&gt;</kbd>
+                        (<code>evil-mc-make-cursor-here</code>).
                       </td>
                     </tr>
                     <tr>
-                      <td>Ctrl+Click jumps to definition</td>
+                      <td><kbd>Ctrl+D</kbd> to select next occurrence</td>
                       <td>
-                        <kbd>C-&lt;mouse-1&gt;</kbd> via Emacs 31
-                        <code>global-xref-mouse-mode</code>
+                        <kbd>M-d</kbd>
+                        (<code>evil-multiedit-match-symbol-and-next</code>).
                       </td>
                     </tr>
                     <tr>
-                      <td>Alt+F12 peeks definition inline</td>
+                      <td><kbd>Ctrl+Shift+L</kbd> to select all occurrences</td>
                       <td>
-                        <kbd>SPC c p d</kbd> (<code>peek-xref-definition</code>)
-                        via <code>peek</code> package
+                        <kbd>M-D</kbd> (<code>evil-multiedit-match-all</code>).
                       </td>
                     </tr>
                     <tr>
-                      <td>Dropdown for multiple definitions</td>
+                      <td><kbd>Alt+Shift+Down</kbd> for column selection</td>
                       <td>
-                        <code>consult-xref</code> intercepts
-                        <code>xref-show-definitions-function</code>
+                        <kbd>C-S-&lt;down&gt;</kbd> in visual state
+                        (<code>evil-mc-make-cursor-in-next-line</code>).
                       </td>
                     </tr>
                     <tr>
-                      <td>Live preview in dropdown</td>
+                      <td>Type/delete simultaneously at all cursors</td>
                       <td>
-                        <code>consult-xref</code> + <code>vertico</code> live
-                        buffer previews
+                        Native behavior of both <code>iedit</code> and
+                        <code>evil-mc</code>.
                       </td>
                     </tr>
                     <tr>
-                      <td>Alt+Left returns to origin</td>
                       <td>
-                        <kbd>M-,</kbd> or <kbd>g ,</kbd>
-                        (<code>xref-go-back</code>)
+                        Execute <code>ciw</code> or <code>daw</code> at all
+                        cursors
+                      </td>
+                      <td>
+                        Natively supported by <code>evil-mc</code>'s fake cursor
+                        engine.
                       </td>
                     </tr>
                     <tr>
-                      <td>Open in split window</td>
                       <td>
-                        <kbd>C-x 4 .</kbd>
-                        (<code>xref-find-definitions-other-window</code>)
+                        <kbd>Esc</kbd> or <kbd>C-g</kbd> to exit multi-cursor
+                      </td>
+                      <td>
+                        <kbd>C-g</kbd> cleanly invokes
+                        <code>evil-mc-undo-all-cursors</code> or
+                        <code>evil-normal-state</code>.
                       </td>
                     </tr>
                   </tbody>
@@ -344,20 +354,18 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <circle cx="12" cy="12" r="3" />
-                        <path d="M12 1v6m0 6v6" />
+                        <path d="M12 2v20M2 12h20" />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">eglot</div>
-                      <div class="eco-sub">LSP Client</div>
+                      <div class="eco-name">evil</div>
+                      <div class="eco-sub">Modal Engine</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    Automatically registers <code>eglot-xref-backend</code> in
-                    <code>xref-backend-functions</code> for managed buffers,
-                    routing <kbd>M-.</kbd> to
-                    <code>textDocument/definition</code>.
+                    <code>evil-mc</code> hooks directly into Evil's command
+                    loop, ensuring that macros (<kbd>@</kbd>), registers, and
+                    operators function identically to single-cursor editing.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -376,18 +384,22 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <path d="M4 6h16M4 12h16M4 18h10" />
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <path
+                          d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
+                        />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">consult</div>
-                      <div class="eco-sub">Preview Engine</div>
+                      <div class="eco-name">general.el</div>
+                      <div class="eco-sub">Keybindings</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    <code>consult-xref</code> intercepts the xref display
-                    functions to provide vertico-powered previews for ambiguous
-                    definition targets.
+                    The <kbd>C-S-&lt;down&gt;</kbd> and
+                    <kbd>C-S-&lt;up&gt;</kbd> bindings are strictly confined to
+                    <code>visual</code> state, preventing accidental activation
+                    during normal typing.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -406,21 +418,20 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <path
-                          d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-                        />
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M12 1v6m0 6v6" />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">treesit</div>
-                      <div class="eco-sub">Fallback Parser</div>
+                      <div class="eco-name">eglot</div>
+                      <div class="eco-sub">LSP Coexistence</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    For non-LSP buffers (or when eglot is disconnected),
-                    <code>treesit</code> modes provide fallback definition
-                    jumping via <code>treesit-thing</code> navigation or
-                    <code>imenu</code> integration.
+                    For project-wide symbol renaming, this multi-cursor setup is
+                    intentionally bypassed in favor of
+                    <code>eglot-rename</code> (<kbd>SPC c r</kbd>), which safely
+                    updates cross-file references.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -439,19 +450,20 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                        <path d="M9 9h6v6H9z" />
+                        <path
+                          d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                        />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">peek</div>
-                      <div class="eco-sub">Inline Overlay</div>
+                      <div class="eco-name">undo-fu</div>
+                      <div class="eco-sub">History Management</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    Provides the inline overlay engine for "Peek Definition"
-                    workflows, keeping the user's spatial context intact without
-                    switching tabs.
+                    Multi-cursor edits are treated as a single atomic operation,
+                    allowing an entire multi-line insertion to be undone with a
+                    single <kbd>u</kbd> press.
                   </p>
                 </div>
               </div>
@@ -504,17 +516,18 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <circle cx="12" cy="12" r="3" />
-                      <path d="M12 1v6m0 6v6" />
+                      <path
+                        d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                      />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">eglot</div>
-                    <div class="stack-role">LSP Client</div>
+                    <div class="stack-name">iedit</div>
+                    <div class="stack-role">Foundation Engine</div>
                     <div class="stack-desc">
-                      Built-in. Drives <code>textDocument/definition</code> and
-                      injects the location payload into the native
-                      <code>xref</code> framework.
+                      GNU ELPA. Provides the core mechanism for highlighting and
+                      synchronizing mutations across multiple instances of a
+                      symbol or region.
                     </div>
                   </div>
                 </div>
@@ -533,15 +546,17 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <path d="M4 6h16M4 12h16M4 18h10" />
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M8 12h8M12 8v8" />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">xref</div>
-                    <div class="stack-role">Navigation Framework</div>
+                    <div class="stack-name">evil-multiedit</div>
+                    <div class="stack-role">Symbol-Based Editing</div>
                     <div class="stack-desc">
-                      Built-in. Manages location abstraction, shared history
-                      ring, and cross-buffer jumping.
+                      Wraps <code>iedit</code> in a dedicated Evil state,
+                      mapping explicit Vim-mnemonics for rapid cursor
+                      accumulation and bulk mutation.
                     </div>
                   </div>
                 </div>
@@ -560,17 +575,19 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <circle cx="11" cy="11" r="8" />
-                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      <circle cx="12" cy="12" r="4" />
+                      <path
+                        d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41"
+                      />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">consult-xref</div>
-                    <div class="stack-role">Preview Engine</div>
+                    <div class="stack-name">evil-mc</div>
+                    <div class="stack-role">Arbitrary Placement</div>
                     <div class="stack-desc">
-                      Intercepts <code>xref-show-definitions-function</code> to
-                      render a vertico-powered dropdown with live buffer
-                      previews.
+                      Creates true, Evil-native fake cursors that flawlessly
+                      execute standard Evil motions and operators across all
+                      points simultaneously.
                     </div>
                   </div>
                 </div>
@@ -589,45 +606,16 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <path d="M9 9h6v6H9z" />
+                      <path d="M4 6h16M4 12h16M4 18h10" />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">peek</div>
-                    <div class="stack-role">Inline Peek</div>
+                    <div class="stack-name">Evil integration hooks</div>
+                    <div class="stack-role">State Management</div>
                     <div class="stack-desc">
-                      Renders the definition inline below the cursor using
-                      overlays without switching tabs (Alt+F12 parity).
-                    </div>
-                  </div>
-                </div>
-                <div class="stack-card">
-                  <div
-                    class="stack-ic"
-                    style="
-                      background: rgba(224, 175, 104, 0.1);
-                      color: var(--yellow);
-                    "
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      aria-hidden="true"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <path d="M12 8v4l3 3" />
-                    </svg>
-                  </div>
-                  <div class="stack-ct">
-                    <div class="stack-name">xref-mouse-mode</div>
-                    <div class="stack-role">Mouse Integration</div>
-                    <div class="stack-desc">
-                      Emacs 31 NEW. Binds <kbd>C-&lt;mouse-1&gt;</kbd> to
-                      <code>xref-find-definitions-at-mouse</code>, enabling
-                      native Ctrl+Click jumps.
+                      Ensures clean exit to <code>evil-normal-state</code> upon
+                      aborting multi-cursor operations, preventing modal
+                      corruption.
                     </div>
                   </div>
                 </div>
@@ -684,51 +672,43 @@
                   </thead>
                   <tbody>
                     <tr>
-                      <td>Jump to definition</td>
-                      <td><code>xref-find-definitions</code></td>
-                      <td><kbd>M-.</kbd> / <kbd>g d</kbd></td>
+                      <td>Add cursor on click</td>
+                      <td><code>evil-mc-make-cursor-here</code></td>
+                      <td><kbd>C-S-&lt;mouse-1&gt;</kbd></td>
                       <td>
-                        Jumps to target; opens
-                        <code>consult-xref</code> dropdown if ambiguous.
+                        VS Code parity: click anywhere to place an arbitrary
+                        cursor.
                       </td>
                     </tr>
                     <tr>
-                      <td>Jump to definition (mouse)</td>
-                      <td><code>xref-find-definitions-at-mouse</code></td>
-                      <td><kbd>C-&lt;mouse-1&gt;</kbd></td>
+                      <td>Edit lines in rectangle</td>
+                      <td><code>evil-mc-make-cursor-in-next-line</code></td>
+                      <td><kbd>C-S-&lt;down&gt;</kbd> (visual)</td>
                       <td>
-                        Emacs 31 NEW — Ctrl+Click parity via
-                        <code>global-xref-mouse-mode</code>.
+                        Adds a cursor to each line in the active visual
+                        rectangle.
                       </td>
                     </tr>
                     <tr>
-                      <td>Peek definition (inline)</td>
-                      <td><code>peek-xref-definition</code></td>
-                      <td><kbd>SPC c p d</kbd></td>
+                      <td>Mark next occurrence</td>
+                      <td><code>evil-multiedit-match-symbol-and-next</code></td>
+                      <td><kbd>M-d</kbd></td>
                       <td>
-                        Shows target in an inline overlay panel (requires
-                        <code>peek</code> package).
+                        Evil-native: adds the next occurrence of the current
+                        symbol.
                       </td>
                     </tr>
                     <tr>
-                      <td>Go back (history)</td>
-                      <td><code>xref-go-back</code></td>
-                      <td><kbd>M-,</kbd> / <kbd>g ,</kbd></td>
-                      <td>
-                        Returns to the exact cursor position before the jump.
-                      </td>
+                      <td>Mark all occurrences</td>
+                      <td><code>evil-multiedit-match-all</code></td>
+                      <td><kbd>M-D</kbd></td>
+                      <td>Evil-native: adds all occurrences in the buffer.</td>
                     </tr>
                     <tr>
-                      <td>Go forward (history)</td>
-                      <td><code>xref-go-forward</code></td>
-                      <td>—</td>
-                      <td>Reverses <code>xref-go-back</code>.</td>
-                    </tr>
-                    <tr>
-                      <td>Find definitions (other window)</td>
-                      <td><code>xref-find-definitions-other-window</code></td>
-                      <td><kbd>C-x 4 .</kbd></td>
-                      <td>Opens definition in a horizontal split.</td>
+                      <td>Exit multi-cursor mode</td>
+                      <td><code>evil-mc-undo-all-cursors</code></td>
+                      <td><kbd>C-g</kbd> or <kbd>RET</kbd></td>
+                      <td>Exits multi-cursor mode, leaving a single cursor.</td>
                     </tr>
                   </tbody>
                 </table>
@@ -777,7 +757,7 @@
                     <div class="dots" aria-hidden="true">
                       <span></span><span></span><span></span>
                     </div>
-                    <span class="fname">init-xref.el</span>
+                    <span class="fname">init-multi-cursor.el</span>
                   </div>
                   <button
                     class="copy"
@@ -800,43 +780,55 @@
                   </button>
                 </div>
                 <pre><code class="language-lisp">;; ==========================================
-;; 1. XREF &amp; CONSULT INTEGRATION (Preview Engine)
-;; ==========================================
-(use-package xref
-  :ensure nil
-  :custom
-  ;; Emacs 31 NEW: Enable Ctrl+Click jump-to-definition globally.
-  ;; Binds `C-&lt;down-mouse-1&gt;` to `xref-find-definitions-at-mouse`.
-  :config
-  (global-xref-mouse-mode 1)
-  ;; Route xref location prompts through Consult for live previews.
-  (setq xref-show-xrefs-function #'consult-xref
-        xref-show-definitions-function #'consult-xref))
-
-;; ==========================================
-;; 2. PEEK PACKAGE (Inline Definition Panel)
-;; ==========================================
-(use-package peek
-  :ensure (peek :host sourcehut :repo "~meow_king/peek")
-  :commands (peek-xref-definition peek-overlay-dwim)
-  :custom
-  (peek-mode-enable-eldoc t)        ;; show eldoc inside peek panel
-  (peek-definition-function #'xref-find-definitions)
-  :config
-  (global-peek-mode 1))
-
-;; ==========================================
-;; 3. GENERAL.EL KEYBINDINGS (registered eagerly)
-;; ==========================================
-(general-define-key
-  :states 'motion
-  "g d" #'xref-find-definitions
-  "g ," #'xref-go-back)
-
-(ar/global-leader
-  "c" '(:ignore t :wk "code")
-  "c p" '(:ignore t :wk "peek")
-  "c p d" '(peek-xref-definition :wk "Peek definition"))</code></pre>
+ ;; 1. IEDIT (Foundation Engine)
+ ;; ==========================================
+ (use-package iedit
+   :defer t
+   :commands (iedit-mode iedit-rectangle-mode)
+   :custom
+   ;; Prevent iedit from accidentally matching substrings of larger words.
+   (iedit-match-subword t))
+ ;; ==========================================
+ ;; 2. EVIL MULTIEDIT (Symbol-Based Editing)
+ ;; ==========================================
+ (use-package evil-multiedit
+   :defer t
+   :after (evil iedit)
+   :commands (evil-multiedit-match-symbol-and-next
+              evil-multiedit-match-all
+              evil-multiedit-toggle-or-restrict-region)
+   :custom-face
+   ;; Tokyo Night synergy: Distinct background for active multi-cursor regions.
+   (evil-multiedit-match-face ((t (:background "#bb9af7" :foreground "#1a1b26" :weight bold))))
+   :config
+   ;; Register default Evil keybindings (e.g., M-d for next, M-D for all).
+   (evil-multiedit-default-keybinds)
+   ;; Ensure clean exit to normal state when multi-edit is aborted.
+   (add-hook 'evil-multiedit-exit-hook #'evil-normal-state))
+ ;; ==========================================
+ ;; 3. EVIL MC (Arbitrary &amp; Rectangular Placement)
+ ;; ==========================================
+ (use-package evil-mc
+   :defer t
+   :after evil
+   :commands (evil-mc-make-and-goto-next-match
+              evil-mc-make-and-goto-prev-match
+              evil-mc-make-all-cursors
+              evil-mc-undo-all-cursors)
+   :custom
+   ;; Disable the default cursor blink to prevent visual distraction.
+   (evil-mc-cursor-default-state 'bar)
+   :config
+   (global-evil-mc-mode 1)
+   ;; VS Code Parity: Allow Ctrl+Shift+Click to place arbitrary cursors.
+   (global-set-key (kbd "C-S-&lt;mouse-1&gt;") #'evil-mc-make-cursor-here)
+   ;; Rectangular multi-cursor (VS Code Alt+Shift+Down parity).
+   (general-define-key
+    :states 'visual
+    "C-S-&lt;down&gt;" #'evil-mc-make-cursor-in-next-line
+    "C-S-&lt;up&gt;" #'evil-mc-make-cursor-in-prev-line)
+   ;; Safe exit: C-g terminates multi-cursors and returns to a single cursor.
+   (define-key evil-mc-key-map (kbd "C-g") #'evil-mc-undo-all-cursors))</code></pre>
               </div>
             </div>
           </div>
@@ -880,108 +872,152 @@
               <div class="sec-title">Why This Approach?</div>
               <div class="grid-2" style="margin-bottom: 24px">
                 <div class="vs-card ok">
-                  <h4>✓ xref + consult-xref · Chosen</h4>
+                  <h4>✓ evil-mc + evil-multiedit · Chosen</h4>
                   <div class="vs-list">
                     <div class="vs-row">
-                      <span class="lab">Coupling</span>
+                      <span class="lab">Evil Operator Support</span>
                       <span class="val"
-                        >Works with <i>any</i> xref backend (eglot, dumb-jump,
-                        etags).</span
+                        >Flawless. Commands like <code>daw</code>,
+                        <code>ciw</code> execute perfectly across all
+                        cursors.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Protocol</span>
+                      <span class="lab">Separation of Concerns</span>
                       <span class="val"
-                        >Honors the <code>eglot</code>-only stack mandate.</span
+                        ><code>evil-multiedit</code> handles symbol matching;
+                        <code>evil-mc</code> handles arbitrary placement.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Preview</span>
+                      <span class="lab">Undo History</span>
                       <span class="val"
-                        ><code>consult-xref</code> leverages
-                        <code>vertico</code> for fuzzy filtering and live
-                        previews.</span
+                        ><code>evil-mc</code> groups multi-cursor edits into a
+                        single, clean undo step natively.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Mouse</span>
+                      <span class="lab">Protocol Compliance</span>
                       <span class="val"
-                        >Native Emacs 31 <code>xref-mouse-mode</code> (zero
-                        dependencies).</span
+                        >Honors the <code>eglot</code>-only stack mandate for
+                        project-wide operations.</span
                       >
                     </div>
                   </div>
                 </div>
                 <div class="vs-card no">
-                  <h4>✕ lsp-ui-peek / lsp-mode · Rejected</h4>
+                  <h4>✕ multiple-cursors · Rejected</h4>
                   <div class="vs-list">
                     <div class="vs-row">
-                      <span class="lab">Coupling</span>
+                      <span class="lab">Evil Operator Support</span>
                       <span class="val"
-                        >Hard-bound to the
-                        <code>lsp-mode</code> ecosystem.</span
+                        >Fragile. Requires complex advice to trick it into
+                        respecting Evil's modal grammar.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Protocol</span>
+                      <span class="lab">Separation of Concerns</span>
                       <span class="val"
-                        >Requires the forbidden
-                        <code>lsp-mode</code> ecosystem.</span
+                        >Attempts to do both but fails at symbol matching and
+                        struggles with Evil integration.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Preview</span>
+                      <span class="lab">Undo History</span>
                       <span class="val"
-                        >Custom child-frame pipeline with heavy rendering
-                        overhead.</span
+                        >Frequently fragments the undo tree, making
+                        <kbd>u</kbd> behave erratically.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Mouse</span>
-                      <span class="val"
-                        >Requires custom mouse-click advice.</span
-                      >
+                      <span class="lab">Protocol Compliance</span>
+                      <span class="val">N/A</span>
                     </div>
                   </div>
                 </div>
               </div>
               <div class="sec-title">Emacs 31 Specific Enhancements</div>
-              <div class="grid-2">
+              <div class="grid-2" style="margin-bottom: 24px">
                 <div class="enh-card g">
-                  <div class="enh-title">xref-mouse-mode (NEW)</div>
-                  <p class="enh-desc">
-                    Emacs 31 introduces native mouse-driven code navigation.
-                    Enabling <code>global-xref-mouse-mode</code> binds
-                    <kbd>C-&lt;down-mouse-1&gt;</kbd> to xref jumps, perfectly
-                    mirroring VS Code's Ctrl+Click convention.
+                  <div class="enh-title">Native Rectangle Synergy</div>
+                  <p class="desc">
+                    <code>evil-mc</code> integrates flawlessly with Emacs 31's
+                    refined rectangle mark (<kbd>C-x SPC</kbd>), allowing a
+                    drawn rectangle to be instantly converted to multiple
+                    cursors via visual state bindings.
                   </p>
                 </div>
                 <div class="enh-card p">
-                  <div class="enh-title">Editable Xref Buffers</div>
-                  <p class="enh-desc">
-                    Emacs 31's <code>xref-change-to-xref-edit-mode</code> (bound
-                    to <kbd>e</kbd> in <code>*xref*</code> buffers) turns
-                    reference lists into writable surfaces for bulk mutation.
+                  <div class="enh-title">Evil State Guards</div>
+                  <p class="desc">
+                    The <code>evil-multiedit-exit-hook</code> and
+                    <code>evil-mc-key-map</code> explicitly restore
+                    <code>evil-normal-state</code>, preventing the "stuck in
+                    insert state" bug that plagued older vanilla Emacs
+                    configurations.
                   </p>
                 </div>
                 <div class="enh-card y">
-                  <div class="enh-title">consult-xref synergy</div>
-                  <p class="enh-desc">
-                    Ambiguous definitions (e.g., C++ overloaded functions,
-                    TypeScript union types) are presented in a highly
-                    performant, searchable Vertico dropdown with instant buffer
-                    previews.
+                  <div class="enh-title">Subword Matching</div>
+                  <p class="desc">
+                    <code>iedit-match-subword</code> is enabled by default,
+                    ensuring that editing <code>myVariable</code> does not
+                    accidentally match <code>myVariableName</code> unless
+                    intended, providing surgical precision.
                   </p>
                 </div>
-                <div class="enh-card g">
-                  <div class="enh-title">peek package integration</div>
-                  <p class="enh-desc">
-                    The <code>peek</code> package hooks directly into the
-                    <code>xref</code> framework via
-                    <code>peek-definition-function</code>, allowing it to
-                    intercept payloads and render them as inline overlays.
-                  </p>
-                </div>
+              </div>
+              <div class="sec-title">Troubleshooting</div>
+              <div class="tbl-wrap">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th>Issue</th>
+                      <th>Cause &amp; Solution</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Cursors Disappear or Behave Erratically</td>
+                      <td>
+                        Ensure <code>iedit</code> and <code>evil-mc</code> are
+                        not activated simultaneously in the same buffer. Use
+                        <code>evil-multiedit</code> for symbol-based tasks and
+                        <code>evil-mc</code> for arbitrary/rectangular tasks. If
+                        corrupted, press <kbd>C-g</kbd> twice to forcefully
+                        reset the buffer state.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Mouse Click Adds Cursor but Doesn't Type</td>
+                      <td>
+                        Verify that <code>global-evil-mc-mode</code> is active.
+                        The <code>global-set-key</code> for
+                        <kbd>C-S-&lt;mouse-1&gt;</kbd> relies on the minor mode
+                        being globally enabled to intercept and process the fake
+                        cursor creation.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Evil State Conflicts on Exit</td>
+                      <td>
+                        If stuck in <code>insert-state</code> after pressing
+                        <kbd>C-g</kbd>, the exit hooks may not have fired. This
+                        is resolved by the explicit
+                        <code
+                          >(add-hook 'evil-multiedit-exit-hook
+                          #'evil-normal-state)</code
+                        >
+                        and
+                        <code
+                          >(define-key evil-mc-key-map (kbd "C-g")
+                          #'evil-mc-undo-all-cursors)</code
+                        >
+                        guards in the configuration.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

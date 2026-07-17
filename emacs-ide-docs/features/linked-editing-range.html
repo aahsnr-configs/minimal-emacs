@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Emacs IDE — Go to Definition</title>
+    <title>Emacs IDE — Linked Editing Range</title>
     <link
       href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.18/index.min.css"
       rel="stylesheet"
@@ -78,7 +78,7 @@
           </svg>
           <span class="nav-label">Signature Help</span>
         </button>
-        <button class="nav active" data-tip="Definition" aria-current="page">
+        <button class="nav" data-tip="Definition">
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -91,7 +91,7 @@
           </svg>
           <span class="nav-label">Definition</span>
         </button>
-        <button class="nav" data-tip="Code Actions">
+        <button class="nav active" data-tip="Code Actions" aria-current="page">
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -146,9 +146,9 @@
         </button>
         <div class="crumbs" aria-label="Breadcrumb">
           <span>Docs</span><span class="s" aria-hidden="true">/</span>
-          <span>Navigation &amp; Code Jumping</span
+          <span>Visual Enhancements / Editing</span
           ><span class="s" aria-hidden="true">/</span>
-          <span class="cur" aria-current="page">Go to Definition</span>
+          <span class="cur" aria-current="page">Linked Editing Range</span>
         </div>
       </div>
       <button
@@ -171,26 +171,31 @@
     <main class="main" id="main-content">
       <header class="page-head">
         <div class="title-row">
-          <h1>Go to Definition</h1>
+          <h1>Linked Editing Range (Auto Rename Tag)</h1>
           <span class="status" role="status">Working</span>
         </div>
-        <div class="category">Navigation &amp; Code Jumping</div>
+        <div class="category">Visual Enhancements / Editing</div>
         <div class="parity">
           <b>VS Code Parity</b>
-          <span>F12 to jump, Ctrl+Click to jump, Alt+F12 to peek inline</span>
+          <span
+            >Editing one HTML/JSX tag name automatically updates its matching
+            pair</span
+          >
         </div>
         <div class="meta-bar">
           <div class="meta-item">
             <span class="k">LSP</span>
-            <code>textDocument/definition</code>
+            <code>textDocument/linkedEditingRange</code>
+            <span class="meta-sep" aria-hidden="true">·</span>
+            <span style="color: var(--text-dim); font-size: 12px"
+              >(Intentionally bypassed)</span
+            >
           </div>
           <div class="meta-item">
             <span class="k">Routing</span>
             <code
-              >eglot<span class="route-arrow">→</span>xref<span
-                class="route-arrow"
-                >→</span
-              >consult-xref OR peek</code
+              >auto-rename-tag<span class="route-arrow">→</span>native Emacs
+              regex/AST parsing</code
             >
           </div>
         </div>
@@ -242,52 +247,36 @@
                   </thead>
                   <tbody>
                     <tr>
-                      <td><kbd>F12</kbd> jumps to definition</td>
                       <td>
-                        <kbd>M-.</kbd> or <kbd>g d</kbd>
-                        (<code>xref-find-definitions</code>)
+                        Typing in <code>&lt;div&gt;</code> instantly updates
+                        <code>&lt;/div&gt;</code>
+                      </td>
+                      <td>
+                        <code>auto-rename-tag-mode</code> detects the pair and
+                        updates it synchronously with 0ms latency.
                       </td>
                     </tr>
                     <tr>
-                      <td>Ctrl+Click jumps to definition</td>
+                      <td>Works for HTML, XML, and JSX/TSX</td>
                       <td>
-                        <kbd>C-&lt;mouse-1&gt;</kbd> via Emacs 31
-                        <code>global-xref-mouse-mode</code>
+                        Hooked into <code>html-ts-mode</code>,
+                        <code>nxml-mode</code>, and <code>tsx-ts-mode</code>
+                        respectively.
                       </td>
                     </tr>
                     <tr>
-                      <td>Alt+F12 peeks definition inline</td>
+                      <td>No lag or stutter while typing</td>
                       <td>
-                        <kbd>SPC c p d</kbd> (<code>peek-xref-definition</code>)
-                        via <code>peek</code> package
+                        Native local execution completely bypasses the LSP
+                        network request cycle.
                       </td>
                     </tr>
                     <tr>
-                      <td>Dropdown for multiple definitions</td>
+                      <td>Respects cursor position</td>
                       <td>
-                        <code>consult-xref</code> intercepts
-                        <code>xref-show-definitions-function</code>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Live preview in dropdown</td>
-                      <td>
-                        <code>consult-xref</code> + <code>vertico</code> live
-                        buffer previews
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Alt+Left returns to origin</td>
-                      <td>
-                        <kbd>M-,</kbd> or <kbd>g ,</kbd>
-                        (<code>xref-go-back</code>)
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Open in split window</td>
-                      <td>
-                        <kbd>C-x 4 .</kbd>
-                        (<code>xref-find-definitions-other-window</code>)
+                        The package is designed to adjust the cursor position
+                        intelligently after the rename operation, preventing
+                        spatial drift.
                       </td>
                     </tr>
                   </tbody>
@@ -344,20 +333,20 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <circle cx="12" cy="12" r="3" />
-                        <path d="M12 1v6m0 6v6" />
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M8 12h8M12 8v8" />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">eglot</div>
-                      <div class="eco-sub">LSP Client</div>
+                      <div class="eco-name">electric-pair-mode</div>
+                      <div class="eco-sub">Auto-Pairing</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    Automatically registers <code>eglot-xref-backend</code> in
-                    <code>xref-backend-functions</code> for managed buffers,
-                    routing <kbd>M-.</kbd> to
-                    <code>textDocument/definition</code>.
+                    Works in tandem with native auto-pairing. When
+                    <code>electric-pair-mode</code> inserts the closing
+                    <code>&gt;</code>, <code>auto-rename-tag</code> is already
+                    primed to track the structural pair for subsequent edits.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -376,18 +365,22 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <path d="M4 6h16M4 12h16M4 18h10" />
+                        <path
+                          d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                        />
+                        <polyline points="14 2 14 8 20 8" />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">consult</div>
-                      <div class="eco-sub">Preview Engine</div>
+                      <div class="eco-name">web-mode / tsx-ts-mode</div>
+                      <div class="eco-sub">Target Modes</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    <code>consult-xref</code> intercepts the xref display
-                    functions to provide vertico-powered previews for ambiguous
-                    definition targets.
+                    The mode hooks ensure that the renaming engine is only
+                    active in buffers where tag pairing is structurally
+                    relevant, preventing false positives in standard programming
+                    languages like Python or Rust.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -406,52 +399,21 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <path
-                          d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-                        />
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M12 1v6m0 6v6" />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">treesit</div>
-                      <div class="eco-sub">Fallback Parser</div>
+                      <div class="eco-name">eglot</div>
+                      <div class="eco-sub">LSP Offloading</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    For non-LSP buffers (or when eglot is disconnected),
-                    <code>treesit</code> modes provide fallback definition
-                    jumping via <code>treesit-thing</code> navigation or
-                    <code>imenu</code> integration.
-                  </p>
-                </div>
-                <div class="eco-card">
-                  <div class="eco-top">
-                    <div
-                      class="eco-ic"
-                      style="
-                        background: rgba(158, 206, 106, 0.1);
-                        color: var(--green);
-                      "
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        aria-hidden="true"
-                      >
-                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                        <path d="M9 9h6v6H9z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div class="eco-name">peek</div>
-                      <div class="eco-sub">Inline Overlay</div>
-                    </div>
-                  </div>
-                  <p class="eco-desc">
-                    Provides the inline overlay engine for "Peek Definition"
-                    workflows, keeping the user's spatial context intact without
-                    switching tabs.
+                    By intentionally bypassing the LSP
+                    <code>linkedEditingRange</code> capability, we free up
+                    <code>eglot</code> to focus on heavier semantic tasks (like
+                    diagnostics and completion) without being bogged down by
+                    per-keystroke rename requests.
                   </p>
                 </div>
               </div>
@@ -504,17 +466,17 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <circle cx="12" cy="12" r="3" />
-                      <path d="M12 1v6m0 6v6" />
+                      <path
+                        d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                      />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">eglot</div>
-                    <div class="stack-role">LSP Client</div>
+                    <div class="stack-name">auto-rename-tag</div>
+                    <div class="stack-role">Renaming Engine</div>
                     <div class="stack-desc">
-                      Built-in. Drives <code>textDocument/definition</code> and
-                      injects the location payload into the native
-                      <code>xref</code> framework.
+                      MELPA package. Provides zero-latency, local tag renaming
+                      for HTML/XML/JSX without requiring LSP round-trips.
                     </div>
                   </div>
                 </div>
@@ -533,15 +495,18 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <path d="M4 6h16M4 12h16M4 18h10" />
+                      <path
+                        d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                      />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">xref</div>
-                    <div class="stack-role">Navigation Framework</div>
+                    <div class="stack-name">Target Modes</div>
+                    <div class="stack-role">Scope Definition</div>
                     <div class="stack-desc">
-                      Built-in. Manages location abstraction, shared history
-                      ring, and cross-buffer jumping.
+                      <code>tsx-ts-mode</code>, <code>web-mode</code>,
+                      <code>html-ts-mode</code>, <code>nxml-mode</code>. Major
+                      modes where structural tag pairing is prevalent.
                     </div>
                   </div>
                 </div>
@@ -560,74 +525,16 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <circle cx="11" cy="11" r="8" />
-                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                    </svg>
-                  </div>
-                  <div class="stack-ct">
-                    <div class="stack-name">consult-xref</div>
-                    <div class="stack-role">Preview Engine</div>
-                    <div class="stack-desc">
-                      Intercepts <code>xref-show-definitions-function</code> to
-                      render a vertico-powered dropdown with live buffer
-                      previews.
-                    </div>
-                  </div>
-                </div>
-                <div class="stack-card">
-                  <div
-                    class="stack-ic"
-                    style="
-                      background: rgba(158, 206, 106, 0.1);
-                      color: var(--green);
-                    "
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      aria-hidden="true"
-                    >
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <path d="M9 9h6v6H9z" />
-                    </svg>
-                  </div>
-                  <div class="stack-ct">
-                    <div class="stack-name">peek</div>
-                    <div class="stack-role">Inline Peek</div>
-                    <div class="stack-desc">
-                      Renders the definition inline below the cursor using
-                      overlays without switching tabs (Alt+F12 parity).
-                    </div>
-                  </div>
-                </div>
-                <div class="stack-card">
-                  <div
-                    class="stack-ic"
-                    style="
-                      background: rgba(224, 175, 104, 0.1);
-                      color: var(--yellow);
-                    "
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      aria-hidden="true"
-                    >
                       <circle cx="12" cy="12" r="10" />
                       <path d="M12 8v4l3 3" />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">xref-mouse-mode</div>
-                    <div class="stack-role">Mouse Integration</div>
+                    <div class="stack-name">Native Emacs parsing</div>
+                    <div class="stack-role">Performance Guard</div>
                     <div class="stack-desc">
-                      Emacs 31 NEW. Binds <kbd>C-&lt;mouse-1&gt;</kbd> to
-                      <code>xref-find-definitions-at-mouse</code>, enabling
-                      native Ctrl+Click jumps.
+                      Operates entirely locally using Emacs' built-in syntax
+                      tables or Tree-sitter AST, guaranteeing 0ms input latency.
                     </div>
                   </div>
                 </div>
@@ -684,51 +591,25 @@
                   </thead>
                   <tbody>
                     <tr>
-                      <td>Jump to definition</td>
-                      <td><code>xref-find-definitions</code></td>
-                      <td><kbd>M-.</kbd> / <kbd>g d</kbd></td>
-                      <td>
-                        Jumps to target; opens
-                        <code>consult-xref</code> dropdown if ambiguous.
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Jump to definition (mouse)</td>
-                      <td><code>xref-find-definitions-at-mouse</code></td>
-                      <td><kbd>C-&lt;mouse-1&gt;</kbd></td>
-                      <td>
-                        Emacs 31 NEW — Ctrl+Click parity via
-                        <code>global-xref-mouse-mode</code>.
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Peek definition (inline)</td>
-                      <td><code>peek-xref-definition</code></td>
-                      <td><kbd>SPC c p d</kbd></td>
-                      <td>
-                        Shows target in an inline overlay panel (requires
-                        <code>peek</code> package).
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Go back (history)</td>
-                      <td><code>xref-go-back</code></td>
-                      <td><kbd>M-,</kbd> / <kbd>g ,</kbd></td>
-                      <td>
-                        Returns to the exact cursor position before the jump.
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Go forward (history)</td>
-                      <td><code>xref-go-forward</code></td>
+                      <td>Toggle auto-rename</td>
+                      <td><code>auto-rename-tag-mode</code></td>
                       <td>—</td>
-                      <td>Reverses <code>xref-go-back</code>.</td>
+                      <td>
+                        Enabled automatically via mode hooks for relevant
+                        languages.
+                      </td>
                     </tr>
                     <tr>
-                      <td>Find definitions (other window)</td>
-                      <td><code>xref-find-definitions-other-window</code></td>
-                      <td><kbd>C-x 4 .</kbd></td>
-                      <td>Opens definition in a horizontal split.</td>
+                      <td>Manual tag jump (fallback)</td>
+                      <td>
+                        <code>sgml-skip-tag-forward</code> /
+                        <code>backward</code>
+                      </td>
+                      <td><kbd>C-c C-f</kbd> / <kbd>C-c C-b</kbd></td>
+                      <td>
+                        Native Emacs commands to manually jump between paired
+                        tags if needed.
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -777,7 +658,7 @@
                     <div class="dots" aria-hidden="true">
                       <span></span><span></span><span></span>
                     </div>
-                    <span class="fname">init-xref.el</span>
+                    <span class="fname">init-linked-editing.el</span>
                   </div>
                   <button
                     class="copy"
@@ -800,43 +681,26 @@
                   </button>
                 </div>
                 <pre><code class="language-lisp">;; ==========================================
-;; 1. XREF &amp; CONSULT INTEGRATION (Preview Engine)
+;; AUTO-RENAME-TAG (Zero-Latency Local Tag Renaming)
 ;; ==========================================
-(use-package xref
-  :ensure nil
+;; The LSP `textDocument/linkedEditingRange` capability requires a synchronous
+;; network round-trip to the language server on every keystroke while inside a
+;; tag. This frequently causes noticeable input latency and main-thread blocking.
+;; Instead, we utilize the `auto-rename-tag` package, which replicates the exact
+;; behavior of the VS Code "Auto Rename Tag" extension using zero-latency local parsing.
+
+(use-package auto-rename-tag
+  :ensure t
+  :defer t
+  :commands auto-rename-tag-mode
+  :hook ((tsx-ts-mode
+          html-ts-mode
+          web-mode
+          nxml-mode
+          rjsx-mode) . auto-rename-tag-mode)
   :custom
-  ;; Emacs 31 NEW: Enable Ctrl+Click jump-to-definition globally.
-  ;; Binds `C-&lt;down-mouse-1&gt;` to `xref-find-definitions-at-mouse`.
-  :config
-  (global-xref-mouse-mode 1)
-  ;; Route xref location prompts through Consult for live previews.
-  (setq xref-show-xrefs-function #'consult-xref
-        xref-show-definitions-function #'consult-xref))
-
-;; ==========================================
-;; 2. PEEK PACKAGE (Inline Definition Panel)
-;; ==========================================
-(use-package peek
-  :ensure (peek :host sourcehut :repo "~meow_king/peek")
-  :commands (peek-xref-definition peek-overlay-dwim)
-  :custom
-  (peek-mode-enable-eldoc t)        ;; show eldoc inside peek panel
-  (peek-definition-function #'xref-find-definitions)
-  :config
-  (global-peek-mode 1))
-
-;; ==========================================
-;; 3. GENERAL.EL KEYBINDINGS (registered eagerly)
-;; ==========================================
-(general-define-key
-  :states 'motion
-  "g d" #'xref-find-definitions
-  "g ," #'xref-go-back)
-
-(ar/global-leader
-  "c" '(:ignore t :wk "code")
-  "c p" '(:ignore t :wk "peek")
-  "c p d" '(peek-xref-definition :wk "Peek definition"))</code></pre>
+  ;; Ensure the package activates instantly upon mode entry.
+  (auto-rename-tag-mode 1))</code></pre>
               </div>
             </div>
           </div>
@@ -880,66 +744,70 @@
               <div class="sec-title">Why This Approach?</div>
               <div class="grid-2" style="margin-bottom: 24px">
                 <div class="vs-card ok">
-                  <h4>✓ xref + consult-xref · Chosen</h4>
+                  <h4>✓ auto-rename-tag · Chosen</h4>
                   <div class="vs-list">
                     <div class="vs-row">
-                      <span class="lab">Coupling</span>
+                      <span class="lab">Latency</span>
                       <span class="val"
-                        >Works with <i>any</i> xref backend (eglot, dumb-jump,
-                        etags).</span
+                        ><b>0ms.</b> Executes locally via native Emacs regex/AST
+                        parsing.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Reliability</span>
+                      <span class="val"
+                        ><b>Perfect.</b> Works offline and is independent of
+                        language server implementation quirks.</span
                       >
                     </div>
                     <div class="vs-row">
                       <span class="lab">Protocol</span>
                       <span class="val"
-                        >Honors the <code>eglot</code>-only stack mandate.</span
+                        >Honors the <code>eglot</code>-only stack mandate by
+                        avoiding unnecessary LSP UI features.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Preview</span>
+                      <span class="lab">Emacs 31 Synergy</span>
                       <span class="val"
-                        ><code>consult-xref</code> leverages
-                        <code>vertico</code> for fuzzy filtering and live
-                        previews.</span
-                      >
-                    </div>
-                    <div class="vs-row">
-                      <span class="lab">Mouse</span>
-                      <span class="val"
-                        >Native Emacs 31 <code>xref-mouse-mode</code> (zero
-                        dependencies).</span
+                        >Integrates seamlessly with <code>tsx-ts-mode</code> and
+                        <code>web-mode</code> without conflicting with
+                        Tree-sitter parsing.</span
                       >
                     </div>
                   </div>
                 </div>
                 <div class="vs-card no">
-                  <h4>✕ lsp-ui-peek / lsp-mode · Rejected</h4>
+                  <h4>✕ LSP textDocument/linkedEditingRange · Rejected</h4>
                   <div class="vs-list">
                     <div class="vs-row">
-                      <span class="lab">Coupling</span>
+                      <span class="lab">Latency</span>
                       <span class="val"
-                        >Hard-bound to the
-                        <code>lsp-mode</code> ecosystem.</span
+                        ><b>High.</b> Requires a synchronous network round-trip
+                        on every keystroke.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Reliability</span>
+                      <span class="val"
+                        ><b>Variable.</b> Depends entirely on the language
+                        server's
+                        <code>linkedEditingRangeProvider</code> capability,
+                        which is often incomplete or slow.</span
                       >
                     </div>
                     <div class="vs-row">
                       <span class="lab">Protocol</span>
                       <span class="val"
-                        >Requires the forbidden
-                        <code>lsp-mode</code> ecosystem.</span
+                        >Adds redundant network overhead for a feature Emacs
+                        handles natively.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Preview</span>
+                      <span class="lab">Emacs 31 Synergy</span>
                       <span class="val"
-                        >Custom child-frame pipeline with heavy rendering
-                        overhead.</span
-                      >
-                    </div>
-                    <div class="vs-row">
-                      <span class="lab">Mouse</span>
-                      <span class="val"
-                        >Requires custom mouse-click advice.</span
+                        >No specific integration with Emacs 31 core
+                        enhancements.</span
                       >
                     </div>
                   </div>
@@ -948,38 +816,24 @@
               <div class="sec-title">Emacs 31 Specific Enhancements</div>
               <div class="grid-2">
                 <div class="enh-card g">
-                  <div class="enh-title">xref-mouse-mode (NEW)</div>
+                  <div class="enh-title">Tree-sitter Mode Compatibility</div>
                   <p class="enh-desc">
-                    Emacs 31 introduces native mouse-driven code navigation.
-                    Enabling <code>global-xref-mouse-mode</code> binds
-                    <kbd>C-&lt;down-mouse-1&gt;</kbd> to xref jumps, perfectly
-                    mirroring VS Code's Ctrl+Click convention.
+                    <code>auto-rename-tag</code> operates harmoniously alongside
+                    Emacs 31's native <code>tsx-ts-mode</code> and
+                    <code>html-ts-mode</code>. Because it relies on fundamental
+                    buffer text manipulation rather than fighting the AST, it
+                    does not disrupt Tree-sitter's font-lock or indentation
+                    engines.
                   </p>
                 </div>
                 <div class="enh-card p">
-                  <div class="enh-title">Editable Xref Buffers</div>
+                  <div class="enh-title">Zero Network Dependency</div>
                   <p class="enh-desc">
-                    Emacs 31's <code>xref-change-to-xref-edit-mode</code> (bound
-                    to <kbd>e</kbd> in <code>*xref*</code> buffers) turns
-                    reference lists into writable surfaces for bulk mutation.
-                  </p>
-                </div>
-                <div class="enh-card y">
-                  <div class="enh-title">consult-xref synergy</div>
-                  <p class="enh-desc">
-                    Ambiguous definitions (e.g., C++ overloaded functions,
-                    TypeScript union types) are presented in a highly
-                    performant, searchable Vertico dropdown with instant buffer
-                    previews.
-                  </p>
-                </div>
-                <div class="enh-card g">
-                  <div class="enh-title">peek package integration</div>
-                  <p class="enh-desc">
-                    The <code>peek</code> package hooks directly into the
-                    <code>xref</code> framework via
-                    <code>peek-definition-function</code>, allowing it to
-                    intercept payloads and render them as inline overlays.
+                    By handling this locally, the configuration remains fully
+                    functional in air-gapped environments, over slow TRAMP
+                    connections, or when the LSP server is temporarily
+                    unresponsive, ensuring a consistently smooth editing
+                    experience.
                   </p>
                 </div>
               </div>

@@ -1,0 +1,16 @@
+{
+  "name": "emacs-31-ide-docs-eleventy",
+  "version": "1.0.0",
+  "description": "Emacs 31 IDE Documentation - Eleventy 11ty SSG Architecture",
+  "scripts": {
+    "dev": "eleventy --serve",
+    "build": "eleventy",
+    "migrate": "python3 scripts/migrate-to-eleventy.py"
+  },
+  "dependencies": {
+    "@11ty/eleventy": "^3.1.6"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2"
+  }
+}

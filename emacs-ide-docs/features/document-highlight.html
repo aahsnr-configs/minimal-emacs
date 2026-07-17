@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Emacs IDE — Go to Definition</title>
+    <title>Emacs IDE — Document Highlight</title>
     <link
       href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.18/index.min.css"
       rel="stylesheet"
@@ -146,9 +146,9 @@
         </button>
         <div class="crumbs" aria-label="Breadcrumb">
           <span>Docs</span><span class="s" aria-hidden="true">/</span>
-          <span>Navigation &amp; Code Jumping</span
+          <span>Navigation &amp; Visual Enhancements</span
           ><span class="s" aria-hidden="true">/</span>
-          <span class="cur" aria-current="page">Go to Definition</span>
+          <span class="cur" aria-current="page">Document Highlight</span>
         </div>
       </div>
       <button
@@ -171,26 +171,28 @@
     <main class="main" id="main-content">
       <header class="page-head">
         <div class="title-row">
-          <h1>Go to Definition</h1>
+          <h1>Document Highlight</h1>
           <span class="status" role="status">Working</span>
         </div>
-        <div class="category">Navigation &amp; Code Jumping</div>
+        <div class="category">Navigation &amp; Visual Enhancements</div>
         <div class="parity">
           <b>VS Code Parity</b>
-          <span>F12 to jump, Ctrl+Click to jump, Alt+F12 to peek inline</span>
+          <span
+            >Auto-highlighting of all references to the symbol at the cursor
+            position</span
+          >
         </div>
         <div class="meta-bar">
           <div class="meta-item">
             <span class="k">LSP</span>
-            <code>textDocument/definition</code>
+            <code>textDocument/documentHighlight</code>
           </div>
           <div class="meta-item">
             <span class="k">Routing</span>
             <code
-              >eglot<span class="route-arrow">→</span>xref<span
-                class="route-arrow"
-                >→</span
-              >consult-xref OR peek</code
+              >eglot<span class="route-arrow">→</span
+              >:documentHighlightProvider<span class="route-arrow">→</span
+              >native overlay application</code
             >
           </div>
         </div>
@@ -242,52 +244,42 @@
                   </thead>
                   <tbody>
                     <tr>
-                      <td><kbd>F12</kbd> jumps to definition</td>
+                      <td>Auto-highlights symbol on cursor stop</td>
                       <td>
-                        <kbd>M-.</kbd> or <kbd>g d</kbd>
-                        (<code>xref-find-definitions</code>)
+                        <code>eglot</code> natively triggers
+                        <code>textDocument/documentHighlight</code> on cursor
+                        idle.
                       </td>
                     </tr>
                     <tr>
-                      <td>Ctrl+Click jumps to definition</td>
+                      <td>Highlights read/write occurrences differently</td>
                       <td>
-                        <kbd>C-&lt;mouse-1&gt;</kbd> via Emacs 31
-                        <code>global-xref-mouse-mode</code>
+                        <code>eglot</code> parses the <code>kind</code>
+                        (read/write/text) from the LSP response and applies
+                        distinct faces.
                       </td>
                     </tr>
                     <tr>
-                      <td>Alt+F12 peeks definition inline</td>
+                      <td>Highlight clears on cursor move</td>
                       <td>
-                        <kbd>SPC c p d</kbd> (<code>peek-xref-definition</code>)
-                        via <code>peek</code> package
+                        Overlays are automatically destroyed when the cursor
+                        moves to a new symbol or buffer.
                       </td>
                     </tr>
                     <tr>
-                      <td>Dropdown for multiple definitions</td>
+                      <td>Works across the entire visible buffer</td>
                       <td>
-                        <code>consult-xref</code> intercepts
-                        <code>xref-show-definitions-function</code>
+                        <code>eglot</code> requests highlights for the current
+                        file scope and renders them as buffer overlays.
                       </td>
                     </tr>
                     <tr>
-                      <td>Live preview in dropdown</td>
+                      <td>Fallback when LSP is slow/disconnected</td>
                       <td>
-                        <code>consult-xref</code> + <code>vertico</code> live
-                        buffer previews
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Alt+Left returns to origin</td>
-                      <td>
-                        <kbd>M-,</kbd> or <kbd>g ,</kbd>
-                        (<code>xref-go-back</code>)
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Open in split window</td>
-                      <td>
-                        <kbd>C-x 4 .</kbd>
-                        (<code>xref-find-definitions-other-window</code>)
+                        Native
+                        <code>isearch-forward-symbol-at-point</code> (<kbd
+                          >M-s .</kbd
+                        >) provides instant local regex-based highlighting.
                       </td>
                     </tr>
                   </tbody>
@@ -354,50 +346,16 @@
                     </div>
                   </div>
                   <p class="eco-desc">
-                    Automatically registers <code>eglot-xref-backend</code> in
-                    <code>xref-backend-functions</code> for managed buffers,
-                    routing <kbd>M-.</kbd> to
-                    <code>textDocument/definition</code>.
+                    Natively routes
+                    <code>textDocument/documentHighlight</code> payloads to the
+                    overlay engine without requiring manual hook registration.
                   </p>
                 </div>
                 <div class="eco-card">
                   <div class="eco-top">
                     <div
                       class="eco-ic"
-                      style="
-                        background: rgba(187, 154, 247, 0.1);
-                        color: var(--purple);
-                      "
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        aria-hidden="true"
-                      >
-                        <path d="M4 6h16M4 12h16M4 18h10" />
-                      </svg>
-                    </div>
-                    <div>
-                      <div class="eco-name">consult</div>
-                      <div class="eco-sub">Preview Engine</div>
-                    </div>
-                  </div>
-                  <p class="eco-desc">
-                    <code>consult-xref</code> intercepts the xref display
-                    functions to provide vertico-powered previews for ambiguous
-                    definition targets.
-                  </p>
-                </div>
-                <div class="eco-card">
-                  <div class="eco-top">
-                    <div
-                      class="eco-ic"
-                      style="
-                        background: rgba(125, 207, 255, 0.1);
-                        color: var(--cyan);
-                      "
+                      style="background: rgba(187, 154, 247, 0.1); color: var(--purple);"
                     >
                       <svg
                         viewBox="0 0 24 24"
@@ -417,20 +375,16 @@
                     </div>
                   </div>
                   <p class="eco-desc">
-                    For non-LSP buffers (or when eglot is disconnected),
-                    <code>treesit</code> modes provide fallback definition
-                    jumping via <code>treesit-thing</code> navigation or
-                    <code>imenu</code> integration.
+                    Provides the underlying structural awareness for local
+                    fallback highlighting, ensuring that even without LSP,
+                    symbol boundaries are respected.
                   </p>
                 </div>
                 <div class="eco-card">
                   <div class="eco-top">
                     <div
                       class="eco-ic"
-                      style="
-                        background: rgba(158, 206, 106, 0.1);
-                        color: var(--green);
-                      "
+                      style="background: rgba(125, 207, 255, 0.1); color: var(--cyan);"
                     >
                       <svg
                         viewBox="0 0 24 24"
@@ -439,19 +393,46 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                        <path d="M9 9h6v6H9z" />
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">peek</div>
-                      <div class="eco-sub">Inline Overlay</div>
+                      <div class="eco-name">consult</div>
+                      <div class="eco-sub">Navigation Bridge</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    Provides the inline overlay engine for "Peek Definition"
-                    workflows, keeping the user's spatial context intact without
-                    switching tabs.
+                    If the user needs to navigate the highlighted occurrences,
+                    <kbd>M-?</kbd> (<code>xref-find-references</code>) instantly
+                    bridges the visual highlight to a searchable dropdown.
+                  </p>
+                </div>
+                <div class="eco-card">
+                  <div class="eco-top">
+                    <div
+                      class="eco-ic"
+                      style="background: rgba(158, 206, 106, 0.1); color: var(--green);"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path d="M12 2v20M2 12h20" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div class="eco-name">doom-themes</div>
+                      <div class="eco-sub">Visual Styling</div>
+                    </div>
+                  </div>
+                  <p class="eco-desc">
+                    Ensures the highlight is visible but recessive enough not to
+                    compete with <code>hl-line-mode</code> or syntax
+                    highlighting.
                   </p>
                 </div>
               </div>
@@ -512,75 +493,16 @@
                     <div class="stack-name">eglot</div>
                     <div class="stack-role">LSP Client</div>
                     <div class="stack-desc">
-                      Built-in. Drives <code>textDocument/definition</code> and
-                      injects the location payload into the native
-                      <code>xref</code> framework.
+                      Built-in. Queries
+                      <code>textDocument/documentHighlight</code> on cursor idle
+                      and parses the returned range array.
                     </div>
                   </div>
                 </div>
                 <div class="stack-card">
                   <div
                     class="stack-ic"
-                    style="
-                      background: rgba(187, 154, 247, 0.1);
-                      color: var(--purple);
-                    "
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      aria-hidden="true"
-                    >
-                      <path d="M4 6h16M4 12h16M4 18h10" />
-                    </svg>
-                  </div>
-                  <div class="stack-ct">
-                    <div class="stack-name">xref</div>
-                    <div class="stack-role">Navigation Framework</div>
-                    <div class="stack-desc">
-                      Built-in. Manages location abstraction, shared history
-                      ring, and cross-buffer jumping.
-                    </div>
-                  </div>
-                </div>
-                <div class="stack-card">
-                  <div
-                    class="stack-ic"
-                    style="
-                      background: rgba(125, 207, 255, 0.1);
-                      color: var(--cyan);
-                    "
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      aria-hidden="true"
-                    >
-                      <circle cx="11" cy="11" r="8" />
-                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                    </svg>
-                  </div>
-                  <div class="stack-ct">
-                    <div class="stack-name">consult-xref</div>
-                    <div class="stack-role">Preview Engine</div>
-                    <div class="stack-desc">
-                      Intercepts <code>xref-show-definitions-function</code> to
-                      render a vertico-powered dropdown with live buffer
-                      previews.
-                    </div>
-                  </div>
-                </div>
-                <div class="stack-card">
-                  <div
-                    class="stack-ic"
-                    style="
-                      background: rgba(158, 206, 106, 0.1);
-                      color: var(--green);
-                    "
+                    style="background: rgba(187, 154, 247, 0.1); color: var(--purple);"
                   >
                     <svg
                       viewBox="0 0 24 24"
@@ -594,21 +516,42 @@
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">peek</div>
-                    <div class="stack-role">Inline Peek</div>
+                    <div class="stack-name">Overlay Engine</div>
+                    <div class="stack-role">Rendering</div>
                     <div class="stack-desc">
-                      Renders the definition inline below the cursor using
-                      overlays without switching tabs (Alt+F12 parity).
+                      Natively applies overlays to matching symbols via its
+                      <code>:documentHighlightProvider</code> capability.
                     </div>
                   </div>
                 </div>
                 <div class="stack-card">
                   <div
                     class="stack-ic"
-                    style="
-                      background: rgba(224, 175, 104, 0.1);
-                      color: var(--yellow);
-                    "
+                    style="background: rgba(125, 207, 255, 0.1); color: var(--cyan);"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 2v20M2 12h20" />
+                    </svg>
+                  </div>
+                  <div class="stack-ct">
+                    <div class="stack-name">highlight face</div>
+                    <div class="stack-role">Visual Styling</div>
+                    <div class="stack-desc">
+                      The standard Emacs face applied to the highlighted ranges,
+                      customizable via theme.
+                    </div>
+                  </div>
+                </div>
+                <div class="stack-card">
+                  <div
+                    class="stack-ic"
+                    style="background: rgba(158, 206, 106, 0.1); color: var(--green);"
                   >
                     <svg
                       viewBox="0 0 24 24"
@@ -622,12 +565,11 @@
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">xref-mouse-mode</div>
-                    <div class="stack-role">Mouse Integration</div>
+                    <div class="stack-name">eglot--managed-mode</div>
+                    <div class="stack-role">Performance Guard</div>
                     <div class="stack-desc">
-                      Emacs 31 NEW. Binds <kbd>C-&lt;mouse-1&gt;</kbd> to
-                      <code>xref-find-definitions-at-mouse</code>, enabling
-                      native Ctrl+Click jumps.
+                      Automatically enables highlighting in LSP-managed buffers,
+                      respecting idle delays to prevent spam.
                     </div>
                   </div>
                 </div>
@@ -684,51 +626,22 @@
                   </thead>
                   <tbody>
                     <tr>
-                      <td>Jump to definition</td>
-                      <td><code>xref-find-definitions</code></td>
-                      <td><kbd>M-.</kbd> / <kbd>g d</kbd></td>
+                      <td>Cycle through highlights</td>
+                      <td><code>xref-find-references</code></td>
+                      <td><kbd>M-?</kbd></td>
                       <td>
-                        Jumps to target; opens
-                        <code>consult-xref</code> dropdown if ambiguous.
+                        If more context is needed, jump to the full reference
+                        list.
                       </td>
                     </tr>
                     <tr>
-                      <td>Jump to definition (mouse)</td>
-                      <td><code>xref-find-definitions-at-mouse</code></td>
-                      <td><kbd>C-&lt;mouse-1&gt;</kbd></td>
+                      <td>Jump to next occurrence</td>
+                      <td><code>isearch-forward-symbol-at-point</code></td>
+                      <td><kbd>M-s .</kbd></td>
                       <td>
-                        Emacs 31 NEW — Ctrl+Click parity via
-                        <code>global-xref-mouse-mode</code>.
+                        Native Emacs fallback to cycle through local occurrences
+                        if LSP is disconnected.
                       </td>
-                    </tr>
-                    <tr>
-                      <td>Peek definition (inline)</td>
-                      <td><code>peek-xref-definition</code></td>
-                      <td><kbd>SPC c p d</kbd></td>
-                      <td>
-                        Shows target in an inline overlay panel (requires
-                        <code>peek</code> package).
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Go back (history)</td>
-                      <td><code>xref-go-back</code></td>
-                      <td><kbd>M-,</kbd> / <kbd>g ,</kbd></td>
-                      <td>
-                        Returns to the exact cursor position before the jump.
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Go forward (history)</td>
-                      <td><code>xref-go-forward</code></td>
-                      <td>—</td>
-                      <td>Reverses <code>xref-go-back</code>.</td>
-                    </tr>
-                    <tr>
-                      <td>Find definitions (other window)</td>
-                      <td><code>xref-find-definitions-other-window</code></td>
-                      <td><kbd>C-x 4 .</kbd></td>
-                      <td>Opens definition in a horizontal split.</td>
                     </tr>
                   </tbody>
                 </table>
@@ -777,7 +690,7 @@
                     <div class="dots" aria-hidden="true">
                       <span></span><span></span><span></span>
                     </div>
-                    <span class="fname">init-xref.el</span>
+                    <span class="fname">init-highlight.el</span>
                   </div>
                   <button
                     class="copy"
@@ -800,43 +713,26 @@
                   </button>
                 </div>
                 <pre><code class="language-lisp">;; ==========================================
-;; 1. XREF &amp; CONSULT INTEGRATION (Preview Engine)
+;; EGLOT DOCUMENT HIGHLIGHT (Built-in)
 ;; ==========================================
-(use-package xref
-  :ensure nil
-  :custom
-  ;; Emacs 31 NEW: Enable Ctrl+Click jump-to-definition globally.
-  ;; Binds `C-&lt;down-mouse-1&gt;` to `xref-find-definitions-at-mouse`.
-  :config
-  (global-xref-mouse-mode 1)
-  ;; Route xref location prompts through Consult for live previews.
-  (setq xref-show-xrefs-function #'consult-xref
-        xref-show-definitions-function #'consult-xref))
+;; Eglot natively handles `textDocument/documentHighlight` via its
+;; `:documentHighlightProvider` capability. When the server supports it,
+;; Eglot automatically applies overlays to matching symbols on cursor idle.
+;; No explicit minor mode hooks or third-party packages are required.
 
 ;; ==========================================
-;; 2. PEEK PACKAGE (Inline Definition Panel)
+;; PERFORMANCE TUNING (Global)
 ;; ==========================================
-(use-package peek
-  :ensure (peek :host sourcehut :repo "~meow_king/peek")
-  :commands (peek-xref-definition peek-overlay-dwim)
-  :custom
-  (peek-mode-enable-eldoc t)        ;; show eldoc inside peek panel
-  (peek-definition-function #'xref-find-definitions)
-  :config
-  (global-peek-mode 1))
+;; The global `jit-lock-defer-time` of 0.05 (50ms) perfectly guards
+;; eglot's document highlight queries. This prevents the LSP server
+;; from being spammed during rapid cursor movement.
+(setq jit-lock-defer-time 0.05)
 
 ;; ==========================================
-;; 3. GENERAL.EL KEYBINDINGS (registered eagerly)
+;; VISUAL STYLING (Tokyo Night Synergy)
 ;; ==========================================
-(general-define-key
-  :states 'motion
-  "g d" #'xref-find-definitions
-  "g ," #'xref-go-back)
-
-(ar/global-leader
-  "c" '(:ignore t :wk "code")
-  "c p" '(:ignore t :wk "peek")
-  "c p d" '(peek-xref-definition :wk "Peek definition"))</code></pre>
+(custom-set-faces
+ '(highlight ((t (:background "#292e42" :foreground "#c0caf5" :weight bold)))))</code></pre>
               </div>
             </div>
           </div>
@@ -880,13 +776,12 @@
               <div class="sec-title">Why This Approach?</div>
               <div class="grid-2" style="margin-bottom: 24px">
                 <div class="vs-card ok">
-                  <h4>✓ xref + consult-xref · Chosen</h4>
+                  <h4>✓ eglot native · Chosen</h4>
                   <div class="vs-list">
                     <div class="vs-row">
                       <span class="lab">Coupling</span>
                       <span class="val"
-                        >Works with <i>any</i> xref backend (eglot, dumb-jump,
-                        etags).</span
+                        >Works exclusively with <code>eglot</code>.</span
                       >
                     </div>
                     <div class="vs-row">
@@ -896,24 +791,22 @@
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Preview</span>
+                      <span class="lab">Performance</span>
                       <span class="val"
-                        ><code>consult-xref</code> leverages
-                        <code>vertico</code> for fuzzy filtering and live
-                        previews.</span
+                        >Lightweight overlays, respects
+                        <code>jit-lock-defer-time</code> (50ms).</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Mouse</span>
+                      <span class="lab">Dependencies</span>
                       <span class="val"
-                        >Native Emacs 31 <code>xref-mouse-mode</code> (zero
-                        dependencies).</span
+                        >Zero. Built directly into <code>eglot.el</code>.</span
                       >
                     </div>
                   </div>
                 </div>
                 <div class="vs-card no">
-                  <h4>✕ lsp-ui-peek / lsp-mode · Rejected</h4>
+                  <h4>✕ lsp-ui / third-party highlighters · Rejected</h4>
                   <div class="vs-list">
                     <div class="vs-row">
                       <span class="lab">Coupling</span>
@@ -925,21 +818,22 @@
                     <div class="vs-row">
                       <span class="lab">Protocol</span>
                       <span class="val"
-                        >Requires the forbidden
+                        >Requires forbidden
                         <code>lsp-mode</code> ecosystem.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Preview</span>
+                      <span class="lab">Performance</span>
                       <span class="val"
-                        >Custom child-frame pipeline with heavy rendering
-                        overhead.</span
+                        >Heavy sideline rendering, prone to main-thread
+                        blocking.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Mouse</span>
+                      <span class="lab">Dependencies</span>
                       <span class="val"
-                        >Requires custom mouse-click advice.</span
+                        >Requires <code>lsp-ui</code> and its complex
+                        child-frame pipeline.</span
                       >
                     </div>
                   </div>
@@ -948,38 +842,30 @@
               <div class="sec-title">Emacs 31 Specific Enhancements</div>
               <div class="grid-2">
                 <div class="enh-card g">
-                  <div class="enh-title">xref-mouse-mode (NEW)</div>
+                  <div class="enh-title">jit-lock-defer-time Synergy</div>
                   <p class="enh-desc">
-                    Emacs 31 introduces native mouse-driven code navigation.
-                    Enabling <code>global-xref-mouse-mode</code> binds
-                    <kbd>C-&lt;down-mouse-1&gt;</kbd> to xref jumps, perfectly
-                    mirroring VS Code's Ctrl+Click convention.
+                    The global <code>jit-lock-defer-time</code> of
+                    <code>0.05</code> (50ms) perfectly guards
+                    <code>eglot</code>'s document highlight queries. Prevents
+                    LSP spam during rapid cursor movement, eliminating
+                    micro-stutters.
                   </p>
                 </div>
                 <div class="enh-card p">
-                  <div class="enh-title">Editable Xref Buffers</div>
+                  <div class="enh-title">Native Overlay Efficiency</div>
                   <p class="enh-desc">
-                    Emacs 31's <code>xref-change-to-xref-edit-mode</code> (bound
-                    to <kbd>e</kbd> in <code>*xref*</code> buffers) turns
-                    reference lists into writable surfaces for bulk mutation.
+                    Emacs 31's C-level overlay rendering is highly optimized.
+                    <code>eglot</code> draws highlight rectangles with zero
+                    redisplay lag, even in files with hundreds of occurrences.
                   </p>
                 </div>
                 <div class="enh-card y">
-                  <div class="enh-title">consult-xref synergy</div>
+                  <div class="enh-title">Treesit Fallback Readiness</div>
                   <p class="enh-desc">
-                    Ambiguous definitions (e.g., C++ overloaded functions,
-                    TypeScript union types) are presented in a highly
-                    performant, searchable Vertico dropdown with instant buffer
-                    previews.
-                  </p>
-                </div>
-                <div class="enh-card g">
-                  <div class="enh-title">peek package integration</div>
-                  <p class="enh-desc">
-                    The <code>peek</code> package hooks directly into the
-                    <code>xref</code> framework via
-                    <code>peek-definition-function</code>, allowing it to
-                    intercept payloads and render them as inline overlays.
+                    If the LSP server stalls, <kbd>M-s .</kbd>
+                    (<code>isearch-forward-symbol-at-point</code>) utilizes
+                    <code>treesit</code> or syntax tables to highlight local
+                    occurrences instantly without network latency.
                   </p>
                 </div>
               </div>

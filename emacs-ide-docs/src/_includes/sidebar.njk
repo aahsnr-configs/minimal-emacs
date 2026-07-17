@@ -1,0 +1,46 @@
+{% set navItems = [
+  { slug: "intellisense", label: "IntelliSense", path: "/content/intellisense/" },
+  { slug: "hover-info-native", label: "Hover Info", path: "/content/hover-info-native/" },
+  { slug: "signature-help", label: "Signature Help", path: "/content/signature-help/" },
+  { slug: "go-to-definition", label: "Definition", path: "/content/go-to-definition/" },
+  { slug: "code-actions", label: "Code Actions", path: "/content/code-actions/" }
+] %}
+
+<aside class="sidebar" id="sb" aria-label="Main Navigation">
+  <div class="sidebar-head">
+    <a href="/" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+      </svg>
+      <span class="brand">Emacs IDE</span>
+    </a>
+  </div>
+  <nav class="sidebar-nav" aria-label="Sidebar Menu">
+    {% for item in navItems %}
+      {% set isActive = page.url == item.path %}
+      <a href="{{ item.path }}" class="nav {% if isActive %}active{% endif %}" data-tip="{{ item.label }}" {% if isActive %}aria-current="page"{% endif %}>
+        {% if item.slug == "intellisense" %}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24A2.5 2.5 0 0 1 9.5 2z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24A2.5 2.5 0 0 0 14.5 2z"/></svg>
+        {% elif item.slug == "hover-info-native" %}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>
+        {% elif item.slug == "signature-help" %}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8" /></svg>
+        {% elif item.slug == "go-to-definition" %}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+        {% elif item.slug == "code-actions" %}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z" /></svg>
+        {% endif %}
+        <span class="nav-label">{{ item.label }}</span>
+      </a>
+    {% endfor %}
+  </nav>
+  <div class="sidebar-foot">
+    <button class="nav" id="sbToggle" data-tip="Toggle Sidebar" aria-label="Toggle Sidebar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <line x1="9" y1="3" x2="9" y2="21" />
+      </svg>
+      <span class="nav-label">Collapse Menu</span>
+    </button>
+  </div>
+</aside>

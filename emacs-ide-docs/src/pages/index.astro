@@ -1,0 +1,56 @@
+---
+import { getCollection } from 'astro:content';
+import DocsLayout from '../layouts/DocsLayout.astro';
+
+// Fetch all MDX documents from the Astro 5 Content Layer
+const docs = await getCollection('docs');
+
+// Group documents by their 'category' frontmatter
+const categories = [...new Set(docs.map(doc => doc.data.category))];
+const groupedDocs = categories.map(cat => ({
+  category: cat,
+  items: docs.filter(d => d.data.category === cat)
+}));
+---
+<DocsLayout title="Master Index">
+  <main class="main" id="main-content">
+    <header class="page-head">
+      <div class="title-row">
+        <h1>Emacs 31 IDE Documentation</h1>
+        <span class="status" role="status">Phase 3 Complete</span>
+      </div>
+      <div class="category">Master Index &amp; Architecture</div>
+      <div class="parity">
+        <b>Strangler Pattern Migration</b>
+        <span>All 40 features successfully migrated to Astro 5.x Content Collections.</span>
+      </div>
+    </header>
+
+    {groupedDocs.map(group => (
+      <section style="margin-bottom: 32px;">
+        <h2 class="sec-title">{group.category}</h2>
+        <div class="grid-2">
+          {group.items.map(doc => (
+            <a href={`/docs/${doc.id}/`} class="eco-card" style="text-decoration: none;">
+              <div class="eco-top">
+                <div class="eco-ic">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <rect x="3" y="3" width="7" height="7" />
+                    <rect x="14" y="3" width="7" height="7" />
+                    <rect x="14" y="14" width="7" height="7" />
+                    <rect x="3" y="14" width="7" height="7" />
+                  </svg>
+                </div>
+                <div>
+                  <div class="eco-name">{doc.data.title}</div>
+                  <div class="eco-sub">{doc.data.status}</div>
+                </div>
+              </div>
+              <p class="eco-desc">{doc.data.parity}</p>
+            </a>
+          ))}
+        </div>
+      </section>
+    ))}
+  </main>
+</DocsLayout>

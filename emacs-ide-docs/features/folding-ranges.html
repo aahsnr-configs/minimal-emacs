@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Emacs IDE — Go to Definition</title>
+    <title>Emacs IDE — Folding Ranges</title>
     <link
       href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.18/index.min.css"
       rel="stylesheet"
@@ -78,7 +78,7 @@
           </svg>
           <span class="nav-label">Signature Help</span>
         </button>
-        <button class="nav active" data-tip="Definition" aria-current="page">
+        <button class="nav" data-tip="Definition">
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -91,7 +91,7 @@
           </svg>
           <span class="nav-label">Definition</span>
         </button>
-        <button class="nav" data-tip="Code Actions">
+        <button class="nav active" data-tip="Code Actions" aria-current="page">
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -146,9 +146,9 @@
         </button>
         <div class="crumbs" aria-label="Breadcrumb">
           <span>Docs</span><span class="s" aria-hidden="true">/</span>
-          <span>Navigation &amp; Code Jumping</span
+          <span>Formatting &amp; Editing</span
           ><span class="s" aria-hidden="true">/</span>
-          <span class="cur" aria-current="page">Go to Definition</span>
+          <span class="cur" aria-current="page">Folding Ranges</span>
         </div>
       </div>
       <button
@@ -171,26 +171,33 @@
     <main class="main" id="main-content">
       <header class="page-head">
         <div class="title-row">
-          <h1>Go to Definition</h1>
+          <h1>Folding Ranges</h1>
           <span class="status" role="status">Working</span>
         </div>
-        <div class="category">Navigation &amp; Code Jumping</div>
+        <div class="category">Formatting &amp; Editing</div>
         <div class="parity">
           <b>VS Code Parity</b>
-          <span>F12 to jump, Ctrl+Click to jump, Alt+F12 to peek inline</span>
+          <span
+            >Gutter arrows to collapse/expand code blocks, functions, imports,
+            regions</span
+          >
         </div>
         <div class="meta-bar">
           <div class="meta-item">
             <span class="k">LSP</span>
-            <code>textDocument/definition</code>
+            <code>textDocument/foldingRange</code>
+            <span class="meta-sep" aria-hidden="true">·</span>
+            <span style="color: var(--text-dim); font-size: 12px"
+              >(Explicitly bypassed)</span
+            >
           </div>
           <div class="meta-item">
             <span class="k">Routing</span>
             <code
-              >eglot<span class="route-arrow">→</span>xref<span
+              >treesit-fold<span class="route-arrow">→</span>hideshow<span
                 class="route-arrow"
                 >→</span
-              >consult-xref OR peek</code
+              >vimish-fold</code
             >
           </div>
         </div>
@@ -242,52 +249,49 @@
                   </thead>
                   <tbody>
                     <tr>
-                      <td><kbd>F12</kbd> jumps to definition</td>
+                      <td>Click gutter arrow to fold/unfold</td>
                       <td>
-                        <kbd>M-.</kbd> or <kbd>g d</kbd>
-                        (<code>xref-find-definitions</code>)
+                        <code>treesit-fold</code> fringe indicators or
+                        <code>hideshow</code> margin clicks.
                       </td>
                     </tr>
                     <tr>
-                      <td>Ctrl+Click jumps to definition</td>
+                      <td><kbd>Ctrl+K Ctrl+0</kbd> (Fold all)</td>
+                      <td><kbd>zM</kbd> (<code>ar/fold-close-all</code>).</td>
+                    </tr>
+                    <tr>
+                      <td><kbd>Ctrl+K Ctrl+J</kbd> (Unfold all)</td>
+                      <td><kbd>zR</kbd> (<code>ar/fold-open-all</code>).</td>
+                    </tr>
+                    <tr>
                       <td>
-                        <kbd>C-&lt;mouse-1&gt;</kbd> via Emacs 31
-                        <code>global-xref-mouse-mode</code>
+                        <kbd>Ctrl+Shift+[</kbd> / <kbd>]</kbd> (Fold/Unfold)
+                      </td>
+                      <td>
+                        <kbd>zc</kbd> / <kbd>zo</kbd> (<code
+                          >ar/fold-close</code
+                        >
+                        / <code>ar/fold-open</code>).
                       </td>
                     </tr>
                     <tr>
-                      <td>Alt+F12 peeks definition inline</td>
+                      <td>Fold arbitrary visual selection</td>
                       <td>
-                        <kbd>SPC c p d</kbd> (<code>peek-xref-definition</code>)
-                        via <code>peek</code> package
+                        <kbd>zf</kbd> (<code>evil-vimish-fold/create</code>).
                       </td>
                     </tr>
                     <tr>
-                      <td>Dropdown for multiple definitions</td>
+                      <td>See hidden line count in gutter</td>
                       <td>
-                        <code>consult-xref</code> intercepts
-                        <code>xref-show-definitions-function</code>
+                        <code>ar/hs-overlay-line-count</code> renders
+                        <code>↴ [X lines]</code> natively.
                       </td>
                     </tr>
                     <tr>
-                      <td>Live preview in dropdown</td>
+                      <td>Indentation-based folding (Python/YAML)</td>
                       <td>
-                        <code>consult-xref</code> + <code>vertico</code> live
-                        buffer previews
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Alt+Left returns to origin</td>
-                      <td>
-                        <kbd>M-,</kbd> or <kbd>g ,</kbd>
-                        (<code>xref-go-back</code>)
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Open in split window</td>
-                      <td>
-                        <kbd>C-x 4 .</kbd>
-                        (<code>xref-find-definitions-other-window</code>)
+                        Emacs 31's <code>hs-indentation-mode</code> handles this
+                        natively without regex hacks.
                       </td>
                     </tr>
                   </tbody>
@@ -344,20 +348,20 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <circle cx="12" cy="12" r="3" />
-                        <path d="M12 1v6m0 6v6" />
+                        <path
+                          d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                        />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">eglot</div>
-                      <div class="eco-sub">LSP Client</div>
+                      <div class="eco-name">treesit</div>
+                      <div class="eco-sub">AST Foundation</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    Automatically registers <code>eglot-xref-backend</code> in
-                    <code>xref-backend-functions</code> for managed buffers,
-                    routing <kbd>M-.</kbd> to
-                    <code>textDocument/definition</code>.
+                    Provides the foundational AST that
+                    <code>treesit-fold</code> queries, ensuring folding
+                    boundaries align perfectly with syntactic scopes.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -376,18 +380,20 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <path d="M4 6h16M4 12h16M4 18h10" />
+                        <path
+                          d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                        />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">consult</div>
-                      <div class="eco-sub">Preview Engine</div>
+                      <div class="eco-name">evil</div>
+                      <div class="eco-sub">Modal Integration</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    <code>consult-xref</code> intercepts the xref display
-                    functions to provide vertico-powered previews for ambiguous
-                    definition targets.
+                    <code>evil-vimish-fold</code> maps standard Vim folding
+                    motions (<kbd>zf</kbd>, <kbd>zo</kbd>, <kbd>zc</kbd>) to the
+                    native folding engine, preserving muscle memory.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -406,21 +412,21 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
                         <path
-                          d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                          d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
                         />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">treesit</div>
-                      <div class="eco-sub">Fallback Parser</div>
+                      <div class="eco-name">general.el</div>
+                      <div class="eco-sub">Keybindings</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    For non-LSP buffers (or when eglot is disconnected),
-                    <code>treesit</code> modes provide fallback definition
-                    jumping via <code>treesit-thing</code> navigation or
-                    <code>imenu</code> integration.
+                    Eagerly registers the <kbd>za</kbd>, <kbd>zo</kbd>,
+                    <kbd>zc</kbd> dispatcher bindings at startup, ensuring they
+                    are available globally without deferred-registration traps.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -428,8 +434,8 @@
                     <div
                       class="eco-ic"
                       style="
-                        background: rgba(158, 206, 106, 0.1);
-                        color: var(--green);
+                        background: rgba(247, 118, 142, 0.1);
+                        color: var(--red);
                       "
                     >
                       <svg
@@ -439,19 +445,19 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                        <path d="M9 9h6v6H9z" />
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">peek</div>
-                      <div class="eco-sub">Inline Overlay</div>
+                      <div class="eco-name">too-long-file-p</div>
+                      <div class="eco-sub">Performance Guard</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    Provides the inline overlay engine for "Peek Definition"
-                    workflows, keeping the user's spatial context intact without
-                    switching tabs.
+                    All folding minor modes are guarded by this custom function,
+                    preventing Emacs from attempting to parse and fold massive
+                    files which would otherwise freeze the main thread.
                   </p>
                 </div>
               </div>
@@ -504,17 +510,18 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <circle cx="12" cy="12" r="3" />
-                      <path d="M12 1v6m0 6v6" />
+                      <path
+                        d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                      />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">eglot</div>
-                    <div class="stack-role">LSP Client</div>
+                    <div class="stack-name">treesit-fold</div>
+                    <div class="stack-role">Primary AST Engine</div>
                     <div class="stack-desc">
-                      Built-in. Drives <code>textDocument/definition</code> and
-                      injects the location payload into the native
-                      <code>xref</code> framework.
+                      Provides intelligent, structural code folding by directly
+                      querying the tree-sitter syntax tree, ensuring 100%
+                      accuracy for functions, classes, and blocks.
                     </div>
                   </div>
                 </div>
@@ -537,11 +544,13 @@
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">xref</div>
-                    <div class="stack-role">Navigation Framework</div>
+                    <div class="stack-name">hideshow</div>
+                    <div class="stack-role">Native Fallback</div>
                     <div class="stack-desc">
-                      Built-in. Manages location abstraction, shared history
-                      ring, and cross-buffer jumping.
+                      Built-in. Emacs 31 introduces native support for
+                      tree-sitter modes via the new <code>list</code> thing,
+                      alongside new commands like <code>hs-cycle</code> and
+                      <code>hs-indentation-mode</code>.
                     </div>
                   </div>
                 </div>
@@ -560,17 +569,17 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <circle cx="11" cy="11" r="8" />
-                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <path d="M9 9h6v6H9z" />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">consult-xref</div>
-                    <div class="stack-role">Preview Engine</div>
+                    <div class="stack-name">vimish-fold</div>
+                    <div class="stack-role">Visual Region Fallback</div>
                     <div class="stack-desc">
-                      Intercepts <code>xref-show-definitions-function</code> to
-                      render a vertico-powered dropdown with live buffer
-                      previews.
+                      Allows arbitrary visual region folding (like VS Code's
+                      <kbd>Ctrl+K Ctrl+0</kbd>), caching fold state persistently
+                      across sessions.
                     </div>
                   </div>
                 </div>
@@ -589,45 +598,16 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <path d="M9 9h6v6H9z" />
+                      <path d="M12 2v20M2 12h20" />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">peek</div>
-                    <div class="stack-role">Inline Peek</div>
+                    <div class="stack-name">Native Fringes / Margins</div>
+                    <div class="stack-role">Indicator Rendering</div>
                     <div class="stack-desc">
-                      Renders the definition inline below the cursor using
-                      overlays without switching tabs (Alt+F12 parity).
-                    </div>
-                  </div>
-                </div>
-                <div class="stack-card">
-                  <div
-                    class="stack-ic"
-                    style="
-                      background: rgba(224, 175, 104, 0.1);
-                      color: var(--yellow);
-                    "
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      aria-hidden="true"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <path d="M12 8v4l3 3" />
-                    </svg>
-                  </div>
-                  <div class="stack-ct">
-                    <div class="stack-name">xref-mouse-mode</div>
-                    <div class="stack-role">Mouse Integration</div>
-                    <div class="stack-desc">
-                      Emacs 31 NEW. Binds <kbd>C-&lt;mouse-1&gt;</kbd> to
-                      <code>xref-find-definitions-at-mouse</code>, enabling
-                      native Ctrl+Click jumps.
+                      Emacs 31's refined <code>hs-indicator-type</code> and
+                      <code>treesit-fold-indicators-priority</code> ensure
+                      clean, non-intrusive gutter arrows.
                     </div>
                   </div>
                 </div>
@@ -684,51 +664,50 @@
                   </thead>
                   <tbody>
                     <tr>
-                      <td>Jump to definition</td>
-                      <td><code>xref-find-definitions</code></td>
-                      <td><kbd>M-.</kbd> / <kbd>g d</kbd></td>
+                      <td>Toggle fold at point</td>
+                      <td><code>ar/fold-toggle</code></td>
+                      <td><kbd>za</kbd></td>
                       <td>
-                        Jumps to target; opens
-                        <code>consult-xref</code> dropdown if ambiguous.
+                        Intelligent dispatcher: tries
+                        <code>treesit-fold</code>, then <code>hideshow</code>,
+                        then <code>vimish-fold</code>.
                       </td>
                     </tr>
                     <tr>
-                      <td>Jump to definition (mouse)</td>
-                      <td><code>xref-find-definitions-at-mouse</code></td>
-                      <td><kbd>C-&lt;mouse-1&gt;</kbd></td>
-                      <td>
-                        Emacs 31 NEW — Ctrl+Click parity via
-                        <code>global-xref-mouse-mode</code>.
-                      </td>
+                      <td>Open fold at point</td>
+                      <td><code>ar/fold-open</code></td>
+                      <td><kbd>zo</kbd></td>
+                      <td>Reveals the hidden block.</td>
                     </tr>
                     <tr>
-                      <td>Peek definition (inline)</td>
-                      <td><code>peek-xref-definition</code></td>
-                      <td><kbd>SPC c p d</kbd></td>
-                      <td>
-                        Shows target in an inline overlay panel (requires
-                        <code>peek</code> package).
-                      </td>
+                      <td>Close fold at point</td>
+                      <td><code>ar/fold-close</code></td>
+                      <td><kbd>zc</kbd></td>
+                      <td>Conceals the block.</td>
                     </tr>
                     <tr>
-                      <td>Go back (history)</td>
-                      <td><code>xref-go-back</code></td>
-                      <td><kbd>M-,</kbd> / <kbd>g ,</kbd></td>
-                      <td>
-                        Returns to the exact cursor position before the jump.
-                      </td>
+                      <td>Open all folds</td>
+                      <td><code>ar/fold-open-all</code></td>
+                      <td><kbd>zR</kbd></td>
+                      <td>Expands the entire buffer.</td>
                     </tr>
                     <tr>
-                      <td>Go forward (history)</td>
-                      <td><code>xref-go-forward</code></td>
-                      <td>—</td>
-                      <td>Reverses <code>xref-go-back</code>.</td>
+                      <td>Close all folds</td>
+                      <td><code>ar/fold-close-all</code></td>
+                      <td><kbd>zM</kbd></td>
+                      <td>Collapses all top-level blocks.</td>
                     </tr>
                     <tr>
-                      <td>Find definitions (other window)</td>
-                      <td><code>xref-find-definitions-other-window</code></td>
-                      <td><kbd>C-x 4 .</kbd></td>
-                      <td>Opens definition in a horizontal split.</td>
+                      <td>Create visual fold</td>
+                      <td><code>evil-vimish-fold/create</code></td>
+                      <td><kbd>zf</kbd></td>
+                      <td>Folds the currently selected visual region.</td>
+                    </tr>
+                    <tr>
+                      <td>Delete visual fold</td>
+                      <td><code>vimish-fold-delete</code></td>
+                      <td><kbd>zd</kbd></td>
+                      <td>Removes the fold at point.</td>
                     </tr>
                   </tbody>
                 </table>
@@ -777,7 +756,7 @@
                     <div class="dots" aria-hidden="true">
                       <span></span><span></span><span></span>
                     </div>
-                    <span class="fname">init-xref.el</span>
+                    <span class="fname">init-folding.el</span>
                   </div>
                   <button
                     class="copy"
@@ -800,43 +779,95 @@
                   </button>
                 </div>
                 <pre><code class="language-lisp">;; ==========================================
-;; 1. XREF &amp; CONSULT INTEGRATION (Preview Engine)
+;; 1. TREESIT-FOLD (Primary AST-Aware Engine)
 ;; ==========================================
-(use-package xref
+(use-package treesit-fold
+  :if (treesit-available-p)
+  :defer t
+  :hook ((prog-mode text-mode conf-mode) . ar/treesit-fold-maybe-enable)
+  :init
+  (defun ar/treesit-fold-maybe-enable ()
+    (unless (derived-mode-p 'lisp-mode 'emacs-lisp-mode 'lisp-interaction-mode 'lisp-data-mode)
+      (treesit-fold-mode 1)))
+  :config
+  (global-treesit-fold-indicators-mode 1)
+  (setq treesit-fold-indicators-priority -1)
+  (define-advice treesit-fold-mode (:before-while (&optional arg) guard-large-files)
+    (or (and arg (&lt; (prefix-numeric-value arg) 1))
+        (not (too-long-file-p)))))
+
+;; ==========================================
+;; 2. HIDESHOW (Emacs 31 Enhanced Native Fallback)
+;; ==========================================
+(use-package hideshow
   :ensure nil
-  :custom
-  ;; Emacs 31 NEW: Enable Ctrl+Click jump-to-definition globally.
-  ;; Binds `C-&lt;down-mouse-1&gt;` to `xref-find-definitions-at-mouse`.
+  :defer t
+  :commands (hs-toggle-hiding hs-hide-block hs-show-block hs-hide-all hs-show-all)
   :config
-  (global-xref-mouse-mode 1)
-  ;; Route xref location prompts through Consult for live previews.
-  (setq xref-show-xrefs-function #'consult-xref
-        xref-show-definitions-function #'consult-xref))
+  (setq hs-hide-comments-when-hiding-all nil
+        hs-set-up-overlay #'ar/hs-overlay-line-count)
+  (define-advice hs-minor-mode (:before-while (&optional arg) guard-large-files)
+    (or (and arg (&lt; (prefix-numeric-value arg) 1))
+        (not (too-long-file-p))))
+  (unless (assq 't hs-special-modes-alist)
+    (setq hs-special-modes-alist
+          (append hs-special-modes-alist
+                  '((t "{{{" "}}}" nil nil))))))
 
 ;; ==========================================
-;; 2. PEEK PACKAGE (Inline Definition Panel)
+;; 3. VIMISH-FOLD (Visual Region Fallback)
 ;; ==========================================
-(use-package peek
-  :ensure (peek :host sourcehut :repo "~meow_king/peek")
-  :commands (peek-xref-definition peek-overlay-dwim)
-  :custom
-  (peek-mode-enable-eldoc t)        ;; show eldoc inside peek panel
-  (peek-definition-function #'xref-find-definitions)
+(use-package vimish-fold
+  :defer t
+  :after evil
+  :init
+  (setq vimish-fold-dir (no-littering-expand-var-file-name "vimish-fold/")
+        vimish-fold-indication-mode 'right-fringe)
   :config
-  (global-peek-mode 1))
+  (vimish-fold-global-mode 1))
+
+(use-package evil-vimish-fold
+  :defer t
+  :after vimish-fold
+  :init
+  (setq evil-vimish-fold-mode-lighter " ↴"
+        evil-vimish-fold-target-modes '(prog-mode conf-mode text-mode))
+  :config
+  (global-evil-vimish-fold-mode 1))
 
 ;; ==========================================
-;; 3. GENERAL.EL KEYBINDINGS (registered eagerly)
+;; 4. UNIFIED DISPATCHER &amp; KEYBINDINGS
 ;; ==========================================
+(defun ar/hs-overlay-line-count (ov)
+  "Append hidden line count to the native ellipsis for visual feedback."
+  (when (eq 'code (overlay-get ov 'hs))
+    (let* ((start (overlay-start ov))
+           (end (overlay-end ov))
+           (lines (count-lines start end)))
+      (overlay-put ov 'display
+                   (format "%s [%d lines]" truncate-string-ellipsis lines)))))
+
+(defun ar/fold-toggle ()
+  (interactive)
+  (cond ((bound-and-true-p treesit-fold-mode) (treesit-fold-toggle))
+        ((bound-and-true-p outline-minor-mode) (outline-cycle))
+        ((bound-and-true-p hs-minor-mode) (hs-toggle-hiding))
+        ((fboundp 'vimish-fold-toggle)
+         (condition-case nil (vimish-fold-toggle)
+           (error (user-error "No foldable region at point"))))
+        (t (user-error "No foldable region at point"))))
+
 (general-define-key
   :states 'motion
-  "g d" #'xref-find-definitions
-  "g ," #'xref-go-back)
-
-(ar/global-leader
-  "c" '(:ignore t :wk "code")
-  "c p" '(:ignore t :wk "peek")
-  "c p d" '(peek-xref-definition :wk "Peek definition"))</code></pre>
+  "za" #'ar/fold-toggle
+  "zo" #'ar/fold-open
+  "zc" #'ar/fold-close
+  "zR" #'ar/fold-open-all
+  "zM" #'ar/fold-close-all
+  "zf" #'evil-vimish-fold/create
+  "zF" #'evil-vimish-fold/create-line
+  "zd" #'vimish-fold-delete
+  "zE" #'vimish-fold-delete-all)</code></pre>
               </div>
             </div>
           </div>
@@ -880,66 +911,66 @@
               <div class="sec-title">Why This Approach?</div>
               <div class="grid-2" style="margin-bottom: 24px">
                 <div class="vs-card ok">
-                  <h4>✓ xref + consult-xref · Chosen</h4>
+                  <h4>✓ Native treesit-fold + hideshow · Chosen</h4>
                   <div class="vs-list">
                     <div class="vs-row">
-                      <span class="lab">Coupling</span>
+                      <span class="lab">Latency</span>
                       <span class="val"
-                        >Works with <i>any</i> xref backend (eglot, dumb-jump,
-                        etags).</span
+                        ><b>0ms.</b> Queries the local C-level AST
+                        instantly.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Accuracy</span>
+                      <span class="val"
+                        ><b>Perfect.</b> Tree-sitter understands the exact
+                        syntactic scope of every block.</span
                       >
                     </div>
                     <div class="vs-row">
                       <span class="lab">Protocol</span>
                       <span class="val"
-                        >Honors the <code>eglot</code>-only stack mandate.</span
+                        >Honors the <code>eglot</code>-only stack mandate by
+                        bypassing unnecessary LSP UI features.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Preview</span>
+                      <span class="lab">Visual Polish</span>
                       <span class="val"
-                        ><code>consult-xref</code> leverages
-                        <code>vertico</code> for fuzzy filtering and live
-                        previews.</span
-                      >
-                    </div>
-                    <div class="vs-row">
-                      <span class="lab">Mouse</span>
-                      <span class="val"
-                        >Native Emacs 31 <code>xref-mouse-mode</code> (zero
-                        dependencies).</span
+                        >Custom <code>ar/hs-overlay-line-count</code> appends
+                        <code>[X lines]</code> to the ellipsis.</span
                       >
                     </div>
                   </div>
                 </div>
                 <div class="vs-card no">
-                  <h4>✕ lsp-ui-peek / lsp-mode · Rejected</h4>
+                  <h4>✕ LSP foldingRange · Rejected</h4>
                   <div class="vs-list">
                     <div class="vs-row">
-                      <span class="lab">Coupling</span>
+                      <span class="lab">Latency</span>
                       <span class="val"
-                        >Hard-bound to the
-                        <code>lsp-mode</code> ecosystem.</span
+                        ><b>High.</b> Requires a synchronous network roundtrip
+                        to the LSP server on file open.</span
+                      >
+                    </div>
+                    <div class="vs-row">
+                      <span class="lab">Accuracy</span>
+                      <span class="val"
+                        ><b>Variable.</b> Depends entirely on the language
+                        server's implementation.</span
                       >
                     </div>
                     <div class="vs-row">
                       <span class="lab">Protocol</span>
                       <span class="val"
-                        >Requires the forbidden
-                        <code>lsp-mode</code> ecosystem.</span
+                        >Adds redundant network overhead for a feature Emacs
+                        handles natively.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Preview</span>
+                      <span class="lab">Visual Polish</span>
                       <span class="val"
-                        >Custom child-frame pipeline with heavy rendering
-                        overhead.</span
-                      >
-                    </div>
-                    <div class="vs-row">
-                      <span class="lab">Mouse</span>
-                      <span class="val"
-                        >Requires custom mouse-click advice.</span
+                        >Generic, uncustomizable server-provided ranges.</span
                       >
                     </div>
                   </div>
@@ -948,38 +979,39 @@
               <div class="sec-title">Emacs 31 Specific Enhancements</div>
               <div class="grid-2">
                 <div class="enh-card g">
-                  <div class="enh-title">xref-mouse-mode (NEW)</div>
+                  <div class="enh-title">Tree-Sitter hideshow Integration</div>
                   <p class="enh-desc">
-                    Emacs 31 introduces native mouse-driven code navigation.
-                    Enabling <code>global-xref-mouse-mode</code> binds
-                    <kbd>C-&lt;down-mouse-1&gt;</kbd> to xref jumps, perfectly
-                    mirroring VS Code's Ctrl+Click convention.
+                    Tree-sitter enabled modes now properly support
+                    <code>hs-minor-mode</code> via the new
+                    <code>list</code> thing, allowing <code>hideshow</code> to
+                    fold structural blocks with C-level precision.
                   </p>
                 </div>
                 <div class="enh-card p">
-                  <div class="enh-title">Editable Xref Buffers</div>
+                  <div class="enh-title">New hideshow Commands</div>
                   <p class="enh-desc">
-                    Emacs 31's <code>xref-change-to-xref-edit-mode</code> (bound
-                    to <kbd>e</kbd> in <code>*xref*</code> buffers) turns
-                    reference lists into writable surfaces for bulk mutation.
+                    Emacs 31 introduces <code>hs-cycle</code> (toggle between
+                    folded, unfolded, and children-only states) and
+                    <code>hs-toggle-all</code> for rapid buffer-wide state
+                    changes.
                   </p>
                 </div>
                 <div class="enh-card y">
-                  <div class="enh-title">consult-xref synergy</div>
+                  <div class="enh-title">hs-indentation-mode</div>
                   <p class="enh-desc">
-                    Ambiguous definitions (e.g., C++ overloaded functions,
-                    TypeScript union types) are presented in a highly
-                    performant, searchable Vertico dropdown with instant buffer
-                    previews.
+                    Provides robust, indentation-based folding for languages
+                    like Python and YAML, replacing fragile regex-based
+                    fallbacks.
                   </p>
                 </div>
                 <div class="enh-card g">
-                  <div class="enh-title">peek package integration</div>
+                  <div class="enh-title">treesit-fold Fringe Priority</div>
                   <p class="enh-desc">
-                    The <code>peek</code> package hooks directly into the
-                    <code>xref</code> framework via
-                    <code>peek-definition-function</code>, allowing it to
-                    intercept payloads and render them as inline overlays.
+                    The configuration explicitly sets
+                    <code>treesit-fold-indicators-priority</code> to
+                    <code>-1</code>, ensuring folding arrows render behind
+                    <code>diff-hl</code> and <code>flymake</code> indicators,
+                    preventing visual clutter in the left margin.
                   </p>
                 </div>
               </div>

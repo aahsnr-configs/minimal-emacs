@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Emacs IDE — Go to Definition</title>
+    <title>Emacs IDE — Diagnostics (Push Model)</title>
     <link
       href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.18/index.min.css"
       rel="stylesheet"
@@ -78,7 +78,7 @@
           </svg>
           <span class="nav-label">Signature Help</span>
         </button>
-        <button class="nav active" data-tip="Definition" aria-current="page">
+        <button class="nav" data-tip="Definition">
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -146,9 +146,9 @@
         </button>
         <div class="crumbs" aria-label="Breadcrumb">
           <span>Docs</span><span class="s" aria-hidden="true">/</span>
-          <span>Navigation &amp; Code Jumping</span
+          <span>Diagnostics &amp; Symbols</span
           ><span class="s" aria-hidden="true">/</span>
-          <span class="cur" aria-current="page">Go to Definition</span>
+          <span class="cur" aria-current="page">Diagnostics (Push)</span>
         </div>
       </div>
       <button
@@ -171,26 +171,29 @@
     <main class="main" id="main-content">
       <header class="page-head">
         <div class="title-row">
-          <h1>Go to Definition</h1>
+          <h1>Diagnostics (Push Model)</h1>
           <span class="status" role="status">Working</span>
         </div>
-        <div class="category">Navigation &amp; Code Jumping</div>
+        <div class="category">Diagnostics &amp; Symbols</div>
         <div class="parity">
           <b>VS Code Parity</b>
-          <span>F12 to jump, Ctrl+Click to jump, Alt+F12 to peek inline</span>
+          <span
+            >Red/green squiggles in the editor and a centralized, filterable
+            "Problems" panel</span
+          >
         </div>
         <div class="meta-bar">
           <div class="meta-item">
             <span class="k">LSP</span>
-            <code>textDocument/definition</code>
+            <code>textDocument/publishDiagnostics</code>
           </div>
           <div class="meta-item">
             <span class="k">Routing</span>
             <code
-              >eglot<span class="route-arrow">→</span>xref<span
+              >eglot<span class="route-arrow">→</span>flymake<span
                 class="route-arrow"
                 >→</span
-              >consult-xref OR peek</code
+              >consult-flymake / native *Flymake diagnostics* buffer</code
             >
           </div>
         </div>
@@ -242,52 +245,46 @@
                   </thead>
                   <tbody>
                     <tr>
-                      <td><kbd>F12</kbd> jumps to definition</td>
+                      <td>Squiggles under erroneous code</td>
                       <td>
-                        <kbd>M-.</kbd> or <kbd>g d</kbd>
-                        (<code>xref-find-definitions</code>)
+                        <code>flymake</code> renders squiggles via
+                        <code>flymake-error</code> /
+                        <code>flymake-warning</code> faces.
                       </td>
                     </tr>
                     <tr>
-                      <td>Ctrl+Click jumps to definition</td>
+                      <td>Centralized Problems panel</td>
                       <td>
-                        <kbd>C-&lt;mouse-1&gt;</kbd> via Emacs 31
-                        <code>global-xref-mouse-mode</code>
+                        <code>flymake-show-buffer-diagnostics</code> or
+                        <code>consult-flymake-project</code>.
                       </td>
                     </tr>
                     <tr>
-                      <td>Alt+F12 peeks definition inline</td>
+                      <td>Filter by severity (Errors / Warnings)</td>
                       <td>
-                        <kbd>SPC c p d</kbd> (<code>peek-xref-definition</code>)
-                        via <code>peek</code> package
+                        Native <kbd>/</kbd> filter in tabulated-list +
+                        <code>consult-flymake</code> for fuzzy matching.
                       </td>
                     </tr>
                     <tr>
-                      <td>Dropdown for multiple definitions</td>
+                      <td>Click error to jump to location</td>
                       <td>
-                        <code>consult-xref</code> intercepts
-                        <code>xref-show-definitions-function</code>
+                        <kbd>RET</kbd> on any row in the diagnostics buffer, or
+                        fringe/margin clicks (Emacs 31).
                       </td>
                     </tr>
                     <tr>
-                      <td>Live preview in dropdown</td>
+                      <td>Inline message on hover</td>
                       <td>
-                        <code>consult-xref</code> + <code>vertico</code> live
-                        buffer previews
+                        Emacs 31 <code>'fancy</code> end-of-line rendering
+                        displays the message contextually.
                       </td>
                     </tr>
                     <tr>
-                      <td>Alt+Left returns to origin</td>
+                      <td>"Quick Fix" from panel</td>
                       <td>
-                        <kbd>M-,</kbd> or <kbd>g ,</kbd>
-                        (<code>xref-go-back</code>)
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>Open in split window</td>
-                      <td>
-                        <kbd>C-x 4 .</kbd>
-                        (<code>xref-find-definitions-other-window</code>)
+                        <kbd>SPC c a</kbd> (<code>eglot-code-actions</code>) at
+                        the diagnostic location.
                       </td>
                     </tr>
                   </tbody>
@@ -354,10 +351,10 @@
                     </div>
                   </div>
                   <p class="eco-desc">
-                    Automatically registers <code>eglot-xref-backend</code> in
-                    <code>xref-backend-functions</code> for managed buffers,
-                    routing <kbd>M-.</kbd> to
-                    <code>textDocument/definition</code>.
+                    Natively intercepts
+                    <code>textDocument/publishDiagnostics</code> and routes the
+                    payload directly into <code>flymake</code>'s API, requiring
+                    zero custom translation layers.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -376,18 +373,20 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <path d="M4 6h16M4 12h16M4 18h10" />
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
                       </svg>
                     </div>
                     <div>
                       <div class="eco-name">consult</div>
-                      <div class="eco-sub">Preview Engine</div>
+                      <div class="eco-sub">Fuzzy Filtering</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    <code>consult-xref</code> intercepts the xref display
-                    functions to provide vertico-powered previews for ambiguous
-                    definition targets.
+                    <code>consult-flymake</code> leverages
+                    <code>vertico</code> and <code>orderless</code> to provide
+                    instant, space-separated fuzzy filtering of diagnostic
+                    messages, complete with live buffer previews.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -406,21 +405,21 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
                         <path
-                          d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                          d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"
                         />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">treesit</div>
-                      <div class="eco-sub">Fallback Parser</div>
+                      <div class="eco-name">doom-modeline</div>
+                      <div class="eco-sub">Status Bar Integration</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    For non-LSP buffers (or when eglot is disconnected),
-                    <code>treesit</code> modes provide fallback definition
-                    jumping via <code>treesit-thing</code> navigation or
-                    <code>imenu</code> integration.
+                    The <code>doom-modeline-lsp</code> segment automatically
+                    displays live error and warning counts in the mode line,
+                    mirroring the VS Code status bar badge.
                   </p>
                 </div>
                 <div class="eco-card">
@@ -439,19 +438,18 @@
                         stroke-width="2"
                         aria-hidden="true"
                       >
-                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                        <path d="M9 9h6v6H9z" />
+                        <path d="M12 2v20M2 12h20" />
                       </svg>
                     </div>
                     <div>
-                      <div class="eco-name">peek</div>
-                      <div class="eco-sub">Inline Overlay</div>
+                      <div class="eco-name">evil-collection</div>
+                      <div class="eco-sub">Modal Navigation</div>
                     </div>
                   </div>
                   <p class="eco-desc">
-                    Provides the inline overlay engine for "Peek Definition"
-                    workflows, keeping the user's spatial context intact without
-                    switching tabs.
+                    Provides Unimpaired-style <kbd>[e</kbd> / <kbd>]e</kbd>
+                    bracket navigation for rapidly cycling through errors
+                    without leaving normal state.
                   </p>
                 </div>
               </div>
@@ -512,9 +510,10 @@
                     <div class="stack-name">eglot</div>
                     <div class="stack-role">LSP Client</div>
                     <div class="stack-desc">
-                      Built-in. Drives <code>textDocument/definition</code> and
-                      injects the location payload into the native
-                      <code>xref</code> framework.
+                      Built-in. Receives
+                      <code>textDocument/publishDiagnostics</code> payloads and
+                      translates them into native <code>flymake</code>
+                      diagnostics.
                     </div>
                   </div>
                 </div>
@@ -533,15 +532,18 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <path d="M4 6h16M4 12h16M4 18h10" />
+                      <path
+                        d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                      />
+                      <polyline points="14 2 14 8 20 8" />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">xref</div>
-                    <div class="stack-role">Navigation Framework</div>
+                    <div class="stack-name">flymake</div>
+                    <div class="stack-role">Diagnostic Engine</div>
                     <div class="stack-desc">
-                      Built-in. Manages location abstraction, shared history
-                      ring, and cross-buffer jumping.
+                      Built-in. Manages the lifecycle of diagnostics, rendering
+                      squiggles and aggregating them into tabulated lists.
                     </div>
                   </div>
                 </div>
@@ -560,17 +562,20 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <circle cx="11" cy="11" r="8" />
-                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      <path
+                        d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                      />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">consult-xref</div>
-                    <div class="stack-role">Preview Engine</div>
+                    <div class="stack-name">
+                      flymake-show-diagnostics-at-end-of-line
+                    </div>
+                    <div class="stack-role">Inline Rendering</div>
                     <div class="stack-desc">
-                      Intercepts <code>xref-show-definitions-function</code> to
-                      render a vertico-powered dropdown with live buffer
-                      previews.
+                      Emacs 31 native feature that lays out diagnostic messages
+                      below the affected line using Unicode graphics,
+                      eliminating the need for <code>flyover</code>.
                     </div>
                   </div>
                 </div>
@@ -589,45 +594,17 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <path d="M9 9h6v6H9z" />
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
                     </svg>
                   </div>
                   <div class="stack-ct">
-                    <div class="stack-name">peek</div>
-                    <div class="stack-role">Inline Peek</div>
+                    <div class="stack-name">consult-flymake</div>
+                    <div class="stack-role">Fuzzy Filtering</div>
                     <div class="stack-desc">
-                      Renders the definition inline below the cursor using
-                      overlays without switching tabs (Alt+F12 parity).
-                    </div>
-                  </div>
-                </div>
-                <div class="stack-card">
-                  <div
-                    class="stack-ic"
-                    style="
-                      background: rgba(224, 175, 104, 0.1);
-                      color: var(--yellow);
-                    "
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      aria-hidden="true"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <path d="M12 8v4l3 3" />
-                    </svg>
-                  </div>
-                  <div class="stack-ct">
-                    <div class="stack-name">xref-mouse-mode</div>
-                    <div class="stack-role">Mouse Integration</div>
-                    <div class="stack-desc">
-                      Emacs 31 NEW. Binds <kbd>C-&lt;mouse-1&gt;</kbd> to
-                      <code>xref-find-definitions-at-mouse</code>, enabling
-                      native Ctrl+Click jumps.
+                      Provides a Vertico-powered, live-preview dropdown for
+                      rapidly searching and jumping to diagnostics across the
+                      buffer or project.
                     </div>
                   </div>
                 </div>
@@ -684,51 +661,47 @@
                   </thead>
                   <tbody>
                     <tr>
-                      <td>Jump to definition</td>
-                      <td><code>xref-find-definitions</code></td>
-                      <td><kbd>M-.</kbd> / <kbd>g d</kbd></td>
+                      <td>Buffer diagnostics list</td>
+                      <td><code>flymake-show-buffer-diagnostics</code></td>
+                      <td><kbd>SPC c e</kbd></td>
                       <td>
-                        Jumps to target; opens
-                        <code>consult-xref</code> dropdown if ambiguous.
+                        Opens a tabulated list of errors/warnings for the
+                        current file.
                       </td>
                     </tr>
                     <tr>
-                      <td>Jump to definition (mouse)</td>
-                      <td><code>xref-find-definitions-at-mouse</code></td>
-                      <td><kbd>C-&lt;mouse-1&gt;</kbd></td>
+                      <td>Project diagnostics search</td>
+                      <td><code>consult-flymake-project</code></td>
+                      <td><kbd>SPC c E</kbd></td>
                       <td>
-                        Emacs 31 NEW — Ctrl+Click parity via
-                        <code>global-xref-mouse-mode</code>.
+                        Fuzzy-searches all diagnostics across the entire
+                        workspace.
                       </td>
                     </tr>
                     <tr>
-                      <td>Peek definition (inline)</td>
-                      <td><code>peek-xref-definition</code></td>
-                      <td><kbd>SPC c p d</kbd></td>
+                      <td>Next error</td>
+                      <td><code>flymake-goto-next-error</code></td>
+                      <td><kbd>SPC c n</kbd> / <kbd>]e</kbd></td>
                       <td>
-                        Shows target in an inline overlay panel (requires
-                        <code>peek</code> package).
+                        Jumps to the next diagnostic in the current buffer.
                       </td>
                     </tr>
                     <tr>
-                      <td>Go back (history)</td>
-                      <td><code>xref-go-back</code></td>
-                      <td><kbd>M-,</kbd> / <kbd>g ,</kbd></td>
+                      <td>Previous error</td>
+                      <td><code>flymake-goto-prev-error</code></td>
+                      <td><kbd>SPC c p</kbd> / <kbd>[e</kbd></td>
                       <td>
-                        Returns to the exact cursor position before the jump.
+                        Jumps to the previous diagnostic in the current buffer.
                       </td>
                     </tr>
                     <tr>
-                      <td>Go forward (history)</td>
-                      <td><code>xref-go-forward</code></td>
-                      <td>—</td>
-                      <td>Reverses <code>xref-go-back</code>.</td>
-                    </tr>
-                    <tr>
-                      <td>Find definitions (other window)</td>
-                      <td><code>xref-find-definitions-other-window</code></td>
-                      <td><kbd>C-x 4 .</kbd></td>
-                      <td>Opens definition in a horizontal split.</td>
+                      <td>Force recheck</td>
+                      <td><code>flymake-start</code></td>
+                      <td><kbd>SPC c !</kbd></td>
+                      <td>
+                        Manually triggers a diagnostic refresh (useful for
+                        pull-model fallbacks).
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -777,7 +750,7 @@
                     <div class="dots" aria-hidden="true">
                       <span></span><span></span><span></span>
                     </div>
-                    <span class="fname">init-xref.el</span>
+                    <span class="fname">init-diagnostics-push.el</span>
                   </div>
                   <button
                     class="copy"
@@ -800,43 +773,51 @@
                   </button>
                 </div>
                 <pre><code class="language-lisp">;; ==========================================
-;; 1. XREF &amp; CONSULT INTEGRATION (Preview Engine)
+;; 1. FLYMAKE CORE (Emacs 31 Native Diagnostics)
 ;; ==========================================
-(use-package xref
+(use-package flymake
   :ensure nil
   :custom
-  ;; Emacs 31 NEW: Enable Ctrl+Click jump-to-definition globally.
-  ;; Binds `C-&lt;down-mouse-1&gt;` to `xref-find-definitions-at-mouse`.
+  ;; Emacs 31 NEW: 'fancy renders Unicode arrow graphics below the affected line,
+  ;; effectively replacing the `flyover` package with richer native output.
+  (flymake-show-diagnostics-at-end-of-line 'fancy)
+  ;; Emacs 31 NEW: 'auto prefers fringes on GUI frames, falls back to margins on TTY.
+  (flymake-indicator-type 'auto)
+  ;; Suppress the legacy echo-area summary to keep the minibuffer clean for eldoc.
+  (flymake-suppress-zero-count-warnings t)
   :config
-  (global-xref-mouse-mode 1)
-  ;; Route xref location prompts through Consult for live previews.
-  (setq xref-show-xrefs-function #'consult-xref
-        xref-show-definitions-function #'consult-xref))
+  ;; Enable flymake globally in programming buffers.
+  (add-hook 'prog-mode-hook #'flymake-mode))
 
 ;; ==========================================
-;; 2. PEEK PACKAGE (Inline Definition Panel)
+;; 2. CONSULT-FLYMAKE (Vertico-powered filtering)
 ;; ==========================================
-(use-package peek
-  :ensure (peek :host sourcehut :repo "~meow_king/peek")
-  :commands (peek-xref-definition peek-overlay-dwim)
-  :custom
-  (peek-mode-enable-eldoc t)        ;; show eldoc inside peek panel
-  (peek-definition-function #'xref-find-definitions)
+(use-package consult-flymake
+  :ensure nil  ;; Bundled with consult
+  :after (consult flymake)
   :config
-  (global-peek-mode 1))
+  ;; `consult-flymake-project` is not a native command; it requires a wrapper
+  ;; to pass the prefix argument for project-wide searching.
+  (defun consult-flymake-project ()
+    "Invoke consult-flymake across all project buffers."
+    (interactive)
+    (consult-flymake t)))
 
 ;; ==========================================
 ;; 3. GENERAL.EL KEYBINDINGS (registered eagerly)
 ;; ==========================================
-(general-define-key
-  :states 'motion
-  "g d" #'xref-find-definitions
-  "g ," #'xref-go-back)
-
 (ar/global-leader
   "c" '(:ignore t :wk "code")
-  "c p" '(:ignore t :wk "peek")
-  "c p d" '(peek-xref-definition :wk "Peek definition"))</code></pre>
+  "c e" '(consult-flymake :wk "Search errors (buffer)")
+  "c E" '(consult-flymake-project :wk "Search errors (project)")
+  "c n" '(flymake-goto-next-error :wk "Next error")
+  "c p" '(flymake-goto-prev-error :wk "Prev error")
+  "c !" '(flymake-start :wk "Force recheck"))
+
+(general-define-key
+  :states 'motion
+  "] e" #'flymake-goto-next-error
+  "[ e" #'flymake-goto-prev-error)</code></pre>
               </div>
             </div>
           </div>
@@ -880,66 +861,67 @@
               <div class="sec-title">Why This Approach?</div>
               <div class="grid-2" style="margin-bottom: 24px">
                 <div class="vs-card ok">
-                  <h4>✓ xref + consult-xref · Chosen</h4>
+                  <h4>✓ flymake native · Chosen</h4>
                   <div class="vs-list">
                     <div class="vs-row">
-                      <span class="lab">Coupling</span>
+                      <span class="lab">LSP client coupling</span>
                       <span class="val"
-                        >Works with <i>any</i> xref backend (eglot, dumb-jump,
-                        etags).</span
+                        >Works seamlessly with <code>eglot</code> out of the
+                        box.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Protocol</span>
+                      <span class="lab">Protocol compliance</span>
                       <span class="val"
                         >Honors the <code>eglot</code>-only stack mandate.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Preview</span>
+                      <span class="lab">Emacs 31 synergy</span>
                       <span class="val"
-                        ><code>consult-xref</code> leverages
-                        <code>vertico</code> for fuzzy filtering and live
-                        previews.</span
+                        >Leverages new <code>'fancy</code> end-of-line rendering
+                        and enhanced tabulated lists.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Mouse</span>
+                      <span class="lab">Performance</span>
                       <span class="val"
-                        >Native Emacs 31 <code>xref-mouse-mode</code> (zero
-                        dependencies).</span
+                        >Built into Emacs core; zero additional packages or
+                        background processes.</span
                       >
                     </div>
                   </div>
                 </div>
                 <div class="vs-card no">
-                  <h4>✕ lsp-ui-peek / lsp-mode · Rejected</h4>
+                  <h4>✕ flycheck / lsp-ui · Rejected</h4>
                   <div class="vs-list">
                     <div class="vs-row">
-                      <span class="lab">Coupling</span>
+                      <span class="lab">LSP client coupling</span>
                       <span class="val"
-                        >Hard-bound to the
-                        <code>lsp-mode</code> ecosystem.</span
+                        ><code>flycheck</code> requires explicit checker
+                        definitions; <code>lsp-ui</code> is hard-bound to
+                        <code>lsp-mode</code>.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Protocol</span>
+                      <span class="lab">Protocol compliance</span>
                       <span class="val"
-                        >Requires the forbidden
-                        <code>lsp-mode</code> ecosystem.</span
+                        >Adds redundant diagnostic engine overhead or requires
+                        forbidden <code>lsp-mode</code> ecosystem.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Preview</span>
+                      <span class="lab">Emacs 31 synergy</span>
                       <span class="val"
-                        >Custom child-frame pipeline with heavy rendering
-                        overhead.</span
+                        >Lacks integration with Emacs 31 core UI enhancements or
+                        relies on heavy child-frame pipelines.</span
                       >
                     </div>
                     <div class="vs-row">
-                      <span class="lab">Mouse</span>
+                      <span class="lab">Performance</span>
                       <span class="val"
-                        >Requires custom mouse-click advice.</span
+                        >Spawns independent checker processes or incurs
+                        child-frame overhead on every update.</span
                       >
                     </div>
                   </div>
@@ -948,38 +930,49 @@
               <div class="sec-title">Emacs 31 Specific Enhancements</div>
               <div class="grid-2">
                 <div class="enh-card g">
-                  <div class="enh-title">xref-mouse-mode (NEW)</div>
+                  <div class="enh-title">
+                    <code>flymake-show-diagnostics-at-end-of-line 'fancy</code>
+                  </div>
                   <p class="enh-desc">
-                    Emacs 31 introduces native mouse-driven code navigation.
-                    Enabling <code>global-xref-mouse-mode</code> binds
-                    <kbd>C-&lt;down-mouse-1&gt;</kbd> to xref jumps, perfectly
-                    mirroring VS Code's Ctrl+Click convention.
+                    A game-changer for inline diagnostics. Instead of truncating
+                    messages in the echo area or requiring a floating
+                    child-frame (<code>flyover</code>), Emacs 31 lays out
+                    diagnostics below the affected line using Unicode graphics
+                    that point back to the exact locus of the error.
                   </p>
                 </div>
                 <div class="enh-card p">
-                  <div class="enh-title">Editable Xref Buffers</div>
+                  <div class="enh-title">
+                    <code>flymake-show-buffer-diagnostics</code> Enhanced
+                  </div>
                   <p class="enh-desc">
-                    Emacs 31's <code>xref-change-to-xref-edit-mode</code> (bound
-                    to <kbd>e</kbd> in <code>*xref*</code> buffers) turns
-                    reference lists into writable surfaces for bulk mutation.
+                    The native diagnostics buffer now highlights the diagnostic
+                    nearest to the current point in the listing and responds to
+                    fringe/margin mouse clicks, making buffer-local navigation
+                    instantaneous. Column widths also dynamically adjust to
+                    content.
                   </p>
                 </div>
                 <div class="enh-card y">
-                  <div class="enh-title">consult-xref synergy</div>
+                  <div class="enh-title">
+                    <code>flymake-indicator-type 'auto</code>
+                  </div>
                   <p class="enh-desc">
-                    Ambiguous definitions (e.g., C++ overloaded functions,
-                    TypeScript union types) are presented in a highly
-                    performant, searchable Vertico dropdown with instant buffer
-                    previews.
+                    Intelligently prefers fringes on GUI frames for a cleaner
+                    look, but gracefully falls back to margins on TTY frames,
+                    maintaining visual consistency across all environments.
                   </p>
                 </div>
                 <div class="enh-card g">
-                  <div class="enh-title">peek package integration</div>
+                  <div class="enh-title">
+                    <code>flymake-make-diagnostic</code> API Extensions
+                  </div>
                   <p class="enh-desc">
-                    The <code>peek</code> package hooks directly into the
-                    <code>xref</code> framework via
-                    <code>peek-definition-function</code>, allowing it to
-                    intercept payloads and render them as inline overlays.
+                    Accepts new <code>origin</code> and
+                    <code>code</code> attributes, and
+                    <code>flymake-diagnostic-format-alist</code>
+                    provides granular, per-context control over how diagnostics
+                    are formatted.
                   </p>
                 </div>
               </div>
