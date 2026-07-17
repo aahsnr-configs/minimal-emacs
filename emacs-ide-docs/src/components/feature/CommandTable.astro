@@ -1,0 +1,36 @@
+---
+interface Props {
+  items: Array<{
+    action: string;
+    cmd: string;
+    key: string;
+    notes?: string;
+  }>;
+}
+
+const { items } = Astro.props;
+---
+
+<div class="sec-title">Commands &amp; Keybindings</div>
+<div class="tbl-wrap">
+  <table class="tbl">
+    <thead>
+      <tr>
+        <th>Action</th>
+        <th>Command</th>
+        <th>Keybinding</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {items.map((item) => (
+        <tr>
+          <td>{item.action}</td>
+          <td><code>{item.cmd}</code></td>
+          <td set:html={item.key} />
+          <td>{item.notes || ''}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>

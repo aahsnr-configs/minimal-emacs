@@ -1,0 +1,100 @@
+---
+title: "Folding Ranges"
+category: "Formatting & Editing"
+slug: "folding-ranges"
+status: "working"
+vscode_parity:
+  - "Gutter arrows to collapse/expand code blocks, functions, imports,\n            regions"
+lsp_methods:
+  - "textDocument/foldingRange"
+routing: "treesit-fold→hideshow→vimish-fold"
+commands:
+  - action: "Toggle fold at point"
+    cmd: "ar/fold-toggle"
+    key: "<kbd>za</kbd>"
+    notes: "Intelligent dispatcher: triestreesit-fold, thenhideshow,\n                        thenvimish-fold."
+  - action: "Open fold at point"
+    cmd: "ar/fold-open"
+    key: "<kbd>zo</kbd>"
+    notes: "Reveals the hidden block."
+  - action: "Close fold at point"
+    cmd: "ar/fold-close"
+    key: "<kbd>zc</kbd>"
+    notes: "Conceals the block."
+  - action: "Open all folds"
+    cmd: "ar/fold-open-all"
+    key: "<kbd>zR</kbd>"
+    notes: "Expands the entire buffer."
+  - action: "Close all folds"
+    cmd: "ar/fold-close-all"
+    key: "<kbd>zM</kbd>"
+    notes: "Collapses all top-level blocks."
+  - action: "Create visual fold"
+    cmd: "evil-vimish-fold/create"
+    key: "<kbd>zf</kbd>"
+    notes: "Folds the currently selected visual region."
+  - action: "Delete visual fold"
+    cmd: "vimish-fold-delete"
+    key: "<kbd>zd</kbd>"
+    notes: "Removes the fold at point."
+parity_matrix:
+  - vscode: "Click gutter arrow to fold/unfold"
+    emacs: "<code>treesit-fold</code> fringe indicators or\n                        <code>hideshow</code> margin clicks."
+  - vscode: "<kbd>Ctrl+K Ctrl+0</kbd> (Fold all)"
+    emacs: "<kbd>zM</kbd> (<code>ar/fold-close-all</code>)."
+  - vscode: "<kbd>Ctrl+K Ctrl+J</kbd> (Unfold all)"
+    emacs: "<kbd>zR</kbd> (<code>ar/fold-open-all</code>)."
+  - vscode: "<kbd>Ctrl+Shift+[</kbd> / <kbd>]</kbd> (Fold/Unfold)"
+    emacs: "<kbd>zc</kbd> / <kbd>zo</kbd> (<code>ar/fold-close</code>\n                        / <code>ar/fold-open</code>)."
+  - vscode: "Fold arbitrary visual selection"
+    emacs: "<kbd>zf</kbd> (<code>evil-vimish-fold/create</code>)."
+  - vscode: "See hidden line count in gutter"
+    emacs: "<code>ar/hs-overlay-line-count</code> renders\n                        <code>↴ [X lines]</code> natively."
+  - vscode: "Indentation-based folding (Python/YAML)"
+    emacs: "Emacs 31's <code>hs-indentation-mode</code> handles this\n                        natively without regex hacks."
+config_filename: "init-folding.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `Click gutter arrow to fold/unfold`, emacs: `<code>treesit-fold</code> fringe indicators or
+                        <code>hideshow</code> margin clicks.` },
+    { vscode: `<kbd>Ctrl+K Ctrl+0</kbd> (Fold all)`, emacs: `<kbd>zM</kbd> (<code>ar/fold-close-all</code>).` },
+    { vscode: `<kbd>Ctrl+K Ctrl+J</kbd> (Unfold all)`, emacs: `<kbd>zR</kbd> (<code>ar/fold-open-all</code>).` },
+    { vscode: `<kbd>Ctrl+Shift+[</kbd> / <kbd>]</kbd> (Fold/Unfold)`, emacs: `<kbd>zc</kbd> / <kbd>zo</kbd> (<code>ar/fold-close</code>
+                        / <code>ar/fold-open</code>).` },
+    { vscode: `Fold arbitrary visual selection`, emacs: `<kbd>zf</kbd> (<code>evil-vimish-fold/create</code>).` },
+    { vscode: `See hidden line count in gutter`, emacs: `<code>ar/hs-overlay-line-count</code> renders
+                        <code>↴ [X lines]</code> natively.` },
+    { vscode: `Indentation-based folding (Python/YAML)`, emacs: `Emacs 31's <code>hs-indentation-mode</code> handles this
+                        natively without regex hacks.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Toggle fold at point", cmd: "ar/fold-toggle", key: `<kbd>za</kbd>`, notes: "Intelligent dispatcher: triestreesit-fold, thenhideshow,
+                        thenvimish-fold." },
+    { action: "Open fold at point", cmd: "ar/fold-open", key: `<kbd>zo</kbd>`, notes: "Reveals the hidden block." },
+    { action: "Close fold at point", cmd: "ar/fold-close", key: `<kbd>zc</kbd>`, notes: "Conceals the block." },
+    { action: "Open all folds", cmd: "ar/fold-open-all", key: `<kbd>zR</kbd>`, notes: "Expands the entire buffer." },
+    { action: "Close all folds", cmd: "ar/fold-close-all", key: `<kbd>zM</kbd>`, notes: "Collapses all top-level blocks." },
+    { action: "Create visual fold", cmd: "evil-vimish-fold/create", key: `<kbd>zf</kbd>`, notes: "Folds the currently selected visual region." },
+    { action: "Delete visual fold", cmd: "vimish-fold-delete", key: `<kbd>zd</kbd>`, notes: "Removes the fold at point." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

@@ -1,0 +1,87 @@
+---
+title: "On-type Formatting"
+category: "Formatting & Editing"
+slug: "on-type-formatting"
+status: "working"
+vscode_parity:
+  - "Auto-indent and auto-pairing on trigger characters (},;,(, etc.)"
+lsp_methods:
+  - "textDocument/onTypeFormatting"
+routing: "electric-indent-mode + electric-pair-mode +\n              electric-layout-mode"
+commands:
+  - action: "Toggle auto-indent"
+    cmd: "electric-indent-mode"
+    key: "<kbd>SPC t i</kbd>"
+    notes: "Re-indents on trigger characters. Enabled globally by\n                        default."
+  - action: "Toggle auto-pairing"
+    cmd: "electric-pair-mode"
+    key: "<kbd>SPC t p</kbd>"
+    notes: "Inserts matching closing delimiters. Enabled globally by\n                        default."
+  - action: "Toggle layout rules"
+    cmd: "electric-layout-mode"
+    key: "<kbd>SPC t l</kbd>"
+    notes: "Enforces structural newline insertion (e.g., around{})."
+  - action: "Manually indent line"
+    cmd: "indent-according-to-mode"
+    key: "<kbd>TAB</kbd>"
+    notes: "Fallback manual indentation if electric modes miss a\n                        trigger."
+parity_matrix:
+  - vscode: "Auto-indents when typing <code>}</code> or\n                        <code>;</code>"
+    emacs: "<code>electric-indent-mode</code> re-indents instantly\n                        on trigger characters."
+  - vscode: "Auto-inserts closing <code>)</code> or <code>}</code>"
+    emacs: "<code>electric-pair-mode</code> inserts the matching\n                        delimiter."
+  - vscode: "Auto-inserts <code>/*</code> and <code>*/</code>"
+    emacs: "Emacs 31 <code>electric-pair-pairs</code> natively\n                        supports multi-character string pairs."
+  - vscode: "Adds newlines around <code>{</code> automatically"
+    emacs: "<code>electric-layout-mode</code> enforces structural\n                        newline rules."
+  - vscode: "No lag or stutter while typing"
+    emacs: "Native C-level execution guarantees 0ms latency, unlike\n                        LSP network requests."
+  - vscode: "Cursor stays in the correct position"
+    emacs: "Native modes preserve point and mark perfectly; LSP\n                        on-type formatting is known to displace the cursor."
+config_filename: "init-on-type-formatting.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `Auto-indents when typing <code>}</code> or
+                        <code>;</code>`, emacs: `<code>electric-indent-mode</code> re-indents instantly
+                        on trigger characters.` },
+    { vscode: `Auto-inserts closing <code>)</code> or <code>}</code>`, emacs: `<code>electric-pair-mode</code> inserts the matching
+                        delimiter.` },
+    { vscode: `Auto-inserts <code>/*</code> and <code>*/</code>`, emacs: `Emacs 31 <code>electric-pair-pairs</code> natively
+                        supports multi-character string pairs.` },
+    { vscode: `Adds newlines around <code>{</code> automatically`, emacs: `<code>electric-layout-mode</code> enforces structural
+                        newline rules.` },
+    { vscode: `No lag or stutter while typing`, emacs: `Native C-level execution guarantees 0ms latency, unlike
+                        LSP network requests.` },
+    { vscode: `Cursor stays in the correct position`, emacs: `Native modes preserve point and mark perfectly; LSP
+                        on-type formatting is known to displace the cursor.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Toggle auto-indent", cmd: "electric-indent-mode", key: `<kbd>SPC t i</kbd>`, notes: "Re-indents on trigger characters. Enabled globally by
+                        default." },
+    { action: "Toggle auto-pairing", cmd: "electric-pair-mode", key: `<kbd>SPC t p</kbd>`, notes: "Inserts matching closing delimiters. Enabled globally by
+                        default." },
+    { action: "Toggle layout rules", cmd: "electric-layout-mode", key: `<kbd>SPC t l</kbd>`, notes: "Enforces structural newline insertion (e.g., around{})." },
+    { action: "Manually indent line", cmd: "indent-according-to-mode", key: `<kbd>TAB</kbd>`, notes: "Fallback manual indentation if electric modes miss a
+                        trigger." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

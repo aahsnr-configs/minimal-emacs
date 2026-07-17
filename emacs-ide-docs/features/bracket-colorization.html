@@ -747,53 +747,51 @@
                     Copy
                   </button>
                 </div>
-                <pre><code class="language-lisp">;; ==========================================
-;; RAINBOW-DELIMITERS (Depth-Based Colorization)
-;; ==========================================
-(use-package rainbow-delimiters
-  :ensure t
-  :hook (prog-mode . rainbow-delimiters-mode)
-  :custom
-  ;; Maximum nesting depth to colorize (prevents visual clutter in deeply nested code).
-  (rainbow-delimiters-max-face-count 9)
-  ;; Disable in specific modes where rainbow colors are distracting.
-  (rainbow-delimiters-disabled-modes '(org-mode text-mode))
-  :config
-  ;; Customize faces to match Tokyo Night theme
-  (custom-set-faces
-   '(rainbow-delimiters-depth-1-face ((t (:foreground "#7aa2f7"))))
-   '(rainbow-delimiters-depth-2-face ((t (:foreground "#bb9af7"))))
-   '(rainbow-delimiters-depth-3-face ((t (:foreground "#7dcfff"))))
-   '(rainbow-delimiters-depth-4-face ((t (:foreground "#e0af68"))))
-   '(rainbow-delimiters-depth-5-face ((t (:foreground "#9ece6a"))))
-   '(rainbow-delimiters-depth-6-face ((t (:foreground "#f7768e"))))
-   '(rainbow-delimiters-depth-7-face ((t (:foreground "#ff9e64"))))
-   '(rainbow-delimiters-depth-8-face ((t (:foreground "#c0caf5"))))
-   '(rainbow-delimiters-depth-9-face ((t (:foreground "#a9b1d8")))))
-  ;; Aborts activation in massive buffers to prevent main-thread freezing.
-  (define-advice rainbow-delimiters-mode (:before-while (&optional arg) guard-large-files)
-    (or (and arg (&lt; (prefix-numeric-value arg) 1))
-        (not (too-long-file-p)))))
-
-;; ==========================================
-;; SHOW-PAREN-MODE (Built-in Matching)
-;; ==========================================
-(use-package paren
-  :ensure nil
-  :custom
-  ;; Delay before highlighting (prevents flicker during fast movement).
-  (show-paren-delay 0)
-  ;; Style: 'expression' highlights the entire expression between parens.
-  (show-paren-style 'expression)
-  ;; Emacs 31 NEW: Prevent phantom bracket highlighting inside strings and comments.
-  (show-paren-not-in-comments-or-strings t)
-  :custom-face
-  ;; Tokyo Night synergy for show-paren faces
-  (show-paren-match ((t (:background "#292e42" :foreground "#7aa2f7" :weight bold))))
-  (show-paren-mismatch ((t (:background "#f7768e" :foreground "#1a1b26" :weight bold)))))
-  :config
-  ;; Highlight the matching parenthesis when cursor is on/near one.
-  (show-paren-mode 1))</code></pre>
+                <pre><code class="language-elisp">;; ==========================================
+ ;; RAINBOW-DELIMITERS (Depth-Based Colorization)
+ ;; ==========================================
+ (use-package rainbow-delimiters
+   :ensure t
+   :hook (prog-mode . rainbow-delimiters-mode)
+   :custom
+   ;; Maximum nesting depth to colorize (prevents visual clutter in deeply nested code).
+   (rainbow-delimiters-max-face-count 9)
+   ;; Disable in specific modes where rainbow colors are distracting.
+   (rainbow-delimiters-disabled-modes '(org-mode text-mode))
+   :config
+   ;; Customize faces to match Tokyo Night theme
+   (custom-set-faces
+    '(rainbow-delimiters-depth-1-face ((t (:foreground "#7aa2f7"))))
+    '(rainbow-delimiters-depth-2-face ((t (:foreground "#bb9af7"))))
+    '(rainbow-delimiters-depth-3-face ((t (:foreground "#7dcfff"))))
+    '(rainbow-delimiters-depth-4-face ((t (:foreground "#e0af68"))))
+    '(rainbow-delimiters-depth-5-face ((t (:foreground "#9ece6a"))))
+    '(rainbow-delimiters-depth-6-face ((t (:foreground "#f7768e"))))
+    '(rainbow-delimiters-depth-7-face ((t (:foreground "#ff9e64"))))
+    '(rainbow-delimiters-depth-8-face ((t (:foreground "#c0caf5"))))
+    '(rainbow-delimiters-depth-9-face ((t (:foreground "#a9b1d8")))))
+   ;; Aborts activation in massive buffers to prevent main-thread freezing.
+   (define-advice rainbow-delimiters-mode (:before-while (&optional arg) guard-large-files)
+     (or (and arg (&lt; (prefix-numeric-value arg) 1))
+         (not (too-long-file-p)))))
+ ;; ==========================================
+ ;; SHOW-PAREN-MODE (Built-in Matching)
+ ;; ==========================================
+ (use-package paren
+   :ensure nil
+   :custom
+   ;; Highlight the matching parenthesis when cursor is on/near one.
+   (show-paren-mode 1)
+   ;; Delay before highlighting (prevents flicker during fast movement).
+   (show-paren-delay 0)
+   ;; Style: 'expression' highlights the entire expression between parens.
+   (show-paren-style 'expression)
+   ;; Emacs 31 NEW: Prevent phantom bracket highlighting inside strings and comments.
+   (show-paren-not-in-comments-or-strings t)
+   :custom-face
+   ;; Tokyo Night synergy for show-paren faces
+   (show-paren-match ((t (:background "#292e42" :foreground "#7aa2f7" :weight bold))))
+   (show-paren-mismatch ((t (:background "#f7768e" :foreground "#1a1b26" :weight bold)))))</code></pre>
               </div>
             </div>
           </div>

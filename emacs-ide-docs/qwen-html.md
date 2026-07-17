@@ -1839,7 +1839,7 @@
                     Copy
                   </button>
                 </div>
-                <pre><code class="language-lisp">;; ==========================================
+                <pre><code class="language-elisp">;; ==========================================
 
 ;; 1. EGLOT (LSP Completion Backend)
 ;; ==========================================
@@ -2675,7 +2675,7 @@
                       Copy
                     </button>
                   </div>
-                  <pre><code class="language-lisp">;; ==========================================
+                  <pre><code class="language-elisp">;; ==========================================
 
 ;; 2. ELDOC CORE (Emacs Native Rendering)
 ;; ==========================================
@@ -2917,43 +2917,52 @@
         }
       });
 
-      // Robust Clipboard Copy (Iframe safe fallback)
-      function copyCode(btn) {
+      // Robust Clipboard Copy — Clipboard API first (execCommand is deprecated
+      // per MDN and being removed by browser vendors); textarea/execCommand
+      // is kept only as a fallback for non-secure contexts.
+      async function copyCode(btn) {
         const codeEl = btn.closest(".code-win").querySelector("code");
         const text = codeEl.innerText;
 
-        // Use a temporary textarea for broad support (execCommand)
-        const textArea = document.createElement("textarea");
-        textArea.value = text;
-
-        // Prevent scrolling to the bottom of the page
-        textArea.style.position = "fixed";
-        textArea.style.top = "0";
-        textArea.style.left = "0";
-        textArea.style.width = "2em";
-        textArea.style.height = "2em";
-        textArea.style.padding = "0";
-        textArea.style.border = "none";
-        textArea.style.outline = "none";
-        textArea.style.boxShadow = "none";
-        textArea.style.background = "transparent";
-        document.body.appendChild(textArea);
-
-        textArea.focus();
-        textArea.select();
-
         try {
-          const successful = document.execCommand("copy");
-          if (successful) {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
             triggerCopySuccess(btn);
-          } else {
-            console.warn("Fallback copy command was unsuccessful");
+            return;
           }
+          throw new Error("Clipboard API unavailable");
         } catch (err) {
-          console.error("Fallback: Oops, unable to copy", err);
-        }
+          // Legacy fallback for non-secure contexts only
+          const textArea = document.createElement("textarea");
+          textArea.value = text;
+          textArea.style.position = "fixed";
+          textArea.style.top = "0";
+          textArea.style.left = "0";
+          textArea.style.width = "2em";
+          textArea.style.height = "2em";
+          textArea.style.padding = "0";
+          textArea.style.border = "none";
+          textArea.style.outline = "none";
+          textArea.style.boxShadow = "none";
+          textArea.style.background = "transparent";
+          document.body.appendChild(textArea);
 
-        document.body.removeChild(textArea);
+          textArea.focus();
+          textArea.select();
+
+          try {
+            const successful = document.execCommand("copy");
+            if (successful) {
+              triggerCopySuccess(btn);
+            } else {
+              console.warn("Fallback copy command was unsuccessful");
+            }
+          } catch (fallbackErr) {
+            console.error("Fallback: Oops, unable to copy", fallbackErr);
+          }
+
+          document.body.removeChild(textArea);
+        }
       }
 
       function triggerCopySuccess(btn) {

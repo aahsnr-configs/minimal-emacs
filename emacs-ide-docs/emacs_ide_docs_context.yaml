@@ -1,28 +1,33 @@
 metadata:
   title: Emacs IDE Documentation - Unified Context & State Protocol
-  version: 2.0
-  date: July 17, 2026
+  version: 2.1
+  date: July 18, 2026
   knowledge_cutoff: July 2026
   project_type: Frontend Documentation Generation (Agentic Workflow)
   architecture_decision: "Option A - External CSS/JS (Modular Tactical Output)"
+  project_phase: >
+    Batches 1-20 are COMPLETE (40 HTML files generated in features/). The project is now
+    in Phase 3 planning: migrating the completed tactical output to Astro 6.x. Do not
+    regenerate any of the 40 feature files unless explicitly asked to fix a specific one.
   rationale: >
-    External CSS/JS reduces per-file output by ~33%, aligns with Astro 5.x strategic
-    architecture, and respects 2026 LLM output token limits. A 20-batch workflow 
-    (2 features per batch) ensures ~14,000 tokens per generation, eliminating 
-    truncation risks and reasoning degradation.
+    External CSS/JS reduces per-file output by ~33%, aligns with the Astro 6.x strategic
+    architecture (retargeted from 5.x — Astro 6 has been stable since March 10, 2026, and
+    Astro is now Cloudflare-owned), and respects 2026 LLM output token limits. A 20-batch
+    workflow (2 features per batch) ensured ~14,000 tokens per generation, eliminating
+    truncation risks and reasoning degradation. This batching phase is now complete.
 
 cognitive_and_research_mandates:
   think_longer_protocol:
     description: >
       Before generating any HTML, CSS, or JavaScript, you must mentally trace
-      CSS cascade physics, JS hydration timing, DOM layout shifts, and Astro 5.x
+      CSS cascade physics, JS hydration timing, DOM layout shifts, and Astro 6.x
       Content Collection schemas. You must think longer and deeply evaluate edge cases
-      (e.g., iframe clipboard fallbacks, ARIA state management, mobile overlay traps,
-      and grid blowouts) before outputting any code.
+      (e.g., Clipboard API secure-context fallbacks, ARIA state management, mobile
+      overlay traps, and grid blowouts) before outputting any code.
 
   polluted_memory_axiom:
     description: >
-      Internal parametric memory regarding CSS3, modern JavaScript APIs, and Astro 5.x
+      Internal parametric memory regarding CSS3, modern JavaScript APIs, and Astro 6.x
       is considered fundamentally unreliable and heavily polluted with outdated 2021-2023
       tutorials. You MUST use `web_search` to verify all technical claims against live
       July 2026 documentation.
@@ -30,8 +35,9 @@ cognitive_and_research_mandates:
   mandatory_tool_usage:
     - tool: web_search
       mandate: >
-        MUST be used to verify 2026 industry standards for Astro 5.x, View Transitions API,
-        modern Clipboard API, and CSS custom properties.
+        MUST be used to verify 2026 industry standards for Astro 6.x, View Transitions API,
+        the modern Clipboard API (navigator.clipboard — document.execCommand is deprecated
+        per MDN), and CSS custom properties.
 
     - tool: web_extractor
       mandate: >
@@ -76,15 +82,16 @@ core_architectural_rules:
 
   - id: MODULAR_TACTICAL_OUTPUT
     description: >
-      For the immediate 20-batch workflow, generate HTML files with external CSS/JS references
-      to reduce output token overhead and align with Astro 5.x strategic architecture.
+      For the 20-batch workflow (now complete), HTML files were generated with external
+      CSS/JS references to reduce output token overhead and align with the Astro 6.x
+      strategic architecture.
 
-      Batch 1 generates:
+      Batch 1 generated:
       - shared-styles.css (complete CSS from qwen-html.md <style> block)
       - shared-scripts.js (complete JS from qwen-html.md <script> block)
       - 2x feature HTML files referencing external assets via <link> and <script>
 
-      Batches 2-20 generate:
+      Batches 2-20 generated:
       - 2x feature HTML files per batch, all referencing shared-styles.css and shared-scripts.js
 
       Each HTML file MUST include:
@@ -94,12 +101,33 @@ core_architectural_rules:
       - Complete topbar HTML
       - Complete main content with 6 accordions
 
-  - id: ASTRO_5_SSG_STRATEGIC_GOAL
+  - id: ELISP_SYNTAX_FIDELITY
     description: >
-      The ultimate end goal is a modular Astro 5.x / MDX SSG architecture. The external
-      CSS/JS files generated now will be directly migrated to src/styles/ and src/scripts/.
-      The HTML files will be parsed and migrated into Astro Content Collections using
-      the Strangler Pattern.
+      Every Elisp code block MUST use `class="language-elisp"`, never the generic
+      `class="language-lisp"`. Prism's dedicated Elisp tokenizer (merged from
+      akirak/prism-emacs-lisp, aliased as lisp/emacs/elisp/emacs-lisp within the same
+      prism-lisp.min.js component file) correctly handles `declare`, `interactive`, and
+      quote/backtick/splice forms that the generic Lisp grammar mis-highlights. No script
+      tag changes are required — only the class attribute on each <code> element.
+
+  - id: CLIPBOARD_API_MODERNIZATION
+    description: >
+      `shared-scripts.js`'s `copyCode()` MUST try `navigator.clipboard.writeText()` as the
+      primary path (inside a secure-context / feature-detection guard). The textarea +
+      `document.execCommand('copy')` approach is a fallback ONLY, used when the Clipboard
+      API is unavailable. `document.execCommand` is deprecated per MDN and browser vendors
+      are actively removing it — it must never be the sole implementation.
+
+  - id: ASTRO_6_SSG_STRATEGIC_GOAL
+    description: >
+      The ultimate end goal is a modular Astro 6.x / MDX SSG architecture (retargeted from
+      5.x — Astro 6 shipped stable March 10, 2026, currently 6.4, and Astro is now
+      Cloudflare-owned). The external CSS/JS files already generated will be directly
+      migrated to src/styles/ and src/scripts/. The HTML files will be parsed and migrated
+      into Astro Content Collections using the Strangler Pattern. Search integration should
+      use Pagefind's own component-based UI (v1.5.0+), not the now-maintenance-mode
+      astro-pagefind wrapper component. Fonts should migrate to Astro 6's built-in Fonts
+      API instead of the jsdelivr CDN <link>.
 
   - id: AUTOMATION_COMPATIBILITY
     description: >
@@ -114,16 +142,20 @@ negative_constraints:
   - "NEVER use external JS frameworks (React, Vue, Svelte, Tailwind) in the standalone HTML files."
   - "NEVER deviate from the JetBrains Mono typography scale or Tokyo Night CSS variables."
   - "NEVER break the 6-accordion structure unless explicitly instructed for a specific edge case."
-  - "NEVER rely on internal training data for Astro 5.x APIs or modern JS Clipboard APIs without live `web_search` and `web_extractor` verification."
+  - "NEVER rely on internal training data for Astro 6.x APIs or modern JS Clipboard APIs without live `web_search` and `web_extractor` verification."
   - "NEVER output partial HTML snippets during the batch workflow; always output the full standalone file."
   - "NEVER use Chinese sources, blogs, or documentation during web searches. Restrict all web search queries strictly to English-language resources."
   - "NEVER interpret phrases like 'work on', 'fix', 'review', or 'update' as permission to generate code. Without `GREEN LIGHT`, these mean 'analyze and plan'."
   - "NEVER inline CSS or JavaScript in HTML files after Batch 1. All styling and scripting MUST reference external shared-styles.css and shared-scripts.js."
   - "NEVER omit the <link> and <script> tags referencing external assets in any HTML file."
+  - "NEVER use class=\"language-lisp\" on Elisp code blocks — use class=\"language-elisp\"."
+  - "NEVER implement clipboard copy as execCommand-only — navigator.clipboard.writeText() must be tried first."
+  - "NEVER regenerate any of the 40 completed feature HTML files from scratch without GREEN LIGHT and an explicit reason (e.g., a targeted fix)."
 
 external_asset_management_protocol:
   description: >
-    Protocol for managing shared CSS and JavaScript assets across the 20-batch workflow.
+    Protocol for managing shared CSS and JavaScript assets across the 20-batch workflow
+    (complete as of this revision).
 
   batch_1_deliverables:
     - file: shared-styles.css
@@ -131,18 +163,18 @@ external_asset_management_protocol:
         Complete CSS extraction from qwen-html.md <style> block.
         Contains all Tokyo Night design tokens, component styles, responsive breakpoints,
         and custom scrollbar styling. Approximately 800 lines.
-      generation_instruction: "Generate this file ONLY in Batch 1. Do not regenerate in subsequent batches."
+      generation_instruction: "Generated in Batch 1. Do not regenerate without GREEN LIGHT and explicit reason."
 
     - file: shared-scripts.js
       description: >
         Complete JavaScript extraction from qwen-html.md <script> block.
-        Contains sidebar toggle, mobile menu, accordion logic, focus mode, and clipboard copy.
-        Approximately 100 lines.
-      generation_instruction: "Generate this file ONLY in Batch 1. Do not regenerate in subsequent batches."
+        Contains sidebar toggle, mobile menu, accordion logic, focus mode, and
+        Clipboard-API-first copy logic (execCommand as fallback only). Approximately 100 lines.
+      generation_instruction: "Generated in Batch 1. Do not regenerate without GREEN LIGHT and explicit reason."
 
   batches_2_through_20_deliverables:
     description: >
-      Each batch generates 2 feature HTML files. All files MUST reference the external
+      Each batch generated 2 feature HTML files (complete). All files reference the external
       shared-styles.css and shared-scripts.js generated in Batch 1.
     html_structure_requirement: |
       Each HTML file MUST include in <head>:
@@ -153,7 +185,7 @@ external_asset_management_protocol:
 
 workflow_state_and_checklists:
   automation_suite:
-    status: "Deployed & Hardened (Updated for External Assets)"
+    status: "Deployed & Hardened (Updated for External Assets + Elisp/Clipboard fixes)"
     scripts:
       - name: "save_batch.py"
         status: "Ready"
@@ -161,7 +193,10 @@ workflow_state_and_checklists:
 
       - name: "validate.sh"
         status: "Ready"
-        notes: "Validates HTML structure AND checks for external CSS/JS references"
+        notes: >
+          Validates HTML structure, external CSS/JS references, that Elisp code blocks use
+          class="language-elisp" (not language-lisp), and that shared-scripts.js calls
+          navigator.clipboard before any execCommand fallback.
 
       - name: "build-index.py"
         status: "Ready"
@@ -175,117 +210,117 @@ workflow_state_and_checklists:
     total_batches: 20
     total_features: 40
     features_per_batch: 2
-    current_batch: 0
+    current_batch: 20
 
     external_assets_status:
-      shared_styles_css: "Pending (Batch 1)"
-      shared_scripts_js: "Pending (Batch 1)"
+      shared_styles_css: "Complete"
+      shared_scripts_js: "Complete (pending Elisp/Clipboard audit — see negative_constraints)"
 
     statuses:
       - batch: 1
         scope: "IntelliSense + Hover Info (Native)"
         features: ["intellisense.html", "hover-info-native.html"]
-        external_assets: "Generate shared-styles.css and shared-scripts.js"
-        status: "Pending"
+        external_assets: "Generated shared-styles.css and shared-scripts.js"
+        status: "Complete"
 
       - batch: 2
         scope: "Hover Info (Childframe) + Signature Help"
         features: ["hover-info-childframe.html", "signature-help.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 3
         scope: "Go to Definition + Go to Declaration"
         features: ["go-to-definition.html", "go-to-declaration.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 4
         scope: "Go to Type Definition + Go to Implementation"
         features: ["go-to-type-definition.html", "go-to-implementation.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 5
         scope: "Find All References + Document Highlight"
         features: ["find-all-references.html", "document-highlight.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 6
         scope: "Document Symbols + Workspace Symbol Search"
         features: ["document-symbols.html", "workspace-symbol-search.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 7
         scope: "Code Actions + Document Formatting"
         features: ["code-actions.html", "document-formatting.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 8
         scope: "Range Formatting + On-type Formatting"
         features: ["range-formatting.html", "on-type-formatting.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 9
         scope: "Rename Symbol + Folding Ranges"
         features: ["rename-symbol.html", "folding-ranges.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 10
         scope: "Selection Range + Linked Editing Range"
         features: ["selection-range.html", "linked-editing-range.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 11
         scope: "Call Hierarchy + Type Hierarchy"
         features: ["call-hierarchy.html", "type-hierarchy.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 12
         scope: "Semantic Tokens + Inlay Hints"
         features: ["semantic-tokens.html", "inlay-hints.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 13
         scope: "Inline Values + Document Links"
         features: ["inline-values.html", "document-links.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 14
         scope: "Document Color + Diagnostics (Push)"
         features: ["document-color.html", "diagnostics-push.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 15
         scope: "Diagnostics (Pull) + Moniker"
         features: ["diagnostics-pull.html", "moniker.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 16
         scope: "File-Operation Hooks + Execute Command"
         features: ["file-operation-hooks.html", "execute-command.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 17
         scope: "Peek Definition + Breadcrumbs Bar"
         features: ["peek-definition.html", "breadcrumbs-bar.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 18
         scope: "Problems Panel + Sticky Scroll"
         features: ["problems-panel.html", "sticky-scroll.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 19
         scope: "Bracket Colorization + Minimap"
         features: ["bracket-colorization.html", "minimap.html"]
-        status: "Pending"
+        status: "Complete"
 
       - batch: 20
         scope: "Multi-Cursor Editing + Quick Fix Lightbulb"
         features: ["multi-cursor-editing.html", "quick-fix-lightbulb.html"]
-        status: "Pending"
+        status: "Complete"
 
   ssg_migration_status:
-    phase: "Phase 3 (Blocked until batch completion)"
-    target: "Astro 5.x with Content Collections"
+    phase: "Phase 3 (Unblocked — batch completion done; migration not yet started)"
+    target: "Astro 6.x with Content Collections"
     external_asset_migration: >
       shared-styles.css will be split into:
       - src/styles/tokens.css (CSS custom properties)
@@ -293,7 +328,11 @@ workflow_state_and_checklists:
       - src/styles/components.css (accordion, cards, tables, code windows)
 
       shared-scripts.js will be migrated to:
-      - src/scripts/shared.js (client-side interactivity)
+      - src/scripts/shared.js (client-side interactivity, Clipboard-API-first copy logic
+        carries over unchanged)
+
+      Search will integrate via Pagefind's own component UI (v1.5.0+); fonts will migrate
+      to Astro 6's built-in Fonts API.
 
 validation_requirements:
   html_files:
@@ -304,6 +343,7 @@ validation_requirements:
     - "Must contain complete topbar HTML"
     - "Must contain exactly 6 accordions"
     - "Must contain Prism.js reference (via shared-scripts.js)"
+    - "Must use class='language-elisp' on Elisp code blocks — never 'language-lisp'"
 
   css_files:
     - "Must contain all Tokyo Night CSS variables"
@@ -315,7 +355,7 @@ validation_requirements:
     - "Must contain sidebar toggle logic"
     - "Must contain accordion toggle logic"
     - "Must contain focus mode logic"
-    - "Must contain clipboard copy logic"
+    - "Must contain Clipboard-API-first copy logic (navigator.clipboard.writeText, with execCommand as fallback only)"
     - "Must contain mobile menu logic"
 
 token_efficiency_analysis:
@@ -328,8 +368,8 @@ token_efficiency_analysis:
     batches_2_20_total_lines: 1840
     estimated_tokens_batch_1: "~14,000"
     estimated_tokens_batches_2_20: "~10,000"
-    feasibility: "OPTIMAL - well within 128K output limit"
-    truncation_risk: "Near Zero"
+    feasibility: "OPTIMAL - well within 128K output limit (current flagship: Opus 4.8 / Fable 5)"
+    truncation_risk: "Near Zero (already realized — all 20 batches completed without truncation)"
 
 initialization_protocol:
   trigger: "When the user uploads or references the core project files."
@@ -337,6 +377,8 @@ initialization_protocol:
     - "Ingest `emacs_ide_docs_context.yaml` to restore operational boundaries."
     - "Ingest `qwen-html.md` as the absolute visual and structural blueprint."
     - "Ingest `ide-features.md` as the source content for the 40 features."
-    - "Acknowledge the current batch state and the strict GREEN LIGHT protocol."
+    - "Acknowledge that batches 1-20 are complete and the project is in Phase 3 planning."
+    - "Acknowledge the strict GREEN LIGHT protocol."
     - "Acknowledge the MODULAR_TACTICAL_OUTPUT constraint (external CSS/JS)."
-    - "Output this exact phrase: 'I have ingested the unified context protocol and the source-of-truth files. I acknowledge the strict Tokyo Night styling rules, the 6-accordion mandate, the external CSS/JS architecture, the web_extractor research requirements, and the current batch state. I am locked in and will write zero code until you give the signal.'"
+    - "Acknowledge the ELISP_SYNTAX_FIDELITY and CLIPBOARD_API_MODERNIZATION rules."
+    - "Output this exact phrase: 'I have ingested the unified context protocol and the source-of-truth files. I acknowledge the strict Tokyo Night styling rules, the 6-accordion mandate, the external CSS/JS architecture, the language-elisp and Clipboard-API-first mandates, the web_extractor research requirements, and that batches 1-20 are complete. I am locked in and will write zero code until you give the signal.'"

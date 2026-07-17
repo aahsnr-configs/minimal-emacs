@@ -1,0 +1,83 @@
+---
+title: "Sticky Scroll"
+category: "Navigation & Visual Enhancements"
+slug: "sticky-scroll"
+status: "working"
+vscode_parity:
+  - "Sticky Scroll (keeps relevant scope headers in view while scrolling\n            through large files)"
+lsp_methods:
+  - "textDocument/documentSymbol"
+routing: "eglot→imenu / treesit→topsy or sticky-scroll-mode→header-line overlay"
+commands:
+  - action: "Toggle sticky scroll"
+    cmd: "topsy-mode/sticky-scroll-mode"
+    key: "<kbd>SPC t s</kbd>"
+    notes: "Enables/disables the sticky header for the current\n                        buffer."
+  - action: "Toggle globally"
+    cmd: "global-topsy-mode"
+    key: "—"
+    notes: "Enables sticky headers across all programming buffers."
+  - action: "Jump to enclosing symbol"
+    cmd: "imenu"
+    key: "<kbd>M-g M-i</kbd>"
+    notes: "Native fallback to jump directly to the symbol currently\n                        pinned in the sticky header."
+parity_matrix:
+  - vscode: "Pins function/class name at top of viewport"
+    emacs: "<code>topsy-mode</code> displays the enclosing\n                        definition in the header line."
+  - vscode: "Multi-line sticky scroll for nested blocks"
+    emacs: "<code>sticky-scroll-mode</code> (Option B) pins multiple\n                        indentation levels simultaneously."
+  - vscode: "Updates dynamically while scrolling"
+    emacs: "Both packages hook into\n                        <code>window-scroll-functions</code> to update the\n                        header instantly."
+  - vscode: "Clickable header to jump to definition"
+    emacs: "<code>topsy</code> headers can be made clickable, or\n                        users can rely on\n                        <kbd>M-g M-i</kbd> (<code>imenu</code>)."
+  - vscode: "Works across all major modes"
+    emacs: "Hooks into <code>prog-mode</code> and\n                        <code>text-mode</code>, covering Python, Rust,\n                        TypeScript, Org, etc."
+  - vscode: "No UI jitter or text shifting"
+    emacs: "Uses native header-line or overlay rendering, keeping\n                        the buffer text perfectly stable."
+config_filename: "init-sticky-scroll.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `Pins function/class name at top of viewport`, emacs: `<code>topsy-mode</code> displays the enclosing
+                        definition in the header line.` },
+    { vscode: `Multi-line sticky scroll for nested blocks`, emacs: `<code>sticky-scroll-mode</code> (Option B) pins multiple
+                        indentation levels simultaneously.` },
+    { vscode: `Updates dynamically while scrolling`, emacs: `Both packages hook into
+                        <code>window-scroll-functions</code> to update the
+                        header instantly.` },
+    { vscode: `Clickable header to jump to definition`, emacs: `<code>topsy</code> headers can be made clickable, or
+                        users can rely on
+                        <kbd>M-g M-i</kbd> (<code>imenu</code>).` },
+    { vscode: `Works across all major modes`, emacs: `Hooks into <code>prog-mode</code> and
+                        <code>text-mode</code>, covering Python, Rust,
+                        TypeScript, Org, etc.` },
+    { vscode: `No UI jitter or text shifting`, emacs: `Uses native header-line or overlay rendering, keeping
+                        the buffer text perfectly stable.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Toggle sticky scroll", cmd: "topsy-mode/sticky-scroll-mode", key: `<kbd>SPC t s</kbd>`, notes: "Enables/disables the sticky header for the current
+                        buffer." },
+    { action: "Toggle globally", cmd: "global-topsy-mode", key: `—`, notes: "Enables sticky headers across all programming buffers." },
+    { action: "Jump to enclosing symbol", cmd: "imenu", key: `<kbd>M-g M-i</kbd>`, notes: "Native fallback to jump directly to the symbol currently
+                        pinned in the sticky header." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

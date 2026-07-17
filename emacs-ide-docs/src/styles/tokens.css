@@ -1,0 +1,42 @@
+/* ============================================
+   Tokyo Night Design Tokens
+   Extracted from qwen-html.md — exact palette match
+   ============================================ */
+
+:root {
+  /* Backgrounds */
+  --bg: #1a1b26;
+  --bg-2: #16161e;
+  --surface: #24283b;
+  --surface-2: #1f2335;
+  --surface-hover: #292e42;
+
+  /* Borders */
+  --border: #2f3348;
+  --border-strong: #414868;
+
+  /* Text */
+  --text: #c0caf5;
+  --text-dim: #9aa5ce;
+  --text-muted: #565f89;
+
+  /* Accent Colors */
+  --blue: #7aa2f7;
+  --purple: #bb9af7;
+  --cyan: #7dcfff;
+  --green: #9ece6a;
+  --red: #f7768e;
+  --yellow: #e0af68;
+  --orange: #ff9e64;
+
+  /* Code */
+  --code-bg: #15161e;
+
+  /* Layout Dimensions */
+  --sidebar-w: 240px;
+  --sidebar-collapsed: 64px;
+  --topbar-h: 56px;
+
+  /* Transitions */
+  --transition-speed: 0.3s;
+}

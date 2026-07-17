@@ -1,6 +1,8 @@
 # 🛠️ Hardened Automation Suite (20-Batch External CSS/JS Architecture)
 
-I have completely re-engineered the automation suite for the **20-batch workflow with external CSS/JS architecture**. Based on modern 2026 DevOps best practices and verified LLM output token limits (Claude Opus 4.6 and GPT-5.5 both support 128K output tokens [[22], [24]]), this suite handles the modular asset extraction while maintaining zero dependencies and bulletproof reliability.
+I have completely re-engineered the automation suite for the **20-batch workflow with external CSS/JS architecture**. Based on modern 2026 DevOps best practices and verified LLM output token limits (Claude Opus 4.8 and Fable 5 support 128K output tokens on the synchronous Messages API, matching the plan's original 128K/64K assumption), this suite handles the modular asset extraction while maintaining zero dependencies and bulletproof reliability.
+
+> **July 2026 addendum:** batches 1–20 are already complete, so the batching mechanics below are historical/reference material — they already worked. Two real fixes are folded into `validate.sh` below: (1) code blocks must use `class="language-elisp"`, not the generic `class="language-lisp"`, since Prism's dedicated Elisp tokenizer handles `declare`/`interactive`/quote-splice forms that generic Lisp highlighting gets wrong; (2) `shared-scripts.js`'s clipboard copy must try `navigator.clipboard.writeText()` before falling back to the deprecated `document.execCommand('copy')`. Run the updated `validate.sh` against the existing `features/` directory to catch any files still using the old class name or clipboard path.
 
 The Python parser now handles HTML, CSS, and JavaScript files using `pathlib` for robust cross-platform path management [[1], [4]]. The validation suite verifies external asset references and enforces the Batch 1 dependency chain.
 
@@ -256,6 +258,12 @@ for file in "${html_files[@]}"; do
         ((file_errors++)) || true
     fi
 
+    # 9. PATCHED: Check for stale generic Lisp class instead of the dedicated Elisp tokenizer
+    if grep -q 'class="language-lisp"' "$file"; then
+        echo "  ⚠️  $filename: Uses class=\"language-lisp\" — should be class=\"language-elisp\"" >&2
+        ((file_errors++)) || true
+    fi
+
     if [ "$file_errors" -eq 0 ]; then
         echo "  ✅ $filename: Valid" >&2
     else
@@ -273,6 +281,13 @@ fi
 
 if [ "$has_shared_js" = true ]; then
     echo "✅ shared-scripts.js found" >&2
+    # PATCHED: verify Clipboard API is tried before the deprecated execCommand fallback
+    if [ -f "$FEATURES_DIR/shared-scripts.js" ]; then
+        if ! grep -q "navigator.clipboard" "$FEATURES_DIR/shared-scripts.js"; then
+            echo "⚠️  shared-scripts.js: No navigator.clipboard call found — copyCode() is likely still execCommand-only (deprecated)" >&2
+            ERRORS=$((ERRORS + 1))
+        fi
+    fi
 else
     echo "⚠️  shared-scripts.js NOT found (required after Batch 1)" >&2
 fi
@@ -569,6 +584,8 @@ Run the parser to extract HTML, CSS, and JS files:
 - **NEW:** HTML references `shared-scripts.js`
 - **NEW:** File size > 50KB (detects truncation)
 - **NEW:** External assets exist (after Batch 1)
+- **PATCHED:** No `class="language-lisp"` remains (should be `class="language-elisp"`)
+- **PATCHED:** `shared-scripts.js` calls `navigator.clipboard` (not execCommand-only)
 
 ---
 
@@ -747,7 +764,7 @@ Open `http://localhost:8000` and verify:
 
 ## 🚀 Next Steps: Transitioning to Phase 3 (Astro SSG)
 
-Once you have verified all 40 standalone HTML files via the local server, we will execute Phase 3 of the `plan.md`: migrating these modular artifacts into the Astro/MDX architecture.
+Once you have verified all 40 standalone HTML files via the local server, we will execute Phase 3 of the `plan.md`: migrating these modular artifacts into the Astro 6.x/MDX architecture (retargeted from 5.x — Astro 6 has been stable since March 10, 2026, and Astro is now Cloudflare-owned).
 
 ### Migration Bridge Strategy
 
@@ -755,20 +772,22 @@ Once you have verified all 40 standalone HTML files via the local server, we wil
 The external CSS/JS architecture makes Phase 3 migration significantly easier:
 
 - `shared-styles.css` splits into `tokens.css`, `base.css`, `components.css`
-- `shared-scripts.js` migrates to `src/scripts/shared.js`
+- `shared-scripts.js` migrates to `src/scripts/shared.js` (the Clipboard-API-first `copyCode()` carries over unchanged)
 - HTML files are parsed, stripping `<head>`, sidebar, and topbar
 - 6 accordion bodies are isolated into raw MDX snippets
+- `class="language-elisp"` code blocks map directly to Astro's Shiki-based code blocks or an Elisp Prism grammar in an MDX `<CodeWindow>` component — carry the class through unchanged
 
 **Frontmatter Generation:**
 The extraction script will automatically generate YAML frontmatter (Title, Category, LSP methods, Routing) based on the metadata bars in each HTML file.
 
 **Astro Scaffolding:**
-I will provide the `GREEN LIGHT` authorized Astro 5.x project structure, including:
+I will provide the `GREEN LIGHT` authorized Astro 6.x project structure, including:
 
 - `FeatureLayout.astro` template
 - Atomic components (`<Accordion>`, `<StackGrid>`, `<CodeWindow>`)
 - Content Collections schema
-- Pagefind search integration
+- Search integration via **Pagefind's own component-based UI (v1.5.0+)** — not the `astro-pagefind` wrapper component, which is now in maintenance mode
+- Astro 6's built-in Fonts API to self-host JetBrains Mono instead of the jsdelivr CDN `<link>` used in the tactical HTML
 
 **Content Ingestion:**
 We will drop the extracted MDX snippets into `src/content/` and let Astro's Content Collections automatically generate the final, hyper-optimized static site with View Transitions.

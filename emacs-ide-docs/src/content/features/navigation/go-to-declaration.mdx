@@ -1,0 +1,93 @@
+---
+title: "Go to Declaration"
+category: "Navigation & Code Jumping"
+slug: "go-to-declaration"
+status: "working"
+vscode_parity:
+  - "Jump to header/declaration site (distinct from F12 \"Go to\n            Definition\")"
+lsp_methods:
+  - "textDocument/declaration"
+routing: "eglot→eglot-find-declaration→xref\n              framework"
+commands:
+  - action: "Jump to declaration"
+    cmd: "eglot-find-declaration"
+    key: "<kbd>C-c d</kbd> / <kbd>g D</kbd>"
+    notes: "Jumps to the header/declaration site; distinct fromM-.(definition)."
+  - action: "Jump to definition"
+    cmd: "xref-find-definitions"
+    key: "<kbd>M-.</kbd> / <kbd>g d</kbd>"
+    notes: "Jumps to the actual implementation/definition site."
+  - action: "Go back (history)"
+    cmd: "xref-go-back"
+    key: "<kbd>M-,</kbd> / <kbd>g ,</kbd>"
+    notes: "Returns to the exact cursor position before the jump."
+  - action: "Go forward (history)"
+    cmd: "xref-go-forward"
+    key: "—"
+    notes: "Reversesxref-go-back."
+  - action: "Peek declaration (inline)"
+    cmd: "peek-xref-definition"
+    key: "<kbd>SPC c p d</kbd>"
+    notes: "Requirespeekpackage; renders the header\n                        inline without switching tabs."
+parity_matrix:
+  - vscode: "Jump to <code>.h</code> header file (C/C++)"
+    emacs: "<kbd>g D</kbd> (<code>eglot-find-declaration</code>)\n                        routes via <code>textDocument/declaration</code>."
+  - vscode: "Jump to <code>.cpp</code> implementation file"
+    emacs: "<kbd>g d</kbd> (<code>xref-find-definitions</code>)\n                        routes via <code>textDocument/definition</code>."
+  - vscode: "Distinct commands for Decl vs Def"
+    emacs: "<code>eglot-find-declaration</code> vs\n                        <code>xref-find-definitions</code>."
+  - vscode: "Fallback to definition if declaration missing"
+    emacs: "<code>eglot</code> natively falls back to definition if\n                        the LSP server returns an empty declaration payload."
+  - vscode: "Dropdown for multiple declarations"
+    emacs: "<code>consult-xref</code> intercepts the xref display\n                        functions for vertico-powered previews."
+  - vscode: "Alt+Left returns to origin"
+    emacs: "<kbd>M-,</kbd> (<code>xref-go-back</code>) via the\n                        native xref history ring."
+  - vscode: "Ctrl+Click on symbol"
+    emacs: "Emacs 31 <code>global-xref-mouse-mode</code>\n                        (<kbd>C-<mouse-1></kbd>)."
+config_filename: "init-declaration.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `Jump to <code>.h</code> header file (C/C++)`, emacs: `<kbd>g D</kbd> (<code>eglot-find-declaration</code>)
+                        routes via <code>textDocument/declaration</code>.` },
+    { vscode: `Jump to <code>.cpp</code> implementation file`, emacs: `<kbd>g d</kbd> (<code>xref-find-definitions</code>)
+                        routes via <code>textDocument/definition</code>.` },
+    { vscode: `Distinct commands for Decl vs Def`, emacs: `<code>eglot-find-declaration</code> vs
+                        <code>xref-find-definitions</code>.` },
+    { vscode: `Fallback to definition if declaration missing`, emacs: `<code>eglot</code> natively falls back to definition if
+                        the LSP server returns an empty declaration payload.` },
+    { vscode: `Dropdown for multiple declarations`, emacs: `<code>consult-xref</code> intercepts the xref display
+                        functions for vertico-powered previews.` },
+    { vscode: `Alt+Left returns to origin`, emacs: `<kbd>M-,</kbd> (<code>xref-go-back</code>) via the
+                        native xref history ring.` },
+    { vscode: `Ctrl+Click on symbol`, emacs: `Emacs 31 <code>global-xref-mouse-mode</code>
+                        (<kbd>C-<mouse-1></kbd>).` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Jump to declaration", cmd: "eglot-find-declaration", key: `<kbd>C-c d</kbd> / <kbd>g D</kbd>`, notes: "Jumps to the header/declaration site; distinct fromM-.(definition)." },
+    { action: "Jump to definition", cmd: "xref-find-definitions", key: `<kbd>M-.</kbd> / <kbd>g d</kbd>`, notes: "Jumps to the actual implementation/definition site." },
+    { action: "Go back (history)", cmd: "xref-go-back", key: `<kbd>M-,</kbd> / <kbd>g ,</kbd>`, notes: "Returns to the exact cursor position before the jump." },
+    { action: "Go forward (history)", cmd: "xref-go-forward", key: `—`, notes: "Reversesxref-go-back." },
+    { action: "Peek declaration (inline)", cmd: "peek-xref-definition", key: `<kbd>SPC c p d</kbd>`, notes: "Requirespeekpackage; renders the header
+                        inline without switching tabs." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

@@ -1,0 +1,100 @@
+---
+title: "Problems Panel"
+category: "Diagnostics & Symbols"
+slug: "problems-panel"
+status: "working"
+vscode_parity:
+  - "\"Problems\" tab aggregating workspace diagnostics with severity\n            filtering"
+lsp_methods:
+  - "textDocument/publishDiagnostics"
+routing: "eglot→flymake→consult-flymake / flymake-show-project-diagnostics"
+commands:
+  - action: "Buffer diagnostics search"
+    cmd: "consult-flymake"
+    key: "<kbd>SPC c e</kbd>"
+    notes: "Fuzzy-searches diagnostics in the current buffer with\n                        live preview."
+  - action: "Project diagnostics search"
+    cmd: "consult-flymake-project"
+    key: "<kbd>SPC c E</kbd>"
+    notes: "Fuzzy-searches all diagnostics across the entire\n                        workspace."
+  - action: "Project diagnostics panel"
+    cmd: "flymake-show-project-diagnostics"
+    key: "<kbd>SPC c P</kbd>"
+    notes: "Emacs 31 NEW — opens a centralized, filterable tabulated\n                        list of all project errors."
+  - action: "Next error"
+    cmd: "flymake-goto-next-error"
+    key: "<kbd>SPC c n</kbd> / <kbd>] e</kbd>"
+    notes: "Jumps to the next diagnostic in the current buffer."
+  - action: "Previous error"
+    cmd: "flymake-goto-prev-error"
+    key: "<kbd>SPC c p</kbd> / <kbd>[ e</kbd>"
+    notes: "Jumps to the previous diagnostic in the current buffer."
+  - action: "Force recheck"
+    cmd: "flymake-start"
+    key: "<kbd>SPC c !</kbd>"
+    notes: "Manually triggers a diagnostic refresh."
+parity_matrix:
+  - vscode: "Centralized Problems panel"
+    emacs: "<kbd>SPC c P</kbd>\n                        (<code>flymake-show-project-diagnostics</code>) or\n                        <kbd>SPC c E</kbd>\n                        (<code>consult-flymake-project</code>)."
+  - vscode: "Filter by severity (Errors / Warnings)"
+    emacs: "Native <kbd>/</kbd> filter in tabulated-list +\n                        <code>consult-flymake</code> for fuzzy matching."
+  - vscode: "Click error to jump to location"
+    emacs: "<kbd>RET</kbd> on any row in the diagnostics buffer, or\n                        fringe/margin clicks."
+  - vscode: "\"Quick Fix\" from panel"
+    emacs: "<kbd>SPC c a</kbd> (<code>eglot-code-actions</code>) at\n                        the diagnostic location."
+  - vscode: "Squiggles under erroneous code"
+    emacs: "<code>flymake</code> renders squiggles via\n                        <code>flymake-error</code> /\n                        <code>flymake-warning</code>\n                        faces."
+  - vscode: "Inline message on hover"
+    emacs: "Emacs 31 <code>'fancy</code> end-of-line rendering\n                        displays the message contextually."
+config_filename: "init-problems-panel.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `Centralized Problems panel`, emacs: `<kbd>SPC c P</kbd>
+                        (<code>flymake-show-project-diagnostics</code>) or
+                        <kbd>SPC c E</kbd>
+                        (<code>consult-flymake-project</code>).` },
+    { vscode: `Filter by severity (Errors / Warnings)`, emacs: `Native <kbd>/</kbd> filter in tabulated-list +
+                        <code>consult-flymake</code> for fuzzy matching.` },
+    { vscode: `Click error to jump to location`, emacs: `<kbd>RET</kbd> on any row in the diagnostics buffer, or
+                        fringe/margin clicks.` },
+    { vscode: `"Quick Fix" from panel`, emacs: `<kbd>SPC c a</kbd> (<code>eglot-code-actions</code>) at
+                        the diagnostic location.` },
+    { vscode: `Squiggles under erroneous code`, emacs: `<code>flymake</code> renders squiggles via
+                        <code>flymake-error</code> /
+                        <code>flymake-warning</code>
+                        faces.` },
+    { vscode: `Inline message on hover`, emacs: `Emacs 31 <code>'fancy</code> end-of-line rendering
+                        displays the message contextually.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Buffer diagnostics search", cmd: "consult-flymake", key: `<kbd>SPC c e</kbd>`, notes: "Fuzzy-searches diagnostics in the current buffer with
+                        live preview." },
+    { action: "Project diagnostics search", cmd: "consult-flymake-project", key: `<kbd>SPC c E</kbd>`, notes: "Fuzzy-searches all diagnostics across the entire
+                        workspace." },
+    { action: "Project diagnostics panel", cmd: "flymake-show-project-diagnostics", key: `<kbd>SPC c P</kbd>`, notes: "Emacs 31 NEW — opens a centralized, filterable tabulated
+                        list of all project errors." },
+    { action: "Next error", cmd: "flymake-goto-next-error", key: `<kbd>SPC c n</kbd> / <kbd>] e</kbd>`, notes: "Jumps to the next diagnostic in the current buffer." },
+    { action: "Previous error", cmd: "flymake-goto-prev-error", key: `<kbd>SPC c p</kbd> / <kbd>[ e</kbd>`, notes: "Jumps to the previous diagnostic in the current buffer." },
+    { action: "Force recheck", cmd: "flymake-start", key: `<kbd>SPC c !</kbd>`, notes: "Manually triggers a diagnostic refresh." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

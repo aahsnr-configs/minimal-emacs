@@ -1,0 +1,81 @@
+---
+title: "Breadcrumbs Bar"
+category: "Navigation & Visual Enhancements"
+slug: "breadcrumbs-bar"
+status: "working"
+vscode_parity:
+  - "Top navigation bar showing Project › Directory › File.ts › Class ›\n            Method"
+lsp_methods:
+  - "textDocument/documentSymbol"
+routing: "eglot→imenu→breadcrumb→header-line-format"
+commands:
+  - action: "Toggle global breadcrumbs"
+    cmd: "breadcrumb-mode"
+    key: "<kbd>SPC t b</kbd>"
+    notes: "Enables/disables the breadcrumb rendering globally."
+  - action: "Jump to enclosing symbol"
+    cmd: "imenu"
+    key: "<kbd>M-g M-i</kbd>"
+    notes: "Native Emacs fallback to jump to any symbol listed in\n                        the breadcrumb trail."
+  - action: "Fuzzy jump to symbol"
+    cmd: "consult-eglot-symbols"
+    key: "<kbd>SPC c s</kbd>"
+    notes: "Provides a searchable, live-preview dropdown of the same\n                        document symbols."
+parity_matrix:
+  - vscode: "Shows <code>src › utils › helpers.ts</code>"
+    emacs: "<code>breadcrumb-project-crumbs</code> renders the\n                        relative file path."
+  - vscode: "Shows <code>Class › Method › Block</code>"
+    emacs: "<code>breadcrumb-imenu-crumbs</code> renders the nested\n                        <code>eglot</code> document symbols."
+  - vscode: "Located above the editor"
+    emacs: "Routed to <code>header-line-format</code> instead of\n                        <code>mode-line-format</code>."
+  - vscode: "Updates as cursor moves"
+    emacs: "<code>breadcrumb-idle-delay</code> (0.3s) debounces the\n                        <code>imenu</code> re-evaluation."
+  - vscode: "Clickable segments to jump"
+    emacs: "Can be extended with <code>header-line</code> keymaps,\n                        or users can rely on <kbd>M-g M-i</kbd>\n                        (<code>imenu</code>)."
+  - vscode: "Truncates long paths intelligently"
+    emacs: "<code>breadcrumb-*-max-length</code> ensures the header\n                        line never overflows the frame."
+config_filename: "init-breadcrumbs.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `Shows <code>src › utils › helpers.ts</code>`, emacs: `<code>breadcrumb-project-crumbs</code> renders the
+                        relative file path.` },
+    { vscode: `Shows <code>Class › Method › Block</code>`, emacs: `<code>breadcrumb-imenu-crumbs</code> renders the nested
+                        <code>eglot</code> document symbols.` },
+    { vscode: `Located above the editor`, emacs: `Routed to <code>header-line-format</code> instead of
+                        <code>mode-line-format</code>.` },
+    { vscode: `Updates as cursor moves`, emacs: `<code>breadcrumb-idle-delay</code> (0.3s) debounces the
+                        <code>imenu</code> re-evaluation.` },
+    { vscode: `Clickable segments to jump`, emacs: `Can be extended with <code>header-line</code> keymaps,
+                        or users can rely on <kbd>M-g M-i</kbd>
+                        (<code>imenu</code>).` },
+    { vscode: `Truncates long paths intelligently`, emacs: `<code>breadcrumb-*-max-length</code> ensures the header
+                        line never overflows the frame.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Toggle global breadcrumbs", cmd: "breadcrumb-mode", key: `<kbd>SPC t b</kbd>`, notes: "Enables/disables the breadcrumb rendering globally." },
+    { action: "Jump to enclosing symbol", cmd: "imenu", key: `<kbd>M-g M-i</kbd>`, notes: "Native Emacs fallback to jump to any symbol listed in
+                        the breadcrumb trail." },
+    { action: "Fuzzy jump to symbol", cmd: "consult-eglot-symbols", key: `<kbd>SPC c s</kbd>`, notes: "Provides a searchable, live-preview dropdown of the same
+                        document symbols." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

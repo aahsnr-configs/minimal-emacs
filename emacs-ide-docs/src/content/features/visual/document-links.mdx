@@ -1,0 +1,78 @@
+---
+title: "Document Links"
+category: "Visual Enhancements"
+slug: "document-links"
+status: "working"
+vscode_parity:
+  - "Ctrl+Click to open URLs, navigate to local files, or jump to module\n            imports"
+lsp_methods:
+  - "textDocument/documentLink"
+  - "documentLink/resolve"
+routing: "eglot (LSP imports)→ffap (local\n              paths)→goto-address-mode\n              (URLs/emails)"
+commands:
+  - action: "Follow link at point"
+    cmd: "ffap"
+    key: "<kbd>C-c C-o</kbd> / <kbd>RET</kbd>"
+    notes: "Opens the file, URL, or buffer referenced at the cursor."
+  - action: "Follow link (mouse)"
+    cmd: "ffap/xref"
+    key: "<kbd>C-<mouse-1></kbd>"
+    notes: "Emacs 31 native Ctrl+Click to jump to the target."
+  - action: "Toggle URL highlighting"
+    cmd: "goto-address-mode"
+    key: "—"
+    notes: "Enabled globally viaprog-modeandtext-modehooks."
+parity_matrix:
+  - vscode: "Ctrl+Click on <code>#include</code> or\n                        <code>import</code>"
+    emacs: "<code>eglot</code> resolves the LSP link;\n                        <kbd>C-<mouse-1></kbd> triggers the jump."
+  - vscode: "Ctrl+Click on local file path"
+    emacs: "<code>ffap</code> instantly opens the file at the\n                        referenced line (if specified)."
+  - vscode: "Ctrl+Click on HTTP/HTTPS URL"
+    emacs: "<code>goto-address-mode</code> fontifies it;\n                        <kbd>C-<mouse-1></kbd> or <kbd>C-c C-o</kbd> opens\n                        it in the default browser."
+  - vscode: "Hovering shows \"Follow link\" tooltip"
+    emacs: "Native Emacs mouse bindings provide immediate\n                        click-to-follow without tooltip overhead."
+  - vscode: "Resolves remote paths over SSH"
+    emacs: "Emacs 31 <code>ffap-prefer-remote-file</code> ensures\n                        Tramp paths are prioritized over local files with the\n                        same name."
+config_filename: "init-document-links.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `Ctrl+Click on <code>#include</code> or
+                        <code>import</code>`, emacs: `<code>eglot</code> resolves the LSP link;
+                        <kbd>C-<mouse-1></kbd> triggers the jump.` },
+    { vscode: `Ctrl+Click on local file path`, emacs: `<code>ffap</code> instantly opens the file at the
+                        referenced line (if specified).` },
+    { vscode: `Ctrl+Click on HTTP/HTTPS URL`, emacs: `<code>goto-address-mode</code> fontifies it;
+                        <kbd>C-<mouse-1></kbd> or <kbd>C-c C-o</kbd> opens
+                        it in the default browser.` },
+    { vscode: `Hovering shows "Follow link" tooltip`, emacs: `Native Emacs mouse bindings provide immediate
+                        click-to-follow without tooltip overhead.` },
+    { vscode: `Resolves remote paths over SSH`, emacs: `Emacs 31 <code>ffap-prefer-remote-file</code> ensures
+                        Tramp paths are prioritized over local files with the
+                        same name.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Follow link at point", cmd: "ffap", key: `<kbd>C-c C-o</kbd> / <kbd>RET</kbd>`, notes: "Opens the file, URL, or buffer referenced at the cursor." },
+    { action: "Follow link (mouse)", cmd: "ffap/xref", key: `<kbd>C-<mouse-1></kbd>`, notes: "Emacs 31 native Ctrl+Click to jump to the target." },
+    { action: "Toggle URL highlighting", cmd: "goto-address-mode", key: `—`, notes: "Enabled globally viaprog-modeandtext-modehooks." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

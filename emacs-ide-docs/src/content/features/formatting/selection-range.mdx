@@ -1,0 +1,92 @@
+---
+title: "Selection Range (Smart Expand/Shrink)"
+category: "Formatting & Editing"
+slug: "selection-range"
+status: "working"
+vscode_parity:
+  - "Shift+Alt+Right / Shift+Alt+Left grows/shrinks selection by\n            syntactic scope"
+lsp_methods:
+  - "textDocument/selectionRange"
+routing: "treesit→expreg→repeat-mode"
+commands:
+  - action: "Expand selection"
+    cmd: "expreg-expand"
+    key: "<kbd>M-=</kbd> / <kbd>v</kbd> (visual)"
+    notes: "Grows the active region to the next logical AST node."
+  - action: "Contract selection"
+    cmd: "expreg-contract"
+    key: "<kbd>C-M--</kbd>"
+    notes: "Shrinks the active region to the previous logical AST\n                        node."
+  - action: "Repeat expansion"
+    cmd: "repeat"
+    key: "<kbd>=</kbd> (after <kbd>M-=</kbd>)"
+    notes: "Modifier-less tapping for rapid expansion loops."
+  - action: "Repeat contraction"
+    cmd: "repeat"
+    key: "<kbd>-</kbd> (after <kbd>C-M--</kbd>)"
+    notes: "Modifier-less tapping for rapid contraction loops."
+  - action: "Cancel & restore"
+    cmd: "keyboard-quit"
+    key: "<kbd>C-g</kbd>"
+    notes: "Aborts the expansion loop and restores the exact\n                        original cursor position."
+parity_matrix:
+  - vscode: "<kbd>Shift+Alt+Right</kbd> expands selection"
+    emacs: "<kbd>M-=</kbd> or <kbd>v</kbd> (in visual state)\n                        triggers <code>expreg-expand</code>."
+  - vscode: "<kbd>Shift+Alt+Left</kbd> shrinks selection"
+    emacs: "<kbd>C-M--</kbd> triggers <code>expreg-contract</code>."
+  - vscode: "Rapid tapping to expand further"
+    emacs: "<code>repeat-mode</code> allows pressing\n                        <kbd>=</kbd> repeatedly after the initial\n                        <kbd>M-=</kbd>."
+  - vscode: "Expands by semantic units (word → line → function)"
+    emacs: "<code>treesit</code> walks the AST to select the next\n                        logical syntactic node."
+  - vscode: "Canceling selection restores original cursor"
+    emacs: "<kbd>C-g</kbd> aborts the loop and\n                        <code>expreg-restore-point-on-quit</code> snaps the\n                        cursor back."
+  - vscode: "Works across all supported languages"
+    emacs: "Native <code>treesit</code> modes\n                        (<code>python-ts-mode</code>, <code>rust-ts-mode</code>,\n                        etc.) provide uniform AST structures."
+config_filename: "init-selection-range.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `<kbd>Shift+Alt+Right</kbd> expands selection`, emacs: `<kbd>M-=</kbd> or <kbd>v</kbd> (in visual state)
+                        triggers <code>expreg-expand</code>.` },
+    { vscode: `<kbd>Shift+Alt+Left</kbd> shrinks selection`, emacs: `<kbd>C-M--</kbd> triggers <code>expreg-contract</code>.` },
+    { vscode: `Rapid tapping to expand further`, emacs: `<code>repeat-mode</code> allows pressing
+                        <kbd>=</kbd> repeatedly after the initial
+                        <kbd>M-=</kbd>.` },
+    { vscode: `Expands by semantic units (word → line → function)`, emacs: `<code>treesit</code> walks the AST to select the next
+                        logical syntactic node.` },
+    { vscode: `Canceling selection restores original cursor`, emacs: `<kbd>C-g</kbd> aborts the loop and
+                        <code>expreg-restore-point-on-quit</code> snaps the
+                        cursor back.` },
+    { vscode: `Works across all supported languages`, emacs: `Native <code>treesit</code> modes
+                        (<code>python-ts-mode</code>, <code>rust-ts-mode</code>,
+                        etc.) provide uniform AST structures.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Expand selection", cmd: "expreg-expand", key: `<kbd>M-=</kbd> / <kbd>v</kbd> (visual)`, notes: "Grows the active region to the next logical AST node." },
+    { action: "Contract selection", cmd: "expreg-contract", key: `<kbd>C-M--</kbd>`, notes: "Shrinks the active region to the previous logical AST
+                        node." },
+    { action: "Repeat expansion", cmd: "repeat", key: `<kbd>=</kbd> (after <kbd>M-=</kbd>)`, notes: "Modifier-less tapping for rapid expansion loops." },
+    { action: "Repeat contraction", cmd: "repeat", key: `<kbd>-</kbd> (after <kbd>C-M--</kbd>)`, notes: "Modifier-less tapping for rapid contraction loops." },
+    { action: "Cancel & restore", cmd: "keyboard-quit", key: `<kbd>C-g</kbd>`, notes: "Aborts the expansion loop and restores the exact
+                        original cursor position." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

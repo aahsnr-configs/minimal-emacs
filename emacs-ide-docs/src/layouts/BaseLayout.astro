@@ -1,0 +1,39 @@
+---
+import { ClientRouter } from 'astro:transitions';
+import '../styles/tokens.css';
+import '../styles/base.css';
+import '../styles/components.css';
+import '../styles/responsive.css';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = 'Emacs IDE feature documentation with VS Code parity' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Astro 6 View Transitions (replaces removed <ViewTransitions />) -->
+    <ClientRouter />
+  </head>
+  <body>
+    <div class="overlay" id="overlay" aria-hidden="true"></div>
+    <div class="focus-hint" id="focusHint" aria-live="polite">
+      <kbd>ESC</kbd> <span>Exit Focus Mode</span>
+    </div>
+
+    <slot />
+
+    <!-- Vanilla JS client-side interactivity — loaded as-is, no Astro processing -->
+    <script is:inline src="/scripts/shared.js"></script>
+  </body>
+</html>

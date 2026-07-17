@@ -1,0 +1,92 @@
+---
+title: "Minimap"
+category: "Visual Enhancements"
+slug: "minimap"
+status: "working"
+vscode_parity:
+  - "Scaled buffer overview with viewport indicator and git diff\n            bars"
+routing: "minimap-mode→side-window\n              rendering + diff-hl overlay injection"
+commands:
+  - action: "Toggle minimap"
+    cmd: "minimap-mode"
+    key: "<kbd>SPC t m</kbd>"
+    notes: "Enables/disables minimap sidebar."
+  - action: "Toggle globally"
+    cmd: "minimap-global-mode"
+    key: "—"
+    notes: "Enables minimap across all programming buffers."
+  - action: "Jump in minimap"
+    cmd: "Mouse drag"
+    key: "—"
+    notes: "Drag viewport region in minimap to scroll buffer."
+  - action: "Next git hunk"
+    cmd: "diff-hl-next-hunk"
+    key: "<kbd>] h</kbd>"
+    notes: "Jump to next git change."
+  - action: "Previous git hunk"
+    cmd: "diff-hl-previous-hunk"
+    key: "<kbd>[ h</kbd>"
+    notes: "Jump to previous git change."
+  - action: "Revert hunk"
+    cmd: "diff-hl-revert-hunk"
+    key: "<kbd>r h</kbd>"
+    notes: "Revert current git hunk."
+parity_matrix:
+  - vscode: "Scaled buffer overview on right edge"
+    emacs: "<code>minimap-mode</code> with\n                        <code>minimap-window-location 'right</code>."
+  - vscode: "Viewport indicator rectangle"
+    emacs: "Native minimap highlights current region."
+  - vscode: "Git diff colored bars in minimap"
+    emacs: "Custom <code>ar/minimap-diff-hl-integration</code>\n                        injects diff-hl overlays."
+  - vscode: "Fringe git diff indicators"
+    emacs: "<code>diff-hl-mode</code> with custom Tokyo Night\n                        colors."
+  - vscode: "Click/drag to scroll"
+    emacs: "Native minimap mouse dragging support."
+  - vscode: "Real-time diff updates"
+    emacs: "<code>diff-hl-flydiff-mode</code> with 0.1s delay."
+  - vscode: "No lag in large files"
+    emacs: "<code>too-long-file-p</code> guard prevents activation\n                        in massive buffers."
+config_filename: "init-minimap.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `Scaled buffer overview on right edge`, emacs: `<code>minimap-mode</code> with
+                        <code>minimap-window-location 'right</code>.` },
+    { vscode: `Viewport indicator rectangle`, emacs: `Native minimap highlights current region.` },
+    { vscode: `Git diff colored bars in minimap`, emacs: `Custom <code>ar/minimap-diff-hl-integration</code>
+                        injects diff-hl overlays.` },
+    { vscode: `Fringe git diff indicators`, emacs: `<code>diff-hl-mode</code> with custom Tokyo Night
+                        colors.` },
+    { vscode: `Click/drag to scroll`, emacs: `Native minimap mouse dragging support.` },
+    { vscode: `Real-time diff updates`, emacs: `<code>diff-hl-flydiff-mode</code> with 0.1s delay.` },
+    { vscode: `No lag in large files`, emacs: `<code>too-long-file-p</code> guard prevents activation
+                        in massive buffers.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Toggle minimap", cmd: "minimap-mode", key: `<kbd>SPC t m</kbd>`, notes: "Enables/disables minimap sidebar." },
+    { action: "Toggle globally", cmd: "minimap-global-mode", key: `—`, notes: "Enables minimap across all programming buffers." },
+    { action: "Jump in minimap", cmd: "Mouse drag", key: `—`, notes: "Drag viewport region in minimap to scroll buffer." },
+    { action: "Next git hunk", cmd: "diff-hl-next-hunk", key: `<kbd>] h</kbd>`, notes: "Jump to next git change." },
+    { action: "Previous git hunk", cmd: "diff-hl-previous-hunk", key: `<kbd>[ h</kbd>`, notes: "Jump to previous git change." },
+    { action: "Revert hunk", cmd: "diff-hl-revert-hunk", key: `<kbd>r h</kbd>`, notes: "Revert current git hunk." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

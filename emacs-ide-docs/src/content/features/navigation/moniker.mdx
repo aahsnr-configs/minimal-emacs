@@ -1,0 +1,73 @@
+---
+title: "Moniker"
+category: "Navigation & Code Jumping"
+slug: "moniker"
+status: "working"
+vscode_parity:
+  - "Background protocol feature enabling external indexers (e.g.,\n            Sourcegraph, LSIF) to link symbols across repositories"
+lsp_methods:
+  - "textDocument/moniker"
+routing: "eglot→custom inspection command\n              (no native UI)"
+commands:
+  - action: "Inspect moniker at point"
+    cmd: "ar/eglot-moniker-at-point"
+    key: "<kbd>SPC c m</kbd>"
+    notes: "Queries the LSP server for the symbol's cross-repo\n                        identity and displays it in the echo area."
+  - action: "Copy moniker to kill-ring"
+    cmd: "ar/eglot-copy-moniker"
+    key: "<kbd>SPC c M</kbd>"
+    notes: "Copies the primary moniker string for use in external\n                        search tools (e.g., Sourcegraph)."
+parity_matrix:
+  - vscode: "Server advertises <code>monikerProvider</code>"
+    emacs: "<code>eglot</code> natively detects and stores this\n                        capability during initialization."
+  - vscode: "External tools (Sourcegraph) use monikers"
+    emacs: "Emacs acts as a passive participant; the LSP server\n                        provides the data to external indexers."
+  - vscode: "Inspect symbol identity"
+    emacs: "<kbd>SPC c m</kbd>\n                        (<code>ar/eglot-moniker-at-point</code>) displays the\n                        scheme, identifier, and kind in the echo area."
+  - vscode: "Copy identity for external search"
+    emacs: "<kbd>SPC c M</kbd> (<code>ar/eglot-copy-moniker</code>)\n                        copies the identifier (e.g.,\n                        <code>npm:lodash:4.17.21:map</code>) to the kill-ring."
+  - vscode: "No local \"jump\" action"
+    emacs: "Correctly omitted, as monikers represent\n                        cross-repository identities, not local file paths."
+config_filename: "init-moniker.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `Server advertises <code>monikerProvider</code>`, emacs: `<code>eglot</code> natively detects and stores this
+                        capability during initialization.` },
+    { vscode: `External tools (Sourcegraph) use monikers`, emacs: `Emacs acts as a passive participant; the LSP server
+                        provides the data to external indexers.` },
+    { vscode: `Inspect symbol identity`, emacs: `<kbd>SPC c m</kbd>
+                        (<code>ar/eglot-moniker-at-point</code>) displays the
+                        scheme, identifier, and kind in the echo area.` },
+    { vscode: `Copy identity for external search`, emacs: `<kbd>SPC c M</kbd> (<code>ar/eglot-copy-moniker</code>)
+                        copies the identifier (e.g.,
+                        <code>npm:lodash:4.17.21:map</code>) to the kill-ring.` },
+    { vscode: `No local "jump" action`, emacs: `Correctly omitted, as monikers represent
+                        cross-repository identities, not local file paths.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Inspect moniker at point", cmd: "ar/eglot-moniker-at-point", key: `<kbd>SPC c m</kbd>`, notes: "Queries the LSP server for the symbol's cross-repo
+                        identity and displays it in the echo area." },
+    { action: "Copy moniker to kill-ring", cmd: "ar/eglot-copy-moniker", key: `<kbd>SPC c M</kbd>`, notes: "Copies the primary moniker string for use in external
+                        search tools (e.g., Sourcegraph)." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

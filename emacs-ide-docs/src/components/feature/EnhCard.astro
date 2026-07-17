@@ -1,0 +1,14 @@
+---
+interface Props {
+  title: string;
+  desc: string;
+  color: 'g' | 'p' | 'y';
+}
+
+const { title, desc, color } = Astro.props;
+---
+
+<div class={`enh-card ${color}`}>
+  <div class="enh-title">{title}</div>
+  <p class="enh-desc" set:html={desc} />
+</div>

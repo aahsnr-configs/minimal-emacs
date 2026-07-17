@@ -1,0 +1,94 @@
+---
+title: "Multi-Cursor Editing"
+category: "Precision Editing"
+slug: "multi-cursor-editing"
+status: "working"
+vscode_parity:
+  - "Alt+Click (arbitrary), Ctrl+D (next occurrence), Ctrl+Shift+L (all\n            occurrences), Alt+Shift+Down (column selection)"
+routing: "iedit→evil-multiedit→evil-mc"
+commands:
+  - action: "Add cursor on click"
+    cmd: "evil-mc-make-cursor-here"
+    key: "<kbd>C-S-<mouse-1></kbd>"
+    notes: "VS Code parity: click anywhere to place an arbitrary\n                        cursor."
+  - action: "Edit lines in rectangle"
+    cmd: "evil-mc-make-cursor-in-next-line"
+    key: "<kbd>C-S-<down></kbd> (visual)"
+    notes: "Adds a cursor to each line in the active visual\n                        rectangle."
+  - action: "Mark next occurrence"
+    cmd: "evil-multiedit-match-symbol-and-next"
+    key: "<kbd>M-d</kbd>"
+    notes: "Evil-native: adds the next occurrence of the current\n                        symbol."
+  - action: "Mark all occurrences"
+    cmd: "evil-multiedit-match-all"
+    key: "<kbd>M-D</kbd>"
+    notes: "Evil-native: adds all occurrences in the buffer."
+  - action: "Exit multi-cursor mode"
+    cmd: "evil-mc-undo-all-cursors"
+    key: "<kbd>C-g</kbd> or <kbd>RET</kbd>"
+    notes: "Exits multi-cursor mode, leaving a single cursor."
+parity_matrix:
+  - vscode: "<kbd>Alt+Click</kbd> to place cursors anywhere"
+    emacs: "<kbd>C-S-<mouse-1></kbd>\n                        (<code>evil-mc-make-cursor-here</code>)."
+  - vscode: "<kbd>Ctrl+D</kbd> to select next occurrence"
+    emacs: "<kbd>M-d</kbd>\n                        (<code>evil-multiedit-match-symbol-and-next</code>)."
+  - vscode: "<kbd>Ctrl+Shift+L</kbd> to select all occurrences"
+    emacs: "<kbd>M-D</kbd> (<code>evil-multiedit-match-all</code>)."
+  - vscode: "<kbd>Alt+Shift+Down</kbd> for column selection"
+    emacs: "<kbd>C-S-<down></kbd> in visual state\n                        (<code>evil-mc-make-cursor-in-next-line</code>)."
+  - vscode: "Type/delete simultaneously at all cursors"
+    emacs: "Native behavior of both <code>iedit</code> and\n                        <code>evil-mc</code>."
+  - vscode: "Execute <code>ciw</code> or <code>daw</code> at all\n                        cursors"
+    emacs: "Natively supported by <code>evil-mc</code>'s fake cursor\n                        engine."
+  - vscode: "<kbd>Esc</kbd> or <kbd>C-g</kbd> to exit multi-cursor"
+    emacs: "<kbd>C-g</kbd> cleanly invokes\n                        <code>evil-mc-undo-all-cursors</code> or\n                        <code>evil-normal-state</code>."
+config_filename: "init-multi-cursor.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `<kbd>Alt+Click</kbd> to place cursors anywhere`, emacs: `<kbd>C-S-<mouse-1></kbd>
+                        (<code>evil-mc-make-cursor-here</code>).` },
+    { vscode: `<kbd>Ctrl+D</kbd> to select next occurrence`, emacs: `<kbd>M-d</kbd>
+                        (<code>evil-multiedit-match-symbol-and-next</code>).` },
+    { vscode: `<kbd>Ctrl+Shift+L</kbd> to select all occurrences`, emacs: `<kbd>M-D</kbd> (<code>evil-multiedit-match-all</code>).` },
+    { vscode: `<kbd>Alt+Shift+Down</kbd> for column selection`, emacs: `<kbd>C-S-<down></kbd> in visual state
+                        (<code>evil-mc-make-cursor-in-next-line</code>).` },
+    { vscode: `Type/delete simultaneously at all cursors`, emacs: `Native behavior of both <code>iedit</code> and
+                        <code>evil-mc</code>.` },
+    { vscode: `Execute <code>ciw</code> or <code>daw</code> at all
+                        cursors`, emacs: `Natively supported by <code>evil-mc</code>'s fake cursor
+                        engine.` },
+    { vscode: `<kbd>Esc</kbd> or <kbd>C-g</kbd> to exit multi-cursor`, emacs: `<kbd>C-g</kbd> cleanly invokes
+                        <code>evil-mc-undo-all-cursors</code> or
+                        <code>evil-normal-state</code>.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Add cursor on click", cmd: "evil-mc-make-cursor-here", key: `<kbd>C-S-<mouse-1></kbd>`, notes: "VS Code parity: click anywhere to place an arbitrary
+                        cursor." },
+    { action: "Edit lines in rectangle", cmd: "evil-mc-make-cursor-in-next-line", key: `<kbd>C-S-<down></kbd> (visual)`, notes: "Adds a cursor to each line in the active visual
+                        rectangle." },
+    { action: "Mark next occurrence", cmd: "evil-multiedit-match-symbol-and-next", key: `<kbd>M-d</kbd>`, notes: "Evil-native: adds the next occurrence of the current
+                        symbol." },
+    { action: "Mark all occurrences", cmd: "evil-multiedit-match-all", key: `<kbd>M-D</kbd>`, notes: "Evil-native: adds all occurrences in the buffer." },
+    { action: "Exit multi-cursor mode", cmd: "evil-mc-undo-all-cursors", key: `<kbd>C-g</kbd> or <kbd>RET</kbd>`, notes: "Exits multi-cursor mode, leaving a single cursor." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

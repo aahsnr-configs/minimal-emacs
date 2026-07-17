@@ -1,0 +1,94 @@
+---
+title: "Type Hierarchy"
+category: "Navigation & Code Jumping"
+slug: "type-hierarchy"
+status: "working"
+vscode_parity:
+  - "\"Show Type Hierarchy\" (supertypes/subtypes tree view)"
+lsp_methods:
+  - "textDocument/prepareTypeHierarchy"
+  - "typeHierarchy/supertypes"
+  - "typeHierarchy/subtypes"
+routing: "eglot→eglot-show-type-hierarchy→interactive *eglot-hierarchy* buffer"
+commands:
+  - action: "Show type hierarchy"
+    cmd: "eglot-show-type-hierarchy"
+    key: "<kbd>SPC c t</kbd> / <kbd>g T</kbd>"
+    notes: "Opens the interactive supertype/subtype tree for the\n                        symbol at point."
+  - action: "Show call hierarchy"
+    cmd: "eglot-show-call-hierarchy"
+    key: "<kbd>SPC c h</kbd> / <kbd>g c</kbd>"
+    notes: "Opens the interactive caller/callee tree for the symbol\n                        at point."
+  - action: "Center on node"
+    cmd: "eglot-hierarchy-center-on-node"
+    key: "<kbd>c</kbd> (in hierarchy buffer)"
+    notes: "Recenters the tree view on the current node."
+  - action: "Expand/Collapse node"
+    cmd: "tabulated-listnative"
+    key: "<kbd>TAB</kbd> / <kbd>RET</kbd>"
+    notes: "Toggles the visibility of child nodes in the tree."
+  - action: "Jump to definition"
+    cmd: "xref-find-definitions"
+    key: "<kbd>RET</kbd> (on node)"
+    notes: "Jumps to the selected type definition in the source\n                        buffer."
+parity_matrix:
+  - vscode: "\"Show Type Hierarchy\" opens tree view"
+    emacs: "<kbd>SPC c t</kbd> or <kbd>g T</kbd> invokes\n                        <code>eglot-show-type-hierarchy</code>."
+  - vscode: "Tree view of supertypes (parents)"
+    emacs: "Native Eglot hierarchy buffer displays \"Supertypes\"\n                        expandable nodes."
+  - vscode: "Tree view of subtypes (children)"
+    emacs: "Native Eglot hierarchy buffer displays \"Subtypes\"\n                        expandable nodes."
+  - vscode: "Click node to jump to source"
+    emacs: "<kbd>RET</kbd> on a hierarchy node triggers\n                        <code>xref-find-definitions</code> to jump to the\n                        location."
+  - vscode: "Expand/collapse tree branches"
+    emacs: "<kbd>TAB</kbd> or <kbd>RET</kbd> on parent nodes toggles\n                        child visibility."
+  - vscode: "Center view on current symbol"
+    emacs: "<code>eglot-hierarchy-center-on-node</code> recenters\n                        the tree on the active symbol."
+config_filename: "init-type-hierarchy.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `"Show Type Hierarchy" opens tree view`, emacs: `<kbd>SPC c t</kbd> or <kbd>g T</kbd> invokes
+                        <code>eglot-show-type-hierarchy</code>.` },
+    { vscode: `Tree view of supertypes (parents)`, emacs: `Native Eglot hierarchy buffer displays "Supertypes"
+                        expandable nodes.` },
+    { vscode: `Tree view of subtypes (children)`, emacs: `Native Eglot hierarchy buffer displays "Subtypes"
+                        expandable nodes.` },
+    { vscode: `Click node to jump to source`, emacs: `<kbd>RET</kbd> on a hierarchy node triggers
+                        <code>xref-find-definitions</code> to jump to the
+                        location.` },
+    { vscode: `Expand/collapse tree branches`, emacs: `<kbd>TAB</kbd> or <kbd>RET</kbd> on parent nodes toggles
+                        child visibility.` },
+    { vscode: `Center view on current symbol`, emacs: `<code>eglot-hierarchy-center-on-node</code> recenters
+                        the tree on the active symbol.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Show type hierarchy", cmd: "eglot-show-type-hierarchy", key: `<kbd>SPC c t</kbd> / <kbd>g T</kbd>`, notes: "Opens the interactive supertype/subtype tree for the
+                        symbol at point." },
+    { action: "Show call hierarchy", cmd: "eglot-show-call-hierarchy", key: `<kbd>SPC c h</kbd> / <kbd>g c</kbd>`, notes: "Opens the interactive caller/callee tree for the symbol
+                        at point." },
+    { action: "Center on node", cmd: "eglot-hierarchy-center-on-node", key: `<kbd>c</kbd> (in hierarchy buffer)`, notes: "Recenters the tree view on the current node." },
+    { action: "Expand/Collapse node", cmd: "tabulated-listnative", key: `<kbd>TAB</kbd> / <kbd>RET</kbd>`, notes: "Toggles the visibility of child nodes in the tree." },
+    { action: "Jump to definition", cmd: "xref-find-definitions", key: `<kbd>RET</kbd> (on node)`, notes: "Jumps to the selected type definition in the source
+                        buffer." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

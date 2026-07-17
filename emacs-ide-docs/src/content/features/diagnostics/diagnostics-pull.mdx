@@ -1,0 +1,90 @@
+---
+title: "Diagnostics (Pull Model)"
+category: "Diagnostics & Symbols"
+slug: "diagnostics-pull"
+status: "working"
+vscode_parity:
+  - "\"Re-run document diagnostics\" or workspace-wide diagnostic\n            refresh"
+lsp_methods:
+  - "textDocument/diagnostic"
+  - "workspace/diagnostic"
+routing: "flymake-start→eglot→LSP pull request→flymake\n              aggregation"
+commands:
+  - action: "Force document re-check"
+    cmd: "flymake-start"
+    key: "<kbd>SPC c !</kbd>"
+    notes: "Explicitly triggers a pull-modeltextDocument/diagnosticrequest for the\n                        current buffer."
+  - action: "Workspace diagnostics list"
+    cmd: "flymake-show-project-diagnostics"
+    key: "<kbd>SPC c P</kbd>"
+    notes: "Emacs 31 NEW — pulls and lists all workspace diagnostics\n                        in a centralized tabulated buffer."
+  - action: "Project diagnostics search"
+    cmd: "consult-flymake-project"
+    key: "<kbd>SPC c E</kbd>"
+    notes: "Fuzzy-searches all pulled diagnostics across the entire\n                        workspace with live preview."
+  - action: "Toggle auto-check"
+    cmd: "flymake-mode"
+    key: "—"
+    notes: "Can be toggled off to rely exclusively on manual\n                        pull-model requests, saving network/CPU cycles."
+parity_matrix:
+  - vscode: "\"Re-run document diagnostics\" command"
+    emacs: "<kbd>SPC c !</kbd> (<code>flymake-start</code>) triggers\n                        an immediate pull request."
+  - vscode: "Workspace-wide diagnostic refresh"
+    emacs: "<kbd>SPC c P</kbd>\n                        (<code>flymake-show-project-diagnostics</code>) pulls\n                        and aggregates all workspace errors."
+  - vscode: "Centralized Problems panel"
+    emacs: "<code>flymake-show-project-diagnostics</code> or\n                        <code>consult-flymake-project</code>."
+  - vscode: "Filter by severity (Errors / Warnings)"
+    emacs: "Native <kbd>/</kbd> filter in tabulated-list +\n                        <code>consult-flymake</code> for fuzzy matching."
+  - vscode: "Click error to jump to location"
+    emacs: "<kbd>RET</kbd> on any row in the diagnostics buffer, or\n                        fringe/margin clicks."
+  - vscode: "On-demand checking (no auto-check)"
+    emacs: "Disable <code>flymake-mode</code> globally, and bind\n                        <code>flymake-start</code> to a convenient key for\n                        manual pulls."
+config_filename: "init-diagnostics-pull.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `"Re-run document diagnostics" command`, emacs: `<kbd>SPC c !</kbd> (<code>flymake-start</code>) triggers
+                        an immediate pull request.` },
+    { vscode: `Workspace-wide diagnostic refresh`, emacs: `<kbd>SPC c P</kbd>
+                        (<code>flymake-show-project-diagnostics</code>) pulls
+                        and aggregates all workspace errors.` },
+    { vscode: `Centralized Problems panel`, emacs: `<code>flymake-show-project-diagnostics</code> or
+                        <code>consult-flymake-project</code>.` },
+    { vscode: `Filter by severity (Errors / Warnings)`, emacs: `Native <kbd>/</kbd> filter in tabulated-list +
+                        <code>consult-flymake</code> for fuzzy matching.` },
+    { vscode: `Click error to jump to location`, emacs: `<kbd>RET</kbd> on any row in the diagnostics buffer, or
+                        fringe/margin clicks.` },
+    { vscode: `On-demand checking (no auto-check)`, emacs: `Disable <code>flymake-mode</code> globally, and bind
+                        <code>flymake-start</code> to a convenient key for
+                        manual pulls.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Force document re-check", cmd: "flymake-start", key: `<kbd>SPC c !</kbd>`, notes: "Explicitly triggers a pull-modeltextDocument/diagnosticrequest for the
+                        current buffer." },
+    { action: "Workspace diagnostics list", cmd: "flymake-show-project-diagnostics", key: `<kbd>SPC c P</kbd>`, notes: "Emacs 31 NEW — pulls and lists all workspace diagnostics
+                        in a centralized tabulated buffer." },
+    { action: "Project diagnostics search", cmd: "consult-flymake-project", key: `<kbd>SPC c E</kbd>`, notes: "Fuzzy-searches all pulled diagnostics across the entire
+                        workspace with live preview." },
+    { action: "Toggle auto-check", cmd: "flymake-mode", key: `—`, notes: "Can be toggled off to rely exclusively on manual
+                        pull-model requests, saving network/CPU cycles." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

@@ -1,0 +1,107 @@
+---
+title: "Hover Info"
+category: "Completion & Intelligence"
+slug: "hover-info-native"
+status: "working"
+vscode_parity:
+  - "Tooltip with type info, docs, and signatures on mouse-hover or\n            keyboard shortcut"
+lsp_methods:
+  - "textDocument/hover"
+routing: "eglot→eldoc→ephemeral buffer"
+commands:
+  - action: "Hover at point (keyboard)"
+    cmd: "eldoc"
+    key: "<kbd>K</kbd> (Evil normal)"
+    notes: "Shows type info / docstring for symbol under cursor."
+  - action: "Help at point"
+    cmd: "help-at-point"
+    key: "<kbd>C-h .</kbd>"
+    notes: "Native Emacs help surfacing viaeldoc-help-at-pt."
+  - action: "Toggle candidate docs"
+    cmd: "corfu-popupinfo-toggle"
+    key: "<kbd>M-h</kbd> (in <code>corfu-map</code>)"
+    notes: "Shows/hides doc popup for selected completion candidate."
+  - action: "Scroll doc buffer"
+    cmd: "scroll-other-window"
+    key: "<kbd>C-M-v</kbd>"
+    notes: "Scrolls the*eldoc*ephemeral buffer when\n                        doc exceeds echo area."
+  - action: "Scroll doc buffer (back)"
+    cmd: "scroll-other-window-down"
+    key: "<kbd>C-M-S-v</kbd>"
+    notes: "Reverse scroll for long documentation."
+  - action: "Force hover refresh"
+    cmd: "eglot-signature-eldoc-bar"
+    key: "—"
+    notes: "Re-queriestextDocument/hoveron demand."
+parity_matrix:
+  - vscode: "Hover tooltip on cursor idle"
+    emacs: "<code>eldoc</code> with\n                        <code>eldoc-idle-delay 0.5</code> triggers\n                        <code>textDocument/hover</code>"
+  - vscode: "Mouse hover shows tooltip"
+    emacs: "<code>eldoc-help-at-pt t</code> surfaces info on cursor\n                        movement"
+  - vscode: "<kbd>K</kbd> key shows hover (Vim)"
+    emacs: "<kbd>K</kbd> bound to <code>eldoc</code> in Evil normal\n                        state"
+  - vscode: "Rich markdown rendering"
+    emacs: "<code>markdown-ts-mode</code> fontifies\n                        <code>*eldoc*</code> ephemeral buffer"
+  - vscode: "Long docs in side panel"
+    emacs: "<code>eldoc-echo-area-prefer-doc-buffer t</code>\n                        routes to <code>*eldoc*</code> buffer"
+  - vscode: "Scroll long documentation"
+    emacs: "<kbd>C-M-v</kbd> / <kbd>C-M-S-v</kbd> scroll the\n                        <code>*eldoc*</code> buffer"
+  - vscode: "Hover on completion candidate"
+    emacs: "<code>corfu-popupinfo-toggle</code> (<kbd>M-h</kbd>)\n                        shows <code>completionItem/resolve</code> docs"
+  - vscode: "Signature help in tooltip"
+    emacs: "<code>eldoc</code> natively merges\n                        <code>textDocument/signatureHelp</code> with hover"
+  - vscode: "Type info + docstring combined"
+    emacs: "<code>eglot</code> merges both payloads into single\n                        eldoc response"
+config_filename: "init-hover.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `Hover tooltip on cursor idle`, emacs: `<code>eldoc</code> with
+                        <code>eldoc-idle-delay 0.5</code> triggers
+                        <code>textDocument/hover</code>` },
+    { vscode: `Mouse hover shows tooltip`, emacs: `<code>eldoc-help-at-pt t</code> surfaces info on cursor
+                        movement` },
+    { vscode: `<kbd>K</kbd> key shows hover (Vim)`, emacs: `<kbd>K</kbd> bound to <code>eldoc</code> in Evil normal
+                        state` },
+    { vscode: `Rich markdown rendering`, emacs: `<code>markdown-ts-mode</code> fontifies
+                        <code>*eldoc*</code> ephemeral buffer` },
+    { vscode: `Long docs in side panel`, emacs: `<code>eldoc-echo-area-prefer-doc-buffer t</code>
+                        routes to <code>*eldoc*</code> buffer` },
+    { vscode: `Scroll long documentation`, emacs: `<kbd>C-M-v</kbd> / <kbd>C-M-S-v</kbd> scroll the
+                        <code>*eldoc*</code> buffer` },
+    { vscode: `Hover on completion candidate`, emacs: `<code>corfu-popupinfo-toggle</code> (<kbd>M-h</kbd>)
+                        shows <code>completionItem/resolve</code> docs` },
+    { vscode: `Signature help in tooltip`, emacs: `<code>eldoc</code> natively merges
+                        <code>textDocument/signatureHelp</code> with hover` },
+    { vscode: `Type info + docstring combined`, emacs: `<code>eglot</code> merges both payloads into single
+                        eldoc response` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Hover at point (keyboard)", cmd: "eldoc", key: `<kbd>K</kbd> (Evil normal)`, notes: "Shows type info / docstring for symbol under cursor." },
+    { action: "Help at point", cmd: "help-at-point", key: `<kbd>C-h .</kbd>`, notes: "Native Emacs help surfacing viaeldoc-help-at-pt." },
+    { action: "Toggle candidate docs", cmd: "corfu-popupinfo-toggle", key: `<kbd>M-h</kbd> (in <code>corfu-map</code>)`, notes: "Shows/hides doc popup for selected completion candidate." },
+    { action: "Scroll doc buffer", cmd: "scroll-other-window", key: `<kbd>C-M-v</kbd>`, notes: "Scrolls the*eldoc*ephemeral buffer when
+                        doc exceeds echo area." },
+    { action: "Scroll doc buffer (back)", cmd: "scroll-other-window-down", key: `<kbd>C-M-S-v</kbd>`, notes: "Reverse scroll for long documentation." },
+    { action: "Force hover refresh", cmd: "eglot-signature-eldoc-bar", key: `—`, notes: "Re-queriestextDocument/hoveron demand." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

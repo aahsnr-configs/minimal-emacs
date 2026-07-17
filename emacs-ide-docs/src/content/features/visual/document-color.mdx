@@ -1,0 +1,78 @@
+---
+title: "Document Color"
+category: "Visual Enhancements"
+slug: "document-color"
+status: "working"
+vscode_parity:
+  - "Inline color swatches and color picker UI"
+lsp_methods:
+  - "textDocument/documentColor"
+routing: "colorful-mode→native\n              regex/overlay stacking"
+commands:
+  - action: "Toggle color visualization"
+    cmd: "colorful-mode"
+    key: "<kbd>SPC t c</kbd>"
+    notes: "Enables/disables inline color swatches globally or\n                        per-buffer."
+  - action: "Display color picker"
+    cmd: "list-colors-display"
+    key: "<kbd>M-x list-colors-display</kbd>"
+    notes: "Native Emacs color palette viewer."
+  - action: "Pick color from screen"
+    cmd: "color-picker"
+    key: "<kbd>M-x color-picker</kbd>"
+    notes: "Requires externalcolor-pickerpackage for\n                        OS-level eyedropper."
+parity_matrix:
+  - vscode: "Inline color swatch next to <code>#fff</code> or\n                        <code>rgb(255,255,255)</code>"
+    emacs: "<code>colorful-mode</code> renders a small colored\n                        overlay box next to the text."
+  - vscode: "Swatch updates as you type"
+    emacs: "Native Emacs <code>post-command-hook</code> updates the\n                        overlay instantly."
+  - vscode: "Click swatch to open color picker"
+    emacs: "Requires optional <code>color-picker</code> package or\n                        native <kbd>M-x list-colors-display</kbd>."
+  - vscode: "Works in CSS, HTML, JS, and config files"
+    emacs: "<code>colorful-mode</code> hooks into\n                        <code>prog-mode</code>, <code>css-mode</code>,\n                        <code>html-mode</code>, etc."
+  - vscode: "No main-thread blocking"
+    emacs: "Regex matching is executed locally with zero network\n                        dependency."
+config_filename: "init-document-color.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `Inline color swatch next to <code>#fff</code> or
+                        <code>rgb(255,255,255)</code>`, emacs: `<code>colorful-mode</code> renders a small colored
+                        overlay box next to the text.` },
+    { vscode: `Swatch updates as you type`, emacs: `Native Emacs <code>post-command-hook</code> updates the
+                        overlay instantly.` },
+    { vscode: `Click swatch to open color picker`, emacs: `Requires optional <code>color-picker</code> package or
+                        native <kbd>M-x list-colors-display</kbd>.` },
+    { vscode: `Works in CSS, HTML, JS, and config files`, emacs: `<code>colorful-mode</code> hooks into
+                        <code>prog-mode</code>, <code>css-mode</code>,
+                        <code>html-mode</code>, etc.` },
+    { vscode: `No main-thread blocking`, emacs: `Regex matching is executed locally with zero network
+                        dependency.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Toggle color visualization", cmd: "colorful-mode", key: `<kbd>SPC t c</kbd>`, notes: "Enables/disables inline color swatches globally or
+                        per-buffer." },
+    { action: "Display color picker", cmd: "list-colors-display", key: `<kbd>M-x list-colors-display</kbd>`, notes: "Native Emacs color palette viewer." },
+    { action: "Pick color from screen", cmd: "color-picker", key: `<kbd>M-x color-picker</kbd>`, notes: "Requires externalcolor-pickerpackage for
+                        OS-level eyedropper." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

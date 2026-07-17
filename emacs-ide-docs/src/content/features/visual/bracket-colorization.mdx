@@ -1,0 +1,76 @@
+---
+title: "Bracket Pair Colorization"
+category: "Visual Enhancements"
+slug: "bracket-colorization"
+status: "working"
+vscode_parity:
+  - "Color-coded highlighting for nested parentheses, brackets, and\n            braces"
+routing: "rainbow-delimiters-mode→text\n              properties / overlays"
+commands:
+  - action: "Toggle rainbow delimiters"
+    cmd: "rainbow-delimiters-mode"
+    key: "<kbd>SPC t r</kbd>"
+    notes: "Enables/disables color-coded bracket highlighting."
+  - action: "Toggle globally"
+    cmd: "global-rainbow-delimiters-mode"
+    key: "—"
+    notes: "Enables rainbow delimiters across all programming\n                        buffers."
+  - action: "Toggle show-paren"
+    cmd: "show-paren-mode"
+    key: "—"
+    notes: "Built-in mode that highlights matching pair at cursor."
+parity_matrix:
+  - vscode: "Nested brackets colorized by depth"
+    emacs: "<code>rainbow-delimiters-mode</code> assigns distinct\n                        colors to each nesting level."
+  - vscode: "Matching pair highlighted on cursor"
+    emacs: "<code>show-paren-mode</code> highlights the matching\n                        delimiter instantly."
+  - vscode: "Colors match theme"
+    emacs: "Custom faces integrate seamlessly with Tokyo Night\n                        palette."
+  - vscode: "No performance lag"
+    emacs: "Text property-based rendering is highly optimized."
+  - vscode: "Works across all programming modes"
+    emacs: "Hooked into <code>prog-mode</code>, covering Python,\n                        Rust, TypeScript, etc."
+  - vscode: "Mismatched brackets visually distinct"
+    emacs: "<code>show-paren-mismatch</code> face highlights errors\n                        in red."
+config_filename: "init-bracket-colorization.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `Nested brackets colorized by depth`, emacs: `<code>rainbow-delimiters-mode</code> assigns distinct
+                        colors to each nesting level.` },
+    { vscode: `Matching pair highlighted on cursor`, emacs: `<code>show-paren-mode</code> highlights the matching
+                        delimiter instantly.` },
+    { vscode: `Colors match theme`, emacs: `Custom faces integrate seamlessly with Tokyo Night
+                        palette.` },
+    { vscode: `No performance lag`, emacs: `Text property-based rendering is highly optimized.` },
+    { vscode: `Works across all programming modes`, emacs: `Hooked into <code>prog-mode</code>, covering Python,
+                        Rust, TypeScript, etc.` },
+    { vscode: `Mismatched brackets visually distinct`, emacs: `<code>show-paren-mismatch</code> face highlights errors
+                        in red.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Toggle rainbow delimiters", cmd: "rainbow-delimiters-mode", key: `<kbd>SPC t r</kbd>`, notes: "Enables/disables color-coded bracket highlighting." },
+    { action: "Toggle globally", cmd: "global-rainbow-delimiters-mode", key: `—`, notes: "Enables rainbow delimiters across all programming
+                        buffers." },
+    { action: "Toggle show-paren", cmd: "show-paren-mode", key: `—`, notes: "Built-in mode that highlights matching pair at cursor." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

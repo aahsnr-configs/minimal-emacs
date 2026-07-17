@@ -1,0 +1,86 @@
+---
+title: "Go to Implementation"
+category: "Navigation & Code Jumping"
+slug: "go-to-implementation"
+status: "working"
+vscode_parity:
+  - "Jump to the concrete class or method that implements an interface\n            or abstract definition"
+lsp_methods:
+  - "textDocument/implementation"
+routing: "eglot→eglot-find-implementation→xref\n              framework"
+commands:
+  - action: "Jump to implementation"
+    cmd: "eglot-find-implementation"
+    key: "<kbd>C-c i</kbd> / <kbd>g i</kbd>"
+    notes: "Jumps to the concrete implementation of the\n                        interface/method at point."
+  - action: "Jump to definition (contrast)"
+    cmd: "xref-find-definitions"
+    key: "<kbd>M-.</kbd> / <kbd>g d</kbd>"
+    notes: "Jumps to the interface/abstract definition itself."
+  - action: "Go back (history)"
+    cmd: "xref-go-back"
+    key: "<kbd>M-,</kbd> / <kbd>g ,</kbd>"
+    notes: "Returns to the exact cursor position before the jump."
+  - action: "Go forward (history)"
+    cmd: "xref-go-forward"
+    key: "—"
+    notes: "Reversesxref-go-back."
+  - action: "Peek implementation (inline)"
+    cmd: "peek-xref-definition"
+    key: "<kbd>SPC c p d</kbd>"
+    notes: "Requirespeekpackage; renders the target\n                        inline without switching tabs."
+parity_matrix:
+  - vscode: "Right-click → Go to Implementation"
+    emacs: "<kbd>g i</kbd> (<code>eglot-find-implementation</code>)\n                        routes via <code>textDocument/implementation</code>."
+  - vscode: "Dropdown for multiple implementations"
+    emacs: "<code>consult-xref</code> intercepts the xref display\n                        functions for vertico-powered previews."
+  - vscode: "Alt+Left returns to origin"
+    emacs: "<kbd>M-,</kbd> (<code>xref-go-back</code>) via the\n                        native xref history ring."
+  - vscode: "Ctrl+Click on interface name"
+    emacs: "Emacs 31 <code>global-xref-mouse-mode</code>\n                        (<kbd>C-<mouse-1></kbd>)."
+  - vscode: "Fallback to definition if impl missing"
+    emacs: "<code>eglot</code> natively falls back to definition if\n                        the LSP server returns an empty implementation payload."
+config_filename: "init-implementation.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `Right-click → Go to Implementation`, emacs: `<kbd>g i</kbd> (<code>eglot-find-implementation</code>)
+                        routes via <code>textDocument/implementation</code>.` },
+    { vscode: `Dropdown for multiple implementations`, emacs: `<code>consult-xref</code> intercepts the xref display
+                        functions for vertico-powered previews.` },
+    { vscode: `Alt+Left returns to origin`, emacs: `<kbd>M-,</kbd> (<code>xref-go-back</code>) via the
+                        native xref history ring.` },
+    { vscode: `Ctrl+Click on interface name`, emacs: `Emacs 31 <code>global-xref-mouse-mode</code>
+                        (<kbd>C-<mouse-1></kbd>).` },
+    { vscode: `Fallback to definition if impl missing`, emacs: `<code>eglot</code> natively falls back to definition if
+                        the LSP server returns an empty implementation payload.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Jump to implementation", cmd: "eglot-find-implementation", key: `<kbd>C-c i</kbd> / <kbd>g i</kbd>`, notes: "Jumps to the concrete implementation of the
+                        interface/method at point." },
+    { action: "Jump to definition (contrast)", cmd: "xref-find-definitions", key: `<kbd>M-.</kbd> / <kbd>g d</kbd>`, notes: "Jumps to the interface/abstract definition itself." },
+    { action: "Go back (history)", cmd: "xref-go-back", key: `<kbd>M-,</kbd> / <kbd>g ,</kbd>`, notes: "Returns to the exact cursor position before the jump." },
+    { action: "Go forward (history)", cmd: "xref-go-forward", key: `—`, notes: "Reversesxref-go-back." },
+    { action: "Peek implementation (inline)", cmd: "peek-xref-definition", key: `<kbd>SPC c p d</kbd>`, notes: "Requirespeekpackage; renders the target
+                        inline without switching tabs." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

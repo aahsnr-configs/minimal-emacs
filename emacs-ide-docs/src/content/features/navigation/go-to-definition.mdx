@@ -1,0 +1,97 @@
+---
+title: "Go to Definition"
+category: "Navigation & Code Jumping"
+slug: "go-to-definition"
+status: "working"
+vscode_parity:
+  - "F12 to jump, Ctrl+Click to jump, Alt+F12 to peek inline"
+lsp_methods:
+  - "textDocument/definition"
+routing: "eglot→xref→consult-xref OR peek"
+commands:
+  - action: "Jump to definition"
+    cmd: "xref-find-definitions"
+    key: "<kbd>M-.</kbd> / <kbd>g d</kbd>"
+    notes: "Jumps to target; opensconsult-xrefdropdown if ambiguous."
+  - action: "Jump to definition (mouse)"
+    cmd: "xref-find-definitions-at-mouse"
+    key: "<kbd>C-<mouse-1></kbd>"
+    notes: "Emacs 31 NEW — Ctrl+Click parity viaglobal-xref-mouse-mode."
+  - action: "Peek definition (inline)"
+    cmd: "peek-xref-definition"
+    key: "<kbd>SPC c p d</kbd>"
+    notes: "Shows target in an inline overlay panel (requirespeekpackage)."
+  - action: "Go back (history)"
+    cmd: "xref-go-back"
+    key: "<kbd>M-,</kbd> / <kbd>g ,</kbd>"
+    notes: "Returns to the exact cursor position before the jump."
+  - action: "Go forward (history)"
+    cmd: "xref-go-forward"
+    key: "—"
+    notes: "Reversesxref-go-back."
+  - action: "Find definitions (other window)"
+    cmd: "xref-find-definitions-other-window"
+    key: "<kbd>C-x 4 .</kbd>"
+    notes: "Opens definition in a horizontal split."
+parity_matrix:
+  - vscode: "<kbd>F12</kbd> jumps to definition"
+    emacs: "<kbd>M-.</kbd> or <kbd>g d</kbd>\n                        (<code>xref-find-definitions</code>)"
+  - vscode: "Ctrl+Click jumps to definition"
+    emacs: "<kbd>C-<mouse-1></kbd> via Emacs 31\n                        <code>global-xref-mouse-mode</code>"
+  - vscode: "Alt+F12 peeks definition inline"
+    emacs: "<kbd>SPC c p d</kbd> (<code>peek-xref-definition</code>)\n                        via <code>peek</code> package"
+  - vscode: "Dropdown for multiple definitions"
+    emacs: "<code>consult-xref</code> intercepts\n                        <code>xref-show-definitions-function</code>"
+  - vscode: "Live preview in dropdown"
+    emacs: "<code>consult-xref</code> + <code>vertico</code> live\n                        buffer previews"
+  - vscode: "Alt+Left returns to origin"
+    emacs: "<kbd>M-,</kbd> or <kbd>g ,</kbd>\n                        (<code>xref-go-back</code>)"
+  - vscode: "Open in split window"
+    emacs: "<kbd>C-x 4 .</kbd>\n                        (<code>xref-find-definitions-other-window</code>)"
+config_filename: "init-xref.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `<kbd>F12</kbd> jumps to definition`, emacs: `<kbd>M-.</kbd> or <kbd>g d</kbd>
+                        (<code>xref-find-definitions</code>)` },
+    { vscode: `Ctrl+Click jumps to definition`, emacs: `<kbd>C-<mouse-1></kbd> via Emacs 31
+                        <code>global-xref-mouse-mode</code>` },
+    { vscode: `Alt+F12 peeks definition inline`, emacs: `<kbd>SPC c p d</kbd> (<code>peek-xref-definition</code>)
+                        via <code>peek</code> package` },
+    { vscode: `Dropdown for multiple definitions`, emacs: `<code>consult-xref</code> intercepts
+                        <code>xref-show-definitions-function</code>` },
+    { vscode: `Live preview in dropdown`, emacs: `<code>consult-xref</code> + <code>vertico</code> live
+                        buffer previews` },
+    { vscode: `Alt+Left returns to origin`, emacs: `<kbd>M-,</kbd> or <kbd>g ,</kbd>
+                        (<code>xref-go-back</code>)` },
+    { vscode: `Open in split window`, emacs: `<kbd>C-x 4 .</kbd>
+                        (<code>xref-find-definitions-other-window</code>)` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Jump to definition", cmd: "xref-find-definitions", key: `<kbd>M-.</kbd> / <kbd>g d</kbd>`, notes: "Jumps to target; opensconsult-xrefdropdown if ambiguous." },
+    { action: "Jump to definition (mouse)", cmd: "xref-find-definitions-at-mouse", key: `<kbd>C-<mouse-1></kbd>`, notes: "Emacs 31 NEW — Ctrl+Click parity viaglobal-xref-mouse-mode." },
+    { action: "Peek definition (inline)", cmd: "peek-xref-definition", key: `<kbd>SPC c p d</kbd>`, notes: "Shows target in an inline overlay panel (requirespeekpackage)." },
+    { action: "Go back (history)", cmd: "xref-go-back", key: `<kbd>M-,</kbd> / <kbd>g ,</kbd>`, notes: "Returns to the exact cursor position before the jump." },
+    { action: "Go forward (history)", cmd: "xref-go-forward", key: `—`, notes: "Reversesxref-go-back." },
+    { action: "Find definitions (other window)", cmd: "xref-find-definitions-other-window", key: `<kbd>C-x 4 .</kbd>`, notes: "Opens definition in a horizontal split." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

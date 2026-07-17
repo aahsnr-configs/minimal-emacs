@@ -1,0 +1,76 @@
+---
+title: "Execute Command"
+category: "Code Actions & Refactoring"
+slug: "execute-command"
+status: "working"
+vscode_parity:
+  - "Server-defined custom commands surfaced in the Command Palette\n            (e.g., \"Restart Server\", \"Expand Macro\")"
+lsp_methods:
+  - "workspace/executeCommand"
+routing: "eglot→eglot-execute-command→completing-read (Vertico/Consult)"
+commands:
+  - action: "Execute server command"
+    cmd: "eglot-execute-command"
+    key: "<kbd>SPC c x</kbd>"
+    notes: "Prompts for a command ID registered by the active LSP\n                        server."
+  - action: "Organize imports (LSP)"
+    cmd: "eglot-code-action-organize-imports"
+    key: "<kbd>SPC c i</kbd>"
+    notes: "Built-in wrapper for the standard LSP organize imports\n                        command."
+  - action: "Code actions menu"
+    cmd: "eglot-code-actions"
+    key: "<kbd>SPC c a</kbd>"
+    notes: "Often surfaces commands like \"Fix All\" as actionable\n                        items, bypassing the need to type raw command IDs."
+parity_matrix:
+  - vscode: "Command Palette shows server commands"
+    emacs: "<kbd>SPC c x</kbd> (<code>eglot-execute-command</code>)\n                        lists commands via <code>completing-read</code>."
+  - vscode: "\"Organize Imports\" quick action"
+    emacs: "<kbd>SPC c i</kbd>\n                        (<code>eglot-code-action-organize-imports</code>) or\n                        <kbd>SPC c a</kbd> (Code Actions)."
+  - vscode: "Command applies workspace edits"
+    emacs: "<code>eglot</code> natively processes the\n                        <code>WorkspaceEdit</code> response and updates affected\n                        buffers atomically."
+  - vscode: "Fails gracefully if unsupported"
+    emacs: "<code>eglot</code> validates\n                        <code>executeCommandProvider</code> capabilities before\n                        offering the command."
+config_filename: "init-execute-command.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `Command Palette shows server commands`, emacs: `<kbd>SPC c x</kbd> (<code>eglot-execute-command</code>)
+                        lists commands via <code>completing-read</code>.` },
+    { vscode: `"Organize Imports" quick action`, emacs: `<kbd>SPC c i</kbd>
+                        (<code>eglot-code-action-organize-imports</code>) or
+                        <kbd>SPC c a</kbd> (Code Actions).` },
+    { vscode: `Command applies workspace edits`, emacs: `<code>eglot</code> natively processes the
+                        <code>WorkspaceEdit</code> response and updates affected
+                        buffers atomically.` },
+    { vscode: `Fails gracefully if unsupported`, emacs: `<code>eglot</code> validates
+                        <code>executeCommandProvider</code> capabilities before
+                        offering the command.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Execute server command", cmd: "eglot-execute-command", key: `<kbd>SPC c x</kbd>`, notes: "Prompts for a command ID registered by the active LSP
+                        server." },
+    { action: "Organize imports (LSP)", cmd: "eglot-code-action-organize-imports", key: `<kbd>SPC c i</kbd>`, notes: "Built-in wrapper for the standard LSP organize imports
+                        command." },
+    { action: "Code actions menu", cmd: "eglot-code-actions", key: `<kbd>SPC c a</kbd>`, notes: "Often surfaces commands like "Fix All" as actionable
+                        items, bypassing the need to type raw command IDs." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

@@ -4,6 +4,7 @@
 # Validates that all generated HTML files meet the structural requirements
 # for the 20-batch external CSS/JS architecture.
 # ==============================================================================
+
 set -euo pipefail
 
 FEATURES_DIR="features"
@@ -89,25 +90,28 @@ for file in "${html_files[@]}"; do
     ((file_errors++)) || true
   fi
 
-  # 6. Check for external CSS reference
+  # 6. NEW: Check for external CSS reference
   if ! grep -q 'href="shared-styles.css"' "$file"; then
     echo "  ⚠️  $filename: Missing external CSS reference (shared-styles.css)" >&2
     ((file_errors++)) || true
   fi
 
-  # 7. Check for external JS reference
+  # 7. NEW: Check for external JS reference
   if ! grep -q 'src="shared-scripts.js"' "$file"; then
     echo "  ⚠️  $filename: Missing external JS reference (shared-scripts.js)" >&2
     ((file_errors++)) || true
   fi
 
-  # 8. Check file size (detect truncation)
-  # NOTE: Threshold lowered to 25KB for External CSS/JS architecture.
-  # A fully complete HTML file referencing external assets naturally weighs ~35-40KB.
-  # Files under 25KB are typically true LLM truncations (missing closing tags).
+  # 8. NEW: Check file size (detect truncation)
   file_size=$(wc -c <"$file")
   if [ "$file_size" -lt 25000 ]; then
     echo "  ⚠️  $filename: Suspiciously small ($file_size bytes) - possibly truncated" >&2
+    ((file_errors++)) || true
+  fi
+
+  # 9. PATCHED: Check for stale generic Lisp class instead of the dedicated Elisp tokenizer
+  if grep -q 'class="language-lisp"' "$file"; then
+    echo "  ⚠️  $filename: Uses class=\"language-lisp\" — should be class=\"language-elisp\"" >&2
     ((file_errors++)) || true
   fi
 
@@ -128,6 +132,13 @@ fi
 
 if [ "$has_shared_js" = true ]; then
   echo "✅ shared-scripts.js found" >&2
+  # PATCHED: verify Clipboard API is tried before the deprecated execCommand fallback
+  if [ -f "$FEATURES_DIR/shared-scripts.js" ]; then
+    if ! grep -q "navigator.clipboard" "$FEATURES_DIR/shared-scripts.js"; then
+      echo "⚠️  shared-scripts.js: No navigator.clipboard call found — copyCode() is likely still execCommand-only (deprecated)" >&2
+      ERRORS=$((ERRORS + 1))
+    fi
+  fi
 else
   echo "⚠️  shared-scripts.js NOT found (required after Batch 1)" >&2
 fi

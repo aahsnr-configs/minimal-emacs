@@ -1,0 +1,87 @@
+---
+title: "Document Formatting (Whole File)"
+category: "Formatting & Editing"
+slug: "document-formatting"
+status: "working"
+vscode_parity:
+  - "\"Format Document\" command (Shift+Alt+F)"
+lsp_methods:
+  - "textDocument/formatting"
+routing: "apheleia (async CLI diff) OR eglot→eglot-format-buffer"
+commands:
+  - action: "Format current buffer"
+    cmd: "apheleia-format-buffer"
+    key: "<kbd>SPC c f</kbd>"
+    notes: "Async, cursor-preserving whole-file formatting\n                        (Recommended)."
+  - action: "LSP Format buffer"
+    cmd: "eglot-format-buffer"
+    key: "<kbd>C-c C-f</kbd>"
+    notes: "Synchronous LSP fallback. Blocks UI briefly on large\n                        files."
+  - action: "Toggle format on save"
+    cmd: "apheleia-global-mode"
+    key: "—"
+    notes: "Enables automatic formatting before everysave-buffer."
+  - action: "Format specific region"
+    cmd: "apheleia-format-buffer(with region)"
+    key: "<kbd>SPC c f</kbd> (visual)"
+    notes: "Formats only the active region (delegates to CLI--rangeflags if supported)."
+parity_matrix:
+  - vscode: "<kbd>Shift+Alt+F</kbd> formats the whole file"
+    emacs: "<kbd>SPC c f</kbd>\n                        (<code>apheleia-format-buffer</code>) or\n                        <kbd>C-c C-f</kbd> (<code>eglot-format-buffer</code>)."
+  - vscode: "Format on Save toggle"
+    emacs: "<code>apheleia-global-mode +1</code> hooks into\n                        <code>before-save-hook</code>."
+  - vscode: "No UI freeze during formatting"
+    emacs: "<code>apheleia</code> runs asynchronously; Emacs remains\n                        fully interactive."
+  - vscode: "Cursor stays in place after format"
+    emacs: "<code>apheleia</code>'s diff engine precisely restores\n                        the cursor and mark."
+  - vscode: "Undo history remains clean"
+    emacs: "<code>apheleia</code> groups the diff application into a\n                        single, clean undo step."
+  - vscode: "Project-specific formatter rules"
+    emacs: "<code>apheleia</code> respects\n                        <code>.dir-locals.el</code> and\n                        <code>project.el</code> root detection."
+config_filename: "init-formatting.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `<kbd>Shift+Alt+F</kbd> formats the whole file`, emacs: `<kbd>SPC c f</kbd>
+                        (<code>apheleia-format-buffer</code>) or
+                        <kbd>C-c C-f</kbd> (<code>eglot-format-buffer</code>).` },
+    { vscode: `Format on Save toggle`, emacs: `<code>apheleia-global-mode +1</code> hooks into
+                        <code>before-save-hook</code>.` },
+    { vscode: `No UI freeze during formatting`, emacs: `<code>apheleia</code> runs asynchronously; Emacs remains
+                        fully interactive.` },
+    { vscode: `Cursor stays in place after format`, emacs: `<code>apheleia</code>'s diff engine precisely restores
+                        the cursor and mark.` },
+    { vscode: `Undo history remains clean`, emacs: `<code>apheleia</code> groups the diff application into a
+                        single, clean undo step.` },
+    { vscode: `Project-specific formatter rules`, emacs: `<code>apheleia</code> respects
+                        <code>.dir-locals.el</code> and
+                        <code>project.el</code> root detection.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Format current buffer", cmd: "apheleia-format-buffer", key: `<kbd>SPC c f</kbd>`, notes: "Async, cursor-preserving whole-file formatting
+                        (Recommended)." },
+    { action: "LSP Format buffer", cmd: "eglot-format-buffer", key: `<kbd>C-c C-f</kbd>`, notes: "Synchronous LSP fallback. Blocks UI briefly on large
+                        files." },
+    { action: "Toggle format on save", cmd: "apheleia-global-mode", key: `—`, notes: "Enables automatic formatting before everysave-buffer." },
+    { action: "Format specific region", cmd: "apheleia-format-buffer(with region)", key: `<kbd>SPC c f</kbd> (visual)`, notes: "Formats only the active region (delegates to CLI--rangeflags if supported)." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

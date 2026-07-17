@@ -1,0 +1,83 @@
+---
+title: "Inlay Hints"
+category: "Completion & Intelligence"
+slug: "inlay-hints"
+status: "working"
+vscode_parity:
+  - "Inline grey annotations showing inferred types, parameter names,\n            etc."
+lsp_methods:
+  - "textDocument/inlayHint"
+  - "inlayHint/resolve"
+routing: "eglot→eglot-inlay-hints-mode→native\n              buffer overlays"
+commands:
+  - action: "Toggle inlay hints"
+    cmd: "eglot-inlay-hints-mode"
+    key: "<kbd>SPC t h</kbd>"
+    notes: "Enables/disables inline annotations for the current\n                        buffer."
+  - action: "Toggle globally"
+    cmd: "global-eglot-inlay-hints-mode"
+    key: "—"
+    notes: "Enables inlay hints across alleglot-managed buffers."
+  - action: "Resolve hint details"
+    cmd: "eglot-inlay-hint-resolve"
+    key: "—"
+    notes: "Triggered automatically byeglotwhen\n                        hovering or interacting with a hint."
+parity_matrix:
+  - vscode: "Inline grey text for parameter names"
+    emacs: "<code>eglot-inlay-hint-parameter-face</code> renders\n                        recessive, italicized parameter names."
+  - vscode: "Inline type annotations for variables"
+    emacs: "<code>eglot-inlay-hint-type-face</code> renders inferred\n                        types adjacent to declarations."
+  - vscode: "Hints disappear when typing in the hint location"
+    emacs: "<code>eglot</code> automatically clears and re-requests\n                        hints on buffer modification."
+  - vscode: "Click/hover to see full resolved hint"
+    emacs: "<code>eglot</code> natively triggers\n                        <code>inlayHint/resolve</code> when the cursor rests on\n                        or interacts with the hint overlay."
+  - vscode: "Toggle hints via command palette"
+    emacs: "<kbd>SPC t h</kbd> (<code>eglot-inlay-hints-mode</code>)\n                        or <kbd>M-x global-eglot-inlay-hints-mode</kbd>."
+  - vscode: "Respects variable-pitch fonts"
+    emacs: "Emacs 31's overlay renderer correctly calculates spacing\n                        even when mixing monospaced code with variable-pitch\n                        hint text."
+config_filename: "init-inlay-hints.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `Inline grey text for parameter names`, emacs: `<code>eglot-inlay-hint-parameter-face</code> renders
+                        recessive, italicized parameter names.` },
+    { vscode: `Inline type annotations for variables`, emacs: `<code>eglot-inlay-hint-type-face</code> renders inferred
+                        types adjacent to declarations.` },
+    { vscode: `Hints disappear when typing in the hint location`, emacs: `<code>eglot</code> automatically clears and re-requests
+                        hints on buffer modification.` },
+    { vscode: `Click/hover to see full resolved hint`, emacs: `<code>eglot</code> natively triggers
+                        <code>inlayHint/resolve</code> when the cursor rests on
+                        or interacts with the hint overlay.` },
+    { vscode: `Toggle hints via command palette`, emacs: `<kbd>SPC t h</kbd> (<code>eglot-inlay-hints-mode</code>)
+                        or <kbd>M-x global-eglot-inlay-hints-mode</kbd>.` },
+    { vscode: `Respects variable-pitch fonts`, emacs: `Emacs 31's overlay renderer correctly calculates spacing
+                        even when mixing monospaced code with variable-pitch
+                        hint text.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Toggle inlay hints", cmd: "eglot-inlay-hints-mode", key: `<kbd>SPC t h</kbd>`, notes: "Enables/disables inline annotations for the current
+                        buffer." },
+    { action: "Toggle globally", cmd: "global-eglot-inlay-hints-mode", key: `—`, notes: "Enables inlay hints across alleglot-managed buffers." },
+    { action: "Resolve hint details", cmd: "eglot-inlay-hint-resolve", key: `—`, notes: "Triggered automatically byeglotwhen
+                        hovering or interacting with a hint." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

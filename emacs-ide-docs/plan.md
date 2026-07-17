@@ -16,6 +16,19 @@ Based on July 2026 research, Claude Opus 4.6 and GPT-5.5 both support 128K outpu
 
 ---
 
+## 🧭 Addendum: July 18, 2026 Re-Verification
+
+Batches 1–20 are complete and all 40 HTML files exist. That makes most of Phase 2 (the batch workflow itself) historical — it already worked, so it isn't touched below. Re-checking the plan's research claims against current sources surfaced three things worth acting on now, and one thing worth deferring:
+
+1. **Prism's Lisp component is not your best option for Elisp.** Prism ships a dedicated `elisp`/`emacs-lisp` language (merged upstream from `akirak/prism-emacs-lisp`), aliased as `lisp`, `emacs`, `elisp`, `emacs-lisp`. It correctly handles `declare`, `interactive`, quote/backtick/splice forms, and `defvar`/`defun`/`lambda` keyword-only-at-head rules — things the generic `language-lisp` class doesn't get right for real Elisp. **Action:** audit the 40 generated files for `prism-lisp.min.js` / `class="language-lisp"` and switch to the `elisp` alias (see §4.3 patch below).
+2. **`document.execCommand('copy')` is deprecated** (MDN, browser vendors actively removing it) and should not be the primary path in `shared-scripts.js`'s copy-to-clipboard logic. **Action:** rewrite `copyCode()` to use `navigator.clipboard.writeText()` as the primary method, keeping the textarea/`execCommand` version only as a last-resort fallback for non-secure contexts (see §4.2 patch below).
+3. **Astro is no longer "5.x."** Astro 6 shipped stable on March 10, 2026 (currently 6.4, May 28, 2026), rebuilt around a unified dev/prod runtime, native CSP, a built-in Fonts API, and stable Live Content Collections — and Astro was acquired by Cloudflare in January 2026. Pagefind's own component-based UI (v1.5.0+) is now the recommended integration path; the `astro-pagefind` wrapper component is in maintenance mode. **Action:** retarget Phase 5's "Astro 5.x Strategic Goal" to Astro 6.x (see §5.1/§5.2 patch below). This only affects the not-yet-started Phase 3 migration — no impact on the completed batches.
+4. **Deferred, no action needed today:** the plan's "Claude Opus 4.6 / GPT-5.5, 128K output tokens" framing reflects the state of things a few months ago. The current lineup (Opus 4.8, Sonnet 5, Haiku 4.5, Fable 5) still splits along the same 128K/64K output-limit line the plan assumed, so the 2-feature-per-batch reasoning was sound and needs no retroactive fix — it's purely a naming/labeling staleness issue, and batching is done anyway.
+
+The sections below are patched in place; everything else in the plan is unchanged.
+
+---
+
 ## 🔍 Research Insights (July 2026 Verified)
 
 ### Industry Best Practices Identified:
@@ -88,15 +101,23 @@ This plan implements a **dual-layer architecture**:
 └─────────────────────────────────────────────────────┘
 ```
 
-**Strategic Layer (Phase 3):**
+**Strategic Layer (Phase 3) — PATCHED to Astro 6.x:**
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  SSG Framework: Astro 5.x (Content Collections)     │
+│  SSG Framework: Astro 6.x (stable since Mar 2026,   │
+│                 currently 6.4; Content Collections   │
+│                 + stable Live Collections)          │
 │  Styling: Vanilla CSS (split from shared-styles)    │
+│  Fonts: Astro 6 built-in Fonts API (self-hosts       │
+│         JetBrains Mono instead of the jsdelivr CDN)  │
 │  Markdown: MDX for interactive components           │
-│  Search: Pagefind (static search index)             │
-│  Deployment: Cloudflare Pages / Vercel              │
+│  Search: Pagefind's own component UI (v1.5.0+)      │
+│         — astro-pagefind's Search.astro wrapper is   │
+│         now maintenance-mode; use Pagefind's native  │
+│         UI component directly                        │
+│  Deployment: Cloudflare Pages / Vercel (Astro is now │
+│              Cloudflare-owned as of Jan 2026)        │
 │  Icons: Lucide (matches current SVG style)          │
 └─────────────────────────────────────────────────────┘
 ```
@@ -288,6 +309,8 @@ This script checks:
 - HTML contains exactly 6 accordions
 - HTML references Prism.js (via shared-scripts.js)
 - File size is reasonable (>50KB indicates complete file)
+- **(PATCHED)** No `class="language-lisp"` remains — all code blocks use `class="language-elisp"`
+- **(PATCHED)** `shared-scripts.js` calls `navigator.clipboard.writeText` before any `execCommand` fallback
 
 **Step 3: Visual Preview**
 
@@ -488,7 +511,7 @@ shared-styles.css
 
 This file contains all interactivity:
 
-```
+````
 shared-scripts.js
 ├── Desktop Sidebar Toggle
 │   ├── Get sidebar element
@@ -515,20 +538,49 @@ shared-scripts.js
 │   ├── Add click listener to focus button
 │   └── Add keydown listener for ESC key
 │
-└── Clipboard Copy
-    ├── Define copyCode function
+└── Clipboard Copy **(PATCHED — execCommand is deprecated, MDN)**
+    ├── Define copyCode function (async)
     │   ├── Get code element from button
-    │   ├── Create temporary textarea
-    │   ├── Set textarea value to code text
-    │   ├── Append to body, focus, select
-    │   ├── Execute document.execCommand('copy')
-    │   ├── Trigger success animation
-    │   └── Remove textarea from body
+    │   ├── Try navigator.clipboard.writeText(text) first (primary path)
+    │   ├── On success/catch, only fall back to the legacy path if
+    │   │   navigator.clipboard is unavailable (non-secure context):
+    │   │     ├── Create temporary textarea
+    │   │     ├── Set textarea value to code text
+    │   │     ├── Append to body, focus, select
+    │   │     ├── Execute document.execCommand('copy') (fallback only)
+    │   │     └── Remove textarea from body
+    │   └── Trigger success animation
     └── Define triggerCopySuccess function
         ├── Change button HTML to checkmark + "Copied"
         ├── Add 'copied' class
         └── Revert after 1800ms
-```
+
+    **Reference implementation:**
+    ```js
+    async function copyCode(btn, codeEl) {
+      const text = codeEl.innerText;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          // Legacy fallback only — execCommand is deprecated per MDN
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        triggerCopySuccess(btn);
+      } catch (err) {
+        console.error('Copy failed:', err);
+      }
+    }
+    ```
+````
 
 ### 4.3 HTML File Structure (Batches 2-20)
 
@@ -592,11 +644,28 @@ Each HTML file follows this template:
     </main>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <!-- PATCHED: use the dedicated elisp component (merged from akirak/prism-emacs-lisp),
+         not the generic prism-lisp.min.js. It correctly handles declare, interactive,
+         quote/backtick/splice, and defun/defvar/lambda keyword rules that plain Lisp misses. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lisp.min.js"></script>
     <script src="shared-scripts.js"></script>
   </body>
 </html>
 ```
+
+Note: on cdnjs, `elisp`/`emacs-lisp` is bundled inside the same `prism-lisp.min.js` file (Prism registers it under aliases `lisp`, `emacs`, `elisp`, `emacs-lisp` in one component) — so the `<script>` tag above doesn't change, but the code block's **class name does**:
+
+```html
+<!-- Was: -->
+<code class="language-lisp">(defun my-command () (interactive) ...)</code>
+
+<!-- Should be: -->
+<code class="language-elisp">(defun my-command () (interactive) ...)</code>
+```
+
+`language-elisp` (or `language-emacs-lisp`) activates the Elisp-specific tokenizing rules; `language-lisp` only gets generic Lisp rules and will mis-highlight `interactive`, `declare`, and quoted/backquoted forms that are common in Emacs config code.
+
+**Post-batch audit:** grep the 40 already-generated files for `class="language-lisp"` and swap to `class="language-elisp"` — no CDN/script changes needed, just the class attribute on each `<code>` block.
 
 **Critical Elements:**
 
@@ -605,6 +674,7 @@ Each HTML file follows this template:
 - Complete sidebar HTML with `class="nav active"` on correct item
 - Complete topbar HTML
 - Exactly 6 `<article class="acc">` elements
+- Code blocks use `class="language-elisp"` (not `language-lisp`)
 
 ---
 
@@ -612,7 +682,7 @@ Each HTML file follows this template:
 
 ### 5.1 Strangler Pattern Migration
 
-Once all 20 batches are complete and validated, we execute the **Strangler Pattern** migration to Astro 5.x:
+Once all 20 batches are complete and validated, we execute the **Strangler Pattern** migration to **Astro 6.x** (PATCHED from 5.x — 6.0 went stable March 10, 2026, now on 6.4; the jump from 5.x is smaller than a typical major version since Live Collections and CSP were already available experimentally in late Astro 5):
 
 **Step 1: Asset Extraction**
 Split `shared-styles.css` into modular files:
@@ -718,8 +788,10 @@ src/pages/
 
 - Astro's zero-JS default reduces page weight
 - Content Collections build 5x faster
-- Pagefind provides instant search without server costs
+- Pagefind provides instant search without server costs — integrate via **Pagefind's own component-based UI (v1.5.0+)** rather than the now-maintenance-mode `astro-pagefind` wrapper component
 - View Transitions API enables SPA-like navigation
+- **(New in Astro 6)** built-in Fonts API self-hosts JetBrains Mono with generated fallbacks, replacing the jsdelivr `<link>` in every tactical HTML file — removes an external request per page load
+- **(New in Astro 6)** stable Live Content Collections, if the docs ever need any per-feature status (e.g. "working"/"partial") to update without a full rebuild
 
 ---
 

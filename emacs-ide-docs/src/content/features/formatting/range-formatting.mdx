@@ -1,0 +1,88 @@
+---
+title: "Range Formatting (Format Selection)"
+category: "Formatting & Editing"
+slug: "range-formatting"
+status: "working"
+vscode_parity:
+  - "\"Format Selection\" command — format active region/selection\n            only"
+lsp_methods:
+  - "textDocument/rangeFormatting"
+routing: "eglot→eglot-format (with region)\n              OR lazy-ruff→ruff format\n              --range"
+commands:
+  - action: "Format active region (LSP)"
+    cmd: "eglot-format"
+    key: "<kbd>SPC c f</kbd> (with region)"
+    notes: "Eglot automatically detects the active region and\n                        requeststextDocument/rangeFormatting."
+  - action: "Format region (Ruff CLI)"
+    cmd: "lazy-ruff-format-region"
+    key: "<kbd>SPC c f</kbd> (with region)"
+    notes: "Invokesruff format --rangeon the selected\n                        text, ideal for Python without LSP overhead."
+  - action: "Format org src block"
+    cmd: "lazy-ruff-format-org-src"
+    key: "<kbd>C-c C-c</kbd> (in src block)"
+    notes: "Specifically targets Python code blocks within Org-mode\n                        files."
+  - action: "Fallback to whole-file"
+    cmd: "apheleia-format-buffer"
+    key: "<kbd>SPC c f</kbd> (no region)"
+    notes: "If no region is active, the binding gracefully falls\n                        back to whole-file async formatting."
+parity_matrix:
+  - vscode: "<kbd>Shift+Alt+F</kbd> formats selection"
+    emacs: "<kbd>SPC c f</kbd> with an active visual region triggers\n                        <code>lazy-ruff-format-region</code> or\n                        <code>eglot-format</code>."
+  - vscode: "Respects <code>.ruff.toml</code> config"
+    emacs: "<code>lazy-ruff</code> automatically inherits the\n                        project's Ruff configuration from the workspace root."
+  - vscode: "Formats embedded code (e.g., Jupyter/Org)"
+    emacs: "<code>lazy-ruff-format-org-src</code> handles Python\n                        blocks inside Org-mode seamlessly."
+  - vscode: "No main-thread blocking"
+    emacs: "CLI execution is asynchronous or near-instantaneous due\n                        to Ruff's Rust-based speed."
+  - vscode: "Fallback to whole-file if no region"
+    emacs: "If no region is active, the command gracefully falls\n                        back to <code>apheleia-format-buffer</code>."
+  - vscode: "Cursor stability after format"
+    emacs: "Region-based formatting inherently preserves the rest of\n                        the buffer's undo history and cursor position."
+config_filename: "init-range-formatting.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `<kbd>Shift+Alt+F</kbd> formats selection`, emacs: `<kbd>SPC c f</kbd> with an active visual region triggers
+                        <code>lazy-ruff-format-region</code> or
+                        <code>eglot-format</code>.` },
+    { vscode: `Respects <code>.ruff.toml</code> config`, emacs: `<code>lazy-ruff</code> automatically inherits the
+                        project's Ruff configuration from the workspace root.` },
+    { vscode: `Formats embedded code (e.g., Jupyter/Org)`, emacs: `<code>lazy-ruff-format-org-src</code> handles Python
+                        blocks inside Org-mode seamlessly.` },
+    { vscode: `No main-thread blocking`, emacs: `CLI execution is asynchronous or near-instantaneous due
+                        to Ruff's Rust-based speed.` },
+    { vscode: `Fallback to whole-file if no region`, emacs: `If no region is active, the command gracefully falls
+                        back to <code>apheleia-format-buffer</code>.` },
+    { vscode: `Cursor stability after format`, emacs: `Region-based formatting inherently preserves the rest of
+                        the buffer's undo history and cursor position.` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Format active region (LSP)", cmd: "eglot-format", key: `<kbd>SPC c f</kbd> (with region)`, notes: "Eglot automatically detects the active region and
+                        requeststextDocument/rangeFormatting." },
+    { action: "Format region (Ruff CLI)", cmd: "lazy-ruff-format-region", key: `<kbd>SPC c f</kbd> (with region)`, notes: "Invokesruff format --rangeon the selected
+                        text, ideal for Python without LSP overhead." },
+    { action: "Format org src block", cmd: "lazy-ruff-format-org-src", key: `<kbd>C-c C-c</kbd> (in src block)`, notes: "Specifically targets Python code blocks within Org-mode
+                        files." },
+    { action: "Fallback to whole-file", cmd: "apheleia-format-buffer", key: `<kbd>SPC c f</kbd> (no region)`, notes: "If no region is active, the binding gracefully falls
+                        back to whole-file async formatting." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

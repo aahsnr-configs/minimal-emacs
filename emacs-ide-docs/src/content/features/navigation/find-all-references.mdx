@@ -1,0 +1,99 @@
+---
+title: "Find All References"
+category: "Navigation & Code Jumping"
+slug: "find-all-references"
+status: "working"
+vscode_parity:
+  - "Shift+F12 / \"Find All References\" centralized panel with editable\n            results"
+lsp_methods:
+  - "textDocument/references"
+routing: "eglot→xref-find-references→consult-xref OR native *xref* buffer"
+commands:
+  - action: "Find all references"
+    cmd: "xref-find-references"
+    key: "<kbd>M-?</kbd> / <kbd>SPC c D</kbd>"
+    notes: "Lists all usages; opensconsult-xrefdropdown or*xref*buffer."
+  - action: "Go back (history)"
+    cmd: "xref-go-back"
+    key: "<kbd>M-,</kbd> / <kbd>g ,</kbd>"
+    notes: "Returns to the exact cursor position before the jump."
+  - action: "Edit references in place"
+    cmd: "xref-change-to-xref-edit-mode"
+    key: "<kbd>e</kbd> (in <code>*xref*</code>)"
+    notes: "Emacs 31 NEW — enables writable reference buffer for\n                        bulk mutation."
+  - action: "Next reference"
+    cmd: "xref-next-line"
+    key: "<kbd>n</kbd> (in <code>*xref*</code>)"
+    notes: "Navigates down the reference list."
+  - action: "Previous reference"
+    cmd: "xref-prev-line"
+    key: "<kbd>p</kbd> (in <code>*xref*</code>)"
+    notes: "Navigates up the reference list."
+  - action: "Filter references"
+    cmd: "consult-xref"
+    key: "<kbd>SPC c E</kbd>"
+    notes: "Fuzzy-filters the reference list with live preview."
+parity_matrix:
+  - vscode: "<kbd>Shift+F12</kbd> lists all references"
+    emacs: "<kbd>M-?</kbd> or <kbd>SPC c D</kbd>\n                        (<code>xref-find-references</code>)"
+  - vscode: "Centralized References panel"
+    emacs: "<code>*xref*</code> buffer or\n                        <code>consult-xref</code> vertico dropdown"
+  - vscode: "Click reference to jump to file"
+    emacs: "<kbd>RET</kbd> on any row in the <code>*xref*</code>\n                        buffer"
+  - vscode: "Filter references by file/path"
+    emacs: "Type filename in <code>consult-xref</code> or use native\n                        <kbd>/</kbd> filter in <code>*xref*</code>"
+  - vscode: "Edit multiple references simultaneously"
+    emacs: "Emacs 31\n                        <code>xref-change-to-xref-edit-mode</code> (<kbd>e</kbd>\n                        in <code>*xref*</code> buffer)"
+  - vscode: "<kbd>Alt+Left</kbd> returns to origin"
+    emacs: "<kbd>M-,</kbd> (<code>xref-go-back</code>) via the\n                        native xref history ring"
+  - vscode: "<kbd>Ctrl+Click</kbd> on symbol"
+    emacs: "Emacs 31 <code>global-xref-mouse-mode</code>\n                        (<kbd>C-<mouse-1></kbd>)"
+config_filename: "init-references.el"
+---
+
+import { Accordion, ParityMatrix, StackGrid, EcoGrid, VsCard, EnhCard, CodeWindow, CommandTable } from '../../components';
+
+<Accordion title="Feature Overview" icon="grid" id="feature-overview" defaultOpen>
+  <ParityMatrix items={[
+    { vscode: `<kbd>Shift+F12</kbd> lists all references`, emacs: `<kbd>M-?</kbd> or <kbd>SPC c D</kbd>
+                        (<code>xref-find-references</code>)` },
+    { vscode: `Centralized References panel`, emacs: `<code>*xref*</code> buffer or
+                        <code>consult-xref</code> vertico dropdown` },
+    { vscode: `Click reference to jump to file`, emacs: `<kbd>RET</kbd> on any row in the <code>*xref*</code>
+                        buffer` },
+    { vscode: `Filter references by file/path`, emacs: `Type filename in <code>consult-xref</code> or use native
+                        <kbd>/</kbd> filter in <code>*xref*</code>` },
+    { vscode: `Edit multiple references simultaneously`, emacs: `Emacs 31
+                        <code>xref-change-to-xref-edit-mode</code> (<kbd>e</kbd>
+                        in <code>*xref*</code> buffer)` },
+    { vscode: `<kbd>Alt+Left</kbd> returns to origin`, emacs: `<kbd>M-,</kbd> (<code>xref-go-back</code>) via the
+                        native xref history ring` },
+    { vscode: `<kbd>Ctrl+Click</kbd> on symbol`, emacs: `Emacs 31 <code>global-xref-mouse-mode</code>
+                        (<kbd>C-<mouse-1></kbd>)` },
+  ]} />
+</Accordion>
+
+<Accordion title="Ecosystem Integration" icon="globe" id="ecosystem-integration">
+</Accordion>
+
+<Accordion title="Implementation Stack" icon="stack" id="implementation-stack">
+</Accordion>
+
+<Accordion title="Commands &amp; Keybindings" icon="keyboard" id="commands-keybindings">
+  <CommandTable items={[
+    { action: "Find all references", cmd: "xref-find-references", key: `<kbd>M-?</kbd> / <kbd>SPC c D</kbd>`, notes: "Lists all usages; opensconsult-xrefdropdown or*xref*buffer." },
+    { action: "Go back (history)", cmd: "xref-go-back", key: `<kbd>M-,</kbd> / <kbd>g ,</kbd>`, notes: "Returns to the exact cursor position before the jump." },
+    { action: "Edit references in place", cmd: "xref-change-to-xref-edit-mode", key: `<kbd>e</kbd> (in <code>*xref*</code>)`, notes: "Emacs 31 NEW — enables writable reference buffer for
+                        bulk mutation." },
+    { action: "Next reference", cmd: "xref-next-line", key: `<kbd>n</kbd> (in <code>*xref*</code>)`, notes: "Navigates down the reference list." },
+    { action: "Previous reference", cmd: "xref-prev-line", key: `<kbd>p</kbd> (in <code>*xref*</code>)`, notes: "Navigates up the reference list." },
+    { action: "Filter references", cmd: "consult-xref", key: `<kbd>SPC c E</kbd>`, notes: "Fuzzy-filters the reference list with live preview." },
+  ]} />
+</Accordion>
+
+<Accordion title="Configuration" icon="code" id="configuration">
+</Accordion>
+
+<Accordion title="Architecture &amp; Enhancements" icon="book" id="architecture-enhancements">
+</Accordion>
+

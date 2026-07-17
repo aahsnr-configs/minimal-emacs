@@ -1,0 +1,51 @@
+---
+interface Props {
+  items: Array<{
+    name: string;
+    sub: string;
+    desc: string;
+    color?: 'blue' | 'purple' | 'cyan' | 'green' | 'red' | 'yellow' | 'orange';
+  }>;
+}
+
+const { items } = Astro.props;
+
+const colorMap: Record<string, { bg: string; fg: string }> = {
+  blue:   { bg: 'rgba(122, 162, 247, 0.1)', fg: 'var(--blue)' },
+  purple: { bg: 'rgba(187, 154, 247, 0.1)', fg: 'var(--purple)' },
+  cyan:   { bg: 'rgba(125, 207, 255, 0.1)', fg: 'var(--cyan)' },
+  green:  { bg: 'rgba(158, 206, 106, 0.1)', fg: 'var(--green)' },
+  yellow: { bg: 'rgba(224, 175, 104, 0.1)', fg: 'var(--yellow)' },
+  orange: { bg: 'rgba(255, 158, 100, 0.1)', fg: 'var(--orange)' },
+};
+
+const ecoIcons: Record<string, string> = {
+  cape: '<path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />',
+  orderless: '<circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />',
+  vertico: '<rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />',
+  yasnippet: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />',
+  default: '<circle cx="12" cy="12" r="3" /><path d="M12 1v6m0 6v6" />',
+};
+---
+
+<div class="sec-title">Ecosystem Integration</div>
+<div class="grid-2">
+  {items.map((item) => {
+    const colors = colorMap[item.color || 'blue'] || colorMap.blue;
+    const iconPath = ecoIcons[item.name] || ecoIcons.default;
+    return (
+      <div class="eco-card">
+        <div class="eco-top">
+          <div class="eco-ic" style={`background: ${colors.bg}; color: ${colors.fg};`}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" set:html={iconPath} />
+          </div>
+          <div>
+            <div class="eco-name">{item.name}</div>
+            <div class="eco-sub">{item.sub}</div>
+          </div>
+        </div>
+        <p class="eco-desc" set:html={item.desc} />
+      </div>
+    );
+  })}
+</div>
