@@ -4,7 +4,6 @@
 # Validates that all generated HTML files meet the structural requirements
 # for the 20-batch external CSS/JS architecture.
 # ==============================================================================
-
 set -euo pipefail
 
 FEATURES_DIR="features"
@@ -90,21 +89,24 @@ for file in "${html_files[@]}"; do
     ((file_errors++)) || true
   fi
 
-  # 6. NEW: Check for external CSS reference
+  # 6. Check for external CSS reference
   if ! grep -q 'href="shared-styles.css"' "$file"; then
     echo "  ⚠️  $filename: Missing external CSS reference (shared-styles.css)" >&2
     ((file_errors++)) || true
   fi
 
-  # 7. NEW: Check for external JS reference
+  # 7. Check for external JS reference
   if ! grep -q 'src="shared-scripts.js"' "$file"; then
     echo "  ⚠️  $filename: Missing external JS reference (shared-scripts.js)" >&2
     ((file_errors++)) || true
   fi
 
-  # 8. NEW: Check file size (detect truncation)
+  # 8. Check file size (detect truncation)
+  # NOTE: Threshold lowered to 25KB for External CSS/JS architecture.
+  # A fully complete HTML file referencing external assets naturally weighs ~35-40KB.
+  # Files under 25KB are typically true LLM truncations (missing closing tags).
   file_size=$(wc -c <"$file")
-  if [ "$file_size" -lt 50000 ]; then
+  if [ "$file_size" -lt 25000 ]; then
     echo "  ⚠️  $filename: Suspiciously small ($file_size bytes) - possibly truncated" >&2
     ((file_errors++)) || true
   fi
