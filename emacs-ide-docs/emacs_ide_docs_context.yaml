@@ -1,0 +1,342 @@
+metadata:
+  title: Emacs IDE Documentation - Unified Context & State Protocol
+  version: 2.0
+  date: July 17, 2026
+  knowledge_cutoff: July 2026
+  project_type: Frontend Documentation Generation (Agentic Workflow)
+  architecture_decision: "Option A - External CSS/JS (Modular Tactical Output)"
+  rationale: >
+    External CSS/JS reduces per-file output by ~33%, aligns with Astro 5.x strategic
+    architecture, and respects 2026 LLM output token limits. A 20-batch workflow 
+    (2 features per batch) ensures ~14,000 tokens per generation, eliminating 
+    truncation risks and reasoning degradation.
+
+cognitive_and_research_mandates:
+  think_longer_protocol:
+    description: >
+      Before generating any HTML, CSS, or JavaScript, you must mentally trace
+      CSS cascade physics, JS hydration timing, DOM layout shifts, and Astro 5.x
+      Content Collection schemas. You must think longer and deeply evaluate edge cases
+      (e.g., iframe clipboard fallbacks, ARIA state management, mobile overlay traps,
+      and grid blowouts) before outputting any code.
+
+  polluted_memory_axiom:
+    description: >
+      Internal parametric memory regarding CSS3, modern JavaScript APIs, and Astro 5.x
+      is considered fundamentally unreliable and heavily polluted with outdated 2021-2023
+      tutorials. You MUST use `web_search` to verify all technical claims against live
+      July 2026 documentation.
+
+  mandatory_tool_usage:
+    - tool: web_search
+      mandate: >
+        MUST be used to verify 2026 industry standards for Astro 5.x, View Transitions API,
+        modern Clipboard API, and CSS custom properties.
+
+    - tool: web_extractor
+      mandate: >
+        MUST be used to read literal documentation, verify upstream API behaviors,
+        inspect Astro component structures, or resolve complex edge cases by extracting
+        content directly from official MDN, Astro docs, W3C specifications, or GitHub repositories.
+
+  temporal_guardrail:
+    description: >
+      Any CSS/JS workaround sourced from community prose older than 2 years must be
+      verified against 2026 standards. If verification is inconclusive via `web_search`
+      and `web_extractor`, the implementation MUST be wrapped in defensive runtime guards
+      or feature-detection checks.
+
+strict_greenlight_protocol:
+  state: "You are in a READ-ONLY planning and analysis state by default."
+  rule: >
+    You may ONLY generate, rewrite, or output ANY code (HTML, CSS, JS, Python, Bash, YAML, etc.)
+    if the user's prompt contains the exact phrase "GREEN LIGHT" within a positive,
+    affirmative sentence (e.g., "You have the GREEN LIGHT to write the script").
+  condition: >
+    If the user asks you to "write the code", "generate the batch", "fix the script",
+    or "process the features" WITHOUT including the exact string "GREEN LIGHT" in a
+    positive context, you must treat it as a planning/analysis request and output ZERO code.
+  refusal_template:
+    trigger: "If commanded to write code before the GREEN LIGHT is given."
+    action: "Output exactly this phrase and nothing else:"
+    exact_phrase: "I am locked in the READ-ONLY planning state. Awaiting explicit `GREEN LIGHT` in a positive sentence to execute the generation."
+
+core_architectural_rules:
+  - id: TOKYO_NIGHT_FIDELITY
+    description: >
+      Match `qwen-html.md` styling exactly. Use the strict Tokyo Night palette
+      (--bg: #1a1b26, --surface: #24283b, --blue: #7aa2f7, etc.), JetBrains Mono
+      typography scale, and custom scrollbar styling.
+
+  - id: SIX_ACCORDION_STANDARD
+    description: >
+      Every feature page MUST contain exactly 6 standard accordions:
+      1. Feature Overview, 2. Ecosystem Integration, 3. Implementation Stack,
+      4. Commands & Keybindings, 5. Configuration, 6. Architecture & Enhancements.
+
+  - id: MODULAR_TACTICAL_OUTPUT
+    description: >
+      For the immediate 20-batch workflow, generate HTML files with external CSS/JS references
+      to reduce output token overhead and align with Astro 5.x strategic architecture.
+
+      Batch 1 generates:
+      - shared-styles.css (complete CSS from qwen-html.md <style> block)
+      - shared-scripts.js (complete JS from qwen-html.md <script> block)
+      - 2x feature HTML files referencing external assets via <link> and <script>
+
+      Batches 2-20 generate:
+      - 2x feature HTML files per batch, all referencing shared-styles.css and shared-scripts.js
+
+      Each HTML file MUST include:
+      - <link rel="stylesheet" href="shared-styles.css"> in the <head>
+      - <script src="shared-scripts.js"></script> at the end of <body>
+      - Complete sidebar HTML with correct active state for current page
+      - Complete topbar HTML
+      - Complete main content with 6 accordions
+
+  - id: ASTRO_5_SSG_STRATEGIC_GOAL
+    description: >
+      The ultimate end goal is a modular Astro 5.x / MDX SSG architecture. The external
+      CSS/JS files generated now will be directly migrated to src/styles/ and src/scripts/.
+      The HTML files will be parsed and migrated into Astro Content Collections using
+      the Strangler Pattern.
+
+  - id: AUTOMATION_COMPATIBILITY
+    description: >
+      Format markdown output so it is cleanly parsable by `save_batch.py`.
+      Always precede HTML code blocks with the exact marker: `Filename: [slug].html`
+      Always precede CSS code blocks with the exact marker: `Filename: shared-styles.css`
+      Always precede JS code blocks with the exact marker: `Filename: shared-scripts.js`
+
+negative_constraints:
+  - "NEVER generate code without the exact string `GREEN LIGHT` in a positive sentence."
+  - "NEVER use Markdown syntax inside HTML output."
+  - "NEVER use external JS frameworks (React, Vue, Svelte, Tailwind) in the standalone HTML files."
+  - "NEVER deviate from the JetBrains Mono typography scale or Tokyo Night CSS variables."
+  - "NEVER break the 6-accordion structure unless explicitly instructed for a specific edge case."
+  - "NEVER rely on internal training data for Astro 5.x APIs or modern JS Clipboard APIs without live `web_search` and `web_extractor` verification."
+  - "NEVER output partial HTML snippets during the batch workflow; always output the full standalone file."
+  - "NEVER use Chinese sources, blogs, or documentation during web searches. Restrict all web search queries strictly to English-language resources."
+  - "NEVER interpret phrases like 'work on', 'fix', 'review', or 'update' as permission to generate code. Without `GREEN LIGHT`, these mean 'analyze and plan'."
+  - "NEVER inline CSS or JavaScript in HTML files after Batch 1. All styling and scripting MUST reference external shared-styles.css and shared-scripts.js."
+  - "NEVER omit the <link> and <script> tags referencing external assets in any HTML file."
+
+external_asset_management_protocol:
+  description: >
+    Protocol for managing shared CSS and JavaScript assets across the 20-batch workflow.
+
+  batch_1_deliverables:
+    - file: shared-styles.css
+      description: >
+        Complete CSS extraction from qwen-html.md <style> block.
+        Contains all Tokyo Night design tokens, component styles, responsive breakpoints,
+        and custom scrollbar styling. Approximately 800 lines.
+      generation_instruction: "Generate this file ONLY in Batch 1. Do not regenerate in subsequent batches."
+
+    - file: shared-scripts.js
+      description: >
+        Complete JavaScript extraction from qwen-html.md <script> block.
+        Contains sidebar toggle, mobile menu, accordion logic, focus mode, and clipboard copy.
+        Approximately 100 lines.
+      generation_instruction: "Generate this file ONLY in Batch 1. Do not regenerate in subsequent batches."
+
+  batches_2_through_20_deliverables:
+    description: >
+      Each batch generates 2 feature HTML files. All files MUST reference the external
+      shared-styles.css and shared-scripts.js generated in Batch 1.
+    html_structure_requirement: |
+      Each HTML file MUST include in <head>:
+      <link rel="stylesheet" href="shared-styles.css">
+
+      Each HTML file MUST include before closing </body>:
+      <script src="shared-scripts.js"></script>
+
+workflow_state_and_checklists:
+  automation_suite:
+    status: "Deployed & Hardened (Updated for External Assets)"
+    scripts:
+      - name: "save_batch.py"
+        status: "Ready"
+        notes: "Parses HTML, CSS, and JS files from markdown output"
+
+      - name: "validate.sh"
+        status: "Ready"
+        notes: "Validates HTML structure AND checks for external CSS/JS references"
+
+      - name: "build-index.py"
+        status: "Ready"
+        notes: "Generates index.html with Tokyo Night styling"
+
+      - name: "serve.sh"
+        status: "Ready"
+        notes: "Local HTTP server for preview (binds to localhost only)"
+
+  batch_progress:
+    total_batches: 20
+    total_features: 40
+    features_per_batch: 2
+    current_batch: 0
+
+    external_assets_status:
+      shared_styles_css: "Pending (Batch 1)"
+      shared_scripts_js: "Pending (Batch 1)"
+
+    statuses:
+      - batch: 1
+        scope: "IntelliSense + Hover Info (Native)"
+        features: ["intellisense.html", "hover-info-native.html"]
+        external_assets: "Generate shared-styles.css and shared-scripts.js"
+        status: "Pending"
+
+      - batch: 2
+        scope: "Hover Info (Childframe) + Signature Help"
+        features: ["hover-info-childframe.html", "signature-help.html"]
+        status: "Pending"
+
+      - batch: 3
+        scope: "Go to Definition + Go to Declaration"
+        features: ["go-to-definition.html", "go-to-declaration.html"]
+        status: "Pending"
+
+      - batch: 4
+        scope: "Go to Type Definition + Go to Implementation"
+        features: ["go-to-type-definition.html", "go-to-implementation.html"]
+        status: "Pending"
+
+      - batch: 5
+        scope: "Find All References + Document Highlight"
+        features: ["find-all-references.html", "document-highlight.html"]
+        status: "Pending"
+
+      - batch: 6
+        scope: "Document Symbols + Workspace Symbol Search"
+        features: ["document-symbols.html", "workspace-symbol-search.html"]
+        status: "Pending"
+
+      - batch: 7
+        scope: "Code Actions + Document Formatting"
+        features: ["code-actions.html", "document-formatting.html"]
+        status: "Pending"
+
+      - batch: 8
+        scope: "Range Formatting + On-type Formatting"
+        features: ["range-formatting.html", "on-type-formatting.html"]
+        status: "Pending"
+
+      - batch: 9
+        scope: "Rename Symbol + Folding Ranges"
+        features: ["rename-symbol.html", "folding-ranges.html"]
+        status: "Pending"
+
+      - batch: 10
+        scope: "Selection Range + Linked Editing Range"
+        features: ["selection-range.html", "linked-editing-range.html"]
+        status: "Pending"
+
+      - batch: 11
+        scope: "Call Hierarchy + Type Hierarchy"
+        features: ["call-hierarchy.html", "type-hierarchy.html"]
+        status: "Pending"
+
+      - batch: 12
+        scope: "Semantic Tokens + Inlay Hints"
+        features: ["semantic-tokens.html", "inlay-hints.html"]
+        status: "Pending"
+
+      - batch: 13
+        scope: "Inline Values + Document Links"
+        features: ["inline-values.html", "document-links.html"]
+        status: "Pending"
+
+      - batch: 14
+        scope: "Document Color + Diagnostics (Push)"
+        features: ["document-color.html", "diagnostics-push.html"]
+        status: "Pending"
+
+      - batch: 15
+        scope: "Diagnostics (Pull) + Moniker"
+        features: ["diagnostics-pull.html", "moniker.html"]
+        status: "Pending"
+
+      - batch: 16
+        scope: "File-Operation Hooks + Execute Command"
+        features: ["file-operation-hooks.html", "execute-command.html"]
+        status: "Pending"
+
+      - batch: 17
+        scope: "Peek Definition + Breadcrumbs Bar"
+        features: ["peek-definition.html", "breadcrumbs-bar.html"]
+        status: "Pending"
+
+      - batch: 18
+        scope: "Problems Panel + Sticky Scroll"
+        features: ["problems-panel.html", "sticky-scroll.html"]
+        status: "Pending"
+
+      - batch: 19
+        scope: "Bracket Colorization + Minimap"
+        features: ["bracket-colorization.html", "minimap.html"]
+        status: "Pending"
+
+      - batch: 20
+        scope: "Multi-Cursor Editing + Quick Fix Lightbulb"
+        features: ["multi-cursor-editing.html", "quick-fix-lightbulb.html"]
+        status: "Pending"
+
+  ssg_migration_status:
+    phase: "Phase 3 (Blocked until batch completion)"
+    target: "Astro 5.x with Content Collections"
+    external_asset_migration: >
+      shared-styles.css will be split into:
+      - src/styles/tokens.css (CSS custom properties)
+      - src/styles/base.css (reset, typography, scrollbar)
+      - src/styles/components.css (accordion, cards, tables, code windows)
+
+      shared-scripts.js will be migrated to:
+      - src/scripts/shared.js (client-side interactivity)
+
+validation_requirements:
+  html_files:
+    - "Must contain <title> tag"
+    - "Must contain <link rel='stylesheet' href='shared-styles.css'>"
+    - "Must contain <script src='shared-scripts.js'></script>"
+    - "Must contain complete sidebar HTML with correct active state"
+    - "Must contain complete topbar HTML"
+    - "Must contain exactly 6 accordions"
+    - "Must contain Prism.js reference (via shared-scripts.js)"
+
+  css_files:
+    - "Must contain all Tokyo Night CSS variables"
+    - "Must contain sidebar, topbar, accordion, table, card styles"
+    - "Must contain responsive breakpoints"
+    - "Must contain custom scrollbar styling"
+
+  js_files:
+    - "Must contain sidebar toggle logic"
+    - "Must contain accordion toggle logic"
+    - "Must contain focus mode logic"
+    - "Must contain clipboard copy logic"
+    - "Must contain mobile menu logic"
+
+token_efficiency_analysis:
+  modular_approach_adopted:
+    shared_css_lines: 800
+    shared_js_lines: 100
+    html_lines_per_file: 920
+    files_per_batch: 2
+    batch_1_total_lines: 2740
+    batches_2_20_total_lines: 1840
+    estimated_tokens_batch_1: "~14,000"
+    estimated_tokens_batches_2_20: "~10,000"
+    feasibility: "OPTIMAL - well within 128K output limit"
+    truncation_risk: "Near Zero"
+
+initialization_protocol:
+  trigger: "When the user uploads or references the core project files."
+  steps:
+    - "Ingest `emacs_ide_docs_context.yaml` to restore operational boundaries."
+    - "Ingest `qwen-html.md` as the absolute visual and structural blueprint."
+    - "Ingest `ide-features.md` as the source content for the 40 features."
+    - "Acknowledge the current batch state and the strict GREEN LIGHT protocol."
+    - "Acknowledge the MODULAR_TACTICAL_OUTPUT constraint (external CSS/JS)."
+    - "Output this exact phrase: 'I have ingested the unified context protocol and the source-of-truth files. I acknowledge the strict Tokyo Night styling rules, the 6-accordion mandate, the external CSS/JS architecture, the web_extractor research requirements, and the current batch state. I am locked in and will write zero code until you give the signal.'"
