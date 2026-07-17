@@ -6858,65 +6858,12 @@ buffer killing or garbage collection cycles."
 
 
 * TODO Development Tools
-** TODO Language Server Protocol
-- [ ] Must disable and remove lsp-org at all costs
+** TODO Eglot
 #+begin_src emacs-lisp
-(use-package lsp-mode
-  :defer t
-  :init
-  ;; ==========================================
-  ;; UPSTREAM FIX (lsp-mode Issue #4898 / PR #4889)
-  ;; ==========================================
-  ;; lsp-mode spins up a hidden temp `org-mode` buffer to check the Org Element API.
-  ;; If any `org-mode-hook` throws an error in that temp buffer, it corrupts Emacs'
-  ;; `cl-generic` system (Bug#77464), causing the fatal "lsp-execute-command is already
-  ;; defined as something else than a generic function" error.
-  ;;
-  ;; We pre-define the function and attach an :around advice here in `:init`.
-  ;; Emacs' `nadvice` system guarantees that when `lsp-mode` later executes its own
-  ;; `defun` for this function, the advice will survive and wrap the new definition,
-  ;; forcing it to return `t` immediately without spinning up the dangerous temp buffer.
-  (defun lsp--detect-org-element-api () t)
-  (defun lsp--detect-org-element-api--always-true (orig-fun &rest args) t)
-  (advice-add 'lsp--detect-org-element-api :around #'lsp--detect-org-element-api--always-true)
-  
-  (setq lsp-keymap-prefix "C-c l")
-  :hook (prog-mode . lsp-deferred)
-  :custom
-  ;; --- UI & Functionality Enhancements ---
-  (lsp-semantic-tokens-enable t)
-  (lsp-headerline-breadcrumb-enable t)
-  (lsp-lens-enable t)
-  (lsp-modeline-diagnostics-enable t)
-  ;; --- Diagnostics & Completion Integration ---
-  (lsp-completion-provider :none)
-  ;; --- Performance & Behavior ---
-  (lsp-eldoc-render-all nil)
-  (lsp-idle-delay 0.2)
-  (lsp-log-io nil)
-  (lsp-signature-render-documentation nil))
 
-(use-package lsp-ui
-  :defer t
-  :after lsp-mode
-  :commands lsp-ui-mode
-  :hook (lsp-mode . lsp-ui-mode)
-  :custom
-  (lsp-ui-doc-position 'at-point)
-  (lsp-ui-doc-show-with-mouse nil)
-  (lsp-ui-sideline-show-diagnostics t)
-  (lsp-ui-sideline-show-hover t)
-  (lsp-ui-sideline-show-code-actions t)
-  (lsp-ui-sideline-delay 0.2)
-  :custom-face
-  (lsp-ui-doc-background ((t (:background "#1e2030"))))
-  (lsp-ui-doc-header ((t (:foreground "#7aa2f7" :weight bold))))
-  (lsp-ui-sideline-background ((t (:background "#1e2030")))))
 #+end_src
 
-
-
-** TODO Formatting
+** TODO apheleia
 #+begin_src emacs-lisp
 (use-package apheleia
   :hook (after-init . apheleia-global-mode)
@@ -6926,10 +6873,6 @@ buffer killing or garbage collection cycles."
 
 
 ** TODO Debug Adapter Protocol
-TODO:
-- [ ] =Replace Dape with dap-mode=
-- [ ] =Use Transient for dap-mode instead of the built-in hydra for dap-mode. Determine if installation of hydra can be skipped.=
-- [ ] =dap-mode must integrate properly with lsp-mode=
 #+begin_src emacs-lisp
 ;; (use-package dape
 ;;   :defer t
@@ -6992,40 +6935,13 @@ TODO:
 ;;   )
 #+end_src
 
+
+** TODO Flymake
 #+begin_src emacs-lisp
-(use-package dap-mode
-  :defer t
-  :config
-  (setq dap-auto-configure-features '(sessions locals controls tooltip)))
-#+end_src
-
-
-** TODO Syntax Checking
-*Replace flymake with flycheck*
-=flycheck and lsp-mode diagnostics must work together=
-#+begin_src emacs-lisp
-;; (use-package flycheck
-;;   :config
-;;   (add-hook 'after-init-hook #'global-flycheck-mode))
-
-;; (with-eval-after-load 'flycheck
-;;   (setq flycheck-disabled-checkers (cons 'org-lint flycheck-disabled-checkers)))
-
-;; (use-package flycheck-posframe
-;;   :after flycheck
-;;   :config (add-hook 'flycheck-mode-hook #'flycheck-posframe-mode))
 #+end_src
 
 
 ** TODO Direnv
-=envrc= enforces strict per-buffer =direnv= isolation. Upstream patches for IDE integration:
-
-- *LSP Race:* Shift init to =change-major-mode-after-body-hook= so LSPs spawn in project env, avoiding global fallback.
-- *Jupyter:* Advise =org-babel-execute-src-block= (bypassing late =org-babel-eval=) to inject buffer vars into kernels pre-init.
-- *Missing Binary:* =:before-while= on =envrc-global-mode= uses =executable-find= to silently abort in TRAMP/Docker, preventing log spam.
-- *Log Loop:* Prefix guard skips =envrc--update= on =*envrc*= buffers, breaking recursive eval feedback loops.
-- *LSP Sync:* =:after= advice on =envrc--update-env= and =envrc-reload-all= restarts =lsp-mode= workspaces on =.envrc= reloads to purge stale envs.
-
    #+begin_src emacs-lisp
 
 (use-package envrc
