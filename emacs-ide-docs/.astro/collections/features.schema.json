@@ -1,0 +1,230 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "string"
+    },
+    "status": {
+      "default": "working",
+      "type": "string",
+      "enum": [
+        "working",
+        "partial",
+        "planned"
+      ]
+    },
+    "vscode_parity": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "lsp_methods": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "routing": {
+      "default": "",
+      "type": "string"
+    },
+    "stack": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "desc": {
+            "type": "string"
+          },
+          "color": {
+            "default": "blue",
+            "type": "string",
+            "enum": [
+              "blue",
+              "purple",
+              "cyan",
+              "green",
+              "red",
+              "yellow",
+              "orange"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "role",
+          "desc"
+        ]
+      }
+    },
+    "ecosystem": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "sub": {
+            "type": "string"
+          },
+          "desc": {
+            "type": "string"
+          },
+          "color": {
+            "default": "blue",
+            "type": "string",
+            "enum": [
+              "blue",
+              "purple",
+              "cyan",
+              "green",
+              "red",
+              "yellow",
+              "orange"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "sub",
+          "desc"
+        ]
+      }
+    },
+    "commands": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "cmd": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "notes": {
+            "default": "",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "cmd",
+          "key"
+        ]
+      }
+    },
+    "enhancements": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "desc": {
+            "type": "string"
+          },
+          "color": {
+            "default": "g",
+            "type": "string",
+            "enum": [
+              "g",
+              "p",
+              "y"
+            ]
+          }
+        },
+        "required": [
+          "title",
+          "desc"
+        ]
+      }
+    },
+    "parity_matrix": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "vscode": {
+            "type": "string"
+          },
+          "emacs": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "vscode",
+          "emacs"
+        ]
+      }
+    },
+    "config_filename": {
+      "default": "init.el",
+      "type": "string"
+    },
+    "rejected_alternative": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "label",
+              "value"
+            ]
+          }
+        }
+      },
+      "required": [
+        "name",
+        "reasons"
+      ]
+    },
+    "$schema": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "category",
+    "slug"
+  ]
+}

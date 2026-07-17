@@ -1,0 +1,242 @@
+document:
+  title: "Elpaca Package Manager & `use-package` Integration: Architecture, Async Physics, and Load-Order Execution (v4)"
+  description: >
+    This document provides a canonical, unified breakdown of the Elpaca package manager (v0.12+)
+    and its deep integration with the `use-package` macro (v2.4.5+). It details the asynchronous
+    queue processing model, macro expansion physics, and chronological load-order dependencies.
+    All definitions are derived from the official Elpaca manual and the GNU Emacs `use-package`
+    User Manual, cross-checked against Emacs 30.2 core source code. Verified current as of July 2026.
+  sections:
+    - id: 1
+      title: Core Philosophy
+      points:
+        - >
+          Elpaca is an asynchronous elisp package manager that replaces `package.el` by delegating
+          downloading, byte-compiling, and activation to background processes.
+        - >
+          `use-package` is not a package manager. Its primary purpose is to organize package
+          configuration declaratively, eliminate repetitive boilerplate, and enable lazy-loading
+          (autoloading) to keep Emacs startup times low.
+        - >
+          Because Elpaca processes its package queues *after* Emacs reads the init file (typically
+          via `after-init-hook`), standard synchronous load-order assumptions do not apply. Code
+          relying on a package being immediately available must be deferred, placed inside the
+          `elpaca` macro's body, or guarded by `elpaca-wait`.
+    - id: 2
+      title: The Unified Asynchronous Execution Timeline
+      description: >
+        This timeline merges Elpaca's asynchronous queue processing with `use-package`'s
+        chronological macro expansion order. Keyword order in your source does not determine
+        evaluation order; the internal `use-package-keywords` list and Elpaca's queue mechanics do.
+      phases:
+        - name: "Phase 0: Bootstrap & Installer (Synchronous)"
+          items:
+            - event: "early-init.el"
+              description: >
+                `package-enable-at-startup` MUST be `nil` to prevent `package.el` interference.
+            - event: "The Installer Block"
+              description: >
+                Clones Elpaca, builds it, and loads autoloads. This is the only strictly synchronous
+                package management operation in the entire startup sequence.
+        - name: "Phase 1: Queue Registration & Pre-Load (Init File Reading)"
+          items:
+            - event: ":disabled Check"
+              description: >
+                Evaluated before everything else. A simple `memq` check on the raw argument list
+                bypasses the entire keyword-processing pipeline. `(use-package foo :disabled nil)`
+                is still disabled, as only the keyword's presence matters.
+            - event: ":ensure (Elpaca Interception)"
+              description: >
+                `use-package-ensure.el` prepends `:ensure` to the keyword list. Elpaca integrates
+                by overriding `use-package-ensure-function`, intercepting `:ensure` and pushing the
+                package (or a full recipe plist) into Elpaca's asynchronous installation queue.
+                It does NOT install packages immediately.
+            - event: ":preface"
+              description: >
+                Evaluated before conditionals. Runs at both byte-compile time and load time, so it
+                must be limited to side-effect-free symbol/function definitions needed by the
+                byte-compiler or an `:if` test.
+            - event: ":if / :when / :unless"
+              description: >
+                Gates whether the *rest* of the declaration loads. Mechanically wraps everything
+                remaining (`:custom`, `:init`, `:config`, etc.) in a `(when PRED ...)` form.
+            - event: ":custom / :custom-face"
+              description: >
+                Processed before `:init`. Expands to `customize-set-variable` calls that run prior
+                to the package loading, allowing the package to adopt your custom value upon load.
+            - event: "Autoload Triggers (:hook, :bind, :mode, :commands)"
+              description: >
+                Do not execute package code immediately. They register autoloads in Emacs, deferring
+                the package load until a hook fires, a key is pressed, or a matching file is opened.
+            - event: ":init"
+              description: >
+                Evaluated just before the package is loaded, after autoload triggers are registered.
+                WARNING: `:init` forms run unconditionally, even if the package is deferred or
+                missing. Referencing package-specific variables here typically raises a
+                `void-variable` error.
+            - event: "The `:wait` Recipe Keyword & `elpaca-wait`"
+              description: >
+                Per the official Elpaca manual, `:wait` (e.g., `:ensure (:wait t)`) splits the
+                current queue and immediately begins processing prior queues. Because Emacs evaluates
+                init-file forms sequentially, this effectively halts init-file reading at that point
+                until the package is installed and configured. It is a localized, inline version of
+                the `(elpaca-wait)` function.
+        - name: "Phase 2: The Loading Boundary (Post-Init Async Resolution)"
+          items:
+            - event: "`elpaca-process-queues`"
+              description: >
+                Hooked to `after-init-hook`, this triggers async resolution, cloning, building, and
+                symlinking of all registered orders.
+            - event: "The Package Loads"
+              description: >
+                Emacs executes `(require 'foo)`. Elpaca's integration ensures the `require` and
+                subsequent `:config` block are safely sequenced/deferred until Elpaca's background
+                queue has finished activating the package. The package's `defcustom`, `defvar`, and
+                `defun` forms are then evaluated.
+        - name: "Phase 3: Post-Load Configuration & Activation"
+          items:
+            - event: ":config"
+              description: >
+                Evaluated after the package has fully loaded. For deferred or Elpaca-async-queued
+                packages, this is postponed until the exact moment loading occurs. This is the
+                bulletproof phase for modifying a package's internal `defcustom` lists, altering
+                keymaps, advising functions, and activating global minor modes.
+            - event: "`elpaca-after-init-hook`"
+              description: >
+                A custom hook that runs ONLY after all queued packages are fully activated. Any
+                configuration relying on `after-init-hook` or `emacs-startup-hook` MUST be attached
+                here to guarantee package availability.
+    - id: 3
+      title: Anatomy of an Elpaca Recipe
+      keywords:
+        - name: ":host / :repo"
+          description: 'Repository source (e.g., `:host github :repo "user/repo"`).'
+        - name: ":branch / :ref / :tag"
+          description: "Git targeting. `:ref` pins to a commit hash (reproducible), `:tag` to a release."
+        - name: ":files"
+          description: "Directives for symlinking files. `:defaults` expands to standard globs."
+        - name: ":main"
+          description: "The main elisp file. Speeds up dependency checking."
+        - name: ":wait"
+          description: "When non-nil, process all queued orders immediately before continuing, effectively blocking init-file reading at that specific declaration."
+    - id: 4
+      title: Detailed `use-package` Keyword Breakdown
+      keywords:
+        - name: ":ensure"
+          subtitle: Prepended Ahead of the Base Keyword List (Elpaca Integration)
+          details:
+            - label: Mechanism
+              text: >
+                `use-package-ensure.el` calls `(add-to-list 'use-package-keywords :ensure)`.
+                Elpaca v0.12 integrates by overriding `use-package-ensure-function`, intercepting
+                `:ensure` and pushing the package (or a full recipe plist) into its async queue.
+            - label: Completeness Note
+              text: >
+                `use-package-ensure.el` also calls `(add-to-list 'use-package-keywords :pin)`
+                immediately after `:ensure`. Because `add-to-list` prepends, `:pin` ends up ahead
+                of `:ensure` in the final processed list. Practically, this has low impact under
+                Elpaca, as Elpaca users should use the recipe system instead of archive pinning.
+        - name: ":init"
+          subtitle: Pre-Load Execution (The "Unconditional" Trap)
+          details:
+            - label: Purpose
+              text: >
+                Sets up state the package's own load sequence might read, or defines hooks/variables
+                that must exist before the package initializes.
+            - label: Constraint
+              text: >
+                Because the package is not yet loaded, its functions and variables generally don't
+                exist yet. Referencing them in `:init` typically raises a `void-function` or
+                `void-variable` error.
+        - name: ":config"
+          subtitle: Post-Load Execution (The Safe Zone)
+          details:
+            - label: Purpose
+              text: >
+                The safe place to call the package's functions, modify its keymaps, advise its
+                internals, and activate its global minor modes.
+            - label: Best Practice
+              text: >
+                Keep `:init` forms minimal and put as much as possible into `:config`, so deferred
+                loading stays effective and upstream defaults are guaranteed to be in place.
+    - id: 5
+      title: "Case Study: The `evil-snipe` `defcustom` List Modification"
+      problem:
+        description: >
+          In an `evil-snipe` configuration, a list of UI modes must be appended to
+          `evil-snipe-disabled-modes` to prevent the package from hijacking native keybindings
+          in read-only or UI-heavy buffers.
+      analysis:
+        - approach: "Why `:init` Fails"
+          explanation: >
+            Attempting to modify this list in `:init` using `dolist` and `add-to-list` runs into
+            a straightforward ordering problem:
+          steps:
+            - "`:init` runs before `evil-snipe` loads."
+            - "The symbol `evil-snipe-disabled-modes` is unbound at this point — the package hasn't defined it yet."
+            - "Calling `add-to-list` on an unbound symbol signals a `void-variable` error, aborting the `:init` block."
+            - >
+              Pre-declaring the variable via `defvar` in `:preface` trades this for a subtler issue:
+              since `defvar` never overwrites an already bound variable, your custom list locks in
+              permanently before `evil-snipe.el`'s own `defcustom` can establish its upstream default.
+        - approach: "Why `:config` is Bulletproof"
+          explanation: >
+            Placing the `dolist` at the very beginning of `:config` guarantees this sequence:
+          steps:
+            - "The package loads: `evil-snipe.el` evaluates, and its `defcustom` registers the upstream default list."
+            - "Your modification runs: the `dolist` executes, safely appending your custom modes to the already-populated upstream list."
+            - "The mode activates: `(evil-snipe-mode 1)` executes only after your modification."
+    - id: 6
+      title: Obsolete / Superseded Paradigms (v3 REFINED)
+      points:
+        - keyword: ":pin"
+          v2_claim: "The :pin keyword is OBSOLETE. Use recipe :ref or :tag for pinning."
+          v3_correction: >
+            Overstated. Elpaca's recipe system DOES still define its own `:pin` keyword — but with
+            different semantics than `package.el`/`use-package`'s archive-pinning `:pin`. Elpaca's
+            `:pin` means "when non-nil, ignore the package during update commands" (i.e., opt a
+            package out of `elpaca-update`), not "lock to an archive." It is the legacy
+            *archive-pinning* meaning of `:pin` that is obsolete under Elpaca, since source selection
+            is handled by the recipe (`:host`/`:repo`), and version pinning is handled via `:ref`/`:tag`.
+        - keyword: ":vc"
+          v2_claim: "The :vc keyword is superseded by Elpaca's native recipe system, and is effectively ignored."
+          v3_correction: >
+            Inaccurate. `elpaca-use-package-mode` only overrides `use-package-ensure-function`
+            (intercepting `:ensure`). It does not touch the separate handler that Emacs 30's built-in
+            `package-vc.el` registers for the `:vc` keyword. If `:vc` is used alongside Elpaca, it is
+            NOT silently ignored — it still invokes `package-vc.el`'s own synchronous, non-Elpaca
+            install path, which can produce confusing double-management. The correct guidance is:
+            don't mix `:vc` with Elpaca; use the recipe system instead.
+        - keyword: "package-quickstart"
+          v2_claim: "package-quickstart is obsolete."
+          v3_correction: >
+            Category error. `package-quickstart` is a `package.el` feature and remains fully valid
+            in vanilla Emacs configurations that still use `package.el`. It is simply INAPPLICABLE
+            under Elpaca, because Elpaca users set `package-enable-at-startup nil` and never invoke
+            `package.el`'s activation path that `package-quickstart` accelerates.
+    - id: 7
+      title: Verification Notes
+      points:
+        - "Primary Source: Official GNU Emacs `use-package` User Manual (v2.4.5, bundled with Emacs 30.2)."
+        - "Primary Source: Official Elpaca Manual (Copyright 2022-2026 Nicholas Vollmer)."
+        - >
+          Canonical execution order confirmed directly against the `use-package-keywords` defcustom
+          in Emacs 30.2's built-in `use-package-core.el` (base order), and against
+          `use-package-ensure.el` (which prepends `:ensure` and `:pin` to that base order at load time).
+        - >
+          The `:disabled` short-circuit was confirmed by reading the actual macro body in Emacs 30.2's
+          `use-package.el`: `(unless (memq :disabled args) (macroexp-progn ...))`, which sits outside
+          and prior to the `use-package-keywords` processing pipeline entirely.
+        - >
+          v3 correction applied: the `:wait` recipe keyword DOES effectively halt init-file reading
+          at the point it is evaluated (same practical effect as calling `elpaca-wait` inline),
+          contrary to the v2 "correction," which had this backwards. Verified directly against the
+          manual's Recipes/`:wait` keyword reference, its Queues section, and its use-package
+          integration section.
+        - >
+          v3 correction applied: `:pin`, `:vc`, and `package-quickstart` obsolescence claims were
+          overstated/imprecise in v2; refined per Section 6 above.
+        - >
+          Emacs 31 Context: Emacs 31 entered its feature-freeze/branch-cut phase near June 2026.
+          Public release previews confirm no structural changes to `use-package`'s keyword ordering
+          or macro expansion logic since the 30.2 baseline.

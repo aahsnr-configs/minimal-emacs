@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.12
+#+VERSION: 0.13
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -840,7 +840,7 @@ Centralized keybinding router establishing global and local leader prefixes for 
 #+end_src
 
 
-* DONE Editor Behavior
+* TODO Editor Behavior
 
 ** DONE Child Frame
 Establishes the foundational child frame API and global border theming. Configures native Emacs 28+ border faces and applies fringe isolation for downstream UI packages.
@@ -1031,7 +1031,7 @@ Reopens the current buffer with elevated privileges via TRAMP's native sudo meth
 #+end_src
 
 
-** DONE Terminal
+** TODO Ghostel
 Terminal emulation powered by =libghostty-vt=, rendering as a persistent 30% bottom drawer with strict Evil integration and automatic TRAMP support.
 #+begin_src emacs-lisp
 (use-package ghostel
@@ -1384,7 +1384,7 @@ Delegates hardware input to =ultra-scroll= and keyboard interpolation to =good-s
 
 
 
-** DONE Treesittor
+** TODO Treesittor
 - [ ] Optimize it for emacs 31.
 Configures the native C-level AST engine and routes grammar binaries to the =no-littering= var directory. Implements defensive version-forking to support Emacs 30 manual remapping and Emacs 31 native auto-installation.
 #+begin_src emacs-lisp
@@ -1849,7 +1849,7 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
   (setq org-ellipsis " ↴ "))
 #+end_src
 
-** Custom Folding Functions
+** DONE Custom Folding Functions
 #+begin_src emacs-lisp
 (defun ar/hs-overlay-line-count (ov)
   "Append hidden line count to the native ellipsis for visual feedback."
@@ -1901,7 +1901,7 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
   (message "All folds closed"))
 #+end_src
 
-** Hideshow
+** TODO Hideshow
 #+begin_src emacs-lisp
 (use-package hideshow
   :ensure nil
@@ -1921,8 +1921,7 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
                   '((t "{{{" "}}}" nil nil))))))
 #+end_src
 
-
-** Treesit-Fold
+** TODO Treesit-Fold
 - [ ] Optimize for emacs 31
 #+begin_src emacs-lisp
 (use-package treesit-fold
@@ -1944,9 +1943,7 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
         (not (too-long-file-p)))))
 #+end_src
 
-
-** Vimish Fold
-
+** TODO Vimish Fold
 #+begin_src emacs-lisp
 ;; ==========================================
 ;; 3. VIMISH-FOLD (Visual Region Folding)
@@ -2457,12 +2454,6 @@ Wraps Avy into Evil's operator-pending grammar via a unified =gs= prefix. Bypass
   (define-key evilem-map "l" #'ar/evil-avy-goto-line)
   (define-key evilem-map "SPC" #'ar/evil-avy-goto-char-timer))
 #+end_src
-
-
-
-
-
-
 
 
 ** DONE Evil Snipe
