@@ -4257,126 +4257,80 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
 * TODO Org Mode
 - [ ] Use doom emacs settings wherever possible
 - [ ] Find alternative packages to org-download
+
 ** TODO Dynamic Directory Structure
+Scaffolds the foundational Second Brain directories and configures core Org-mode paths for the Factory (task management) paradigm.
 #+begin_src emacs-lisp
-;; Define base directory with symlinks resolved
-(defvar my/org-directory (file-truename (expand-file-name "~/org/"))
-  "Base directory for all org files (symlinks resolved).")
+;; ==========================================
+;; DIRECTORY CREATION & SCAFFOLDING UTILITIES
+;; ==========================================
+(defvar my/org-directory
+  (let ((xdg-docs (getenv "XDG_DOCUMENTS_DIR")))
+    (if (and xdg-docs (file-directory-p xdg-docs))
+        (expand-file-name "org/" xdg-docs)
+      (expand-file-name "~/org/")))
+  "Base directory for all Org and Denote files, respecting XDG specifications.")
 
-;; Define all subdirectories that need to exist
-(defvar my/org-subdirs
-  '("notes"
-    "notes/journal"
-    "notes/literature"
-    "gtd"
-    "reviews"
-    "downloads"
-    "noter"
-    "archive"
-    "attachments"
-    "backups")
-  "List of subdirectories to create under `my/org-directory'.")
+;; Ensure base root exists immediately to prevent `file-truename' edge cases.
+(unless (file-directory-p my/org-directory)
+  (make-directory my/org-directory t))
 
-;; Helper function to get org subdirectory paths
-(defun my/org-subdir (subdir)
-  "Return full path for SUBDIR under `my/org-directory'."
-  (expand-file-name subdir my/org-directory))
+;; Canonicalize symlinks for downstream I/O stability.
+(setq my/org-directory (file-truename my/org-directory))
 
-;; Helper function to ensure directory exists
 (defun my/ensure-org-dir (subdir)
-  "Ensure SUBDIR exists under `my/org-directory'.
-Creates parent directories as needed. Returns the full path."
-  (let ((dir (my/org-subdir subdir)))
+  "Ensure SUBDIR exists under `my/org-directory', creating parents if needed."
+  (let ((dir (expand-file-name subdir my/org-directory)))
     (unless (file-directory-p dir)
-      (make-directory dir t)
-      (message "Created directory: %s" dir))
+      (make-directory dir t))
     dir))
 
-;; Helper function to create file with optional template content
-(defun my/ensure-org-file (filename &optional template)
-  "Ensure FILENAME exists in org directory with optional TEMPLATE content.
-If the file does not exist, creates it. Returns the full path."
-  (let ((filepath (expand-file-name filename my/org-directory)))
-    (unless (file-exists-p filepath)
-      ;; FIX: message moved outside with-temp-file so it fires after the file
-      ;; is written, not as part of the buffer content evaluation.
-      (with-temp-file filepath
-        (when template
-          (insert template)))
-      (message "Created file: %s" filepath))
-    filepath))
+(defun my/ensure-org-file (filepath &optional template)
+  "Ensure FILEPATH exists, seeding it with TEMPLATE if newly created."
+  (let ((full-path (expand-file-name filepath my/org-directory)))
+    (unless (file-exists-p full-path)
+      (with-temp-file full-path
+        (when template (insert template))))
+    full-path))
 
-;; ============================================
-;; CREATE ALL DIRECTORIES
-;; ============================================
-(mapc #'my/ensure-org-dir my/org-subdirs)
+;; ==========================================
+;; THE FACTORY (Task & Time Tracking Bootstrap)
+;; ==========================================
+(my/ensure-org-dir "agenda/")
+(my/ensure-org-dir "agenda/archive/")
 
-;; Journal file
-(my/ensure-org-file "journal.org"
-  "#+title: Journal
-#+filetags: :journal:
+(my/ensure-org-file "agenda/todo.org"
+                    "#+title: Task Registry\n#+filetags: :agenda:\n\n* Inbox\n\n* Projects\n\n* Tasks\n\n* Someday\n\n* Waiting\n")
 
-,* Journal Entries
+(my/ensure-org-file "agenda/journal.org"
+                    "#+title: Journal\n#+filetags: :journal:\n\n")
 
-")
+(my/ensure-org-file "agenda/habits.org"
+                    "#+title: Habits\n#+filetags: :habit:\n\n")
 
-;; Habits tracking file
-(my/ensure-org-file "habits.org"
-  "#+title: Habits
-#+filetags: :habit:
+;; ==========================================
+;; EPHEMERAL & ATTACHMENT ROUTING
+;; ==========================================
+(my/ensure-org-dir "attachments/")
+(my/ensure-org-dir "downloads/")
+#+end_src
 
-,* Daily Habits
+#+begin_src emacs-lisp
+;; ==========================================
+;; ORG PACKAGE WIRING & GLOBAL EXPORT
+;; ==========================================
+;; Set the global Org directory.
+(setq org-directory my/org-directory)
 
-,* Weekly Habits
+;; Define the foundational `org-agenda-files` list.
+;; Strictly confined to the Factory to prevent I/O latency and Denote globbing.
+(setq org-agenda-files (list (expand-file-name "agenda/todo.org" my/org-directory)
+                             (expand-file-name "agenda/habits.org" my/org-directory)
+                             (expand-file-name "agenda/journal.org" my/org-directory)))
 
-,* Monthly Habits
-
-")
-
-;; Long-term goals file
-(my/ensure-org-file "goals.org"
-  "#+title: Goals
-#+filetags: :goals:
-
-,* Life Goals
-
-,* This Year
-
-,* This Quarter
-
-,* This Month
-
-")
-
-;; Reading list and notes
-(my/ensure-org-file "reading.org"
-  "#+title: Reading List
-#+filetags: :reading:
-
-,* Currently Reading
-
-,* To Read
-
-,* Completed
-
-")
-
-;; Meeting notes
-(my/ensure-org-file "meetings.org"
-  "#+title: Meetings
-#+filetags: :meeting:
-
-,* Meetings
-
-")
-
-
-;; ============================================
-;; DEFINE CONVENIENCE VARIABLES
-;; ============================================
-(defvar my/denote-directory      (my/org-subdir "notes/"))
-(defvar my/org-gtd-directory     (my/org-subdir "gtd/"))
-(defvar my/org-reviews-directory (my/org-subdir "reviews/"))
+;; Route attachments dynamically to prevent binary pollution in Git-tracked silos.
+(setq org-attach-id-dir (expand-file-name "attachments/" my/org-directory)
+      org-attach-use-inheritance t)
 #+end_src
 
 ** TODO Per-Project Org Context
@@ -4629,8 +4583,8 @@ If the file does not exist, creates it. Returns the full path."
   ;; Core settings
   (org-modules nil)
   (org-directory my/org-directory)
-  (org-log-done 'time)
-  (org-log-into-drawer t)
+  ;;(org-log-done 'time)
+  ;;(org-log-into-drawer t)
   (org-return-follows-link t)
 
   ;; Display settings
@@ -4901,250 +4855,9 @@ If the file does not exist, creates it. Returns the full path."
           (string-to-char (nerd-icons-codicon "nf-cod-circle_filled")))))
 #+end_src
 
-** TODO Eldoc for Org Mode
+** TODO Org Eldoc
 #+begin_src emacs-lisp
-(defun ar/org-eldoc-breadcrumb (callback &rest _)
-  "Show org heading breadcrumb path in eldoc."
-  (when (derived-mode-p 'org-mode)
-    (let* ((face-sep     '(:inherit shadow :height 0.8))
-           (face-path    '(:inherit shadow))
-           (face-current '(:inherit font-lock-keyword-face :weight bold))
-           (sep-str (propertize " → " 'face face-sep)))
-      (condition-case nil
-          (unless (org-in-src-block-p)
-            (cond
-             ((or (eobp)
-                  (save-excursion (forward-line 1) (eobp)))
-              (funcall callback (propertize "Bottom Level" 'face face-path)))
 
-             ((let ((path (ignore-errors (org-get-outline-path t))))
-                (when path
-                  (funcall callback
-                           (mapconcat
-                            (lambda (heading)
-                              (if (string= heading (car (last path)))
-                                  (propertize heading 'face face-current)
-                                (propertize heading 'face face-path)))
-                            path
-                            sep-str)))))
-
-             (t
-              (funcall callback (propertize "Top Level" 'face face-path)))))
-        (error nil)))))
-
-(defun ar/org-eldoc-heading-info (callback &rest _)
-  "Show TODO keyword, priority, and tags for current heading."
-  (when (derived-mode-p 'org-mode)
-    (condition-case nil
-        (let* ((element (org-element-at-point))
-               (type (org-element-type element)))
-          (when (eq type 'headline)
-            (let* ((todo     (org-element-property :todo-keyword element))
-                   (priority (org-element-property :priority element))
-                   (tags     (org-element-property :tags element))
-                   (info-parts '()))
-              (when todo
-                (push (propertize todo 'face (org-get-todo-face todo))
-                      info-parts))
-              (when priority
-                (push (propertize (format "[#%c]" priority) 'face
-                                  (org-get-priority-face priority))
-                      info-parts))
-              (when tags
-                (push (propertize (concat ":" (string-join tags ":") ":")
-                                  'face 'org-tag)
-                      info-parts))
-              (when info-parts
-                (funcall callback (string-join (nreverse info-parts) " "))))))
-      (error nil))))
-
-(defun ar/org-eldoc-timestamps (callback &rest _)
-  "Show scheduling info (SCHEDULED, DEADLINE, CLOSED) for current heading."
-  (when (derived-mode-p 'org-mode)
-    (condition-case nil
-        (let* ((element (org-element-at-point))
-               (type (org-element-type element)))
-          (when (eq type 'headline)
-            (let* ((scheduled (org-element-property :scheduled element))
-                   (deadline  (org-element-property :deadline  element))
-                   (closed    (org-element-property :closed    element))
-                   (timestamps '()))
-              (when scheduled
-                (push (concat
-                       (propertize "SCHEDULED: " 'face 'org-special-keyword)
-                       (org-element-property :raw-value scheduled))
-                      timestamps))
-              (when deadline
-                (push (concat
-                       (propertize "DEADLINE: " 'face 'org-special-keyword)
-                       (org-element-property :raw-value deadline))
-                      timestamps))
-              (when closed
-                (push (concat
-                       (propertize "CLOSED: " 'face 'org-special-keyword)
-                       (org-element-property :raw-value closed))
-                      timestamps))
-              (when timestamps
-                (funcall callback (string-join (nreverse timestamps) " │ "))))))
-      (error nil))))
-
-(defun ar/org-eldoc-link (callback &rest _)
-  "Show link type and target."
-  (when (derived-mode-p 'org-mode)
-    (condition-case nil
-        (when-let ((context (org-element-context)))
-          (when (eq (org-element-type context) 'link)
-            (let* ((type (org-element-property :type context))
-                   (path (org-element-property :path context))
-                   (desc (when (org-element-property :contents-begin context)
-                           (buffer-substring-no-properties
-                            (org-element-property :contents-begin context)
-                            (org-element-property :contents-end context)))))
-              (when (and type path)
-                (funcall callback
-                         (concat
-                          (propertize "Link: " 'face 'bold)
-                          (propertize (concat type ":" path) 'face 'link)
-                          (when desc
-                            (format " [%s]"
-                                    (propertize desc 'face 'font-lock-doc-face)))))))))
-      (error nil))))
-
-(defun ar/org-eldoc-table (callback &rest _)
-  "Show table cell position and formula information."
-  (when (and (derived-mode-p 'org-mode)
-             (org-at-table-p)
-             (not (org-at-table.el-p)))
-    (condition-case nil
-        (let* ((col (org-table-current-column))
-               (row (save-excursion
-                      (org-table-goto-line 1)
-                      (count-lines (org-table-begin) (line-beginning-position))))
-               (formula (org-table-get-formula col)))
-          (funcall callback
-                   (concat
-                    (propertize (format "Cell[%d,%d]" row col)
-                                'face 'font-lock-keyword-face)
-                    (when (and formula (not (string-empty-p formula)))
-                      (format " Formula: %s"
-                              (propertize formula 'face 'font-lock-function-name-face))))))
-      (error nil))))
-
-(defun ar/org-eldoc-drawer (callback &rest _)
-  "Show current drawer name."
-  (when (derived-mode-p 'org-mode)
-    (condition-case nil
-        (save-excursion
-          (beginning-of-line)
-          (when (looking-at org-drawer-regexp)
-            (let ((drawer (match-string 1)))
-              (funcall callback
-                       (propertize (format "Drawer: :%s:" drawer)
-                                   'face 'org-drawer)))))
-      (error nil))))
-
-(defun ar/org-eldoc-property (callback &rest _)
-  "Show property at point."
-  (when (derived-mode-p 'org-mode)
-    (condition-case nil
-        (let ((context (org-element-context)))
-          (when (eq (org-element-type context) 'node-property)
-            (let ((key   (org-element-property :key   context))
-                  (value (org-element-property :value context)))
-              (funcall callback
-                       (format "%s: %s"
-                               (propertize key   'face 'org-special-keyword)
-                               (propertize value 'face 'font-lock-string-face))))))
-      (error nil))))
-
-(defun ar/org-eldoc-clock (callback &rest _)
-  "Show currently clocked item if any."
-  (when (and (derived-mode-p 'org-mode)
-             (featurep 'org-clock)
-             (bound-and-true-p org-clock-current-task))
-    (condition-case nil
-        (funcall callback
-                 (format "%s %s"
-                         (propertize "CLOCKING:" 'face 'org-special-keyword)
-                         (propertize org-clock-current-task 'face 'org-clock-overlay)))
-      (error nil))))
-
-;; On-demand functions (not in eldoc rotation)
-(defun ar/org-show-statistics ()
-  "Show statistics about current subtree (word count, task count)."
-  (interactive)
-  (when (derived-mode-p 'org-mode)
-    (condition-case nil
-        (let* ((element (org-element-at-point))
-               (type (org-element-type element)))
-          (if (eq type 'headline)
-              (save-excursion
-                (org-narrow-to-subtree)
-                (let* ((words (count-words (point-min) (point-max)))
-                       ;; FIX: org-map-entries requires a callable as its first
-                       ;; argument. The original passed bare `t', which throws
-                       ;; (wrong-type-argument functionp t) at runtime.
-                       (tasks (length (org-map-entries
-                                       (lambda () t)
-                                       "/+TODO|DONE|NEXT|WAIT|HOLD" 'tree)))
-                       (done  (length (org-map-entries
-                                       (lambda () t)
-                                       "/+DONE" 'tree))))
-                  (widen)
-                  (message (concat
-                            (when (> words 0)
-                              (format "%s words"
-                                      (propertize (number-to-string words)
-                                                  'face 'font-lock-constant-face)))
-                            (when (and (> words 0) (> tasks 0)) " │ ")
-                            (when (> tasks 0)
-                              (format "Tasks: %s/%s"
-                                      (propertize (number-to-string done)
-                                                  'face 'org-done)
-                                      (propertize (number-to-string tasks)
-                                                  'face 'org-todo)))))))
-            (message "Not in an Org heading")))
-      (error (message "Failed to calculate statistics")))))
-
-(defun ar/org-show-src-block-info ()
-  "Show source block language and important parameters."
-  (interactive)
-  (when (and (derived-mode-p 'org-mode)
-             (org-in-src-block-p))
-    (condition-case nil
-        (save-excursion
-          (let* ((element    (org-element-at-point))
-                 (lang       (org-element-property :language   element))
-                 (switches   (org-element-property :switches   element))
-                 (parameters (org-element-property :parameters element)))
-            (when lang
-              (message (concat
-                        (propertize "Source: " 'face 'bold)
-                        (propertize lang 'face 'font-lock-keyword-face)
-                        (when switches
-                          (format " %s" (propertize switches 'face 'font-lock-comment-face)))
-                        (when (and parameters (not (string-empty-p parameters)))
-                          (format " [%s]"
-                                  (propertize parameters 'face 'font-lock-comment-face))))))))
-      (error (message "Not in a source block or failed to retrieve info")))))
-
-;; Keybindings for on-demand functions
-(with-eval-after-load 'org
-  (define-key org-mode-map (kbd "C-c i s") #'ar/org-show-statistics)
-  (define-key org-mode-map (kbd "C-c i b") #'ar/org-show-src-block-info))
-
-;; Register eldoc functions for org-mode
-(add-hook 'org-mode-hook
-          (lambda ()
-            (setq-local eldoc-documentation-strategy 'eldoc-documentation-compose)
-            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-clock          -100 t)
-            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-link            -80 t)
-            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-table           -70 t)
-            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-property        -60 t)
-            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-drawer          -50 t)
-            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-heading-info    -40 t)
-            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-timestamps      -30 t)
-            (add-hook 'eldoc-documentation-functions #'ar/org-eldoc-breadcrumb      -10 t)))
 #+end_src
 
 ** TODO Org Appear
@@ -5231,60 +4944,6 @@ If the file does not exist, creates it. Returns the full path."
   (citar-denote-mode 1))
 #+end_src
 
-** TODO Org GTD - Pure Task Management
-#+begin_src emacs-lisp
-(use-package org-gtd
-  :defer t
-  :after org
-  :commands (org-gtd-capture
-             org-gtd-process-inbox
-             org-gtd-engage
-             org-gtd-show-all-next
-             org-gtd-show-stuck-projects
-             org-gtd-organize)
-  :init
-  ;; FIX: org-gtd-update-ack MUST be set before the package loads.
-  ;; Without it, org-gtd shows a blocking upgrade-warning dialog at startup.
-  (setq org-gtd-update-ack "4.0.0")
-  ;; Set GTD directory before load so org-gtd can locate its files.
-  (setq org-gtd-directory my/org-gtd-directory)
-  (my/ensure-org-dir "gtd")
-
-  :custom
-  (org-todo-keywords
-   '((sequence "TODO(t)" "NEXT(n)" "PROG(p)" "WAIT(w@/!)" "|" "DONE(d!)" "CANCEL(c@)")
-     (sequence "PLAN(P)" "ACTIVE(A)" "PAUSED(x)" "|" "ACHIEVED(a)" "DROPPED(D)")
-     ;; GTD-specific keywords (used only in ~/org/gtd/ files)
-     (sequence "INBOX(i)" "GTD-NEXT(N)" "GTD-WAIT(W@/!)" "|" "GTD-DONE(D!)" "GTD-CNCL(C@)")))
-
-  ;; Map GTD semantic states to the keywords above
-  (org-gtd-keyword-mapping
-   '((todo     . "INBOX")
-     (next     . "GTD-NEXT")
-     (wait     . "GTD-WAIT")
-     (done     . "GTD-DONE")
-     (canceled . "GTD-CNCL")))
-
-  ;; FIX: Removed (org-gtd-mode nil) from :custom. You cannot deactivate a
-  ;; minor mode via customize-set-variable. The mode is off by default; the
-  ;; idle timer in :config handles deferred activation.
-
-  :config
-  ;; org-edna is a required dependency; activate its minor mode here.
-  (org-edna-mode 1)
-
-  ;; Authoritative definition of org-agenda-files — kept in one place only.
-  (setq org-agenda-files
-        (list my/org-directory
-              my/org-gtd-directory))
-
-  ;; Performance: defer full mode activation until Emacs is idle
-  (run-with-idle-timer 30 nil
-    (lambda ()
-      (when (and (featurep 'org-gtd)
-                 (not (bound-and-true-p org-gtd-mode)))
-        (org-gtd-mode 1)))))
-#+end_src
 
 ** TODO Weekly Review
 #+begin_src emacs-lisp
@@ -6853,6 +6512,7 @@ buffer killing or garbage collection cycles."
 #+begin_src emacs-lisp
 
 #+end_src
+
 
 ** TODO apheleia
 #+begin_src emacs-lisp
