@@ -4730,38 +4730,25 @@ Configures the task overview display, sorting, and window behavior.
 
 ** DONE Org Super Agenda
 Groups agenda items into labeled sections by urgency, context, and status.
-
 #+begin_src emacs-lisp
 (use-package org-super-agenda
   :defer t
   :after org-agenda
-  ;; Explicit enable (not toggle) to prevent disable on repeated hook fires.
   :hook (org-agenda-mode . (lambda () (org-super-agenda-mode 1)))
   :custom
-  ;; Single character auto-repeats to window width on resize.
   (org-super-agenda-header-separator ?─)
-  ;; Suppress groups with zero matching items.
   (org-super-agenda-hide-empty-groups t)
-  ;; Preserve org-agenda-sorting-strategy order within each group.
   (org-super-agenda-keep-order t)
-  ;; Name for the implicit catch-all group.
   (org-super-agenda-unmatched-name "Other Tasks")
-  ;; Suppress mode-enable echo-area message.
   (org-super-agenda-show-message nil)
-  ;; Consistent visual bullet for all group headers.
   (org-super-agenda-header-prefix "▸ ")
-  ;; Visual boundary between last group and agenda footer.
   (org-super-agenda-final-group-separator
    "\n─────────────────────────────────────────────────\n")
-  ;; Human-readable date format for :auto-planning/:auto-ts headers.
   (org-super-agenda-date-format "%A, %B %d")
   :config
-  ;; Global face for package-specific header. NOT per-buffer;
-  ;; does not violate the NO Global Face Pollution constraint.
   (set-face-attribute 'org-super-agenda-header nil
     :inherit 'font-lock-keyword-face :weight 'bold :height 1.05)
 
-  ;; Native group folding via overlay invisibility (no origami dependency).
   (defun ar/org-super-agenda-toggle-group ()
     "Toggle visibility of the current agenda group at point."
     (interactive)
@@ -4773,8 +4760,6 @@ Groups agenda items into labeled sections by urgency, context, and status.
       (let* ((header-end (save-excursion
                            (goto-char pos)
                            (forward-line 0)
-                           ;; Safety: if property boundary landed on the next
-                           ;; line, step back to the actual header line.
                            (unless (get-text-property
                                     (point) 'org-agenda-structural-header)
                              (forward-line -1))
@@ -4782,7 +4767,6 @@ Groups agenda items into labeled sections by urgency, context, and status.
              (next-header (next-single-property-change
                            header-end 'org-agenda-structural-header
                            nil (point-max)))
-             ;; Snap to line start so overlay ends cleanly before next header.
              (next-header-start (if next-header
                                     (save-excursion
                                       (goto-char next-header)
@@ -4808,8 +4792,6 @@ Groups agenda items into labeled sections by urgency, context, and status.
           (progn (goto-char origin)
                  (user-error "Empty group")))))
 
-  ;; Header keymap: TAB folds, RET jumps to first item, q quits.
-  ;; Note: q overrides Evil macro recording on header lines only.
   (define-key org-super-agenda-header-map (kbd "TAB")
     #'ar/org-super-agenda-toggle-group)
   (define-key org-super-agenda-header-map (kbd "RET")
@@ -4817,27 +4799,16 @@ Groups agenda items into labeled sections by urgency, context, and status.
   (define-key org-super-agenda-header-map (kbd "q")
     #'org-agenda-quit)
 
-  ;; ARCHITECTURAL NOTES:
-  ;; - :children todo and :auto-parent t are EXCLUDED from this default
-  ;;   list. They MUST only appear in custom commands using org-agenda-list
-  ;;   (daily/weekly views). In org-todo-list or org-tags-view they cause
-  ;;   O(n × depth) recursive scanning freezes. See project_operationals.yaml.
-  ;; - :take is used ONLY on the catch-all "Other Tasks" group. Urgency
-  ;;   groups (Overdue, Due Soon) remain unbounded because :take discards
-  ;;   excess items permanently with no recovery path.
-  ;; - :log closed is placed BEFORE :time-grid to prevent consumption conflict.
-  ;;   Requires log mode (v l in agenda) to populate; hidden when empty.
+  ;; :log closed MUST precede :discard; both match DONE items and
+  ;; first-match-wins would otherwise empty the Completed group.
   (setq org-super-agenda-groups
-        `(;; Consume terminal-state items before any group sees them.
-          (:discard (:todo ("DONE" "CANCEL")))
-
-          ;; Items closed today. Requires log mode (v l) to populate.
-          (:name ,(concat (nerd-icons-faicon "nf-fa-check_circle" :v-adjust 0.02)
+        `((:name ,(concat (nerd-icons-faicon "nf-fa-check_circle" :v-adjust 0.02)
                           " Completed Today")
            :log closed
            :order 0)
 
-          ;; Past deadline or scheduled date. Unbounded for full visibility.
+          (:discard (:todo ("DONE" "CANCEL")))
+
           (:name ,(concat (nerd-icons-octicon "nf-oct-alert" :v-adjust 0.02)
                           " Overdue")
            :deadline past
@@ -4845,7 +4816,6 @@ Groups agenda items into labeled sections by urgency, context, and status.
            :face font-lock-warning-face
            :order 1)
 
-          ;; Unprocessed items in the flat todo.org (Inbox heading).
           (:name ,(concat (nerd-icons-octicon "nf-oct-inbox" :v-adjust 0.02)
                           " Inbox")
            :todo "TODO"
@@ -4853,25 +4823,21 @@ Groups agenda items into labeled sections by urgency, context, and status.
            :transformer (string-remove-prefix "TODO " it)
            :order 2)
 
-          ;; Items on today's time grid.
           (:name ,(concat (nerd-icons-faicon "nf-fa-calendar" :v-adjust 0.02)
                           " Today")
            :time-grid t
            :order 3)
 
-          ;; Habit consistency graphs, isolated from actionable tasks.
           (:name ,(concat (nerd-icons-mdicon "nf-md-chart_line" :v-adjust 0.02)
                           " Habits")
            :habit t
            :order 4)
 
-          ;; Priority A items not already consumed above.
           (:name ,(concat (nerd-icons-faicon "nf-fa-fire" :v-adjust 0.02)
                           " High Priority")
            :priority "A"
            :order 5)
 
-          ;; Context groups: tag AND actionable keyword.
           (:name ,(concat (nerd-icons-faicon "nf-fa-laptop" :v-adjust 0.02)
                           " @Computer")
            :and (:tag "@computer" :todo ("NEXT" "TODO"))
@@ -4893,7 +4859,6 @@ Groups agenda items into labeled sections by urgency, context, and status.
            :and (:tag "@deep_work" :todo ("NEXT" "TODO"))
            :order 10)
 
-          ;; Delegated or blocked items awaiting external input.
           (:name ,(concat (nerd-icons-faicon "nf-fa-hourglass_half" :v-adjust 0.02)
                           " Waiting For")
            :todo "WAIT"
@@ -4901,13 +4866,11 @@ Groups agenda items into labeled sections by urgency, context, and status.
            :transformer (string-remove-prefix "WAIT " it)
            :order 11)
 
-          ;; Deadlines within the next 7 days. Unbounded for full visibility.
           (:name ,(concat (nerd-icons-faicon "nf-fa-clock" :v-adjust 0.02)
                           " Due Soon")
            :deadline (before "+7d")
            :order 12)
 
-          ;; Everything not consumed above. Capped to prevent domination.
           (:name ,(concat (nerd-icons-octicon "nf-oct-kebab_horizontal"
                           :v-adjust 0.02)
                           " Other Tasks")
@@ -4921,16 +4884,8 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
 
 #+begin_src emacs-lisp
 (with-eval-after-load 'org-agenda
-  ;; Named group lists for custom commands.
-  ;; Defined here (not in org-super-agenda :config) because they are
-  ;; specific to these custom commands and use :children/:auto-parent
-  ;; which are UNSAFE in the default group list.
-
-  ;; Daily Dashboard: full view with project structure.
-  ;; SAFE: uses `agenda' command (org-agenda-list) with bounded time span.
   (defconst ar/org-sa-daily-groups
-    `(;; Capture today's closed items BEFORE discard removes all DONE.
-      (:name ,(concat (nerd-icons-faicon "nf-fa-check_circle" :v-adjust 0.02)
+    `((:name ,(concat (nerd-icons-faicon "nf-fa-check_circle" :v-adjust 0.02)
                       " Completed Today")
        :log closed
        :order 0)
@@ -4989,7 +4944,6 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
                       " Due Soon")
        :deadline (before "+7d")
        :order 12)
-      ;; Project structure groups. SAFE in org-agenda-list only.
       (:name ,(concat (nerd-icons-octicon "nf-oct-project" :v-adjust 0.02)
                       " Active Projects")
        :children todo
@@ -5003,9 +4957,8 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
                       " Other Tasks")
        :take (15 (:anything t))
        :order 99))
-    "Org-super-agenda groups for the Daily Dashboard custom command.")
+    "Groups for the Daily Dashboard command.")
 
-  ;; Weekly Review: inbox, waiting, stuck, someday.
   (defconst ar/org-sa-weekly-groups
     `((:name ,(concat (nerd-icons-octicon "nf-oct-inbox" :v-adjust 0.02)
                       " Inbox (Process to Zero)")
@@ -5029,11 +4982,8 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
                       " Everything Else")
        :anything t
        :order 99))
-    "Org-super-agenda groups for the Weekly Review custom command.")
+    "Groups for the Weekly Review command.")
 
-  ;; Effort-Based: group by estimated effort duration.
-  ;; Uses `alltodo' command type. NO :children or :auto-parent here
-  ;; because alltodo collects ALL TODO items globally (O(n × depth) risk).
   (defconst ar/org-sa-effort-groups
     `((:name ,(concat (nerd-icons-faicon "nf-fa-bolt" :v-adjust 0.02)
                       " Quick Wins (< 15 min)")
@@ -5060,9 +5010,8 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
                       " No Estimate")
        :anything t
        :order 99))
-    "Org-super-agenda groups for the Effort-Based custom command.")
+    "Groups for the Effort-Based command.")
 
-  ;; Accomplishments: what was completed and clocked today.
   (defconst ar/org-sa-accomplishments-groups
     `((:name ,(concat (nerd-icons-faicon "nf-fa-check_circle" :v-adjust 0.02)
                       " Completed Today")
@@ -5076,10 +5025,8 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
                       " State Changed Today")
        :log changed
        :order 3))
-    "Org-super-agenda groups for the Accomplishments custom command.")
+    "Groups for the Accomplishments command.")
 
-  ;; Project Status: overview of all projects and their task health.
-  ;; SAFE: uses `agenda' command (org-agenda-list) with bounded time span.
   (defconst ar/org-sa-project-groups
     `((:name ,(concat (nerd-icons-octicon "nf-oct-project" :v-adjust 0.02)
                       " Active Projects (with open tasks)")
@@ -5094,17 +5041,13 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
                       " Ungrouped")
        :anything t
        :order 99))
-    "Org-super-agenda groups for the Project Status custom command.")
+    "Groups for the Project Status command.")
 
-  ;; ==========================================
-  ;; CUSTOM COMMAND DEFINITIONS
-  ;; ==========================================
   (setq org-agenda-custom-commands
         `(("d" "Daily Dashboard"
            ((agenda ""
              ((org-agenda-span 'day)
               (org-agenda-start-day "0d")
-              ;; Enable log mode so :log closed items appear.
               (org-agenda-start-with-log-mode t)
               (org-super-agenda-groups ,ar/org-sa-daily-groups)))))
 
@@ -5132,10 +5075,8 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
              ((org-agenda-span 'day)
               (org-agenda-start-day "0d")
               (org-super-agenda-groups ,ar/org-sa-project-groups))))))))
-
-;; NOTE: SPC a bindings (a d/w/e/A/p) must be added to the
-;; General Keybindings section at the end of config.org.
 #+end_src
+
 
 ** TODO Org Habit
 #+begin_src emacs-lisp

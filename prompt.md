@@ -516,4 +516,4 @@ Org-Mode has the follw
 
 ---
 
-Now review and audit Org Super Agenda subsection and present me a plan on how you want to approach and rewrite Org Agenda Super subsection. Look at org super agenda in https://github.com/alphapapa/org-super-agenda for any inspiration, errors and issues. Search the web and think longer for this. Use best emacs practices. Make sure you have the latest information till July 18, 2026.
+Now review and audit Org Agenda Custom Commands subsection and find and fix any errors and issues in this subsection. Also make sure this subsection integrates properly with Org Agenda and Org Super Agenda subsections. Search the web and think longer for this. Use best emacs practices. Make sure you have the latest information till July 18, 2026. Then explain everything back to me.
