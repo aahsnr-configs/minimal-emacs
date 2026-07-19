@@ -1442,7 +1442,7 @@ Delegates hardware input to =ultra-scroll= and keyboard interpolation to =good-s
 
 
 
-** TODO Treesittor
+** TODO Tree-sitter
 - [ ] Optimize it for emacs 31.
 Configures the native C-level AST engine and routes grammar binaries to the =no-littering= var directory. Implements defensive version-forking to support Emacs 30 manual remapping and Emacs 31 native auto-installation.
 #+begin_src emacs-lisp
@@ -4729,64 +4729,85 @@ Configures the task overview display, sorting, and window behavior.
 
 
 ** TODO Org Super Agenda
+Groups agenda items into labeled sections by urgency, context, and status.
+
 #+begin_src emacs-lisp
 (use-package org-super-agenda
   :defer t
   :after org-agenda
   :hook (org-agenda-mode . org-super-agenda-mode)
   :custom
-  (org-super-agenda-header-separator "─────────────────────────────────")
+  ;; Single character auto-repeats to window width on resize.
+  (org-super-agenda-header-separator ?─)
+  ;; Suppress groups with zero matching items.
+  (org-super-agenda-hide-empty-groups t)
+  ;; Preserve org-agenda-sorting-strategy order within each group.
+  (org-super-agenda-keep-order t)
+  ;; Name for the implicit catch-all group.
+  (org-super-agenda-unmatched-name "Other Tasks")
   (org-super-agenda-groups
-   '((:name "🔴 Overdue"
+   '(;; Consume terminal-state items before any group sees them.
+     (:discard (:todo ("DONE" "CANCEL")))
+
+     ;; Past deadline or scheduled date.
+     (:name "Overdue"
       :deadline past
       :scheduled past
-      :face (:foreground "#f7768e")
+      :face font-lock-warning-face
       :order 1)
 
-     (:name "🔥 GTD Inbox (Process Today)"
-      :todo "INBOX"
-      :file-path "gtd/inbox.org"
+     ;; Unprocessed items in the flat todo.org (Inbox heading).
+     (:name "Inbox"
+      :todo "TODO"
+      :file-path "agenda/todo\\.org"
       :order 2)
 
-     (:name "⚡ Today's Schedule"
+     ;; Items on today's time grid (scheduled + deadline for today).
+     (:name "Today"
       :time-grid t
-      :date today
-      :scheduled today
       :order 3)
 
-     (:name "🎯 High Priority"
-      :priority "A"
+     ;; Habit consistency graphs, isolated from actionable tasks.
+     (:name "Habits"
+      :habit t
       :order 4)
 
-     (:name "💻 @Computer"
-      :and (:tag "@computer" :todo ("GTD-NEXT" "NEXT"))
+     ;; Priority A items not already consumed by Overdue or Today.
+     (:name "High Priority"
+      :priority "A"
       :order 5)
 
-     (:name "🏠 @Home"
-      :and (:tag "@home" :todo ("GTD-NEXT" "NEXT"))
+     ;; Context groups: tag AND actionable keyword.
+     (:name "@Computer"
+      :and (:tag "@computer" :todo ("NEXT" "TODO"))
       :order 6)
-
-     (:name "📞 @Phone"
-      :and (:tag "@phone" :todo ("GTD-NEXT" "NEXT"))
+     (:name "@Home"
+      :and (:tag "@home" :todo ("NEXT" "TODO"))
       :order 7)
-
-     (:name "🚗 @Errands"
-      :and (:tag "@errands" :todo ("GTD-NEXT" "NEXT"))
+     (:name "@Errands"
+      :and (:tag "@errands" :todo ("NEXT" "TODO"))
       :order 8)
-
-     (:name "⏳ Waiting For"
-      :todo ("GTD-WAIT" "WAIT")
+     (:name "@Phone"
+      :and (:tag "@phone" :todo ("NEXT" "TODO"))
       :order 9)
-
-     (:name "📆 Due Soon (Next 7 Days)"
-      :deadline future
+     (:name "@Deep Work"
+      :and (:tag "@deep_work" :todo ("NEXT" "TODO"))
       :order 10)
 
-     (:name "📋 Other Tasks"
-      :anything t
+     ;; Delegated or blocked items awaiting external input.
+     (:name "Waiting For"
+      :todo "WAIT"
+      :order 11)
+
+     ;; Deadlines within the next 7 days.
+     (:name "Due Soon"
+      :deadline (before "+7d")
+      :order 12)
+
+     ;; Everything not consumed above.
+     (:anything t
       :order 99))))
 #+end_src
-
 
 ** TODO Org Agenda Custom Commands
 #+begin_src emacs-lisp
