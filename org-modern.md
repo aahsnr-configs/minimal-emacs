@@ -176,6 +176,5 @@ We analyzed how `org-modern` renders statistics cookies (e.g., `[50%]`) and conf
 ---
 
 ### List of Sources
-
 - **[1]** GNU Emacs Lisp Reference Manual: _Text Properties -> Special Properties (`display`)_. Confirms that the `display` property requires a string, image, or display specification, and will reject raw Lisp symbols.
 - **[2]** GNU Org Mode Manual: _Checkboxes_. Confirms that Org mode's internal parser strictly recognizes only `[ ]`, `[X]`, and `[-]` as valid structural checkbox states.

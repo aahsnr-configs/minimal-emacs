@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.13
+#+VERSION: 0.15
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -36,9 +36,7 @@ Initializes =elpaca=, an asynchronous package manager replacing =package.el=. Di
 (eval-when-compile (require 'use-package))
 (require 'bind-key)
 
-;; ==========================================
 ;; ELPACA BOOTSTRAP
-;; ==========================================
 (defvar elpaca-installer-version 0.12)
 ;; Redirect Elpaca root to var/elpaca/ (no-littering paradigm).
 (defvar elpaca-directory (expand-file-name "var/elpaca/" user-emacs-directory))
@@ -80,9 +78,7 @@ Initializes =elpaca=, an asynchronous package manager replacing =package.el=. Di
 (add-hook 'after-init-hook #'elpaca-process-queues)
 (elpaca `(,@elpaca-order))
 
-;; ==========================================
-;; USE-PACKAGE INTEGRATION
-;; ==========================================
+;; Use Package Integration
 (elpaca elpaca-use-package
   (elpaca-use-package-mode)
   (setq elpaca-use-package-by-default t))
@@ -90,18 +86,14 @@ Initializes =elpaca=, an asynchronous package manager replacing =package.el=. Di
 ;; Block init reading until elpaca-use-package advice is applied.
 (elpaca-wait)
 
-;; ==========================================
-;; USE-PACKAGE CONFIGURATION
-;; ==========================================
+;; Use Package Configuration
 (setq use-package-verbose nil
       use-package-always-ensure t
       use-package-expand-minimally t
       use-package-compute-statistics nil
       use-package-enable-imenu-support t)
 
-;; ==========================================
 ;; NO-LITTERING & CUSTOM FILE
-;; ==========================================
 ;; Synchronously load no-littering to preempt async package cache paths.
 (use-package no-littering
   :ensure (:wait t)
@@ -367,16 +359,78 @@ Quality-of-life settings, safety guards, and core minor modes. Disables unused V
 
 
 ** DONE Auto Save
-Configures seamless auto-saving via =auto-save-visited-mode=. Bypasses the legacy =#filename#= recovery mechanism by writing buffer changes directly to the visited file on disk after a defined idle interval.
-
+Saves buffer contents directly to disk on idle, focus loss, and window/buffer switches.
 #+begin_src emacs-lisp
-;; Interval in seconds before visited files are auto-saved.
-(setq auto-save-visited-interval 5)
-
-;; Enable direct-to-file auto-saving.
-(auto-save-visited-mode 1)
+(use-package super-save
+  :config
+  (super-save-mode +1)
+  ;; Idle save after 5 seconds.
+  (setq super-save-auto-save-when-idle t
+        super-save-idle-duration 5)
+  ;; Exclude TRAMP/remote files to prevent SSH main-thread freezes.
+  (setq super-save-remote-files nil)
+  ;; Event-driven triggers at natural navigation boundaries.
+  (setq super-save-triggers
+        '(switch-to-buffer
+          other-window
+          windmove-up
+          windmove-down
+          windmove-left
+          windmove-right
+          ace-window))
+  ;; Exclude read-only, terminal, and UI buffers.
+  (setq super-save-exclude
+        '(magit-status-mode
+          magit-log-mode
+          magit-diff-mode
+          dired-mode
+          dirvish-mode
+          dirvish-directory-view-mode
+          treemacs-mode
+          dashboard-mode
+          eshell-mode
+          ghostel-mode
+          ghostel-compile-view-mode
+          vterm-mode
+          term-mode
+          eat-mode
+          compilation-mode
+          grep-mode
+          occur-mode
+          org-agenda-mode
+          xref--xref-buffer-mode
+          embark-collect-mode
+          lsp-ui-imenu-mode
+          help-mode
+          helpful-mode
+          Info-mode
+          woman-mode
+          eww-mode
+          pdf-view-mode
+          docker-container-mode
+          docker-image-mode
+          Custom-mode
+          ediff-mode
+          profiler-report-mode
+          messages-buffer-mode
+          backtrace-mode
+          special-mode)))
 #+end_src
 
+
+** TODO Auto Tangle
+Automatically regenerates tangled output files when any Org buffer is saved.
+#+begin_src emacs-lisp
+(use-package org-auto-tangle
+  :defer t
+  :hook (org-mode . org-auto-tangle-mode)
+  :custom
+  ;; Tangle asynchronously to prevent main-thread blocking on large files.
+  (org-auto-tangle-async t)
+  ;; Default for ALL org buffers. Files without source blocks are unaffected.
+  ;; To opt out a specific file, add #+auto_tangle: nil to its header.
+  (org-auto-tangle-default t))
+#+end_src
 
 ** DONE Garbage Collector
 Manages garbage collection via =gcmh= idle timers. Elevates the GC threshold during active input and triggers background collection during idle periods. Disables =gcmh= on experimental MPS Incremental GC (=igc=) builds and utilizes =after-focus-change-function= for focus-out memory reclamation.
@@ -886,14 +940,18 @@ Foundational glyph substitution and icon API. Eagerly loaded to prevent void-fun
 
 
 ** DONE Fonts
-Configures global typography and baseline monospaced faces. Utilizes server-frame hooks for daemon-safe inheritance and integer line-spacing to prevent sub-pixel artifacts.
+Configures global typography, baseline monospaced faces, fontset fallback registration, and vertical line centering.
 #+begin_src emacs-lisp
 (defun ar/setup-fonts ()
-  "Apply global typography and baseline monospaced faces to the current frame."
+  "Apply global typography, baseline faces, and fontset fallbacks to the current frame."
   (set-face-attribute 'default nil :font "JetBrains Mono" :height 125 :weight 'medium)
   (set-face-attribute 'fixed-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
-  ;; Maps variable-pitch to the monospaced font to preserve Org-mode table alignment.
-  (set-face-attribute 'variable-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium))
+  ;; Maps variable-pitch to monospaced to preserve Org-mode table alignment.
+  (set-face-attribute 'variable-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
+  ;; Pre-register Noto Sans for Unicode blocks used by org-modern-replace-stars.
+   (set-fontset-font t '(#x25A0 . #x25FF) "Noto Sans")  ; Geometric Shapes (◉ ○ ◇ ▷)
+  (set-fontset-font t '(#x2600 . #x26FF) "Noto Sans")  ; Miscellaneous Symbols
+  (set-fontset-font t '(#x2700 . #x27BF) "Noto Sans")) ; Dingbats (✸ ✿ ✤ ✜)
 
 ;; Applies fonts immediately for standard GUI sessions.
 (unless noninteractive
@@ -902,8 +960,8 @@ Configures global typography and baseline monospaced faces. Utilizes server-fram
 ;; Daemon-safe hook: applies fonts to GUI frames spawned by emacsclient.
 (add-hook 'server-after-make-frame-hook #'ar/setup-fonts)
 
-;; Integer pixel spacing prevents sub-pixel rendering artifacts while providing vertical breathing room.
-(setq-default line-spacing 2)
+;; Vertically centers org-modern badges (TODO, tags, priorities) against text baseline.
+(setq-default line-spacing '(2 . 2))
 
 ;; Maximizes syntax highlighting decoration across all programming buffers.
 (setq font-lock-maximum-decoration t)
@@ -4254,16 +4312,13 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
 #+end_src
 
 
-* TODO Org Mode
-- [ ] Use doom emacs settings wherever possible
-- [ ] Find alternative packages to org-download
+* TODO Org Mode & Second Brain
 
-** TODO Dynamic Directory Structure
-Scaffolds the foundational Second Brain directories and configures core Org-mode paths for the Factory (task management) paradigm.
+** DONE Dynamic Directory Structure
+Creates folders and starter files for the Second Brain and configures core Org-mode paths.
+*** Core Directory Scaffolding
+Defines base directories and bootstrap utilities.
 #+begin_src emacs-lisp
-;; ==========================================
-;; DIRECTORY CREATION & SCAFFOLDING UTILITIES
-;; ==========================================
 (defvar my/org-directory
   (let ((xdg-docs (getenv "XDG_DOCUMENTS_DIR")))
     (if (and xdg-docs (file-directory-p xdg-docs))
@@ -4271,11 +4326,9 @@ Scaffolds the foundational Second Brain directories and configures core Org-mode
       (expand-file-name "~/org/")))
   "Base directory for all Org and Denote files, respecting XDG specifications.")
 
-;; Ensure base root exists immediately to prevent `file-truename' edge cases.
 (unless (file-directory-p my/org-directory)
   (make-directory my/org-directory t))
 
-;; Canonicalize symlinks for downstream I/O stability.
 (setq my/org-directory (file-truename my/org-directory))
 
 (defun my/ensure-org-dir (subdir)
@@ -4292,10 +4345,47 @@ Scaffolds the foundational Second Brain directories and configures core Org-mode
       (with-temp-file full-path
         (when template (insert template))))
     full-path))
+#+end_src
 
-;; ==========================================
-;; THE FACTORY (Task & Time Tracking Bootstrap)
-;; ==========================================
+*** Denote Library Scaffolding
+Creates note-taking folders and isolates them with local configuration files.
+#+begin_src emacs-lisp
+(defun my/ensure-denote-silo (silo-dir)
+  "Isolate SILO-DIR via a native `.dir-locals.el' file.
+This mathematically guarantees Denote commands remain scoped to the silo."
+  (let ((dir-locals (expand-file-name ".dir-locals.el" silo-dir)))
+    (unless (file-exists-p dir-locals)
+      (with-temp-file dir-locals
+        (insert ";;; Directory Local Variables.  For more information evaluate:\n")
+        (insert ";;;\n")
+        (insert ";;;     (info \"(emacs) Directory Variables\")\n\n")
+        (insert (format "((nil . ((denote-directory . %S))))\n" silo-dir))))
+    silo-dir))
+
+(defun my/create-denote-project-silo (project-name)
+  "Create a new isolated Denote silo for PROJECT-NAME under `projects/'."
+  (interactive "sProject Name: ")
+  (let ((silo-dir (expand-file-name project-name (my/ensure-org-dir "projects/"))))
+    (unless (file-directory-p silo-dir)
+      (make-directory silo-dir t))
+    (my/ensure-denote-silo silo-dir)
+    (message "Created Denote Silo: %s" silo-dir)
+    silo-dir))
+
+(defvar my/denote-zettelkasten-dir (my/ensure-org-dir "zettelkasten/")
+  "Global, evergreen concepts. Serves as the fallback `denote-directory'.")
+
+(my/ensure-denote-silo my/denote-zettelkasten-dir)
+
+(my/ensure-org-dir "projects/")
+(my/ensure-org-dir "areas/")
+(my/ensure-org-dir "resources/")
+(my/ensure-org-dir "archives/")
+#+end_src
+
+*** Task Management & Ephemeral Routing
+Creates folders and starter files for task management and temporary downloads.
+#+begin_src emacs-lisp
 (my/ensure-org-dir "agenda/")
 (my/ensure-org-dir "agenda/archive/")
 
@@ -4308,286 +4398,45 @@ Scaffolds the foundational Second Brain directories and configures core Org-mode
 (my/ensure-org-file "agenda/habits.org"
                     "#+title: Habits\n#+filetags: :habit:\n\n")
 
-;; ==========================================
-;; EPHEMERAL & ATTACHMENT ROUTING
-;; ==========================================
 (my/ensure-org-dir "attachments/")
 (my/ensure-org-dir "downloads/")
 #+end_src
 
+*** Org Package Wiring
+Routes global Org-mode settings to the newly created folders.
 #+begin_src emacs-lisp
-;; ==========================================
-;; ORG PACKAGE WIRING & GLOBAL EXPORT
-;; ==========================================
-;; Set the global Org directory.
 (setq org-directory my/org-directory)
 
-;; Define the foundational `org-agenda-files` list.
-;; Strictly confined to the Factory to prevent I/O latency and Denote globbing.
 (setq org-agenda-files (list (expand-file-name "agenda/todo.org" my/org-directory)
                              (expand-file-name "agenda/habits.org" my/org-directory)
                              (expand-file-name "agenda/journal.org" my/org-directory)))
 
-;; Route attachments dynamically to prevent binary pollution in Git-tracked silos.
 (setq org-attach-id-dir (expand-file-name "attachments/" my/org-directory)
       org-attach-use-inheritance t)
 #+end_src
 
-** TODO Per-Project Org Context
-#+begin_src emacs-lisp
-;; TODO: Replace this whole source code block with projectile alternatives
-;; TODO: Determine if persp-mode is used, then replace with persp-mode alternative if needed
-;; ;;; ── Registry ─────────────────────────────────────────────────────────────
-;; ;; Each entry: (ABSOLUTE-ROOT plist...)
-;; ;; Plist keys:
-;; ;;   :name           Human-readable label shown in echo area
-;; ;;   :org-directory  Replaces my/org-directory + org-directory
-;; ;;   :denote-dir     Replaces my/denote-directory + denote-directory
-;; ;;   :gtd-dir        Replaces my/org-gtd-directory + org-gtd-directory
-;; ;;   :agenda-files   Replaces org-agenda-files entirely
-;; ;;   :capture-tpls   Extra capture templates PREPENDED to the global list.
-;; ;;
-;; (defvar my/project-org-contexts '()
-;;   "Alist mapping absolute (truename) project roots to org context plists.
-;; All directory paths should be pre-expanded with file-truename so that
-;; runtime comparisons are fast string-equal checks with no I/O.
-;; Populate via `my/register-project-org-context'.")
 
-;; ;;; ── Registration helper ──────────────────────────────────────
-;; (defun my/register-project-org-context (root &rest plist)
-;;   "Register ROOT as a project-specific org context with PLIST settings.
 
-;; ROOT is the project's root directory; it is expanded and resolved via
-;; `file-truename' automatically, so you can pass a raw path like \"~/myproject/\".
-
-;; PLIST accepts the same keys documented in `my/project-org-contexts':
-;;   :name         Human-readable label (defaults to last component of ROOT)
-;;   :org-directory  Custom org base directory for this project
-;;   :denote-dir     Custom Denote notes directory for this project
-;;   :gtd-dir        Custom GTD directory
-;;   :agenda-files   Agenda files list (replaces global value)
-;;   :capture-tpls   Capture templates prepended to the global list
-
-;; Example — register a project with its own roam DB and capture templates:
-
-;;   (my/register-project-org-context \"~/code/myproject/\"
-;;     :name        \"myproject\"
-;;     :roam-dir    (expand-file-name \"~/code/myproject/notes/\")
-;;     :roam-db     (expand-file-name \"~/code/myproject/notes/org-roam.db\")
-;;     :gtd-dir     (expand-file-name \"~/code/myproject/gtd/\")
-;;     :agenda-files (list (expand-file-name \"~/code/myproject/\")
-;;                         (expand-file-name \"~/code/myproject/gtd/\"))
-;;     :capture-tpls
-;;     '((\"P\" \"MyProject\")
-;;       (\"Pj\" \"MyProject Journal\" entry
-;;        (file+olp+datetree \"~/code/myproject/journal.org\")
-;;        \"* %<%H:%M> %?\\n\" :empty-lines 1)))"
-;;   (let* ((truename (file-truename (expand-file-name root)))
-;;          ;; Default :name to the last path component if not supplied
-;;          (name (or (plist-get plist :name)
-;;                    (file-name-nondirectory (directory-file-name truename))))
-;;          (ctx (plist-put plist :name name)))
-;;     ;; Replace any existing entry for this root
-;;     (setq my/project-org-contexts
-;;           (cons (cons truename ctx)
-;;                 (assoc-delete-all truename my/project-org-contexts)))))
-
-;; ;;; ── State ─────────────────────────────────────────────────────────────────
-;; (defvar my/global-org-context nil
-;;   "Snapshot of the global org context taken on first project activation.
-;; nil means no project has ever been activated this session.
-;; Plist shape mirrors `my/project-org-contexts' entries, plus:
-;;   :capture-tpls — the full `org-capture-templates' list at snapshot time.")
-
-;; (defvar my/active-org-project nil
-;;   "Truename root of the currently active project, or nil for global.")
-
-;; ;;; ── Snapshot ──────────────────────────────────────────────────────────────
-;; (defun my/project-org--snapshot ()
-;;   "Save current global org variable values into `my/global-org-context'.
-;; Called lazily the first time any project is activated."
-;;   (setq my/global-org-context
-;;         (list :name          "global"
-;;               :org-directory  my/org-directory
-;;               :denote-dir     my/denote-directory
-;;               :gtd-dir        my/org-gtd-directory
-;;               :agenda-files   (and (boundp 'org-agenda-files)
-;;                                    (copy-sequence org-agenda-files))
-;;               ;; FIX: was set twice; now correctly captures capture templates
-;;               ;; so deactivation can restore the full list exactly.
-;;               :capture-tpls   (and (boundp 'org-capture-templates)
-;;                                    (copy-sequence org-capture-templates)))))
-
-;; ;;; ── Directory application ─────────────────────────────────────────────────
-;; (defun my/project-org--set-dirs (ctx)
-;;   "Apply directory-related keys from context plist CTX."
-;;   (let ((odir (plist-get ctx :org-directory))
-;;         (ddir (plist-get ctx :denote-dir))
-;;         (gdir (plist-get ctx :gtd-dir))
-;;         (af   (plist-get ctx :agenda-files)))
-;;     (when odir
-;;       (setq my/org-directory odir
-;;             org-directory    odir))
-;;     (when ddir
-;;       (make-directory ddir t)
-;;       (setq my/denote-directory ddir
-;;             denote-directory    ddir))
-;;     (when gdir
-;;       (make-directory gdir t)
-;;       (setq my/org-gtd-directory gdir
-;;             org-gtd-directory    gdir))
-;;     (when af
-;;       (setq org-agenda-files af))))
-
-;; ;;; ── Post-switch side-effects ────────────────────────────
-;; (defun my/project-org--post-switch ()
-;;   "Refresh any open agenda buffer after a project context switch."
-;;   (when (and (featurep 'org-agenda)
-;;              (boundp 'org-agenda-buffer-name)
-;;              (get-buffer org-agenda-buffer-name))
-;;     (with-current-buffer org-agenda-buffer-name
-;;       (org-agenda-redo t))))
-
-;; ;;; ── Public API ───────────────────────────────────────────
-;; (defun my/project-org-activate (root)
-;;   "Switch org context to the registered project at ROOT (truename string)."
-;;   (unless my/global-org-context
-;;     (my/project-org--snapshot))
-;;   (let* ((ctx       (cdr (assoc root my/project-org-contexts)))
-;;          (proj-tpls (plist-get ctx :capture-tpls))
-;;          (base-tpls (plist-get my/global-org-context :capture-tpls)))
-;;     (setq my/active-org-project root)
-;;     (my/project-org--set-dirs ctx)
-;;     (setq org-capture-templates
-;;           (if proj-tpls
-;;               (append proj-tpls base-tpls)
-;;             base-tpls))
-;;     (my/project-org--post-switch)
-;;     (message "[org-ctx] ▶ %s" (plist-get ctx :name))))
-
-;; (defun my/project-org-deactivate ()
-;;   "Restore the global org context saved before any project activation."
-;;   (when (and my/active-org-project my/global-org-context)
-;;     (setq my/active-org-project nil)
-;;     (my/project-org--set-dirs my/global-org-context)
-;;     (setq org-capture-templates
-;;           (copy-sequence (plist-get my/global-org-context :capture-tpls)))
-;;     (my/project-org--post-switch)
-;;     (message "[org-ctx] ▶ global")))
-
-;; (defun my/project-org-maybe-switch ()
-;;   "Detect project root change and switch org context if needed.
-;; Called from `find-file-hook' and `dired-mode-hook'.
-
-;; Short-circuits immediately when:
-;;   - neither org nor org-roam have been loaded yet (avoids eager loading), or
-;;   - the project root is identical to the last seen root (avoids redundant work).
-
-;; FIX: No hardcoded project roots. Detection is fully dynamic: Projectile
-;; identifies any recognized project root; only roots that appear in
-;; `my/project-org-contexts' (populated by `my/register-project-org-context')
-;; trigger a context switch. All other projects simply stay on global context."
-;;   (let* ((root (ignore-errors (projectile-project-root)))
-;;          (root (and root (file-truename root))))
-;;     (cond
-;;      ;; Entering a registered project we are not already in
-;;      ((and root
-;;            (assoc root my/project-org-contexts)
-;;            (not (equal root my/active-org-project)))
-;;       (my/project-org-activate root))
-;;      ;; Leaving the active project — root is nil or unregistered
-;;      ((and my/active-org-project
-;;            (not (equal root my/active-org-project)))
-;;       (my/project-org-deactivate)))))
-
-;; (defun my/project-org-status ()
-;;   "Echo the currently active org context."
-;;   (interactive)
-;;   (if my/active-org-project
-;;       (message "[org-ctx] project=%s  denote=%s  gtd=%s  agenda=%s"
-;;                my/active-org-project
-;;                (bound-and-true-p denote-directory)
-;;                (bound-and-true-p org-gtd-directory)
-;;                org-agenda-files)
-;;     (message "[org-ctx] global  denote=%s  gtd=%s"
-;;              my/denote-directory
-;;              my/org-gtd-directory)))
-
-;; (defun my/project-org-force-global ()
-;;   "Manually reset to the global org context, ignoring the current project."
-;;   (interactive)
-;;   (my/project-org-deactivate))
-
-;; ;;; ── Hooks — covers every path into a project buffer ──────────────────────
-;; ;; find-file-hook:  fires when any file is opened (SPC p f, C-x p f, etc.)
-;; ;; dired-mode-hook: fires when dired opens a project directory
-;; (add-hook 'find-file-hook  #'my/project-org-maybe-switch)
-;; (add-hook 'dired-mode-hook #'my/project-org-maybe-switch)
-#+end_src
-
-** TODO Register Projects
-#+begin_src emacs-lisp
-; (my/register-project-org-context "~/physics/"
-;   :name "physics"
-;   :org-directory (file-truename (expand-file-name "~/physics/"))
-;   :denote-dir    (file-truename (expand-file-name "~/physics/notes/"))
-;   :gtd-dir       (file-truename (expand-file-name "~/physics/gtd/"))
-;   :agenda-files  (list (file-truename (expand-file-name "~/physics/"))
-;                        (file-truename (expand-file-name "~/physics/gtd/")))
-;   :capture-tpls
-;   '(("P"  "Physics")
-;     ("Pj" "Physics Journal" entry
-;      (file denote-journal-path-to-new-or-existing-entry)
-;      "* %<%H:%M> %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n"
-;      :empty-lines 1 :kill-buffer t)
-;     ("Pt" "Physics Task" entry
-;      (file "~/physics/gtd/inbox.org")
-;      "* INBOX %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n"
-;      :empty-lines 1)
-;     ("Pr" "Physics Reading" entry
-;      (file "~/physics/reading.org")
-;      "* %? :read:\n:PROPERTIES:\n:CREATED: %U\n:AUTHOR: \n:STATUS: Reading\n:END:\n"
-;      :empty-lines 1)))
-#+end_src
-
-** TODO Better Font Faces
-#+begin_src emacs-lisp
-(defun ar/org-font-setup ()
-  ;; Replace list hyphen with dot
-  (font-lock-add-keywords nil
-                          '(("^ *\\([-]\\) "
-                             (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
-
-  ;; Set faces for heading levels
-  (dolist (face '((org-level-1 . 1.13)
-                  (org-level-2 . 1.11)
-                  (org-level-3 . 1.10)
-                  (org-level-4 . 1.07)
-                  (org-level-5 . 1.05)
-                  (org-level-6 . 1.03)
-                  (org-level-7 . 1.02)
-                  (org-level-8 . 1)))
-    (set-face-attribute (car face) nil :font "JetBrainsMono Nerd Font" :weight 'bold :height (cdr face)))
-
-  (custom-set-faces
-   '(bold   ((t (:foreground "#e0af68" :weight bold))))
-   '(italic ((t (:foreground "#bb9af7" :slant italic))))))
-#+end_src
-
-** TODO Core Configuration
+** DONE Core Configuration
+Configures Org's core behavior, display, source editing, and performance settings.
 #+begin_src emacs-lisp
 (use-package org
   :ensure nil
   :defer t
+  :preface
+  ;; Prevent eager loading of legacy modules. Only org-habit is required.
+  (defvar org-modules '(org-habit))
+  ;; Enable alphabetical list formats (a), A), a.) before parser init.
+  (defvar org-list-allow-alphabetical t)
+  :init
+  ;; Route Org cache directories into no-littering var tree.
+  (setq org-persist-directory (no-littering-expand-var-file-name "org/persist/")
+        org-preview-latex-image-directory (no-littering-expand-var-file-name "org/ltximg/")
+        org-publish-timestamp-directory (no-littering-expand-var-file-name "org/timestamps/"))
   :custom
-  ;; Core settings
-  (org-modules nil)
-  (org-directory my/org-directory)
-  ;;(org-log-done 'time)
-  ;;(org-log-into-drawer t)
+  ;; Navigation
   (org-return-follows-link t)
-
-  ;; Display settings
+  ;; Display
   (org-pretty-entities t)
   (org-hide-leading-stars t)
   (org-hide-emphasis-markers t)
@@ -4595,241 +4444,482 @@ Scaffolds the foundational Second Brain directories and configures core Org-mode
   (org-adapt-indentation nil)
   (org-fontify-done-headline t)
   (org-fontify-quote-and-verse-blocks t)
-
-  ;; Source block settings
+  ;; Source blocks
   (org-src-fontify-natively t)
   (org-src-preserve-indentation t)
   (org-src-tab-acts-natively t)
   (org-edit-src-content-indentation 0)
-
-  ;; Performance optimizations
+  ;; Performance
   (org-element-use-cache t)
   (org-element-cache-persistent nil)
-  (org-highlight-latex-and-related nil)
-
-  ;; Startup settings
+  ;; LaTeX: native AST-aware highlighting for academic writing.
+  (org-highlight-latex-and-related 'native)
+  ;; Startup
   (org-startup-folded 'overview)
   (org-startup-with-inline-images nil)
   (org-startup-with-latex-preview nil)
-  (org-cycle-separator-lines 2))
+  (org-cycle-separator-lines 2)
+  :config
+  ;; Vim-inspired emphasis toggle. Extends the z display prefix.
+  ;; Only active in normal/motion states; never fires during insert-state typing.
+  (evil-define-key '(normal motion) org-mode-map
+    "ze" #'org-toggle-pretty-entities))
 #+end_src
 
-** TODO Hooks
+
+
+** DONE Better Font Faces
+Applies global typography mappings and conditional, buffer-local heading zoom for Org buffers.
 #+begin_src emacs-lisp
+;; Global emphasis faces. Tokyo Night semantic coloring.
+(custom-set-faces
+ '(bold   ((t (:foreground "#e0af68" :weight bold))))
+ '(italic ((t (:foreground "#bb9af7" :slant italic)))))
+
+;; Conditional org-level zoom. Buffer-local via face-remap.
+;; Foreground colors inherited from doom-themes-org-config.
+(defcustom ar/org-zoom-file-patterns
+  '("config\\.org\\'")
+  "Regexps matching files that receive org-level heading zoom."
+  :type '(repeat regexp)
+  :group 'org)
+
+(defconst ar/org-zoom-levels
+  '((org-level-1 . 1.13)
+    (org-level-2 . 1.11)
+    (org-level-3 . 1.10)
+    (org-level-4 . 1.07)
+    (org-level-5 . 1.05)
+    (org-level-6 . 1.03)
+    (org-level-7 . 1.02)
+    (org-level-8 . 1.0))
+  "Alist of (org-level-face . height-multiplier).")
+
+(defun ar/org-apply-heading-zoom ()
+  "Apply heading zoom buffer-locally. Cleaned up on buffer kill."
+  (dolist (entry ar/org-zoom-levels)
+    (face-remap-add-relative (car entry) :height (cdr entry))))
+
+(defun ar/org-font-setup ()
+  "Org buffer typography. Bullet prettification delegated to org-modern-list."
+  (when (and buffer-file-name
+             (seq-some (lambda (re)
+                         (string-match-p re buffer-file-name))
+                       ar/org-zoom-file-patterns))
+    (ar/org-apply-heading-zoom)))
+#+end_src
+
+
+
+** DONE Org Modern
+Prettifies Org buffers with badges, pills, and typographic substitutions.
+#+begin_src emacs-lisp
+(use-package org-modern
+  :hook (org-mode . org-modern-mode)
+  :hook (org-agenda-finalize . org-modern-agenda)
+  :custom
+  ;; Stars: replace asterisks with decorative glyphs.
+  (org-modern-star 'replace)
+  (org-modern-replace-stars '("◉" "○" "✸" "✿" "✤" "✜" "◇" "▷"))
+  (org-modern-hide-stars nil)
+  ;; Checkboxes: map Org's three valid states to Unicode glyphs.
+  (org-modern-checkbox '((?X . "☑") (?- . "◧") (?\s . "☐")))
+  ;; TODO/Tag/Priority badges consume faces from Task States & Contexts.
+  (org-modern-todo t)
+  (org-modern-todo-faces t)
+  (org-modern-tag t)
+  (org-modern-priority t)
+  ;; Badge geometry: 1px border, 1-space inner padding.
+  (org-modern-label-border 1)
+  (org-modern-inner-spacing 1)
+  ;; Keywords and rules.
+  (org-modern-keyword t)
+  (org-modern-horizontal-rule t)
+  ;; Blocks: hide #+begin_/#+end_ prefix, show only replacement glyphs.
+  (org-modern-block-keyword t)
+  (org-modern-block-fringe nil)
+  (org-modern-block-name
+   '(("src"        ("»" "«"))
+     ("example"    ("¶" "¶"))
+     ("quote"      ("❝" "❞"))
+     ("verse"      ("❝" "❞"))
+     ("center"     ("≡" "≡"))
+     ("comment"    ("⊘" "⊘"))
+     ("export"     ("⇥" "⇤"))
+     ("latex"      ("∫" "∫"))
+     ("theorem"    ("∴" "∎"))
+     ("proof"      ("∵" "∎"))
+     ("definition" ("≝" "≝"))
+     ("warning"    ("⚠" "⚠"))
+     ("note"       ("✎" "✎"))))
+  ;; Lists: map ASCII bullet characters to Unicode glyphs.
+  (org-modern-list '((43 . "▸") (45 . "–") (42 . "•")))
+  ;; Tables: nil horizontal multiplier prevents fractional redisplay stutter.
+  (org-modern-table t)
+  (org-modern-table-vertical 1)
+  (org-modern-table-horizontal nil)
+  ;; Disabled features.
+  (org-modern-timestamp nil)
+  (org-modern-progress nil)
+  :config
+  ;; Aborts activation in massive buffers to prevent font-lock overhead.
+  (define-advice org-modern-mode (:before-while (&optional arg) guard-large-files)
+    (or (and arg (< (prefix-numeric-value arg) 1))
+        (not (too-long-file-p)))))
+#+end_src
+
+
+** DONE Hooks
+Wires Org mode, agenda, and capture buffers with display, typography, and behavioral hooks.
+#+begin_src emacs-lisp
+(defun ar/org-setup-yas-parents ()
+  "Set YASnippet parent tables for Org buffers."
+  (setq-local yas-parents '(latex-mode)))
+
+(defun ar/org-disable-indent-mode ()
+  "Prevent org-indent-mode from conflicting with org-modern block fringes."
+  (org-indent-mode -1))
+
+(defun ar/org-agenda-setup ()
+  "Configure agenda buffer display: truncated lines, no mode-line chrome."
+  (visual-line-mode -1)
+  (setq-local truncate-lines t)
+  (setq-local mode-line-format nil))
+
+(defun ar/org-capture-setup ()
+  "Hide all chrome in capture buffers for distraction-free entry."
+  (setq-local mode-line-format nil)
+  (setq-local header-line-format nil))
+
 (with-eval-after-load 'org
   (add-hook 'org-mode-hook #'visual-line-mode)
   (add-hook 'org-mode-hook #'ar/org-font-setup)
-  (add-hook 'org-mode-hook (lambda () (setq-local yas-parents '(latex-mode))))
-  (add-hook 'org-agenda-mode-hook (lambda ()
-                                    (visual-line-mode -1)
-                                    (toggle-truncate-lines 1)
-                                    (display-line-numbers-mode -1)
-                                    (setq mode-line-format nil)
-                                    (setq header-line-format nil)))
-  (add-hook 'org-capture-mode-hook (lambda ()
-                                     (setq mode-line-format nil)
-                                     (setq header-line-format nil))))
+  (add-hook 'org-mode-hook #'ar/org-setup-yas-parents)
+  (add-hook 'org-mode-hook #'ar/org-disable-indent-mode)
+  (add-hook 'org-agenda-mode-hook #'ar/org-agenda-setup)
+  (add-hook 'org-capture-mode-hook #'ar/org-capture-setup)
+  (add-hook 'org-babel-after-execute-hook #'org-display-inline-images))
 #+end_src
 
-** TODO Keywords
+
+** DONE Task States & Contexts
+Defines the lifecycle of actionable items and groups them by physical or digital environments.
 #+begin_src emacs-lisp
 (with-eval-after-load 'org
+  ;; 1. TASK STATE MACHINE
+  ;; Flat GTD-lite workflow in `agenda/todo.org`, routed via `org-refile`.
+  ;; `@` = note on entry, `/` = log on exit, `!` = timestamp.
   (setq org-todo-keywords
-        '((sequence "TODO(t)" "NEXT(n)" "PROG(p)" "WAIT(w@/!)" "|" "DONE(d)" "CANCEL(c@)")
-          (sequence "PLAN(P)" "ACTIVE(A)" "PAUSED(x)" "|" "ACHIEVED(a)" "DROPPED(D)")
-          (sequence "INBOX(i)" "GTD-NEXT(N)" "GTD-WAIT(W@/!)" "|" "GTD-DONE(D!)" "GTD-CNCL(C@)")
-          (sequence "CRITICAL(!)" "COMMENT(M)" "|" "RESOLVED(R)" "DISABLED(d!)"))))
+        '((sequence "TODO(t)" "NEXT(n)" "WAIT(w@/!)" "HOLD(h@/!)" "|" "DONE(d)" "CANCEL(c@)")))
+
+  ;; State-change metadata folded into :LOGBOOK: drawer.
+  (setq org-log-into-drawer t
+        org-log-done 'time
+        org-log-redeadline 'time
+        org-log-reschedule 'time)
+
+  ;; 2. TODO KEYWORD FACES
+  ;; Color palette consumed by `org-modern-todo` badge engine.
+  ;; Tokyo Night.
+  (setq org-todo-keyword-faces
+        '(("TODO"   . (:foreground "#f7768e" :weight bold))
+          ("NEXT"   . (:foreground "#e0af68" :weight bold))
+          ("WAIT"   . (:foreground "#bb9af7" :weight bold))
+          ("HOLD"   . (:foreground "#565f89" :weight bold))
+          ("DONE"   . (:foreground "#9ece6a" :weight bold))
+          ("CANCEL" . (:foreground "#565f89" :strike-through t))))
+
+  ;; 3. CONTEXTUAL TAGGING
+  ;; Mutual exclusivity within :startgroup/:endgroup.
+  ;; One context tag per task; other tags combine freely.
+  (setq org-tag-alist
+        '((:startgroup)
+          ("@computer" . ?c)
+          ("@home" . ?h)
+          ("@errands" . ?e)
+          ("@phone" . ?p)
+          ("@deep_work" . ?d)
+          (:endgroup)
+          ("read" . ?r)
+          ("meeting" . ?m)
+          ("urgent" . ?u)
+          ("someday" . ?s)))
+
+  ;; Tag color palette consumed by `org-modern-tag` pill engine.
+  (setq org-tag-faces
+        '(("@computer"  . (:foreground "#7aa2f7" :weight bold))
+          ("@home"      . (:foreground "#9ece6a" :weight bold))
+          ("@errands"   . (:foreground "#e0af68" :weight bold))
+          ("@phone"     . (:foreground "#bb9af7" :weight bold))
+          ("@deep_work" . (:foreground "#f7768e" :weight bold))
+          ("urgent"     . (:foreground "#f7768e" :weight bold :underline t))))
+
+  ;; Priority palette consumed by `org-modern-priority` badge engine.
+  (setq org-priority-faces
+        '((?A . (:foreground "#f7768e" :weight bold))
+          (?B . (:foreground "#e0af68" :weight bold))
+          (?C . (:foreground "#7aa2f7" :weight bold))))
+
+  ;; 4. REFILE & ARCHIVE
+  ;; `C-c C-w` routes inbox items to level-2 Project headings.
+  (setq org-refile-targets
+        '((nil :maxlevel . 2)
+          (org-agenda-files :maxlevel . 2))
+        org-refile-use-outline-path 'file
+        org-outline-path-complete-in-steps nil
+        org-refile-allow-creating-parent-nodes 'confirm)
+
+  ;; Completed subtrees route to `agenda/archive/todo.org_archive`.
+  (setq org-archive-location "archive/%s_archive::"))
 #+end_src
 
-** TODO Tags & Priorities
+
+
+
+** DONE Org Agenda
+Configures the task overview display, sorting, and window behavior.
 #+begin_src emacs-lisp
-(with-eval-after-load 'org
-  (setq org-tag-alist '(("@work"      . ?w)
-                        ("@home"      . ?h)
-                        ("@computer"  . ?c)
-                        ("@phone"     . ?p)
-                        ("@errands"   . ?e)
-                        ("read"       . ?r)
-                        ("meeting"    . ?m)
-                        ("urgent"     . ?u)
-                        ("someday"    . ?s)))
-
-  (setq org-priority-faces '((?A . error)
-                             (?B . warning)
-                             (?C . success))))
+(use-package org-agenda
+  :ensure nil
+  :defer t
+  :after org
+  :custom
+  ;; Compact blocks: suppresses default headers (org-super-agenda adds its own).
+  (org-agenda-compact-blocks t)
+  ;; Performance: skip startup, tag inheritance, and unavailable files.
+  (org-agenda-inhibit-startup t)
+  (org-agenda-use-tag-inheritance nil)
+  (org-agenda-skip-unavailable-files t)
+  (org-agenda-ignore-properties '(effort appt))
+  ;; Task visibility: hide completed scheduled/deadline items.
+  (org-agenda-skip-scheduled-if-done t)
+  (org-agenda-skip-deadline-if-done t)
+  (org-agenda-dim-blocked-tasks nil)
+  ;; Window management: reuse current window, restore layout on quit.
+  (org-agenda-window-setup 'current-window)
+  (org-agenda-restore-windows-after-quit t)
+  (org-agenda-sticky nil)
+  ;; Span and calendar: daily default, start on current day, show all dates.
+  (org-agenda-span 'day)
+  (org-agenda-start-on-weekday nil)
+  (org-agenda-show-all-dates t)
+  ;; Time grid: visual hour markers with current-time indicator.
+  (org-agenda-time-grid
+   '((daily today require-timed)
+     (800 1000 1200 1400 1600 1800 2000)
+     " ┄┄┄┄┄ " "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"))
+  (org-agenda-current-time-string
+   "◀ now ─────────────────────────────────────────────────")
+  ;; Sorting: habits first, then time, then priority.
+  ;; org-super-agenda :order overrides within groups; this is the fallback.
+  (org-agenda-sorting-strategy
+   '((agenda habit-down time-up priority-down category-keep)
+     (todo priority-down category-keep)
+     (tags priority-down category-keep)
+     (search category-keep)))
+  ;; Prefix format: category + timestamp per item.
+  (org-agenda-prefix-format
+   '((agenda . " %i %-12:c%?-12t% s")
+     (todo . " %i %-12:c")
+     (tags . " %i %-12:c")
+     (search . " %i %-12:c")))
+  ;; Tag alignment: right-aligned at column 80.
+  (org-tags-column -80))
 #+end_src
 
-** TODO Org Structure Templates
+
+** TODO Org Super Agenda
 #+begin_src emacs-lisp
-(with-eval-after-load 'org
-  ;; Load org-tempo for structure templates
-  (require 'org-tempo)
+(use-package org-super-agenda
+  :defer t
+  :after org-agenda
+  :hook (org-agenda-mode . org-super-agenda-mode)
+  :custom
+  (org-super-agenda-header-separator "─────────────────────────────────")
+  (org-super-agenda-groups
+   '((:name "🔴 Overdue"
+      :deadline past
+      :scheduled past
+      :face (:foreground "#f7768e")
+      :order 1)
 
-  ;; Babel language configuration
-  (setq org-confirm-babel-evaluate nil
-        org-src-fontify-natively t
-        org-src-tab-acts-natively t)
+     (:name "🔥 GTD Inbox (Process Today)"
+      :todo "INBOX"
+      :file-path "gtd/inbox.org"
+      :order 2)
 
-  (defconst load-language-alist
-    '((emacs-lisp . t) (perl . t) (python . t) (ruby . t)
-      (js . t) (css . t) (sass . t) (C . t) (java . t) (latex . t)
-      (shell . t) (plantuml . t) (dot . t)))
+     (:name "⚡ Today's Schedule"
+      :time-grid t
+      :date today
+      :scheduled today
+      :order 3)
 
-  (org-babel-do-load-languages 'org-babel-load-languages load-language-alist)
+     (:name "🎯 High Priority"
+      :priority "A"
+      :order 4)
 
-  ;; Add Structure Templates
-  (dolist (pair '(("sh" . "src shell")
-                  ("el" . "src emacs-lisp")
-                  ("py" . "src python")
-                  ("jpy" . "src jupyter-python")
-                  ("dot" . "src dot")
-                  ("plantuml" . "src plantuml")
-                  ("tex" . "src latex")
-                  ("yml" . "src yaml")
-                  ("kbd" . "src kbd")
-                  ("kdl" . "src kdl")))
-    (add-to-list 'org-structure-template-alist pair)))
+     (:name "💻 @Computer"
+      :and (:tag "@computer" :todo ("GTD-NEXT" "NEXT"))
+      :order 5)
+
+     (:name "🏠 @Home"
+      :and (:tag "@home" :todo ("GTD-NEXT" "NEXT"))
+      :order 6)
+
+     (:name "📞 @Phone"
+      :and (:tag "@phone" :todo ("GTD-NEXT" "NEXT"))
+      :order 7)
+
+     (:name "🚗 @Errands"
+      :and (:tag "@errands" :todo ("GTD-NEXT" "NEXT"))
+      :order 8)
+
+     (:name "⏳ Waiting For"
+      :todo ("GTD-WAIT" "WAIT")
+      :order 9)
+
+     (:name "📆 Due Soon (Next 7 Days)"
+      :deadline future
+      :order 10)
+
+     (:name "📋 Other Tasks"
+      :anything t
+      :order 99))))
 #+end_src
 
-** TODO Transient Template System
-- [ ] Review transient code beforehand
+
+** TODO Org Agenda Custom Commands
 #+begin_src emacs-lisp
-(with-eval-after-load 'org
-  (defun ar/org-template-expand (str &optional mod)
-    "Expand org template STR with optional modifier MOD."
-    (let (text)
-      (when (region-active-p)
-        (setq text (buffer-substring (region-beginning) (region-end)))
-        (delete-region (region-beginning) (region-end)))
-      (insert str)
-      (org-tempo-complete-tag)
-      (when mod (insert mod) (forward-line))
-      (when text (insert text))))
+(with-eval-after-load 'org-agenda
+  (setq org-agenda-custom-commands
+        '(("d" "Daily Dashboard"
+           ((agenda ""
+                    ((org-agenda-span 'day)
+                     (org-agenda-start-day "0d")
+                     (org-super-agenda-groups
+                      '((:name "⏰ Time-Blocked Today"
+                         :time-grid t
+                         :date today
+                         :order 1)
+                        (:name "🔴 Overdue"
+                         :deadline past
+                         :scheduled past
+                         :order 2)
+                        (:name "🔥 GTD Inbox (Must Process)"
+                         :todo "INBOX"
+                         :order 3)))))
 
-  (defun ar/org-insert-perl-tangled ()
-    (interactive)
-    (insert "#+HEADERS: :results output :exports both :shebang \"#!/usr/bin/env perl\"\n")
-    (ar/org-template-expand "<s" "perl"))
+            (alltodo ""
+                     ((org-agenda-overriding-header "")
+                      (org-super-agenda-groups
+                       '((:name "🎯 Priority A"
+                          :priority "A"
+                          :order 1)
+                         (:name "💻 @Computer"
+                          :and (:tag "@computer" :todo ("GTD-NEXT" "NEXT"))
+                          :order 2)
+                         (:name "🏠 @Home"
+                          :and (:tag "@home" :todo ("GTD-NEXT" "NEXT"))
+                          :order 3)
+                         (:name "📞 @Phone"
+                          :and (:tag "@phone" :todo ("GTD-NEXT" "NEXT"))
+                          :order 4)
+                         (:name "🚗 @Errands"
+                          :and (:tag "@errands" :todo ("GTD-NEXT" "NEXT"))
+                          :order 5)
+                         (:name "⏳ Waiting"
+                          :todo ("GTD-WAIT" "WAIT")
+                          :order 6)
+                         (:discard (:anything t))))))))
 
-  (defun ar/org-insert-ipython ()
-    (interactive)
-    (ar/org-template-expand "<s" "ipython :session :exports both :results raw drawer\n$0"))
+          ("w" "Weekly Review"
+           ((todo "INBOX"
+                  ((org-agenda-overriding-header "🔥 GTD Inbox (Zero This Out)")
+                   (org-agenda-files (list (expand-file-name "gtd/inbox.org" my/org-directory)))
+                   (org-super-agenda-groups
+                    '((:auto-ts t)))))
 
-  (defun ar/org-transient-title ()
-    (concat
-     (if (and (fboundp 'nerd-icons-sucicon) (display-graphic-p))
-         (nerd-icons-sucicon "nf-custom-orgmode" :face 'transient-heading :v-adjust 0.02)
-       "")
-     (propertize " Org Template" 'face 'transient-heading)))
+            (todo "GTD-WAIT"
+                  ((org-agenda-overriding-header "⏳ Waiting For (Follow-up Required)")
+                   (org-super-agenda-groups
+                    '((:auto-property "DELEGATED_TO")))))
 
-  (with-eval-after-load 'transient
-    (transient-define-prefix ar/org-template-transient ()
-      "Org Mode Structure Templates"
-      [:description ar/org-transient-title
+            (stuck ""
+                   ((org-agenda-overriding-header "🚫 Stuck Projects (No NEXT Actions)")
+                    (org-super-agenda-groups
+                     '((:auto-category t)))))
 
-       ["Basic"
-        ("a" "ascii"   (lambda () (interactive) (ar/org-template-expand "<a")))
-        ("c" "center"  (lambda () (interactive) (ar/org-template-expand "<c")))
-        ("C" "comment" (lambda () (interactive) (ar/org-template-expand "<C")))
-        ("x" "example" (lambda () (interactive) (ar/org-template-expand "<e")))
-        ("E" "export"  (lambda () (interactive) (ar/org-template-expand "<E")))
-        ("h" "html"    (lambda () (interactive) (ar/org-template-expand "<h")))
-        ("l" "latex"   (lambda () (interactive) (ar/org-template-expand "<l")))
-        ("n" "note"    (lambda () (interactive) (ar/org-template-expand "<n")))
-        ("o" "quote"   (lambda () (interactive) (ar/org-template-expand "<q")))
-        ("v" "verse"   (lambda () (interactive) (ar/org-template-expand "<v")))]
+            (todo "GTD-NEXT"
+                  ((org-agenda-overriding-header "✅ All NEXT Actions")
+                   (org-super-agenda-groups
+                    '((:auto-parent t)))))))
 
-       ["Head"
-        ("i" "index"   (lambda () (interactive) (ar/org-template-expand "<i")))
-        ("A" "ASCII"   (lambda () (interactive) (ar/org-template-expand "<A")))
-        ("I" "INCLUDE" (lambda () (interactive) (ar/org-template-expand "<I")))
-        ("H" "HTML"    (lambda () (interactive) (ar/org-template-expand "<H")))
-        ("L" "LaTeX"   (lambda () (interactive) (ar/org-template-expand "<L")))]
+          ("p" "Projects Dashboard"
+           ((tags "LEVEL=1"
+                  ((org-agenda-overriding-header "📋 GTD Projects (Execution Layer)")
+                   (org-agenda-files (list (expand-file-name "gtd/projects.org" my/org-directory)))
+                   (org-super-agenda-groups
+                    '((:name "🔴 Stuck (No NEXT)"
+                       :children ("GTD-WAIT" "TODO" "INBOX")
+                       :order 1)
+                      (:name "✅ Active (Has NEXT)"
+                       :children "GTD-NEXT"
+                       :order 2)
+                      (:name "⸻ Paused"
+                       :scheduled future
+                       :order 3)))))))
 
-       ["Source"
-        ("s" "src"       (lambda () (interactive) (ar/org-template-expand "<s")))
-        ("e" "emacs-lisp" (lambda () (interactive) (ar/org-template-expand "<s" "emacs-lisp")))
-        ("y" "python"    (lambda () (interactive) (ar/org-template-expand "<s" "python")))
-        ("w" "powershell" (lambda () (interactive) (ar/org-template-expand "<s" "powershell")))
-        ("r" "ruby"      (lambda () (interactive) (ar/org-template-expand "<s" "ruby")))
-        ("S" "sh"        (lambda () (interactive) (ar/org-template-expand "<s" "sh")))
-        ("g" "golang"    (lambda () (interactive) (ar/org-template-expand "<s" "go :imports '(\"fmt\")")))]
+          ("g" . "GTD Views")
 
-       ["Misc"
-        ("m" "mermaid"     (lambda () (interactive) (ar/org-template-expand "<s" "mermaid :file chart.png")))
-         ("k" "kdl"         (lambda () (interactive) (ar/org-template-expand "<s" "kdl")))
-        ("u" "plantuml"    (lambda () (interactive) (ar/org-template-expand "<s" "plantuml :file chart.png")))
-         ("K" "kbd"         (lambda () (interactive) (ar/org-template-expand "<s" "kbd")))
-        ("Z" "yaml"        (lambda () (interactive) (ar/org-template-expand "<s" "yaml")))
-        ("Y" "ipython"     ar/org-insert-ipython)
-        ("P" "Perl tangled" ar/org-insert-perl-tangled)
-        ("<" "insert <"    self-insert-command)]]))
+          ("gn" "Next Actions"
+           ((todo "GTD-NEXT"
+                  ((org-agenda-overriding-header "✅ Next Actions")
+                   (org-agenda-sorting-strategy '(priority-down category-keep))
+                   (org-super-agenda-groups
+                    '((:auto-category t)))))))
 
-  (defun ar/org-smart-less-than ()
-    "Smart less-than key: trigger transient menu or insert character."
-    (interactive)
-    (if (or (region-active-p) (looking-back "^[ \t]*" 1))
-        (if (featurep 'transient)
-            (ar/org-template-transient)
-          (require 'transient)
-          (ar/org-template-transient))
-      (self-insert-command 1)))
+          ("gi" "Inbox (Unprocessed)"
+           ((todo "INBOX"
+                  ((org-agenda-overriding-header "🔥 GTD Inbox")
+                   (org-agenda-files (list (expand-file-name "gtd/inbox.org" my/org-directory)))
+                   (org-super-agenda-groups
+                    '((:auto-ts t)))))))
 
-  (define-key org-mode-map (kbd "<") #'ar/org-smart-less-than))
+          ("gw" "Waiting For"
+           ((todo "GTD-WAIT"
+                  ((org-agenda-overriding-header "⏳ Waiting For")
+                   (org-super-agenda-groups
+                    '((:auto-property "DELEGATED_TO")))))))
+
+          ("gs" "Stuck Projects"
+           ((stuck ""
+                   ((org-agenda-overriding-header "🚫 Stuck Projects")
+                    (org-super-agenda-groups
+                     '((:auto-category t)))))))
+
+          ("gc" "By Context"
+           ((tags-todo "@computer/GTD-NEXT"
+                       ((org-agenda-overriding-header "💻 @Computer")
+                        (org-super-agenda-groups
+                         '((:auto-priority t)))))
+
+            (tags-todo "@home/GTD-NEXT"
+                       ((org-agenda-overriding-header "🏠 @Home")
+                        (org-super-agenda-groups
+                         '((:auto-priority t)))))
+
+            (tags-todo "@errands/GTD-NEXT"
+                       ((org-agenda-overriding-header "🚗 @Errands")
+                        (org-super-agenda-groups
+                         '((:auto-priority t)))))
+
+            (tags-todo "@phone/GTD-NEXT"
+                       ((org-agenda-overriding-header "📞 @Phone")
+                        (org-super-agenda-groups
+                         '((:auto-priority t))))))))))
 #+end_src
 
-** TODO Org Modern
-- [ ] List all the features of org-modern and determine optimal ways to use those features without relying on org-modern
-  OR
-- [ ] Use this updated org-modern config instead
-- [ ] Improve sluggishness when using org-modern
-- [ ] Look at https://github.com/minad/org-modern/blob/main/README.org about line spacing note for emacs 31 and look at https://debbugs.gnu.org/cgi/bugreport.cgi?bug=76390 to determine what it suggests
-#+begin_src emacs-lisp
-(use-package org-modern
-  :hook (org-mode          . org-modern-mode)
-  :hook (org-agenda-finalize . org-modern-agenda)
-  :config
 
-  (setq org-modern-hide-stars nil
-        ;; TODO Replace with numbers
-        org-modern-star '("◉" "○" "✸" "✿" "✤" "✜" "◇" "▷"))
-
-  (setq org-modern-checkbox t
-        org-modern-todo t
-        org-modern-tag t
-        org-modern-priority t)
-
-  ;; Enabled features
-  (setq org-modern-keyword t   ; Badges for #+TITLE, #+AUTHOR, etc.
-        org-modern-block-name t   ; Prettify #+begin_/#+end_ prefixes
-        org-modern-block-fringe nil ; Remove fringe marker (cleaner look)
-        org-modern-horizontal-rule t   ; Draw lines for '-----'
-        org-modern-timestamp nil
-        org-modern-statistics nil
-        org-modern-progress nil) ; TODO what does the org-modern-progress bar do
-
-  ;; Tables & Lists  (43 = +, 45 = -, 42 = *)
-  (setq org-modern-list '((43 . "➤") (45 . "–") (42 . "•"))
-        org-modern-table            t
-        org-modern-table-vertical   1
-        org-modern-table-horizontal 0.2
-        org-modern-block-name
-        '(("src"     "»" "«")
-          ("example" "»" "«")
-          ("quote"   "\u201c" "\u201d"))))
-  ;; FIX: Removed stray commented-out setq forms (org-modern-tag-faces,
-  ;; org-modern-checkbox) that appeared after the closing paren of the
-  ;; use-package block. They were dead code outside any valid form.
-#+end_src
-
-** TODO Org Src Buffer Naming
-#+begin_src emacs-lisp
-(defun ar/org-src-simplify-buffer-name (base-buffer-name lang)
-  "Return a static buffer name for Org source edit buffers."
-  "src code")
-
-(advice-add 'org-src--construct-edit-buffer-name :override #'ar/org-src-simplify-buffer-name)
-#+end_src
 
 ** TODO Org Habit
 #+begin_src emacs-lisp
@@ -4855,20 +4945,7 @@ Scaffolds the foundational Second Brain directories and configures core Org-mode
           (string-to-char (nerd-icons-codicon "nf-cod-circle_filled")))))
 #+end_src
 
-** TODO Org Eldoc
-#+begin_src emacs-lisp
 
-#+end_src
-
-** TODO Org Appear
-#+begin_src emacs-lisp
-;; (straight-use-package '(org-appear :type git :host github :repo "awth13/org-appear"))
-
-;; (add-hook 'org-mode-hook 'org-appear-mode)
-#+end_src
-
-
-* TODO Second Brain & Productivity
 ** TODO Denote Directory
 #+begin_src emacs-lisp
 (defvar my/denote-directory
@@ -4879,6 +4956,7 @@ Scaffolds the foundational Second Brain directories and configures core Org-mode
 (my/ensure-org-dir "notes/journal")
 (my/ensure-org-dir "notes/literature")
 #+end_src
+
 
 ** TODO Denote
 #+begin_src emacs-lisp
@@ -4902,6 +4980,7 @@ Scaffolds the foundational Second Brain directories and configures core Org-mode
   (denote-rename-buffer-mode 1))
 #+end_src
 
+
 ** TODO Denote Journal
 #+begin_src emacs-lisp
 (use-package denote-journal
@@ -4914,6 +4993,7 @@ Scaffolds the foundational Second Brain directories and configures core Org-mode
   (denote-journal-title-format 'day-date-month-year))
 #+end_src
 
+
 ** TODO Denote Org
 #+begin_src emacs-lisp
 (use-package denote-org
@@ -4921,7 +5001,10 @@ Scaffolds the foundational Second Brain directories and configures core Org-mode
   :after (denote org))
 #+end_src
 
+
 ** TODO Denote Explore
+
+
 ** TODO Consult Denote
 #+begin_src emacs-lisp
 (use-package consult-denote
@@ -4932,6 +5015,7 @@ Scaffolds the foundational Second Brain directories and configures core Org-mode
   :config
   (consult-denote-mode 1))
 #+end_src
+
 
 ** TODO Citar Denote
 #+begin_src emacs-lisp
@@ -4944,102 +5028,6 @@ Scaffolds the foundational Second Brain directories and configures core Org-mode
   (citar-denote-mode 1))
 #+end_src
 
-
-** TODO Weekly Review
-#+begin_src emacs-lisp
-(defun ar/weekly-review ()
-  "Open or create this week's Denote review note, pre-populated with stats."
-  (interactive)
-  (require 'denote)
-  (let* ((week   (format-time-string "%Y-W%V"))
-         (regexp (concat "__review.*" (regexp-quote week)))
-         (files  (denote-directory-files regexp)))
-    (if files
-        (find-file (car files))
-      ;; Count pending tasks in GTD inbox
-      (let* ((inbox-file  (expand-file-name "gtd/inbox.org" my/org-directory))
-             (inbox-count
-              (if (file-exists-p inbox-file)
-                  (with-temp-buffer
-                    (insert-file-contents inbox-file)
-                    (count-matches "^\\* INBOX " (point-min) (point-max)))
-                0))
-             ;; Count GTD-NEXT actions
-             (next-count
-              (length (org-map-entries
-                       (lambda () t)
-                       "TODO=\"GTD-NEXT\""
-                       (list my/org-gtd-directory))))
-             ;; Count Denote notes created in the last 7 days
-             (week-start (format-time-string "%Y%m%d"
-                           (time-subtract (current-time)
-                                          (seconds-to-time (* 7 24 60 60)))))
-             (new-notes
-              (length (seq-filter
-                       (lambda (f)
-                         (let ((id (denote-retrieve-filename-identifier f)))
-                           (and id (string>= (substring id 0 8) week-start))))
-                       (denote-directory-files)))))
-        (denote (concat "Weekly Review " week) '("review"))
-        (goto-char (point-max))
-        (insert
-         (concat
-          "\n* GTD Health Check\n\n"
-          (format "- Inbox items: *%d* %s\n"
-                  inbox-count
-                  (if (> inbox-count 10) "⚠ PROCESS URGENTLY" "✓"))
-          (format "- GTD-NEXT actions: *%d*\n"
-                  next-count)
-          (format "- New Denote notes this week: *%d*\n\n" new-notes)
-          "* Review Checklist\n\n"
-          "** GTD Review\n"
-          "- [ ] Process GTD inbox to zero\n"
-          "- [ ] Review all GTD-WAIT items\n"
-          "- [ ] Confirm each project has a NEXT action\n"
-          "- [ ] Review calendar (past week + next 2 weeks)\n"
-          "- [ ] Review Someday/Maybe\n\n"
-          "** Notes Review\n"
-          "- [ ] Review notes created this week\n"
-          "- [ ] Identify missing connections\n"
-          "- [ ] Rename/re-keyword any stale notes\n\n"
-          "* Reflections\n\n"
-          "** What Went Well?\n\n\n"
-          "** What Could Improve?\n\n\n"
-          "** Key Insights This Week\n\n\n"
-          "** Next Week's Focus\n\n\n"))))))
-#+end_src
-
-** TODO Org Agenda
-#+begin_src emacs-lisp
-(use-package org-agenda
-  :ensure nil
-  :defer t
-  :after org
-  :config
-  ;; NOTE: org-agenda-files is set authoritatively in org-gtd :config above.
-  ;; Defining it here would be silently overridden when org-gtd loads.
-
-  (setq org-agenda-block-separator ?─
-        org-agenda-compact-blocks nil)
-
-  (setq org-agenda-time-grid
-        '((daily today require-timed)
-          (800 1000 1200 1400 1600 1800 2000)
-          " ┄┄┄┄┄ " "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"))
-
-  (setq org-agenda-current-time-string
-        "◀ now ─────────────────────────────────────────────────")
-
-  (setq org-agenda-inhibit-startup t
-        org-agenda-dim-blocked-tasks nil
-        org-agenda-use-tag-inheritance nil
-        org-agenda-ignore-properties '(effort appt category)
-        org-agenda-span 'day
-        org-tags-column -80)
-
-  (setq org-agenda-skip-scheduled-if-done t
-        org-agenda-skip-deadline-if-done t))
-#+end_src
 
 ** TODO Org Capture
 *** Helper Functions
@@ -5453,195 +5441,213 @@ Top-level keys:
                 (org-save-all-org-buffers)))))
 #+end_src
 
-** TODO Org Super Agenda
+
+** TODO Weekly Review
 #+begin_src emacs-lisp
-(use-package org-super-agenda
-  :defer t
-  :after org-agenda
-  :hook (org-agenda-mode . org-super-agenda-mode)
-  :custom
-  (org-super-agenda-header-separator "─────────────────────────────────")
-  (org-super-agenda-groups
-   '((:name "🔴 Overdue"
-      :deadline past
-      :scheduled past
-      :face (:foreground "#f7768e")
-      :order 1)
-
-     (:name "🔥 GTD Inbox (Process Today)"
-      :todo "INBOX"
-      :file-path "gtd/inbox.org"
-      :order 2)
-
-     (:name "⚡ Today's Schedule"
-      :time-grid t
-      :date today
-      :scheduled today
-      :order 3)
-
-     (:name "🎯 High Priority"
-      :priority "A"
-      :order 4)
-
-     (:name "💻 @Computer"
-      :and (:tag "@computer" :todo ("GTD-NEXT" "NEXT"))
-      :order 5)
-
-     (:name "🏠 @Home"
-      :and (:tag "@home" :todo ("GTD-NEXT" "NEXT"))
-      :order 6)
-
-     (:name "📞 @Phone"
-      :and (:tag "@phone" :todo ("GTD-NEXT" "NEXT"))
-      :order 7)
-
-     (:name "🚗 @Errands"
-      :and (:tag "@errands" :todo ("GTD-NEXT" "NEXT"))
-      :order 8)
-
-     (:name "⏳ Waiting For"
-      :todo ("GTD-WAIT" "WAIT")
-      :order 9)
-
-     (:name "📆 Due Soon (Next 7 Days)"
-      :deadline future
-      :order 10)
-
-     (:name "📋 Other Tasks"
-      :anything t
-      :order 99))))
+(defun ar/weekly-review ()
+  "Open or create this week's Denote review note, pre-populated with stats."
+  (interactive)
+  (require 'denote)
+  (let* ((week   (format-time-string "%Y-W%V"))
+         (regexp (concat "__review.*" (regexp-quote week)))
+         (files  (denote-directory-files regexp)))
+    (if files
+        (find-file (car files))
+      ;; Count pending tasks in GTD inbox
+      (let* ((inbox-file  (expand-file-name "gtd/inbox.org" my/org-directory))
+             (inbox-count
+              (if (file-exists-p inbox-file)
+                  (with-temp-buffer
+                    (insert-file-contents inbox-file)
+                    (count-matches "^\\* INBOX " (point-min) (point-max)))
+                0))
+             ;; Count GTD-NEXT actions
+             (next-count
+              (length (org-map-entries
+                       (lambda () t)
+                       "TODO=\"GTD-NEXT\""
+                       (list my/org-gtd-directory))))
+             ;; Count Denote notes created in the last 7 days
+             (week-start (format-time-string "%Y%m%d"
+                           (time-subtract (current-time)
+                                          (seconds-to-time (* 7 24 60 60)))))
+             (new-notes
+              (length (seq-filter
+                       (lambda (f)
+                         (let ((id (denote-retrieve-filename-identifier f)))
+                           (and id (string>= (substring id 0 8) week-start))))
+                       (denote-directory-files)))))
+        (denote (concat "Weekly Review " week) '("review"))
+        (goto-char (point-max))
+        (insert
+         (concat
+          "\n* GTD Health Check\n\n"
+          (format "- Inbox items: *%d* %s\n"
+                  inbox-count
+                  (if (> inbox-count 10) "⚠ PROCESS URGENTLY" "✓"))
+          (format "- GTD-NEXT actions: *%d*\n"
+                  next-count)
+          (format "- New Denote notes this week: *%d*\n\n" new-notes)
+          "* Review Checklist\n\n"
+          "** GTD Review\n"
+          "- [ ] Process GTD inbox to zero\n"
+          "- [ ] Review all GTD-WAIT items\n"
+          "- [ ] Confirm each project has a NEXT action\n"
+          "- [ ] Review calendar (past week + next 2 weeks)\n"
+          "- [ ] Review Someday/Maybe\n\n"
+          "** Notes Review\n"
+          "- [ ] Review notes created this week\n"
+          "- [ ] Identify missing connections\n"
+          "- [ ] Rename/re-keyword any stale notes\n\n"
+          "* Reflections\n\n"
+          "** What Went Well?\n\n\n"
+          "** What Could Improve?\n\n\n"
+          "** Key Insights This Week\n\n\n"
+          "** Next Week's Focus\n\n\n"))))))
 #+end_src
 
-** TODO Org Agenda Custom Commands
+
+** TODO Org Structure Templates
 #+begin_src emacs-lisp
-(with-eval-after-load 'org-agenda
-  (setq org-agenda-custom-commands
-        '(("d" "Daily Dashboard"
-           ((agenda ""
-                    ((org-agenda-span 'day)
-                     (org-agenda-start-day "0d")
-                     (org-super-agenda-groups
-                      '((:name "⏰ Time-Blocked Today"
-                         :time-grid t
-                         :date today
-                         :order 1)
-                        (:name "🔴 Overdue"
-                         :deadline past
-                         :scheduled past
-                         :order 2)
-                        (:name "🔥 GTD Inbox (Must Process)"
-                         :todo "INBOX"
-                         :order 3)))))
+(with-eval-after-load 'org
+  ;; Load org-tempo for structure templates
+  (require 'org-tempo)
 
-            (alltodo ""
-                     ((org-agenda-overriding-header "")
-                      (org-super-agenda-groups
-                       '((:name "🎯 Priority A"
-                          :priority "A"
-                          :order 1)
-                         (:name "💻 @Computer"
-                          :and (:tag "@computer" :todo ("GTD-NEXT" "NEXT"))
-                          :order 2)
-                         (:name "🏠 @Home"
-                          :and (:tag "@home" :todo ("GTD-NEXT" "NEXT"))
-                          :order 3)
-                         (:name "📞 @Phone"
-                          :and (:tag "@phone" :todo ("GTD-NEXT" "NEXT"))
-                          :order 4)
-                         (:name "🚗 @Errands"
-                          :and (:tag "@errands" :todo ("GTD-NEXT" "NEXT"))
-                          :order 5)
-                         (:name "⏳ Waiting"
-                          :todo ("GTD-WAIT" "WAIT")
-                          :order 6)
-                         (:discard (:anything t))))))))
+  ;; Babel language configuration
+  (setq org-confirm-babel-evaluate nil
+        org-src-fontify-natively t
+        org-src-tab-acts-natively t)
 
-          ("w" "Weekly Review"
-           ((todo "INBOX"
-                  ((org-agenda-overriding-header "🔥 GTD Inbox (Zero This Out)")
-                   (org-agenda-files (list (expand-file-name "gtd/inbox.org" my/org-directory)))
-                   (org-super-agenda-groups
-                    '((:auto-ts t)))))
+  (defconst load-language-alist
+    '((emacs-lisp . t) (perl . t) (python . t) (ruby . t)
+      (js . t) (css . t) (sass . t) (C . t) (java . t) (latex . t)
+      (shell . t) (plantuml . t) (dot . t)))
 
-            (todo "GTD-WAIT"
-                  ((org-agenda-overriding-header "⏳ Waiting For (Follow-up Required)")
-                   (org-super-agenda-groups
-                    '((:auto-property "DELEGATED_TO")))))
+  (org-babel-do-load-languages 'org-babel-load-languages load-language-alist)
 
-            (stuck ""
-                   ((org-agenda-overriding-header "🚫 Stuck Projects (No NEXT Actions)")
-                    (org-super-agenda-groups
-                     '((:auto-category t)))))
-
-            (todo "GTD-NEXT"
-                  ((org-agenda-overriding-header "✅ All NEXT Actions")
-                   (org-super-agenda-groups
-                    '((:auto-parent t)))))))
-
-          ("p" "Projects Dashboard"
-           ((tags "LEVEL=1"
-                  ((org-agenda-overriding-header "📋 GTD Projects (Execution Layer)")
-                   (org-agenda-files (list (expand-file-name "gtd/projects.org" my/org-directory)))
-                   (org-super-agenda-groups
-                    '((:name "🔴 Stuck (No NEXT)"
-                       :children ("GTD-WAIT" "TODO" "INBOX")
-                       :order 1)
-                      (:name "✅ Active (Has NEXT)"
-                       :children "GTD-NEXT"
-                       :order 2)
-                      (:name "⸻ Paused"
-                       :scheduled future
-                       :order 3)))))))
-
-          ("g" . "GTD Views")
-
-          ("gn" "Next Actions"
-           ((todo "GTD-NEXT"
-                  ((org-agenda-overriding-header "✅ Next Actions")
-                   (org-agenda-sorting-strategy '(priority-down category-keep))
-                   (org-super-agenda-groups
-                    '((:auto-category t)))))))
-
-          ("gi" "Inbox (Unprocessed)"
-           ((todo "INBOX"
-                  ((org-agenda-overriding-header "🔥 GTD Inbox")
-                   (org-agenda-files (list (expand-file-name "gtd/inbox.org" my/org-directory)))
-                   (org-super-agenda-groups
-                    '((:auto-ts t)))))))
-
-          ("gw" "Waiting For"
-           ((todo "GTD-WAIT"
-                  ((org-agenda-overriding-header "⏳ Waiting For")
-                   (org-super-agenda-groups
-                    '((:auto-property "DELEGATED_TO")))))))
-
-          ("gs" "Stuck Projects"
-           ((stuck ""
-                   ((org-agenda-overriding-header "🚫 Stuck Projects")
-                    (org-super-agenda-groups
-                     '((:auto-category t)))))))
-
-          ("gc" "By Context"
-           ((tags-todo "@computer/GTD-NEXT"
-                       ((org-agenda-overriding-header "💻 @Computer")
-                        (org-super-agenda-groups
-                         '((:auto-priority t)))))
-
-            (tags-todo "@home/GTD-NEXT"
-                       ((org-agenda-overriding-header "🏠 @Home")
-                        (org-super-agenda-groups
-                         '((:auto-priority t)))))
-
-            (tags-todo "@errands/GTD-NEXT"
-                       ((org-agenda-overriding-header "🚗 @Errands")
-                        (org-super-agenda-groups
-                         '((:auto-priority t)))))
-
-            (tags-todo "@phone/GTD-NEXT"
-                       ((org-agenda-overriding-header "📞 @Phone")
-                        (org-super-agenda-groups
-                         '((:auto-priority t))))))))))
+  ;; Add Structure Templates
+  (dolist (pair '(("sh" . "src shell")
+                  ("el" . "src emacs-lisp")
+                  ("py" . "src python")
+                  ("jpy" . "src jupyter-python")
+                  ("dot" . "src dot")
+                  ("plantuml" . "src plantuml")
+                  ("tex" . "src latex")
+                  ("yml" . "src yaml")
+                  ("kbd" . "src kbd")
+                  ("kdl" . "src kdl")))
+    (add-to-list 'org-structure-template-alist pair)))
 #+end_src
+
+
+** TODO Transient Template System
+- [ ] Review transient code beforehand
+#+begin_src emacs-lisp
+(with-eval-after-load 'org
+  (defun ar/org-template-expand (str &optional mod)
+    "Expand org template STR with optional modifier MOD."
+    (let (text)
+      (when (region-active-p)
+        (setq text (buffer-substring (region-beginning) (region-end)))
+        (delete-region (region-beginning) (region-end)))
+      (insert str)
+      (org-tempo-complete-tag)
+      (when mod (insert mod) (forward-line))
+      (when text (insert text))))
+
+  (defun ar/org-insert-perl-tangled ()
+    (interactive)
+    (insert "#+HEADERS: :results output :exports both :shebang \"#!/usr/bin/env perl\"\n")
+    (ar/org-template-expand "<s" "perl"))
+
+  (defun ar/org-insert-ipython ()
+    (interactive)
+    (ar/org-template-expand "<s" "ipython :session :exports both :results raw drawer\n$0"))
+
+  (defun ar/org-transient-title ()
+    (concat
+     (if (and (fboundp 'nerd-icons-sucicon) (display-graphic-p))
+         (nerd-icons-sucicon "nf-custom-orgmode" :face 'transient-heading :v-adjust 0.02)
+       "")
+     (propertize " Org Template" 'face 'transient-heading)))
+
+  (with-eval-after-load 'transient
+    (transient-define-prefix ar/org-template-transient ()
+      "Org Mode Structure Templates"
+      [:description ar/org-transient-title
+
+       ["Basic"
+        ("a" "ascii"   (lambda () (interactive) (ar/org-template-expand "<a")))
+        ("c" "center"  (lambda () (interactive) (ar/org-template-expand "<c")))
+        ("C" "comment" (lambda () (interactive) (ar/org-template-expand "<C")))
+        ("x" "example" (lambda () (interactive) (ar/org-template-expand "<e")))
+        ("E" "export"  (lambda () (interactive) (ar/org-template-expand "<E")))
+        ("h" "html"    (lambda () (interactive) (ar/org-template-expand "<h")))
+        ("l" "latex"   (lambda () (interactive) (ar/org-template-expand "<l")))
+        ("n" "note"    (lambda () (interactive) (ar/org-template-expand "<n")))
+        ("o" "quote"   (lambda () (interactive) (ar/org-template-expand "<q")))
+        ("v" "verse"   (lambda () (interactive) (ar/org-template-expand "<v")))]
+
+       ["Head"
+        ("i" "index"   (lambda () (interactive) (ar/org-template-expand "<i")))
+        ("A" "ASCII"   (lambda () (interactive) (ar/org-template-expand "<A")))
+        ("I" "INCLUDE" (lambda () (interactive) (ar/org-template-expand "<I")))
+        ("H" "HTML"    (lambda () (interactive) (ar/org-template-expand "<H")))
+        ("L" "LaTeX"   (lambda () (interactive) (ar/org-template-expand "<L")))]
+
+       ["Source"
+        ("s" "src"       (lambda () (interactive) (ar/org-template-expand "<s")))
+        ("e" "emacs-lisp" (lambda () (interactive) (ar/org-template-expand "<s" "emacs-lisp")))
+        ("y" "python"    (lambda () (interactive) (ar/org-template-expand "<s" "python")))
+        ("w" "powershell" (lambda () (interactive) (ar/org-template-expand "<s" "powershell")))
+        ("r" "ruby"      (lambda () (interactive) (ar/org-template-expand "<s" "ruby")))
+        ("S" "sh"        (lambda () (interactive) (ar/org-template-expand "<s" "sh")))
+        ("g" "golang"    (lambda () (interactive) (ar/org-template-expand "<s" "go :imports '(\"fmt\")")))]
+
+       ["Misc"
+        ("m" "mermaid"     (lambda () (interactive) (ar/org-template-expand "<s" "mermaid :file chart.png")))
+         ("k" "kdl"         (lambda () (interactive) (ar/org-template-expand "<s" "kdl")))
+        ("u" "plantuml"    (lambda () (interactive) (ar/org-template-expand "<s" "plantuml :file chart.png")))
+         ("K" "kbd"         (lambda () (interactive) (ar/org-template-expand "<s" "kbd")))
+        ("Z" "yaml"        (lambda () (interactive) (ar/org-template-expand "<s" "yaml")))
+        ("Y" "ipython"     ar/org-insert-ipython)
+        ("P" "Perl tangled" ar/org-insert-perl-tangled)
+        ("<" "insert <"    self-insert-command)]]))
+
+  (defun ar/org-smart-less-than ()
+    "Smart less-than key: trigger transient menu or insert character."
+    (interactive)
+    (if (or (region-active-p) (looking-back "^[ \t]*" 1))
+        (if (featurep 'transient)
+            (ar/org-template-transient)
+          (require 'transient)
+          (ar/org-template-transient))
+      (self-insert-command 1)))
+
+  (define-key org-mode-map (kbd "<") #'ar/org-smart-less-than))
+#+end_src
+
+
+
+
+** TODO Org Src Buffer Naming
+#+begin_src emacs-lisp
+(defun ar/org-src-simplify-buffer-name (base-buffer-name lang)
+  "Return a static buffer name for Org source edit buffers."
+  "src code")
+
+(advice-add 'org-src--construct-edit-buffer-name :override #'ar/org-src-simplify-buffer-name)
+#+end_src
+
+
+** TODO Org Eldoc
+#+begin_src emacs-lisp
+
+#+end_src
+
+
+
+
 
 
 
@@ -9333,7 +9339,6 @@ This section just contains checkboxes with stuff that still needs to be done for
 
 - [ ] Revisit embark and consult config for Workflow Management
 - [ ] add a doom emacs style keybinding with SPC as leader in general.el for =org-babel-remove-result-one-or-many=
-- [ ] remove flycheck for now since messing with org-mode editing
 - [ ] Illustrate a workflow using iedit and evil-multiedit
 
 - [ ] customize org-agenda-finalize to customize org-agenda buffer
@@ -9357,7 +9362,6 @@ This section just contains checkboxes with stuff that still needs to be done for
 - [X] show-paren-mode should highlight matching brackets when cursor is inside that the bracket pair
 - [ ] orderless only matches letters next to each other; I dont want that
 - [ ] add keybindings for embark
-- [ ] add lsp-ltex-plus
 - [ ] `Important`: Write a test org-mode file to practice all the writing practices in org buffers. Then determine what and how to optimize the writing workflow.
 - [ ] lsp-mode ideas: 1. how would code lens be useful in python programming
 - [ ] I also need interactive custom functions for .dir-locals.el

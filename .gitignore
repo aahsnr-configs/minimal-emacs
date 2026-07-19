@@ -23,6 +23,7 @@ org-roam.db
 transient/
 .cache/
 straight/
+.obsidian/
 perspective-state
 emacs-diff.md
 tmp/
