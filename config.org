@@ -4745,200 +4745,256 @@ Groups agenda items into labeled sections by urgency, context, and status.
   (org-super-agenda-keep-order t)
   ;; Name for the implicit catch-all group.
   (org-super-agenda-unmatched-name "Other Tasks")
-  (org-super-agenda-groups
-   '(;; Consume terminal-state items before any group sees them.
-     (:discard (:todo ("DONE" "CANCEL")))
+  :config
+  ;; Bold keyword-colored headers for visual weight.
+  (custom-set-faces
+   '(org-super-agenda-header
+     ((t (:inherit font-lock-keyword-face :weight bold :height 1.05)))))
+  ;; Groups list built here so nerd-icons glyphs evaluate post-load.
+  (setq org-super-agenda-groups
+        `(;; Consume terminal-state items before any group sees them.
+          (:discard (:todo ("DONE" "CANCEL")))
 
-     ;; Past deadline or scheduled date.
-     (:name "Overdue"
-      :deadline past
-      :scheduled past
-      :face font-lock-warning-face
-      :order 1)
+          ;; Past deadline or scheduled date.
+          (:name ,(concat (nerd-icons-octicon "nf-oct-alert" :v-adjust 0.02) " Overdue")
+           :deadline past
+           :scheduled past
+           :face font-lock-warning-face
+           :order 1)
 
-     ;; Unprocessed items in the flat todo.org (Inbox heading).
-     (:name "Inbox"
-      :todo "TODO"
-      :file-path "agenda/todo\\.org"
-      :order 2)
+          ;; Unprocessed items in the flat todo.org (Inbox heading).
+          (:name ,(concat (nerd-icons-octicon "nf-oct-inbox" :v-adjust 0.02) " Inbox")
+           :todo "TODO"
+           :file-path "agenda/todo\\.org"
+           :order 2)
 
-     ;; Items on today's time grid (scheduled + deadline for today).
-     (:name "Today"
-      :time-grid t
-      :order 3)
+          ;; Items on today's time grid.
+          (:name ,(concat (nerd-icons-faicon "nf-fa-calendar" :v-adjust 0.02) " Today")
+           :time-grid t
+           :order 3)
 
-     ;; Habit consistency graphs, isolated from actionable tasks.
-     (:name "Habits"
-      :habit t
-      :order 4)
+          ;; Habit consistency graphs, isolated from actionable tasks.
+          (:name ,(concat (nerd-icons-mdicon "nf-md-chart_line" :v-adjust 0.02) " Habits")
+           :habit t
+           :order 4)
 
-     ;; Priority A items not already consumed by Overdue or Today.
-     (:name "High Priority"
-      :priority "A"
-      :order 5)
+          ;; Priority A items not already consumed by Overdue or Today.
+          (:name ,(concat (nerd-icons-faicon "nf-fa-fire" :v-adjust 0.02) " High Priority")
+           :priority "A"
+           :order 5)
 
-     ;; Context groups: tag AND actionable keyword.
-     (:name "@Computer"
-      :and (:tag "@computer" :todo ("NEXT" "TODO"))
-      :order 6)
-     (:name "@Home"
-      :and (:tag "@home" :todo ("NEXT" "TODO"))
-      :order 7)
-     (:name "@Errands"
-      :and (:tag "@errands" :todo ("NEXT" "TODO"))
-      :order 8)
-     (:name "@Phone"
-      :and (:tag "@phone" :todo ("NEXT" "TODO"))
-      :order 9)
-     (:name "@Deep Work"
-      :and (:tag "@deep_work" :todo ("NEXT" "TODO"))
-      :order 10)
+          ;; Context groups: tag AND actionable keyword.
+          (:name ,(concat (nerd-icons-faicon "nf-fa-laptop" :v-adjust 0.02) " @Computer")
+           :and (:tag "@computer" :todo ("NEXT" "TODO"))
+           :order 6)
+          (:name ,(concat (nerd-icons-faicon "nf-fa-home" :v-adjust 0.02) " @Home")
+           :and (:tag "@home" :todo ("NEXT" "TODO"))
+           :order 7)
+          (:name ,(concat (nerd-icons-faicon "nf-fa-car" :v-adjust 0.02) " @Errands")
+           :and (:tag "@errands" :todo ("NEXT" "TODO"))
+           :order 8)
+          (:name ,(concat (nerd-icons-faicon "nf-fa-phone" :v-adjust 0.02) " @Phone")
+           :and (:tag "@phone" :todo ("NEXT" "TODO"))
+           :order 9)
+          (:name ,(concat (nerd-icons-faicon "nf-fa-brain" :v-adjust 0.02) " @Deep Work")
+           :and (:tag "@deep_work" :todo ("NEXT" "TODO"))
+           :order 10)
 
-     ;; Delegated or blocked items awaiting external input.
-     (:name "Waiting For"
-      :todo "WAIT"
-      :order 11)
+          ;; Delegated or blocked items awaiting external input.
+          (:name ,(concat (nerd-icons-faicon "nf-fa-hourglass_half" :v-adjust 0.02) " Waiting For")
+           :todo "WAIT"
+           :face shadow
+           :order 11)
 
-     ;; Deadlines within the next 7 days.
-     (:name "Due Soon"
-      :deadline (before "+7d")
-      :order 12)
+          ;; Deadlines within the next 7 days.
+          (:name ,(concat (nerd-icons-faicon "nf-fa-clock" :v-adjust 0.02) " Due Soon")
+           :deadline (before "+7d")
+           :order 12)
 
-     ;; Everything not consumed above.
-     (:anything t
-      :order 99))))
+          ;; Everything not consumed above.
+          (:name ,(concat (nerd-icons-octicon "nf-oct-kebab_horizontal" :v-adjust 0.02) " Other Tasks")
+           :anything t
+           :order 99))))
 #+end_src
 
-** TODO Org Agenda Custom Commands
+
+
+** TODO Org Super Agenda
+Groups agenda items into labeled sections by urgency, context, and status.
+
 #+begin_src emacs-lisp
-(with-eval-after-load 'org-agenda
-  (setq org-agenda-custom-commands
-        '(("d" "Daily Dashboard"
-           ((agenda ""
-                    ((org-agenda-span 'day)
-                     (org-agenda-start-day "0d")
-                     (org-super-agenda-groups
-                      '((:name "⏰ Time-Blocked Today"
-                         :time-grid t
-                         :date today
-                         :order 1)
-                        (:name "🔴 Overdue"
-                         :deadline past
-                         :scheduled past
-                         :order 2)
-                        (:name "🔥 GTD Inbox (Must Process)"
-                         :todo "INBOX"
-                         :order 3)))))
+(use-package org-super-agenda
+  :defer t
+  :after org-agenda
+  :hook (org-agenda-mode . org-super-agenda-mode)
+  :custom
+  ;; Single character auto-repeats to window width on resize.
+  (org-super-agenda-header-separator ?─)
+  ;; Suppress groups with zero matching items.
+  (org-super-agenda-hide-empty-groups t)
+  ;; Preserve org-agenda-sorting-strategy order within each group.
+  (org-super-agenda-keep-order t)
+  ;; Name for the implicit catch-all group.
+  (org-super-agenda-unmatched-name "Other Tasks")
+  ;; Suppress mode-enable echo-area message.
+  (org-super-agenda-show-message nil)
+  ;; Consistent visual bullet for all group headers.
+  (org-super-agenda-header-prefix "▸ ")
+  ;; Visual boundary between last group and agenda footer.
+  (org-super-agenda-final-group-separator
+   "\n─────────────────────────────────────────────────\n")
+  ;; Human-readable date format for :auto-planning/:auto-ts headers.
+  (org-super-agenda-date-format "%A, %B %d")
+  :config
+  ;; Bold keyword-colored headers for visual weight.
+  (custom-set-faces
+   '(org-super-agenda-header
+     ((t (:inherit font-lock-keyword-face :weight bold :height 1.05)))))
 
-            (alltodo ""
-                     ((org-agenda-overriding-header "")
-                      (org-super-agenda-groups
-                       '((:name "🎯 Priority A"
-                          :priority "A"
-                          :order 1)
-                         (:name "💻 @Computer"
-                          :and (:tag "@computer" :todo ("GTD-NEXT" "NEXT"))
-                          :order 2)
-                         (:name "🏠 @Home"
-                          :and (:tag "@home" :todo ("GTD-NEXT" "NEXT"))
-                          :order 3)
-                         (:name "📞 @Phone"
-                          :and (:tag "@phone" :todo ("GTD-NEXT" "NEXT"))
-                          :order 4)
-                         (:name "🚗 @Errands"
-                          :and (:tag "@errands" :todo ("GTD-NEXT" "NEXT"))
-                          :order 5)
-                         (:name "⏳ Waiting"
-                          :todo ("GTD-WAIT" "WAIT")
-                          :order 6)
-                         (:discard (:anything t))))))))
+  ;; Native group folding via overlay invisibility (no origami dependency).
+  (defun ar/org-super-agenda-toggle-group ()
+    "Toggle visibility of the current agenda group at point."
+    (interactive)
+    (let ((pos (if (get-text-property (point) 'org-agenda-structural-header)
+                   (point)
+                 (or (previous-single-property-change
+                      (point) 'org-agenda-structural-header)
+                     (user-error "No group header found")))))
+      (let* ((header-end (save-excursion (goto-char pos) (line-end-position)))
+             (next-header (next-single-property-change
+                           header-end 'org-agenda-structural-header
+                           nil (point-max)))
+             (ovs (overlays-in (1+ header-end) next-header))
+             (fold-ovs (seq-filter
+                        (lambda (ov) (overlay-get ov 'ar/sa-fold)) ovs)))
+        (if fold-ovs
+            (dolist (ov fold-ovs) (delete-overlay ov))
+          (let ((ov (make-overlay (1+ header-end) next-header)))
+            (overlay-put ov 'invisible t)
+            (overlay-put ov 'ar/sa-fold t))))))
 
-          ("w" "Weekly Review"
-           ((todo "INBOX"
-                  ((org-agenda-overriding-header "🔥 GTD Inbox (Zero This Out)")
-                   (org-agenda-files (list (expand-file-name "gtd/inbox.org" my/org-directory)))
-                   (org-super-agenda-groups
-                    '((:auto-ts t)))))
+  (defun ar/org-super-agenda-goto-first-item ()
+    "Move point to the first item in the current group."
+    (interactive)
+    (forward-line 1)
+    (when (or (get-text-property (point) 'org-agenda-structural-header)
+              (eobp))
+      (user-error "Empty group")))
 
-            (todo "GTD-WAIT"
-                  ((org-agenda-overriding-header "⏳ Waiting For (Follow-up Required)")
-                   (org-super-agenda-groups
-                    '((:auto-property "DELEGATED_TO")))))
+  ;; Header keymap: TAB folds, RET jumps to first item, q quits.
+  (define-key org-super-agenda-header-map (kbd "TAB")
+    #'ar/org-super-agenda-toggle-group)
+  (define-key org-super-agenda-header-map (kbd "RET")
+    #'ar/org-super-agenda-goto-first-item)
+  (define-key org-super-agenda-header-map (kbd "q")
+    #'org-agenda-quit)
 
-            (stuck ""
-                   ((org-agenda-overriding-header "🚫 Stuck Projects (No NEXT Actions)")
-                    (org-super-agenda-groups
-                     '((:auto-category t)))))
+  ;; NOTE: Project grouping via :auto-parent is PROVISIONAL.
+  ;; May change after Workflow Management finalization (projection/bufferlo).
+  ;; See project_operationals.yaml v33 for tracking.
+  (setq org-super-agenda-groups
+        `(;; Consume terminal-state items before any group sees them.
+          (:discard (:todo ("DONE" "CANCEL")))
 
-            (todo "GTD-NEXT"
-                  ((org-agenda-overriding-header "✅ All NEXT Actions")
-                   (org-super-agenda-groups
-                    '((:auto-parent t)))))))
+          ;; Items closed today. Requires log mode (v l) to populate.
+          ;; Placed BEFORE :time-grid to prevent consumption conflict.
+          (:name ,(concat (nerd-icons-faicon "nf-fa-check_circle" :v-adjust 0.02)
+                          " Completed Today")
+           :log closed
+           :order 0)
 
-          ("p" "Projects Dashboard"
-           ((tags "LEVEL=1"
-                  ((org-agenda-overriding-header "📋 GTD Projects (Execution Layer)")
-                   (org-agenda-files (list (expand-file-name "gtd/projects.org" my/org-directory)))
-                   (org-super-agenda-groups
-                    '((:name "🔴 Stuck (No NEXT)"
-                       :children ("GTD-WAIT" "TODO" "INBOX")
-                       :order 1)
-                      (:name "✅ Active (Has NEXT)"
-                       :children "GTD-NEXT"
-                       :order 2)
-                      (:name "⸻ Paused"
-                       :scheduled future
-                       :order 3)))))))
+          ;; Past deadline or scheduled date. Capped at 10 items.
+          (:name ,(concat (nerd-icons-octicon "nf-oct-alert" :v-adjust 0.02)
+                          " Overdue")
+           :take (10 (:deadline past :scheduled past))
+           :face font-lock-warning-face
+           :order 1)
 
-          ("g" . "GTD Views")
+          ;; Unprocessed items in the flat todo.org (Inbox heading).
+          (:name ,(concat (nerd-icons-octicon "nf-oct-inbox" :v-adjust 0.02)
+                          " Inbox")
+           :todo "TODO"
+           :file-path "agenda/todo\\.org"
+           :transformer (string-remove-prefix "TODO " it)
+           :order 2)
 
-          ("gn" "Next Actions"
-           ((todo "GTD-NEXT"
-                  ((org-agenda-overriding-header "✅ Next Actions")
-                   (org-agenda-sorting-strategy '(priority-down category-keep))
-                   (org-super-agenda-groups
-                    '((:auto-category t)))))))
+          ;; Items on today's time grid.
+          (:name ,(concat (nerd-icons-faicon "nf-fa-calendar" :v-adjust 0.02)
+                          " Today")
+           :time-grid t
+           :order 3)
 
-          ("gi" "Inbox (Unprocessed)"
-           ((todo "INBOX"
-                  ((org-agenda-overriding-header "🔥 GTD Inbox")
-                   (org-agenda-files (list (expand-file-name "gtd/inbox.org" my/org-directory)))
-                   (org-super-agenda-groups
-                    '((:auto-ts t)))))))
+          ;; Habit consistency graphs, isolated from actionable tasks.
+          (:name ,(concat (nerd-icons-mdicon "nf-md-chart_line" :v-adjust 0.02)
+                          " Habits")
+           :habit t
+           :order 4)
 
-          ("gw" "Waiting For"
-           ((todo "GTD-WAIT"
-                  ((org-agenda-overriding-header "⏳ Waiting For")
-                   (org-super-agenda-groups
-                    '((:auto-property "DELEGATED_TO")))))))
+          ;; Priority A items not already consumed above.
+          (:name ,(concat (nerd-icons-faicon "nf-fa-fire" :v-adjust 0.02)
+                          " High Priority")
+           :priority "A"
+           :order 5)
 
-          ("gs" "Stuck Projects"
-           ((stuck ""
-                   ((org-agenda-overriding-header "🚫 Stuck Projects")
-                    (org-super-agenda-groups
-                     '((:auto-category t)))))))
+          ;; Context groups: tag AND actionable keyword.
+          (:name ,(concat (nerd-icons-faicon "nf-fa-laptop" :v-adjust 0.02)
+                          " @Computer")
+           :and (:tag "@computer" :todo ("NEXT" "TODO"))
+           :order 6)
+          (:name ,(concat (nerd-icons-faicon "nf-fa-home" :v-adjust 0.02)
+                          " @Home")
+           :and (:tag "@home" :todo ("NEXT" "TODO"))
+           :order 7)
+          (:name ,(concat (nerd-icons-faicon "nf-fa-car" :v-adjust 0.02)
+                          " @Errands")
+           :and (:tag "@errands" :todo ("NEXT" "TODO"))
+           :order 8)
+          (:name ,(concat (nerd-icons-faicon "nf-fa-phone" :v-adjust 0.02)
+                          " @Phone")
+           :and (:tag "@phone" :todo ("NEXT" "TODO"))
+           :order 9)
+          (:name ,(concat (nerd-icons-faicon "nf-fa-brain" :v-adjust 0.02)
+                          " @Deep Work")
+           :and (:tag "@deep_work" :todo ("NEXT" "TODO"))
+           :order 10)
 
-          ("gc" "By Context"
-           ((tags-todo "@computer/GTD-NEXT"
-                       ((org-agenda-overriding-header "💻 @Computer")
-                        (org-super-agenda-groups
-                         '((:auto-priority t)))))
+          ;; Delegated or blocked items awaiting external input.
+          (:name ,(concat (nerd-icons-faicon "nf-fa-hourglass_half" :v-adjust 0.02)
+                          " Waiting For")
+           :todo "WAIT"
+           :face shadow
+           :transformer (string-remove-prefix "WAIT " it)
+           :order 11)
 
-            (tags-todo "@home/GTD-NEXT"
-                       ((org-agenda-overriding-header "🏠 @Home")
-                        (org-super-agenda-groups
-                         '((:auto-priority t)))))
+          ;; Deadlines within the next 7 days. Capped at 7 items.
+          (:name ,(concat (nerd-icons-faicon "nf-fa-clock" :v-adjust 0.02)
+                          " Due Soon")
+           :take (7 (:deadline (before "+7d")))
+           :order 12)
 
-            (tags-todo "@errands/GTD-NEXT"
-                       ((org-agenda-overriding-header "🚗 @Errands")
-                        (org-super-agenda-groups
-                         '((:auto-priority t)))))
+          ;; Project headings with open child tasks.
+          ;; SAFE: Only in daily/weekly views. NEVER in org-todo-list
+          ;; or org-tags-view (recursive child-scanning is O(n × depth)).
+          (:name ,(concat (nerd-icons-octicon "nf-oct-project" :v-adjust 0.02)
+                          " Active Projects")
+           :children todo
+           :order 14)
 
-            (tags-todo "@phone/GTD-NEXT"
-                       ((org-agenda-overriding-header "📞 @Phone")
-                        (org-super-agenda-groups
-                         '((:auto-priority t))))))))))
+          ;; Items grouped by parent heading in flat todo.org.
+          ;; PROVISIONAL: May change after Workflow Management finalization.
+          (:name ,(concat (nerd-icons-octicon "nf-oct-repo" :v-adjust 0.02)
+                          " By Project")
+           :auto-parent t
+           :order 15)
+
+          ;; Everything not consumed above. Capped at 15 items.
+          (:name ,(concat (nerd-icons-octicon "nf-oct-kebab_horizontal"
+                          :v-adjust 0.02)
+                          " Other Tasks")
+           :take (15 (:anything t))
+           :order 99))))
 #+end_src
+
 
 
 
