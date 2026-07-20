@@ -10,7 +10,7 @@
 
 - Okay then you have the signal to rewrite the Session Management subsection. Follow the protocols and instructions from system-prompt-protocols.md file and make sure the documentation is very concise as well.
 
-- Now review the subsection: Grep. Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from system_prompt_protocol.yaml file. Search the web determine if there are additional configuration settings that might be useful. Then explain everything to me in detail and present me how you plan to deal with this configuration.I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 2026.
+- Now audit and review the subsection: Org Habit. Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from project_operationals.yaml file. Search the web determine if there are additional configuration settings that might be useful. Then explain everything to me in detail and present me how you plan to deal with this configuration.I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 18 2026.
 
 - Are you sure there are no more errors and issues in this iteration of Workspaces? And are you sure there are not any more extra configurations you need to add by search the web? Answer and explain everything to me in great detail.Search the web and think longer for this task and make sure the information you get is latest till July 2026.
 

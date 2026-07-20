@@ -4877,13 +4877,10 @@ Groups agenda items into labeled sections by urgency, context, and status.
            :order 99))))
 #+end_src
 
-
-** TODO Org Agenda Custom Commands
+** DONE Org Agenda Custom Commands
 Defines named agenda views for daily planning, weekly review, effort-based selection, accomplishments, and project status.
 #+begin_src emacs-lisp
 (with-eval-after-load 'org-agenda
-  ;; org-super-agenda uses first-match-wins on LIST POSITION, not :order.
-  ;; If :discard runs first, it consumes all DONE items before :log can claim them.
   (defvar ar/org-sa-daily-groups
     `((:name ,(concat (nerd-icons-faicon "nf-fa-check_circle" :v-adjust 0.02)
                       " Completed Today")
@@ -5088,29 +5085,27 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
                  (org-super-agenda-groups ,ar/org-sa-project-groups))))))))
 #+end_src
 
-** TODO Org Habit
 
+** DONE Org Habit
+Renders habit consistency graphs in the daily agenda with configurable history, future span, and custom completion glyphs.
 #+begin_src emacs-lisp
 (use-package org-habit
   :ensure nil
   :defer t
   :after org
   :custom
+  (org-habit-show-habits t)
   (org-habit-graph-column 60)
   (org-habit-show-habits-only-for-today t)
+  (org-habit-show-all-today t)
   (org-habit-preceding-days 21)
   (org-habit-following-days 7)
+  (org-habit-scheduled-past-days 10000)
   :config
-  ;; FIX: nerd-icons-codicon calls moved from :custom to :config.
-  ;; In :custom, these execute via customize-set-variable at package-load
-  ;; time before nerd-icons is guaranteed to be available, causing a
-  ;; void-function error. In :config they run after the package loads,
-  ;; and are guarded so a missing nerd-icons is handled gracefully.
-  (when (fboundp 'nerd-icons-codicon)
-    (setq org-habit-completed-glyph
-          (string-to-char (nerd-icons-codicon "nf-cod-check"))
-          org-habit-today-glyph
-          (string-to-char (nerd-icons-codicon "nf-cod-circle_filled")))))
+  (setq org-habit-completed-glyph
+        (string-to-char (nerd-icons-codicon "nf-cod-check"))
+        org-habit-today-glyph
+        (string-to-char (nerd-icons-codicon "nf-cod-circle_filled"))))
 #+end_src
 
 
