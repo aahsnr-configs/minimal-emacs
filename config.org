@@ -4389,6 +4389,7 @@ denote: links correctly inside silos (denote-silo manual §2.3)."
 (my/ensure-org-dir "areas/")
 (my/ensure-org-dir "resources/")
 (my/ensure-org-dir "archives/")
+(my/ensure-org-dir "journal/")
 #+end_src
 
 *** Task Management & Ephemeral Routing
@@ -5174,31 +5175,54 @@ Configures the core note-taking engine with strict file-naming, keyword inferenc
 
 
 ** DONE Denote Silo
-Provides commands for creating notes, opening files, and switching directories across isolated Denote silos.
+Isolates note-taking environments and routes commands across distinct Denote directories.
 #+begin_src emacs-lisp
 (use-package denote-silo
   :defer t
   :after denote
-  :commands (denote-silo-create-note
-             denote-silo-open-or-create
-             denote-silo-select-silo-then-command
-             denote-silo-dired
-             denote-silo-cd)
-  :config
+  :commands
+  (denote-silo-create-note
+   denote-silo-open-or-create
+   denote-silo-select-silo-then-command
+   denote-silo-dired
+   denote-silo-cd)
+  :custom
   ;; Discover silos: Zettelkasten root + subdirectories with .dir-locals.el.
-  (setq denote-silo-directories
-        (delete-dups
-         (cons my/denote-zettelkasten-dir
-               (cl-loop for parent in '("projects" "areas" "resources")
-                        for dir = (expand-file-name parent my/org-directory)
-                        if (file-directory-p dir)
-                        nconc (cl-loop for sub in (directory-files dir t directory-files-no-dot-files-regexp)
-                                       if (and (file-directory-p sub)
-                                               (file-exists-p (expand-file-name ".dir-locals.el" sub)))
-                                       collect sub))))))
+  ;; `file-name-as-directory` enforces trailing slashes to prevent prefix collisions.
+  (denote-silo-directories
+   (delete-dups
+    (cons (file-name-as-directory my/denote-zettelkasten-dir)
+          (cl-loop for parent in '("projects" "areas" "resources" "journal")
+                   for dir = (expand-file-name parent my/org-directory)
+                   if (file-directory-p dir)
+                   nconc (cl-loop for sub in (directory-files dir t directory-files-no-dot-files-regexp)
+                                  if (and (file-directory-p sub)
+                                          (file-exists-p (expand-file-name ".dir-locals.el" sub)))
+                                  collect (file-name-as-directory sub)))))))
 #+end_src
 
-** TODO Denote Journal
+
+** DONE Denote Org
+Bridges Denote with Org mode's dynamic blocks, subtree extraction, and deep heading links.
+#+begin_src emacs-lisp
+(use-package denote-org
+  :defer t
+  :after (denote org)
+  :commands (denote-org-link-to-heading
+             denote-org-backlinks-for-heading
+             denote-org-extract-org-subtree
+             denote-org-convert-links-to-file-type
+             denote-org-convert-links-to-denote-type
+             denote-org-dblock-insert-files
+             denote-org-dblock-insert-links
+             denote-org-dblock-insert-backlinks
+             denote-org-dblock-insert-missing-links
+             denote-org-dblock-insert-files-as-headings))
+#+end_src
+
+
+** DONE Denote Journal
+Routes daily journaling workflows into isolated Denote notes with strict top-level domain pinning.
 #+begin_src emacs-lisp
 (use-package denote-journal
   :defer t
@@ -5207,15 +5231,22 @@ Provides commands for creating notes, opening files, and switching directories a
              denote-journal-new-or-existing-entry
              denote-journal-link-or-create-entry)
   :custom
+  ;; Pin journal to a top-level domain to prevent silo-bleed and Zettelkasten pollution.
+  (denote-journal-directory (expand-file-name "journal" my/org-directory))
   (denote-journal-title-format 'day-date-month-year))
 #+end_src
 
 
-** TODO Denote Org
+** DONE Denote Journal Capture
+Bridges Denote journal routing with state-aware org-capture template expansions.
 #+begin_src emacs-lisp
-(use-package denote-org
+(use-package denote-journal-capture
   :defer t
-  :after (denote org))
+  :after denote-journal
+  :commands (denote-journal-capture-entry-for-date
+             denote-journal-capture-entry-today
+             denote-journal-capture-timestamp
+             denote-journal-capture-insert-date))
 #+end_src
 
 
@@ -5336,32 +5367,34 @@ Top-level keys:
       (?i (org-capture nil "i"))
       (?q (keyboard-quit)))))
 #+end_src
+
 *** Journal Templates
-Daily Denote journal entries with optional context links.
+Daily Denote journal entries with optional context links, utilizing state-aware date routing.
 #+begin_src emacs-lisp
 (defvar ar/capture-templates-journal
   `(("j" "Journal")
     ("jd" "Daily entry" entry
-     (file denote-journal-path-to-new-or-existing-entry)
+     (file denote-journal-capture-entry-today)
      ,(string-join
-       '("* %<%H:%M> %?"
+       '("* %(denote-journal-capture-timestamp) %?"
          ":PROPERTIES:"
          ":CREATED: %U"
          ":END:")
        "\n")
      :empty-lines 1 :kill-buffer t)
     ("jl" "Daily entry + context link" entry
-     (file denote-journal-path-to-new-or-existing-entry)
+     (file denote-journal-capture-entry-today)
      ,(string-join
-       '("* %<%H:%M> %?"
+       '("* %(denote-journal-capture-timestamp) %?"
          ":PROPERTIES:"
          ":CREATED:  %U"
          ":CONTEXT:  %a"
          ":END:")
        "\n")
      :empty-lines 1 :kill-buffer t))
-  "Journal capture templates backed by denote-journal.")
+  "Journal capture templates backed by denote-journal-capture.")
 #+end_src
+
 *** Meeting Template
 Structured meeting notes with attendees, agenda, and action items.
 #+begin_src emacs-lisp
@@ -5829,6 +5862,328 @@ Spawns a Denote note with task statistics, a structured review checklist, and re
 
 
 
+
+
+** TODO Keybindings
+Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motions, and the complete 25-package Denote ecosystem matrix.
+#+begin_src emacs-lisp
+(use-package evil-org
+  :defer t
+  :after (evil org)
+  :hook (org-mode . evil-org-mode)
+  :config
+  ;; Activate navigation, insert, textobjects, additional, calendar, todo, and heading themes.
+  (evil-org-set-key-theme '(navigation insert textobjects additional calendar todo heading))
+  ;; Context-aware RET: toggles TODO states, checkboxes, follows links, or opens folds.
+  (defun ar/org-return-dwim (&optional arg)
+    "Doom Emacs parity: Context-aware RET in Org normal/motion states."
+    (interactive "P")
+    (cond
+     ((and (org-at-heading-p) (org-get-todo-state))
+      (org-todo arg))
+     ((org-at-item-checkbox-p)
+      (org-toggle-checkbox arg))
+     ((org-in-regexp org-link-any-re 1)
+      (org-open-at-point arg))
+     ((and (org-at-heading-p) (org-invisible-p))
+      (org-fold-show-entry))
+     (t (org-ctrl-c-ctrl-c arg))))
+  ;; Bind RET in normal and motion states to the DWIM handler.
+  (evil-define-key '(normal motion) evil-org-mode-map
+    (kbd "RET") #'ar/org-return-dwim))
+
+(use-package evil-org-agenda
+  :defer t
+  :after evil-org
+  :hook (org-agenda-mode . evil-org-agenda-mode)
+  :config
+  ;; Inject Vim motions for agenda manipulation, item reordering, and date jumping.
+  (evil-org-agenda-set-keys))
+
+(defun ar/org-babel-remove-result-one-or-many (&optional arg)
+  "Remove babel results. With ARG, remove all results in buffer."
+  (interactive "P")
+  (org-babel-remove-result-one-or-many arg))
+
+;; Agenda Prefix (SPC o)
+(ar/global-leader
+  "o"   '(:ignore t :wk "org")
+  "o a" '(:ignore t :wk "agenda")
+  "o a a" '(org-agenda :wk "Agenda dashboard")
+  "o a m" '(org-tags-view :wk "Tags search")
+  "o a t" '(org-todo-list :wk "Global TODO list")
+  "o a v" '(consult-org-agenda :wk "Fuzzy heading jump")
+  "o a d" '((lambda () (interactive) (org-agenda nil "d")) :wk "Daily dashboard")
+  "o a w" '((lambda () (interactive) (org-agenda nil "w")) :wk "Weekly review")
+  "o a e" '((lambda () (interactive) (org-agenda nil "e")) :wk "Effort-based")
+  "o a A" '((lambda () (interactive) (org-agenda nil "A")) :wk "Accomplishments")
+  "o a p" '((lambda () (interactive) (org-agenda nil "p")) :wk "Project status")
+  "o c" '(org-capture :wk "Capture")
+  "o l" '(org-store-link :wk "Store link"))
+
+;; Notes / Denote Ecosystem (SPC n)
+(ar/global-leader
+  "n"   '(:ignore t :wk "notes")
+
+  ;; Core Denote
+  "n n" '(denote :wk "New note")
+  "n N" '(denote-subdirectory :wk "New note in subdir")
+  "n t" '(denote-type :wk "New note (choose type)")
+  "n r" '(denote-rename-file :wk "Rename file")
+  "n R" '(denote-rename-file-using-front-matter :wk "Rename from front matter")
+  "n k" '(denote-rename-file-keywords :wk "Edit keywords")
+  "n d" '(denote-dired :wk "Denote dired")
+
+  ;; Search & Discovery
+  "n f" '(consult-denote-find :wk "Find note")
+  "n s" '(consult-denote-grep :wk "Search notes")
+  "n x" '(denote-regexp-search :wk "Regex search")
+
+  ;; Linking & Transclusion
+  "n l" '(denote-link :wk "Insert link")
+  "n i" '(denote-link-or-create :wk "Insert link or create")
+  "n b" '(denote-backlinks :wk "Backlinks")
+  "n r b" '(denote-refs-backlinks :wk "Back references")
+  "n r f" '(denote-refs-forward :wk "Forward references")
+  "n T" '(org-transclusion-add :wk "Transclude note")
+
+  ;; Journaling
+  "n j" '(denote-journal-new-or-existing-entry :wk "Journal (today)")
+  "n J" '(denote-journal-new-entry :wk "New journal entry")
+
+  ;; Sequence Notes / Folgezettel
+  "n q"   '(:ignore t :wk "sequence")
+  "n q n" '(denote-sequence :wk "New sequence")
+  "n q p" '(denote-sequence-new-parent :wk "New parent")
+  "n q c" '(denote-sequence-new-child-of-current :wk "New child (current)")
+  "n q b" '(denote-sequence-new-sibling-of-current :wk "New sibling (current)")
+  "n q f" '(denote-sequence-find :wk "Find relative")
+  "n q l" '(denote-sequence-link :wk "Link to sequence")
+  "n q r" '(denote-sequence-reparent :wk "Reparent file")
+  "n q v" '(denote-sequence-view-hierarchy :wk "View hierarchy")
+
+  ;; Silo Management
+  "n S"   '(:ignore t :wk "silo")
+  "n S s" '(denote-silo-select-silo-then-command :wk "Silo dispatch")
+  "n S o" '(denote-silo-open-or-create :wk "Open/create silo")
+  "n S n" '(denote-silo-create-note :wk "New note in silo")
+  "n S d" '(denote-silo-dired :wk "Silo dired")
+
+  ;; Explore & Analytics
+  "n e"   '(:ignore t :wk "explore")
+  "n e s" '(denote-explore-statistics :wk "Statistics")
+  "n e o" '(denote-explore-orphans :wk "Orphan detection")
+  "n e r" '(denote-explore-random-note :wk "Random walk")
+  "n e n" '(denote-explore-network-keywords :wk "Keyword network")
+  "n e w" '(denote-wordcloud :wk "Word cloud")
+
+  ;; Management & Refactoring
+  "n m"   '(:ignore t :wk "manage")
+  "n m m" '(denote-menu-list-notes :wk "Tabulated menu")
+  "n m e" '(denote-merge-notes :wk "Merge notes")
+  "n m z" '(denote-solo-mode :wk "Focus mode")
+  "n m r" '(denote-review :wk "Spaced repetition")
+  "n m x" '(denote-sections-create :wk "Extract section")
+  "n m f" '(denote-refs-backlinks :wk "Back references")
+
+  ;; Bibliography & Publishing
+  "n B"   '(:ignore t :wk "bibliography")
+  "n B o" '(citar-denote-open-note :wk "Open bib note")
+  "n B c" '(citar-denote-create-note :wk "Create bib note")
+  "n B i" '(citar-denote-insert-citation :wk "Insert citation")
+  "n B s" '(denote-citar-sections-create :wk "Citar section")
+  "n p" '(denote-publish :wk "Publish notes")
+
+  ;; Misc
+  "n P" '(denote-project-notes :wk "Project notes")
+  "n A" '(denote-agenda :wk "Chronological view")
+  "n w" '(ar/weekly-review :wk "Weekly review"))
+
+
+;; Capture (SPC X)
+(ar/global-leader
+  "X" '(ar/capture-dispatch :wk "Smart capture"))
+
+
+;; Org Buffer (SPC m)
+(ar/local-leader
+  :keymaps 'org-mode-map
+
+  ;; Single-Key
+  "#" '(org-update-statistics-cookies :wk "Update cookies")
+  "'" '(org-edit-special :wk "Edit babel block")
+  "*" '(org-ctrl-c-star :wk "Heading from list")
+  "-" '(org-ctrl-c-minus :wk "Cycle list bullet")
+  "," '(org-switchb :wk "Switch org buffer")
+  "." '(consult-org-heading :wk "Fuzzy jump heading")
+  "/" '(consult-org-agenda :wk "Fuzzy jump agenda")
+  "@" '(org-cite-insert :wk "Insert citation")
+  "A" '(org-archive-subtree-default :wk "Archive subtree")
+  "C" '(org-capture :wk "Local capture")
+  "e" '(org-export-dispatch :wk "Export dispatch")
+  "f" '(org-footnote-action :wk "Footnote action")
+  "h" '(org-toggle-heading :wk "Toggle heading")
+  "I" '(org-id-get-create :wk "Create ID")
+  "k" '(ar/org-babel-remove-result-one-or-many :wk "Remove babel result")
+  "K" '(org-babel-remove-result :wk "Remove block result")
+  "n" '(org-store-link :wk "Store link")
+  "o" '(org-set-property :wk "Set property")
+  "q" '(org-set-tags-command :wk "Set tags")
+  "t" '(org-todo :wk "Cycle TODO")
+  "x" '(org-toggle-checkbox :wk "Toggle checkbox")
+
+  ;; Prefix Routes
+  "a" '(:ignore t :wk "attachments")
+  "a a" '(org-attach :wk "Attach file")
+  "a d" '(org-attach-delete-one :wk "Delete attachment")
+  "a o" '(org-attach-open :wk "Open attachment")
+  "a r" '(org-attach-reveal :wk "Reveal in dired")
+
+  "b" '(:ignore t :wk "babel")
+  "b t" '(org-babel-tangle :wk "Tangle")
+  "b e" '(org-babel-execute-src-block :wk "Execute block")
+  "b b" '(org-babel-execute-buffer :wk "Execute buffer")
+  "b c" '(org-babel-check-src-block :wk "Check block")
+
+  "c" '(:ignore t :wk "clock")
+  "c c" '(org-clock-cancel :wk "Cancel clock")
+  "c d" '(org-clock-display :wk "Display clock times")
+  "c e" '(org-set-effort :wk "Set effort")
+  "c g" '(org-clock-goto :wk "Goto running clock")
+  "c i" '(org-clock-in :wk "Clock in")
+  "c o" '(org-clock-out :wk "Clock out")
+  "c r" '(org-resolve-clocks :wk "Resolve clocks")
+
+  "d" '(:ignore t :wk "date/deadline")
+  "d d" '(org-deadline :wk "Set deadline")
+  "d s" '(org-schedule :wk "Schedule")
+  "d t" '(org-time-stamp :wk "Timestamp")
+
+  "g" '(:ignore t :wk "goto")
+  "g g" '(consult-org-heading :wk "Goto heading")
+  "g c" '(org-clock-goto :wk "Goto clock")
+  "g i" '(org-id-goto :wk "Goto ID")
+  "g r" '(org-refile-goto-last-stored :wk "Goto last refile")
+  "g v" '(org-reveal :wk "Reveal context")
+
+  "i" '(:ignore t :wk "insert")
+  "i l" '(org-insert-link :wk "Insert link")
+  "i @" '(org-cite-insert :wk "Insert citation")
+  "i t" '(org-table-create :wk "Create table")
+  "i h" '(org-insert-heading :wk "Insert heading")
+  "i s" '(org-download-screenshot :wk "Screenshot")
+
+  "l" '(:ignore t :wk "link")
+  "l l" '(org-insert-link :wk "Insert link")
+  "l s" '(org-store-link :wk "Store link")
+  "l i" '(org-id-store-link :wk "Store ID link")
+  "l c" '(org-cliplink :wk "Cliplink")
+  "l d" '(org-delete-link :wk "Delete link")
+
+  "p" '(:ignore t :wk "priority")
+  "p d" '(org-priority-down :wk "Priority down")
+  "p u" '(org-priority-up :wk "Priority up")
+  "p p" '(org-priority :wk "Set priority")
+
+  "P" '(:ignore t :wk "publish")
+  "P a" '(org-publish-all :wk "Publish all")
+  "P f" '(org-publish-current-file :wk "Publish file")
+  "P p" '(org-publish-current-project :wk "Publish project")
+
+  "r" '(:ignore t :wk "refile")
+  "r r" '(org-refile :wk "Refile")
+  "r l" '(org-refile-goto-last-stored :wk "Last refile location")
+  "r f" '(org-refile-cache-clear :wk "Clear refile cache")
+  "r c" '(org-refile-cache-check :wk "Check refile cache")
+
+  "s" '(:ignore t :wk "subtree")
+  "s a" '(org-toggle-archive-tag :wk "Archive tag")
+  "s b" '(org-tree-to-indirect-buffer :wk "Indirect buffer")
+  "s c" '(org-clone-subtree-with-time-shift :wk "Clone subtree")
+  "s d" '(org-cut-subtree :wk "Cut subtree")
+  "s h" '(org-promote-subtree :wk "Promote subtree")
+  "s j" '(org-move-subtree-down :wk "Move subtree down")
+  "s k" '(org-move-subtree-up :wk "Move subtree up")
+  "s l" '(org-demote-subtree :wk "Demote subtree")
+  "s n" '(org-narrow-to-subtree :wk "Narrow to subtree")
+  "s s" '(org-sparse-tree :wk "Sparse tree")
+  "s S" '(org-sort-entries :wk "Sort entries")
+
+  "T" '(:ignore t :wk "tables")
+  "T -" '(org-table-insert-hline :wk "Insert hline")
+  "T a" '(org-table-align :wk "Align table")
+  "T c" '(org-table-create :wk "Create table")
+  "T e" '(org-table-edit-field :wk "Edit field")
+  "T h" '(org-table-header-toggle :wk "Header info")
+  "T s" '(org-table-sort-lines :wk "Sort lines")
+  "T r" '(org-table-recalculate :wk "Recalculate")
+
+  "x" '(:ignore t :wk "text")
+  "x b" '(org-toggle-checkbox :wk "Toggle checkbox")
+  "x i" '(org-toggle-item :wk "Toggle item")
+  "x p" '(org-set-property :wk "Set property")
+  "x t" '(org-set-tags-command :wk "Set tags"))
+
+
+;; Agenda Buffer (SPC m)
+(ar/local-leader
+  :keymaps 'org-agenda-mode-map
+  "d" '(:ignore t :wk "date/deadline")
+  "d d" '(org-agenda-deadline :wk "Set deadline")
+  "d s" '(org-agenda-schedule :wk "Schedule")
+
+  "c" '(:ignore t :wk "clock")
+  "c c" '(org-agenda-clock-cancel :wk "Cancel clock")
+  "c g" '(org-agenda-clock-goto :wk "Goto clock")
+  "c i" '(org-agenda-clock-in :wk "Clock in")
+  "c o" '(org-agenda-clock-out :wk "Clock out")
+  "c r" '(org-agenda-clockreport-mode :wk "Clock report")
+
+  "p" '(:ignore t :wk "priority")
+  "p d" '(org-agenda-priority-down :wk "Priority down")
+  "p u" '(org-agenda-priority-up :wk "Priority up")
+  "p p" '(org-agenda-priority :wk "Set priority")
+
+  "q" '(org-agenda-set-tags :wk "Set tags")
+  "r" '(org-agenda-refile :wk "Refile")
+  "t" '(org-agenda-todo :wk "Cycle TODO")
+  "f" '(org-agenda-filter-by-tag :wk "Filter by tag"))
+
+
+;; Unimpaired Motions
+(general-define-key
+  :states 'motion
+  :keymaps 'org-mode-map
+  "]h" #'org-forward-heading-same-level
+  "[h" #'org-backward-heading-same-level
+  "]l" #'org-next-link
+  "[l" #'org-previous-link
+  "]c" #'org-babel-next-src-block
+  "[c" #'org-babel-previous-src-block)
+
+
+;; Subtree Manipulation
+(general-define-key
+  :states '(normal visual)
+  :keymaps 'org-mode-map
+  "M-h" #'org-metaleft
+  "M-l" #'org-metaright
+  "M-k" #'org-metaup
+  "M-j" #'org-metadown
+  "M-H" #'org-shiftmetaleft
+  "M-L" #'org-shiftmetaright
+  "M-K" #'org-shiftmetaup
+  "M-J" #'org-shiftmetadown)
+
+
+;; Agenda Item Manipulation
+(general-define-key
+  :states 'motion
+  :keymaps 'org-agenda-mode-map
+  "M-k" #'org-agenda-drag-line-backward
+  "M-j" #'org-agenda-drag-line-forward
+  "gd"  #'org-agenda-goto-date)
+#+end_src
 
 
 * TODO Completion Framework
@@ -9248,20 +9603,6 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
   "g R" '(diff-hl-revert-hunk :wk "Revert hunk")
   "g H" '(diff-hl-show-hunk :wk "Preview hunk"))
 
-
-;; Unified Capture
-(ar/global-leader
-  "X" '(ar/capture-dispatch :wk "Smart capture"))
-
-;; GTD operations
-(ar/global-leader
-  "g d" '(:ignore t :wk "gtd")
-  "g d c" '(org-gtd-capture :wk "Capture to inbox")
-  "g d p" '(org-gtd-process-inbox :wk "Process inbox")
-  "g d e" '(org-gtd-engage :wk "Daily engage")
-  "g d n" '(org-gtd-show-all-next :wk "Show all NEXT")
-  "g d s" '(org-gtd-show-stuck-projects :wk "Stuck projects"))
-
 (ar/global-leader
   "j" '(:ignore t :wk "jinx (spellcheck)")
   "j c" '(jinx-correct :wk "Correct word at point")
@@ -9282,54 +9623,6 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
   "r B" '(bookmark-set :wk "Set bookmark")
   "r d" '(bookmark-delete :wk "Delete bookmark")
   "r m" '(bookmark-bmenu-list :wk "Bookmark menu"))
-
-;; Notes (SPC n) — Denote
-(ar/global-leader
-  "n" '(:ignore t :wk "notes")
-
-  ;; Create
-  "n n" '(denote :wk "New note")
-  "n N" '(denote-subdirectory :wk "New note in subdir")
-  "n j" '(denote-journal-new-or-existing-entry :wk "Journal entry (today)")
-  "n J" '(denote-journal-new-entry :wk "New journal entry")
-  "n t" '(denote-type :wk "New note (choose type)")
-  "n c" '(ar/capture-dispatch :wk "Smart capture")
-
-  ;; Find & Search
-  "n f" '(consult-denote-find :wk "Find note")
-  "n s" '(consult-denote-grep :wk "Search notes")
-
-  ;; Links & Backlinks
-  "n l" '(denote-link :wk "Insert link")
-  "n b" '(denote-backlinks :wk "Backlinks")
-  "n i" '(denote-link-or-create :wk "Insert link or create note")
-
-  ;; Rename & Manage
-  "n r" '(denote-rename-file :wk "Rename file")
-  "n R" '(denote-rename-file-using-front-matter :wk "Rename from front matter")
-  "n k" '(denote-rename-file-keywords :wk "Edit keywords")
-
-  ;; Dired & Grep
-  "n d" '(denote-dired :wk "Denote dired")
-  "n g" '(denote-grep :wk "Grep notes")
-
-  ;; Bibliography
-  "n B" '(citar-denote-open-note :wk "Open bib note")
-
-  ;; Review
-  "n w" '(ar/weekly-review :wk "Weekly review")
-
-  ;; Agenda Views (Submenu)
-  "n a" '(:ignore t :wk "agenda")
-  "n a d" '((lambda () (interactive) (org-agenda nil "d")) :wk "Daily")
-  "n a w" '((lambda () (interactive) (org-agenda nil "w")) :wk "Weekly")
-  "n a p" '((lambda () (interactive) (org-agenda nil "p")) :wk "Projects")
-
-  ;; Table Operations (preserved from original)
-  "n T" '(:ignore t :wk "table")
-  "n T c" '(org-table-create :wk "Create table")
-  "n T a" '(org-table-align :wk "Align table")
-  "n T r" '(org-table-recalculate :wk "Recalculate"))
 
 ;; Quit/Session operations (SPC q)
 (ar/global-leader
@@ -9474,44 +9767,6 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
  "RET" (lambda () (interactive) (goto-char (point-max)))
  "[[" #'eshell-previous-prompt
  "]]" #'eshell-next-prompt)
-
-(ar/local-leader
- :keymaps 'org-mode-map
-  "," '(org-ctrl-c-ctrl-c :wk "Ctrl-c Ctrl-c")
-  "." '(org-time-stamp :wk "Timestamp")
-  "*" '(org-ctrl-c-star :wk "Heading")
-  "-" '(org-ctrl-c-minus :wk "List")
-  "a" '(org-agenda :wk "Agenda")
-  "c" '(org-capture :wk "Capture")
-  "e" '(org-export-dispatch :wk "Export")
-  "i" '(:ignore t :wk "insert")
-  "i l" '(org-insert-link :wk "Link")
-  "@" '(org-cite-insert :wk "Insert citation")
-  "i s" '(org-download-screenshot :wk "Screenshot")
-  "i y" '(org-download-yank :wk "Yank image")
-  "i t" '(org-table-create :wk "Table")
-  "i h" '(org-insert-heading :wk "Heading")
-  "t" '(org-todo :wk "Todo")
-  "T" '(org-show-todo-tree :wk "Todo tree")
-  "s" '(org-schedule :wk "Schedule")
-  "d" '(org-deadline :wk "Deadline")
-  "p" '(org-priority :wk "Priority")
-  "r" '(org-refile :wk "Refile")
-  "A" '(org-archive-subtree :wk "Archive")
-  "l" '(:ignore t :wk "link")
-  "l l" '(org-insert-link :wk "Insert link")
-  "l s" '(org-store-link :wk "Store link")
-  "l i" '(org-id-get-create :wk "Insert ID")
-  "b" '(:ignore t :wk "babel")
-  "b t" '(org-babel-tangle :wk "Tangle")
-  "b e" '(org-babel-execute-src-block :wk "Execute")
-  "b b" '(org-babel-execute-buffer :wk "Execute buffer")
-  "b c" '(org-babel-check-src-block :wk "Check")
-  "x" '(:ignore t :wk "text")
-  "x b" '(org-toggle-checkbox :wk "Toggle checkbox")
-  "x i" '(org-toggle-item :wk "Toggle item")
-  "x p" '(org-set-property :wk "Set property")
-  "x t" '(org-set-tags-command :wk "Set tags"))
 #+end_src
 
 * TODO Remaining Work
