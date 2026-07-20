@@ -221,3 +221,29 @@ I remain locked in the READ-ONLY planning state. Awaiting your explicit `GREEN L
 
 ;; NOTE: SPC o a bindings (a/d/w/e/A/p) are defined in the
 ;; General Keybindings section at the end of config.org for Org Agenda Custom Commands subsection.
+
+---
+
+## 3rd Iteration — Denote Silo Keybindings
+
+### Additions to `SPC n` (Notes / Denote) Prefix
+
+Insert the following four bindings into the existing `ar/global-leader` block
+under the `"n"` prefix, after the `"n w"` (Weekly review) entry:
+
+| Binding   | Command                                | `:wk` Annotation    |
+| --------- | -------------------------------------- | ------------------- |
+| `SPC n S` | `denote-silo-create-note`              | "Silo: new note"    |
+| `SPC n O` | `denote-silo-open-or-create`           | "Silo: open/create" |
+| `SPC n C` | `denote-silo-select-silo-then-command` | "Silo: command"     |
+| `SPC n D` | `denote-silo-dired`                    | "Silo: dired"       |
+
+### Elisp Snippet (insert after `"n w"` line in General Keybindings)
+
+```elisp
+;; Silo operations
+"n S" '(denote-silo-create-note :wk "Silo: new note")
+"n O" '(denote-silo-open-or-create :wk "Silo: open/create")
+"n C" '(denote-silo-select-silo-then-command :wk "Silo: command")
+"n D" '(denote-silo-dired :wk "Silo: dired")
+```

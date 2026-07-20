@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.15
+#+VERSION: 0.16
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -4312,7 +4312,6 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
 
 
 * TODO Org Mode & Second Brain
-
 ** DONE Dynamic Directory Structure
 Creates folders and starter files for the Second Brain and configures core Org-mode paths.
 *** Core Directory Scaffolding
@@ -4346,34 +4345,44 @@ Defines base directories and bootstrap utilities.
     full-path))
 #+end_src
 
+
 *** Denote Library Scaffolding
 Creates note-taking folders and isolates them with local configuration files.
 #+begin_src emacs-lisp
 (defun my/ensure-denote-silo (silo-dir)
   "Isolate SILO-DIR via a native `.dir-locals.el' file.
-This mathematically guarantees Denote commands remain scoped to the silo."
+This mathematically guarantees Denote commands remain scoped to the silo.
+Also bakes #+bind into denote-org-front-matter so Org export resolves
+denote: links correctly inside silos (denote-silo manual §2.3)."
+  ;; Enforce trailing slash to prevent false-positive prefix collisions.
+  (setq silo-dir (file-name-as-directory silo-dir))
   (let ((dir-locals (expand-file-name ".dir-locals.el" silo-dir)))
     (unless (file-exists-p dir-locals)
       (with-temp-file dir-locals
         (insert ";;; Directory Local Variables.  For more information evaluate:\n")
         (insert ";;;\n")
-        (insert ";;;     (info \"(emacs) Directory Variables\")\n\n")
-        (insert (format "((nil . ((denote-directory . %S))))\n" silo-dir))))
+        (insert ";;;     (info \"(emacs) Directory Variables\")\n")
+        (let ((front-matter (concat "#+title: %s\n"
+                                    "#+date: %s\n"
+                                    "#+filetags: %s\n"
+                                    "#+identifier: %s\n"
+                                    "#+bind: denote-directory \""
+                                    silo-dir "\"\n\n")))
+          (pp `((nil . ((denote-directory . ,silo-dir)
+                        (denote-org-front-matter . ,front-matter))))
+              (current-buffer)))))
     silo-dir))
 
 (defun my/create-denote-project-silo (project-name)
   "Create a new isolated Denote silo for PROJECT-NAME under `projects/'."
   (interactive "sProject Name: ")
-  (let ((silo-dir (expand-file-name project-name (my/ensure-org-dir "projects/"))))
-    (unless (file-directory-p silo-dir)
-      (make-directory silo-dir t))
+  (let ((silo-dir (my/ensure-org-dir (concat "projects/" project-name))))
     (my/ensure-denote-silo silo-dir)
     (message "Created Denote Silo: %s" silo-dir)
     silo-dir))
 
 (defvar my/denote-zettelkasten-dir (my/ensure-org-dir "zettelkasten/")
   "Global, evergreen concepts. Serves as the fallback `denote-directory'.")
-
 (my/ensure-denote-silo my/denote-zettelkasten-dir)
 
 (my/ensure-org-dir "projects/")
@@ -4413,7 +4422,6 @@ Routes global Org-mode settings to the newly created folders.
 (setq org-attach-id-dir (expand-file-name "attachments/" my/org-directory)
       org-attach-use-inheritance t)
 #+end_src
-
 
 
 ** DONE Core Configuration
@@ -4466,7 +4474,6 @@ Configures Org's core behavior, display, source editing, and performance setting
 #+end_src
 
 
-
 ** DONE Better Font Faces
 Applies global typography mappings and conditional, buffer-local heading zoom for Org buffers.
 #+begin_src emacs-lisp
@@ -4507,7 +4514,6 @@ Applies global typography mappings and conditional, buffer-local heading zoom fo
                        ar/org-zoom-file-patterns))
     (ar/org-apply-heading-zoom)))
 #+end_src
-
 
 
 ** DONE Org Modern
@@ -4671,7 +4677,6 @@ Defines the lifecycle of actionable items and groups them by physical or digital
   ;; Completed subtrees route to `agenda/archive/todo.org_archive`.
   (setq org-archive-location "archive/%s_archive::"))
 #+end_src
-
 
 
 
@@ -4876,6 +4881,7 @@ Groups agenda items into labeled sections by urgency, context, and status.
            :take (15 (:anything t))
            :order 99))))
 #+end_src
+
 
 ** DONE Org Agenda Custom Commands
 Defines named agenda views for daily planning, weekly review, effort-based selection, accomplishments, and project status.
@@ -5108,41 +5114,89 @@ Renders habit consistency graphs in the daily agenda with configurable history, 
         (string-to-char (nerd-icons-codicon "nf-cod-circle_filled"))))
 #+end_src
 
+----------------------------------------
 
-** TODO Denote Directory
-#+begin_src emacs-lisp
-(defvar my/denote-directory
-  (file-truename (expand-file-name "notes/" my/org-directory))
-  "Denote notes directory, nested inside `my/org-directory'.")
-
-;; Ensure subdirectories that Denote and related packages expect.
-(my/ensure-org-dir "notes/journal")
-(my/ensure-org-dir "notes/literature")
-#+end_src
+- [ ] Utilize the mir package for denote ecosystem
+- [ ] Setup denote templates
+- [ ] Do I need to integrate sqlite with denote
 
 
-** TODO Denote
+** DONE Denote
+Configures the core note-taking engine with strict file-naming, keyword inference, and Zettelkasten-oriented defaults.
 #+begin_src emacs-lisp
 (use-package denote
   :defer t
   :hook (dired-mode . denote-dired-mode)
   :custom
-  (denote-directory my/denote-directory)
-  (denote-known-keywords '("emacs" "philosophy" "reading"
-                           "project" "journal" "meeting" "idea" "physics"))
-  (denote-org-capture-specifiers "%l\n%i\n%?")
+  ;; Canonical Zettelkasten silo from Dynamic Directory Structure.
+  (denote-directory my/denote-zettelkasten-dir)
+  (denote-file-type 'org)
+  (denote-known-keywords
+   '("emacs" "philosophy" "reading" "project" "journal"
+     "meeting" "idea" "physics" "zettelkasten" "gtd"
+     "workflow" "architecture" "literature" "reference"
+     "area" "archive"))
+  ;; Atomic notes: no automatic link-to-origin; links added intentionally.
+  (denote-org-capture-specifiers "%i\n%?\n")
   :config
+  ;; Org export ignores directory-local variables, breaking denote: links
+  ;; in silos. Enable #+bind so per-silo overrides resolve correctly.
+  (setq org-export-allow-bind-keywords t)
+  ;; Prevent security prompts when .dir-locals.el injects front-matter templates.
+  (put 'denote-org-front-matter 'safe-local-variable #'stringp)
+
   (setq denote-save-buffers nil
         denote-infer-keywords t
         denote-sort-keywords t
         denote-prompts '(title keywords)
-        denote-excluded-directories-regexp nil
+        denote-excluded-directories-regexp "\\.git"
         denote-keywords-to-not-infer-regexp nil
         denote-rename-confirmations '(rewrite-front-matter modify-file-name)
         denote-date-prompt-use-org-read-date t)
-  (denote-rename-buffer-mode 1))
+  ;; Clean buffer names with backlinks indicator (default "<-->").
+  (denote-rename-buffer-mode 1)
+  ;; Atomic note skeleton after note creation in the Zettelkasten root.
+  (defun ar/denote-insert-atomic-note-template ()
+    "Insert a minimal atomic note skeleton after note creation."
+    (when (and (derived-mode-p 'org-mode)
+               buffer-file-name
+               ;; `denote-directory` function safely resolves the silo path
+               ;; to a string with a guaranteed trailing slash.
+               (string= (denote-directory)
+                        (file-name-directory buffer-file-name)))
+      (goto-char (point-max))
+      (insert "\n* Summary\n")
+      (save-excursion
+        (insert "\n* Connections\n-\n* Sources\n- "))))
+  (add-hook 'denote-after-new-note-hook
+            #'ar/denote-insert-atomic-note-template))
 #+end_src
 
+
+** DONE Denote Silo
+Provides commands for creating notes, opening files, and switching directories across isolated Denote silos.
+#+begin_src emacs-lisp
+(use-package denote-silo
+  :defer t
+  :after denote
+  :commands (denote-silo-create-note
+             denote-silo-open-or-create
+             denote-silo-select-silo-then-command
+             denote-silo-dired
+             denote-silo-cd)
+  :config
+  ;; Discover silos: Zettelkasten root + subdirectories with .dir-locals.el.
+  (setq denote-silo-directories
+        (delete-dups
+         (cons my/denote-zettelkasten-dir
+               (cl-loop for parent in '("projects" "areas" "resources")
+                        for dir = (expand-file-name parent my/org-directory)
+                        if (file-directory-p dir)
+                        nconc (cl-loop for sub in (directory-files dir t directory-files-no-dot-files-regexp)
+                                       if (and (file-directory-p sub)
+                                               (file-exists-p (expand-file-name ".dir-locals.el" sub)))
+                                       collect sub))))))
+#+end_src
 
 ** TODO Denote Journal
 #+begin_src emacs-lisp
@@ -5166,6 +5220,7 @@ Renders habit consistency graphs in the daily agenda with configurable history, 
 
 
 ** TODO Denote Explore
+
 
 ** TODO Consult Denote
 #+begin_src emacs-lisp
@@ -5192,15 +5247,10 @@ Renders habit consistency graphs in the daily agenda with configurable history, 
 
 
 ** TODO Org Capture
+Routes quick entries to the flat task registry, spawns Denote notes, and provides a hierarchical dispatcher for all capture workflows.
 *** Helper Functions
+Utility functions for clipboard URL extraction, habit schedule prompting, and context-aware capture targets.
 #+begin_src emacs-lisp
-(defun ar/capture-goto-inbox ()
-  "Visit the GTD inbox file and position point at end for capture.
-Required by the `(function ...)' capture target for the quick inbox
-template — org-capture calls this to find the insertion location."
-  (find-file (expand-file-name "gtd/inbox.org" my/org-directory))
-  (goto-char (point-max)))
-
 (defun ar/capture-url-from-clipboard ()
   "Return the URL currently in the clipboard/kill-ring.
 Falls back to `read-string' if no HTTP/HTTPS URL is found."
@@ -5213,21 +5263,15 @@ Falls back to `read-string' if no HTTP/HTTPS URL is found."
       (read-string "URL: "))))
 
 (defun ar/capture-url-as-org-link ()
-  "Format the clipboard URL as an org link with a prompted description.
-Called from %(sexp) inside the web-clip capture templates."
+  "Format the clipboard URL as an org link with a prompted description."
   (let* ((url  (ar/capture-url-from-clipboard))
          (desc (read-string (format "Description [%s]: " url) nil nil url)))
     (format "[[%s][%s]]" url desc)))
 
 (defun ar/capture-habit-range-schedule ()
-  "Interactively prompt for ideal and max repeat intervals.
-Returns a SCHEDULED timestamp string for an org-habit range repeater,
-e.g. \"<2026-03-14 Sat .+1d/2d>\".
-
-FIX: This function replaces the broken pattern of nesting %^{prompt}
-inside %(sexp). Per the org manual, %(sexp) is expanded BEFORE
-interactive %^{} prompts, so %^{} inside a sexp receives the literal
-string, not the user's input. Using read-string here is correct."
+  "Prompt for ideal and max repeat intervals, return a SCHEDULED timestamp.
+Uses `read-string' because %^{prompt} inside %(sexp) receives the literal
+string, not user input, per the Org manual expansion order."
   (let* ((ideal   (read-string "Ideal interval in days (e.g. 1): " "1"))
          (ideal-n (string-to-number ideal))
          (max-def (number-to-string (* 2 ideal-n)))
@@ -5236,32 +5280,18 @@ string, not the user's input. Using read-string here is correct."
                    max-def)))
     (format-time-string
      (format "<%%Y-%%m-%%d %%a .+%sd/%sd>" ideal max))))
-
-(defun ar/capture-region-or-empty ()
-  "Return the active region as an org quote block, or empty string."
-  (if (region-active-p)
-      (format "#+begin_quote\n%s\n#+end_quote"
-              (buffer-substring-no-properties
-               (region-beginning) (region-end)))
-    ""))
 #+end_src
-
 *** Smart Dispatcher
+Hierarchical capture menu routing tasks, notes, journal, habits, goals, and web clips.
 #+begin_src emacs-lisp
 (defun ar/capture-dispatch ()
   "Hierarchical smart capture dispatcher.
-
 Top-level keys:
-  [t] GTD task → org-gtd inbox
-  [n] New Denote note
-  [j] Journal (sub-menu, via denote-journal)
-  [m] Meeting notes
-  [b] Book / article to reading list
-  [h] Habit (sub-menu)
-  [g] Goal (sub-menu)
-  [w] Web clip / bookmark (sub-menu)
-  [i] Quick inbox item with context link
-  [q] Quit"
+  [t] Task → inbox in todo.org    [n] New Denote note
+  [j] Journal (sub-menu)          [m] Meeting notes
+  [b] Book / article              [h] Habit (sub-menu)
+  [g] Goal (sub-menu)             [w] Web clip (sub-menu)
+  [i] Quick inbox with context    [q] Quit"
   (interactive)
   (let ((choice (read-char-choice
                  (concat "Capture: "
@@ -5269,10 +5299,8 @@ Top-level keys:
                          "[h]abit [g]oal [w]eb [i]nbox [q]uit: ")
                  '(?t ?n ?j ?m ?b ?h ?g ?w ?i ?q))))
     (pcase choice
-      (?t (org-gtd-capture))
-
+      (?t (org-capture nil "i"))
       (?n (call-interactively #'denote))
-
       (?j (let ((kind (read-char-choice
                        "Journal: [d]aily  [l]ink+context  [q]uit: "
                        '(?d ?l ?q))))
@@ -5280,11 +5308,8 @@ Top-level keys:
               (?d (org-capture nil "jd"))
               (?l (org-capture nil "jl"))
               (?q (keyboard-quit)))))
-
       (?m (org-capture nil "m"))
-
       (?b (org-capture nil "b"))
-
       (?h (let ((kind (read-char-choice
                        "Habit: [d]aily flexible  [s]trict daily  [r]ange  [q]uit: "
                        '(?d ?s ?r ?q))))
@@ -5293,7 +5318,6 @@ Top-level keys:
               (?s (org-capture nil "hs"))
               (?r (org-capture nil "hr"))
               (?q (keyboard-quit)))))
-
       (?g (let ((kind (read-char-choice
                        "Goal: [l]ife  [Q]uarterly  [w]eekly  [q]uit: "
                        '(?l ?Q ?w ?q))))
@@ -5302,7 +5326,6 @@ Top-level keys:
               (?Q (org-capture nil "gQ"))
               (?w (org-capture nil "gw"))
               (?q (keyboard-quit)))))
-
       (?w (let ((kind (read-char-choice
                        "Web: [c]lipboard URL  [l]ink+context  [q]uit: "
                        '(?c ?l ?q))))
@@ -5310,20 +5333,14 @@ Top-level keys:
               (?c (org-capture nil "wc"))
               (?l (org-capture nil "wl"))
               (?q (keyboard-quit)))))
-
       (?i (org-capture nil "i"))
-
       (?q (keyboard-quit)))))
 #+end_src
-
 *** Journal Templates
+Daily Denote journal entries with optional context links.
 #+begin_src emacs-lisp
-;; Both templates target today's Denote journal file via
-;; `denote-journal-path-to-new-or-existing-entry'.  This opens or creates
-;; a file in notes/journal/ per the denote-journal manual.
 (defvar ar/capture-templates-journal
   `(("j" "Journal")
-
     ("jd" "Daily entry" entry
      (file denote-journal-path-to-new-or-existing-entry)
      ,(string-join
@@ -5333,7 +5350,6 @@ Top-level keys:
          ":END:")
        "\n")
      :empty-lines 1 :kill-buffer t)
-
     ("jl" "Daily entry + context link" entry
      (file denote-journal-path-to-new-or-existing-entry)
      ,(string-join
@@ -5346,12 +5362,12 @@ Top-level keys:
      :empty-lines 1 :kill-buffer t))
   "Journal capture templates backed by denote-journal.")
 #+end_src
-
 *** Meeting Template
+Structured meeting notes with attendees, agenda, and action items.
 #+begin_src emacs-lisp
 (defvar ar/capture-templates-meeting
   `(("m" "Meeting" entry
-     (file+headline ,(expand-file-name "journal.org" my/org-directory)
+     (file+headline ,(expand-file-name "agenda/journal.org" my/org-directory)
                     "Meetings")
      ,(string-join
        '("* %^{Meeting title} :meeting:"
@@ -5376,13 +5392,13 @@ Top-level keys:
      :clock-resume t))
   "Meeting capture template.")
 #+end_src
-
 *** Book / Article Template
+Reading list entries with metadata and reflection prompts.
 #+begin_src emacs-lisp
 (defvar ar/capture-templates-book
   `(("b" "Book / Article" entry
-     (file+headline ,(expand-file-name "reading.org" my/org-directory)
-                    "To Read")
+     (file+headline ,(expand-file-name "agenda/todo.org" my/org-directory)
+                    "Someday")
      ,(string-join
        '("* TODO %^{Title} :read:"
          ":PROPERTIES:"
@@ -5401,14 +5417,13 @@ Top-level keys:
      :empty-lines 1))
   "Book and article capture template.")
 #+end_src
-
 *** Habit Templates
+Habit entries with flexible, strict, and range repeaters routed to habits.org.
 #+begin_src emacs-lisp
 (defvar ar/capture-templates-habits
   `(("h" "Habit")
-
     ("hd" "Daily habit (flexible .+1d)" entry
-     (file+headline ,(expand-file-name "habits.org" my/org-directory)
+     (file+headline ,(expand-file-name "agenda/habits.org" my/org-directory)
                     "Habits")
      ,(string-join
        '("* TODO %^{Habit name}"
@@ -5418,9 +5433,8 @@ Top-level keys:
          ":END:")
        "\n")
      :empty-lines 1)
-
     ("hs" "Daily habit (strict ++1d)" entry
-     (file+headline ,(expand-file-name "habits.org" my/org-directory)
+     (file+headline ,(expand-file-name "agenda/habits.org" my/org-directory)
                     "Habits")
      ,(string-join
        '("* TODO %^{Habit name}"
@@ -5430,9 +5444,8 @@ Top-level keys:
          ":END:")
        "\n")
      :empty-lines 1)
-
     ("hr" "Range habit (.+Xd/Yd)" entry
-     (file+headline ,(expand-file-name "habits.org" my/org-directory)
+     (file+headline ,(expand-file-name "agenda/habits.org" my/org-directory)
                     "Habits")
      ,(string-join
        '("* TODO %^{Habit name}"
@@ -5444,15 +5457,14 @@ Top-level keys:
      :empty-lines 1))
   "Habit capture templates.")
 #+end_src
-
 *** Goal Templates
+Life, quarterly, and weekly goals routed to the flat task registry.
 #+begin_src emacs-lisp
 (defvar ar/capture-templates-goals
   `(("g" "Goal")
-
     ("gl" "Life goal" entry
-     (file+headline ,(expand-file-name "goals.org" my/org-directory)
-                    "Life Goals")
+     (file+headline ,(expand-file-name "agenda/todo.org" my/org-directory)
+                    "Projects")
      ,(string-join
        '("* TODO %^{Goal}"
          ":PROPERTIES:"
@@ -5469,10 +5481,9 @@ Top-level keys:
          "- [ ] ")
        "\n")
      :empty-lines 1)
-
     ("gQ" "Quarterly goal" entry
-     (file+headline ,(expand-file-name "goals.org" my/org-directory)
-                    "This Quarter")
+     (file+headline ,(expand-file-name "agenda/todo.org" my/org-directory)
+                    "Projects")
      ,(string-join
        '("* TODO %^{Goal}"
          "DEADLINE: %^{Deadline}t"
@@ -5490,10 +5501,9 @@ Top-level keys:
          "** Weekly check-in notes")
        "\n")
      :empty-lines 1)
-
     ("gw" "Weekly intention" entry
-     (file+headline ,(expand-file-name "goals.org" my/org-directory)
-                    "This Month")
+     (file+headline ,(expand-file-name "agenda/todo.org" my/org-directory)
+                    "Tasks")
      ,(string-join
        '("* TODO %^{Intention for the week}"
          "SCHEDULED: %t"
@@ -5506,15 +5516,14 @@ Top-level keys:
      :empty-lines 1))
   "Goal capture templates.")
 #+end_src
-
 *** Web / Bookmark Templates
+Clipboard URL bookmarks and Emacs context links for the reading list.
 #+begin_src emacs-lisp
 (defvar ar/capture-templates-web
   `(("w" "Web / Bookmark")
-
     ("wc" "Clipboard URL bookmark" entry
-     (file+headline ,(expand-file-name "reading.org" my/org-directory)
-                    "Bookmarks")
+     (file+headline ,(expand-file-name "agenda/todo.org" my/org-directory)
+                    "Someday")
      ,(string-join
        '("* %(ar/capture-url-as-org-link) :bookmark:"
          ":PROPERTIES:"
@@ -5526,10 +5535,9 @@ Top-level keys:
        "\n")
      :empty-lines 1
      :prepend t)
-
     ("wl" "Link to current Emacs location" entry
-     (file+headline ,(expand-file-name "reading.org" my/org-directory)
-                    "Bookmarks")
+     (file+headline ,(expand-file-name "agenda/todo.org" my/org-directory)
+                    "Someday")
      ,(string-join
        '("* %^{Description} :bookmark:context:"
          ":PROPERTIES:"
@@ -5543,29 +5551,26 @@ Top-level keys:
      :prepend t))
   "Web clip and bookmark capture templates.")
 #+end_src
-
 *** Quick Inbox Template
+Frictionless capture to the Inbox heading in the flat task registry.
 #+begin_src emacs-lisp
 (defvar ar/capture-templates-inbox
   `(("i" "Quick inbox item (with context)" entry
-     (function ar/capture-goto-inbox)
+     (file+headline ,(expand-file-name "agenda/todo.org" my/org-directory)
+                    "Inbox")
      ,(string-join
-       '("* INBOX %?"
+       '("* TODO %?"
          ":PROPERTIES:"
          ":CREATED:  %U"
          ":CONTEXT:  %a"
          ":END:")
        "\n")
      :empty-lines 1))
-  "Quick GTD inbox capture template.")
+  "Quick inbox capture template routed to agenda/todo.org.")
 #+end_src
-
 *** Denote Note Template
+Spawns a new Denote note via org-capture with front-matter handled by denote-org-capture.
 #+begin_src emacs-lisp
-;; This template creates a Denote note via org-capture.  The file path is
-;; generated dynamically by denote-org-capture, so the :file target is always
-;; `denote-last-path'.  Content after the front matter is controlled by
-;; `denote-org-capture-specifiers' (configured in use-package denote above).
 (defvar ar/capture-templates-denote
   '(("n" "Note (Denote)" plain
      (file denote-last-path)
@@ -5573,14 +5578,13 @@ Top-level keys:
      :no-save t :immediate-finish nil :kill-buffer t :jump-to-captured t))
   "Denote note capture template.")
 #+end_src
-
 *** use-package
+Wires all template groups into org-capture and saves buffers on successful capture.
 #+begin_src emacs-lisp
 (use-package org-capture
   :ensure nil
   :defer t
   :after org
-
   :custom
   (org-capture-templates
    (append ar/capture-templates-journal
@@ -5591,12 +5595,8 @@ Top-level keys:
            ar/capture-templates-web
            ar/capture-templates-inbox
            ar/capture-templates-denote))
-
   :config
-  ;; Save all org buffers after a SUCCESSFUL capture only.
-  ;; org-capture-after-finalize-hook fires on both success and abort;
-  ;; org-note-abort is let-bound to t during org-capture-kill (abort),
-  ;; so the guard prevents unnecessary saves on cancelled captures.
+  ;; Save all org buffers after successful capture only (not on abort).
   (add-hook 'org-capture-after-finalize-hook
             (lambda ()
               (unless org-note-abort
@@ -5605,34 +5605,52 @@ Top-level keys:
 
 
 ** TODO Weekly Review
+Spawns a Denote note with task statistics, a structured review checklist, and reflection prompts.
 #+begin_src emacs-lisp
 (defun ar/weekly-review ()
   "Open or create this week's Denote review note, pre-populated with stats."
   (interactive)
   (require 'denote)
-  (let* ((week   (format-time-string "%Y-W%V"))
+  (let* ((week (format-time-string "%Y-W%V"))
          (regexp (concat "__review.*" (regexp-quote week)))
-         (files  (denote-directory-files regexp)))
+         (files (denote-directory-files regexp)))
     (if files
         (find-file (car files))
-      ;; Count pending tasks in GTD inbox
-      (let* ((inbox-file  (expand-file-name "gtd/inbox.org" my/org-directory))
+      (let* ((todo-file (expand-file-name "agenda/todo.org" my/org-directory))
+             ;; Count TODO items under the * Inbox heading in todo.org.
              (inbox-count
-              (if (file-exists-p inbox-file)
+              (if (file-exists-p todo-file)
                   (with-temp-buffer
-                    (insert-file-contents inbox-file)
-                    (count-matches "^\\* INBOX " (point-min) (point-max)))
+                    (insert-file-contents todo-file)
+                    (goto-char (point-min))
+                    (if (re-search-forward "^\\* Inbox" nil t)
+                        (let ((end (or (save-excursion
+                                         (re-search-forward "^\\* " nil t)
+                                         (match-beginning 0))
+                                       (point-max))))
+                          (count-matches "^\\*\\* TODO " (point) end))
+                      0))
                 0))
-             ;; Count GTD-NEXT actions
+             ;; Count NEXT actions in todo.org.
              (next-count
-              (length (org-map-entries
-                       (lambda () t)
-                       "TODO=\"GTD-NEXT\""
-                       (list my/org-gtd-directory))))
-             ;; Count Denote notes created in the last 7 days
+              (if (file-exists-p todo-file)
+                  (length (org-map-entries
+                           (lambda () t)
+                           "TODO=\"NEXT\""
+                           (list todo-file)))
+                0))
+             ;; Count WAIT items in todo.org.
+             (wait-count
+              (if (file-exists-p todo-file)
+                  (length (org-map-entries
+                           (lambda () t)
+                           "TODO=\"WAIT\""
+                           (list todo-file)))
+                0))
+             ;; Count Denote notes created in the last 7 days.
              (week-start (format-time-string "%Y%m%d"
-                           (time-subtract (current-time)
-                                          (seconds-to-time (* 7 24 60 60)))))
+                                             (time-subtract (current-time)
+                                                            (seconds-to-time (* 7 24 60 60)))))
              (new-notes
               (length (seq-filter
                        (lambda (f)
@@ -5643,29 +5661,29 @@ Top-level keys:
         (goto-char (point-max))
         (insert
          (concat
-          "\n* GTD Health Check\n\n"
+          "\n* Task Health Check\n"
           (format "- Inbox items: *%d* %s\n"
                   inbox-count
                   (if (> inbox-count 10) "⚠ PROCESS URGENTLY" "✓"))
-          (format "- GTD-NEXT actions: *%d*\n"
-                  next-count)
-          (format "- New Denote notes this week: *%d*\n\n" new-notes)
-          "* Review Checklist\n\n"
-          "** GTD Review\n"
-          "- [ ] Process GTD inbox to zero\n"
-          "- [ ] Review all GTD-WAIT items\n"
+          (format "- NEXT actions: *%d*\n" next-count)
+          (format "- WAIT items: *%d*\n" wait-count)
+          (format "- New Denote notes this week: *%d*\n" new-notes)
+          "* Review Checklist\n"
+          "** Task Review\n"
+          "- [ ] Process Inbox to zero\n"
+          "- [ ] Review all WAIT items\n"
           "- [ ] Confirm each project has a NEXT action\n"
           "- [ ] Review calendar (past week + next 2 weeks)\n"
-          "- [ ] Review Someday/Maybe\n\n"
+          "- [ ] Review Someday/Maybe\n"
           "** Notes Review\n"
           "- [ ] Review notes created this week\n"
           "- [ ] Identify missing connections\n"
-          "- [ ] Rename/re-keyword any stale notes\n\n"
-          "* Reflections\n\n"
-          "** What Went Well?\n\n\n"
-          "** What Could Improve?\n\n\n"
-          "** Key Insights This Week\n\n\n"
-          "** Next Week's Focus\n\n\n"))))))
+          "- [ ] Rename/re-keyword any stale notes\n"
+          "* Reflections\n"
+          "** What Went Well?\n"
+          "** What Could Improve?\n"
+          "** Key Insights This Week\n"
+          "** Next Week's Focus\n"))))))
 #+end_src
 
 
