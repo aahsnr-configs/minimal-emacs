@@ -1,17 +1,18 @@
 document:
-  title: "Unified AI Operational Protocol & Project State Checkpoint (v35: Denote Ecosystem Package Ordering & config.org v0.16 Sync)"
-  version: 35
-  date: "July 20, 2026"
+  title: "Unified AI Operational Protocol & Project State Checkpoint (v37: Contextual Sidebars Integration & denote-sections Hallucination Fix)"
+  version: 37
+  date: "July 21, 2026"
   description: >
     This document serves as the persistent memory anchor, behavioral boundary, and project tracker
     for the AI. It merges the system prompt protocol (rules, persona, formatting) with the project
     state (progress, architecture, checklists) to survive context window truncation.
-    v35 CORRECTION: Incorporated the full Denote Ecosystem Package Ordering (25 packages) from
-    denote-pkgs.md into the Org Mode & Second Brain paradigm. Synced project state with config.org
-    v0.16 (font family unified to JetBrainsMono Nerd Font across nerd-icons and default faces).
-    Documented the Denote subsection implementation order and dependency graph. Updated the
-    Org-Super-Agenda Enhancement Architecture category statuses to reflect v34 Custom Commands
-    implementation. All AI interactions must strictly adhere to the constraints and state defined herein.
+    
+    v37 CORRECTION: Excised the parametric hallucination that `denote-sections` manipulates internal
+    AST/heading structure. Verified upstream that it is strictly a `universal-sidecar` bridge for
+    rendering backlinks and bibliography metadata. Created a dedicated `* TODO Contextual Sidebars`
+    main section between Development Tools and Highlight TODOs. Updated the Denote Ecosystem
+    implementation order and config.org subsection mapping to reflect the new architectural placement.
+    All AI interactions must strictly adhere to the constraints and state defined herein.
 
   sections:
     - id: 1
@@ -32,7 +33,7 @@ document:
           - Ingest all files completely.
           - Acknowledge the current version and date from this file.
           - Scan `config.org.txt` and identify the exact next subsection lacking the `DONE` keyword.
-          - 'Output this exact phrase: "I have ingested the source-of-truth files and the unified protocol. I acknowledge the strict formatting rules, the negative constraints, and the current project state (Version 35). The next pending subsection is [Subsection Name]. I am locked in and will write zero code until you give the signal."'
+          - 'Output this exact phrase: "I have ingested the source-of-truth files and the unified protocol. I acknowledge the strict formatting rules, the negative constraints, and the current project state (Version 37). The next pending subsection is [Subsection Name]. I am locked in and will write zero code until you give the signal."'
       strict_greenlight_protocol:
         state: "You are in a READ-ONLY planning state by default."
         rule: >
@@ -209,11 +210,11 @@ document:
           implementation_order:
             - { order: 1, package: "denote", status: "CONFIGURED", config_subsection: "Denote", notes: "Core engine. File naming, keyword inference, rename-buffer-mode." }
             - { order: 2, package: "denote-org", status: "CONFIGURED", config_subsection: "Denote Org", notes: "Org-specific link types and capture integration." }
-            - { order: 3, package: "denote-silo", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Multi-silo isolation via .dir-locals.el. GNU ELPA official package." }
+            - { order: 3, package: "denote-silo", status: "CONFIGURED", config_subsection: "Denote Silo", notes: "Multi-silo isolation via .dir-locals.el. GNU ELPA official package." }
             - { order: 4, package: "denote-journal", status: "CONFIGURED", config_subsection: "Denote Journal", notes: "Daily journal routing to notes/journal/ subdirectory." }
-            - { order: 5, package: "denote-journal-capture", status: "PLANNED", config_subsection: "Denote Journal (extend)", notes: "org-capture integration for journal entries." }
-            - { order: 6, package: "denote-sequence", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Sequential/ordered note numbering for linear workflows." }
-            - { order: 7, package: "denote-sections", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Section-based note organization within single files." }
+            - { order: 5, package: "denote-journal-capture", status: "CONFIGURED", config_subsection: "Denote Journal Capture", notes: "org-capture integration for journal entries." }
+            - { order: 6, package: "denote-sequence", status: "CONFIGURED", config_subsection: "Denote Sequence", notes: "Hierarchical Folgezettel numbering schemes." }
+            - { order: 7, package: "denote-sections", status: "PLANNED", config_subsection: "Contextual Sidebars", notes: "Universal Sidecar integration for dynamic backlinks rendering." }
             - { order: 8, package: "denote-refs", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Backlink and forward-link reference management." }
             - { order: 9, package: "denote-regexp", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Regex-powered note filtering and search." }
             - { order: 10, package: "denote-search", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Enhanced search across Denote silos." }
@@ -228,7 +229,7 @@ document:
             - { order: 19, package: "denote-agenda", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Agenda-like chronological view of Denote notes." }
             - { order: 20, package: "denote-publish", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Publish Denote notes to static site generators." }
             - { order: 21, package: "denote-markdown", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Markdown file-type support for Denote notes." }
-            - { order: 22, package: "denote-citar-sections", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Citar bibliography sections within Denote notes." }
+            - { order: 22, package: "denote-citar-sections", status: "PLANNED", config_subsection: "Contextual Sidecars", notes: "Universal Sidecar integration for bibliography abstracts and references." }
             - { order: 23, package: "org-transclusion + denote", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Transclude Denote note content into Org documents." }
             - { order: 24, package: "consult-denote", status: "CONFIGURED", config_subsection: "Consult Denote", notes: "Vertico-powered search/grep scoped to active silo." }
             - { order: 25, package: "citar-denote", status: "CONFIGURED", config_subsection: "Citar Denote", notes: "Bibliography → literature note pipeline." }
@@ -240,27 +241,39 @@ document:
             mapping:
               - subsection: "Denote Directory"
                 packages: ["(path variables only — no package)"]
-                status: "TODO in config.org v0.16"
+                status: "DONE in config.org v0.16"
               - subsection: "Denote"
-                packages: ["denote", "denote-silo", "denote-sequence"]
-                status: "TODO in config.org v0.16 (denote only)"
+                packages: ["denote"]
+                status: "DONE in config.org v0.16"
+              - subsection: "Denote Silo"
+                packages: ["denote-silo"]
+                status: "DONE in config.org v0.16"
+              - subsection: "Denote Sequence"
+                packages: ["denote-sequence"]
+                status: "DONE in config.org v0.16"
               - subsection: "Denote Journal"
-                packages: ["denote-journal", "denote-journal-capture"]
-                status: "TODO in config.org v0.16 (denote-journal only)"
+                packages: ["denote-journal"]
+                status: "DONE in config.org v0.16"
+              - subsection: "Denote Journal Capture"
+                packages: ["denote-journal-capture"]
+                status: "DONE in config.org v0.16"
               - subsection: "Denote Org"
                 packages: ["denote-org", "denote-markdown", "org-transclusion + denote"]
-                status: "TODO in config.org v0.16 (denote-org only)"
+                status: "DONE in config.org v0.16 (denote-org only)"
               - subsection: "Denote Explore"
                 packages: ["denote-explore", "denote-wordcloud", "denote-zettel-interface"]
                 status: "TODO in config.org v0.16 (empty)"
               - subsection: "Consult Denote"
                 packages: ["consult-denote", "denote-search", "denote-regexp"]
-                status: "TODO in config.org v0.16 (consult-denote only)"
+                status: "TODO in config.org v0.16 (consult-denote implemented, header TODO)"
               - subsection: "Citar Denote"
-                packages: ["citar-denote", "denote-citar-sections"]
-                status: "TODO in config.org v0.16 (citar-denote only)"
+                packages: ["citar-denote"]
+                status: "TODO in config.org v0.16 (citar-denote implemented, header TODO)"
+              - subsection: "Contextual Sidebars (NEW)"
+                packages: ["universal-sidecar", "denote-sections", "denote-citar-sections"]
+                status: "TODO in config.org v0.16 (newly created in v37)"
               - subsection: "Denote Management (NEW)"
-                packages: ["denote-menu", "denote-merge", "denote-solo", "denote-review", "denote-refs", "denote-sections", "denote-project-notes", "denote-agenda", "denote-publish"]
+                packages: ["denote-menu", "denote-merge", "denote-solo", "denote-review", "denote-refs", "denote-project-notes", "denote-agenda", "denote-publish"]
                 status: "NOT YET CREATED in config.org"
           load_order_physics:
             - "denote core MUST load before ALL extensions (it defines denote-directory, denote-file-type, etc.)."
@@ -271,6 +284,9 @@ document:
             - "citar-denote MUST load after both citar and denote (it bridges bibliography to note creation)."
             - "denote-explore MUST load after denote (it queries denote-directory-files)."
             - "org-transclusion + denote MUST load after both org-transclusion and denote-org."
+            - "universal-sidecar MUST load before denote-sections and denote-citar-sections."
+            - "denote-sections MUST load after both universal-sidecar and denote."
+            - "denote-citar-sections MUST load after universal-sidecar, denote, and citar."
       org_super_agenda_enhancement_architecture:
         summary: >
           The org-super-agenda subsection implements a 14-category enhancement architecture
@@ -278,83 +294,20 @@ document:
           All enhancements use native Emacs primitives (overlays, text properties, keymaps) with
           zero external package dependencies beyond org-super-agenda itself.
         categories:
-          - id: 1
-            name: "Group Folding (Native Outline via TAB)"
-            status: "PLANNED"
-            mechanism: "Overlays with `invisible` property toggled via `org-super-agenda-header-map` TAB binding. No origami dependency."
-            key_function: "ar/org-super-agenda-toggle-group"
-          - id: 2
-            name: "Group Size Limiting (:take)"
-            status: "IMPLEMENTED in Custom Commands (v34)"
-            mechanism: ":take selector on Overdue (10), Due Soon (7), Other Tasks (15). Combined with org-super-agenda-keep-order t + deterministic org-agenda-sorting-strategy."
-            note: "Org Super Agenda subsection's global default groups still use the BROKEN :take (15 (:anything t)) nesting. Must be fixed when that subsection is rewritten."
-          - id: 3
-            name: "Project-Based Grouping (:auto-parent)"
-            status: "IMPLEMENTED in Custom Commands (v34) — MAY CHANGE"
-            mechanism: ":auto-parent t groups items by immediate parent heading in flat todo.org."
-            critical_note: >
-              This approach MAY CHANGE after Workflow Management section finalization.
-              If projection/bufferlo introduces a different project-boundary mechanism,
-              the strategy may shift to :ancestor-with-todo with a dedicated PROJECT keyword,
-              or to a custom :pred function querying project-current.
-          - id: 4
-            name: "Effort-Based Grouping (:effort< / :effort>)"
-            status: "IMPLEMENTED in Custom Commands (v34)"
-            mechanism: "Dedicated custom command (SPC a e), NOT in main daily view. Eliminates consumption conflicts with :auto-parent."
-            conflict_resolution: "Separate view profile; main view uses :transformer to append effort indicators."
-            note: "The :property selector syntax was fixed from dotted pair to proper list in the v34 rewrite."
-          - id: 5
-            name: "Log Mode Integration (:log)"
-            status: "IMPLEMENTED in Custom Commands (v34)"
-            mechanism: ":log closed group at order 0, BEFORE :time-grid group. org-agenda-start-with-log-mode t set in daily/weekly/accomplishments custom command settings."
-            caveat_resolution: "Consumption-order placement solves the README caveat. First-match-wins guarantees closed items are captured before time-grid sees them. Explanatory comment added to prevent future reordering."
-          - id: 6
-            name: "Header Keymap Actions"
-            status: "PLANNED"
-            mechanism: "TAB (fold), RET (goto first item), q (quit) bound in org-super-agenda-header-map."
-          - id: 7
-            name: "Multiple View Profiles (Custom Commands)"
-            status: "IMPLEMENTED in Custom Commands (v34)"
-            placement: "Defined in the org-agenda-custom-commands subsection. Each custom command sets its own org-super-agenda-groups in its settings list."
-            profiles:
-              - { key: "SPC a d", name: "Daily Dashboard", description: "Full 16-group view with :take limits, :children, :auto-parent, :transformer" }
-              - { key: "SPC a w", name: "Weekly Review", description: "Inbox + Waiting + Stuck + Someday + Everything Else" }
-              - { key: "SPC a e", name: "Effort-Based", description: "Quick Wins + Energy (high/low via :property) + Medium + Deep Work + No Estimate" }
-              - { key: "SPC a A", name: "Accomplishments", description: ":log closed + :log clocked + :log changed" }
-              - { key: "SPC a p", name: "Project Status", description: ":children todo + :auto-parent + Ungrouped" }
-          - id: 8
-            name: ":transformer for Item Enhancement"
-            status: "IMPLEMENTED in Custom Commands (v34)"
-            constraint: "O(1) string operations ONLY. No regex compilation, no property lookups beyond position 0, no recursive calls."
-            operations:
-              - "Strip TODO keyword prefix via nested string-remove-prefix (handles both NEXT and TODO)"
-              - "Strip WAIT keyword prefix via string-remove-prefix"
-            note: "Org Super Agenda subsection's global default groups still LACK :transformer on context groups. Must be added when that subsection is rewritten."
-          - id: 9
-            name: "org-super-agenda-header-prefix"
-            status: "PLANNED (Org Super Agenda subsection)"
-            value: '"▸ "'
-          - id: 10
-            name: "org-super-agenda-final-group-separator"
-            status: "PLANNED (Org Super Agenda subsection)"
-            value: "Unicode box-drawing horizontal line (U+2500) with leading/trailing newlines"
-          - id: 11
-            name: ":children for Project Detection"
-            status: "IMPLEMENTED in Custom Commands (v34)"
-            caveat_fix: "Restricted to daily/weekly/project-status agenda views ONLY. NEVER use in org-todo-list or org-tags-view (unbounded recursive child-scanning). Explanatory comment added."
-          - id: 12
-            name: ":property for Custom Metadata"
-            status: "IMPLEMENTED in Custom Commands (v34)"
-            mechanism: "ENERGY property (high/low) grouped in dedicated Effort-Based custom command."
-            note: "Syntax fixed from dotted pair (\"ENERGY\" . \"high\") to proper list (\"ENERGY\" \"high\") per org-super-agenda pcase pattern requirements."
-          - id: 13
-            name: "org-super-agenda-show-message Suppression"
-            status: "PLANNED (Org Super Agenda subsection)"
-            value: "nil"
-          - id: 14
-            name: "org-super-agenda-date-format"
-            status: "PLANNED (Org Super Agenda subsection)"
-            value: '"%A, %B %d" (renders as "Monday, July 20")'
+          - { id: 1, name: "Group Folding (Native Outline via TAB)", status: "IMPLEMENTED in Global Defaults (v36)", mechanism: "Overlays with `invisible` property toggled via `org-super-agenda-header-map` TAB binding. No origami dependency.", key_function: "ar/org-super-agenda-toggle-group" }
+          - { id: 2, name: "Group Size Limiting (:take)", status: "IMPLEMENTED in Custom Commands (v34)", mechanism: ":take selector on Overdue (10), Due Soon (7), Other Tasks (15). Combined with org-super-agenda-keep-order t + deterministic org-agenda-sorting-strategy.", note: "Org Super Agenda subsection's global default groups still use the BROKEN :take (15 (:anything t)) nesting. Must be fixed when that subsection is rewritten." }
+          - { id: 3, name: "Project-Based Grouping (:auto-parent)", status: "IMPLEMENTED in Custom Commands (v34) — MAY CHANGE", mechanism: ":auto-parent t groups items by immediate parent heading in flat todo.org.", critical_note: "This approach MAY CHANGE after Workflow Management section finalization." }
+          - { id: 4, name: "Effort-Based Grouping (:effort< / :effort>)", status: "IMPLEMENTED in Custom Commands (v34)", mechanism: "Dedicated custom command (SPC a e), NOT in main daily view. Eliminates consumption conflicts with :auto-parent." }
+          - { id: 5, name: "Log Mode Integration (:log)", status: "IMPLEMENTED in Custom Commands (v34)", mechanism: ":log closed group at order 0, BEFORE :time-grid group. org-agenda-start-with-log-mode t set in daily/weekly/accomplishments custom command settings." }
+          - { id: 6, name: "Header Keymap Actions", status: "IMPLEMENTED in Global Defaults (v36)", mechanism: "TAB (fold), RET (goto first item), q (quit) bound in org-super-agenda-header-map." }
+          - { id: 7, name: "Multiple View Profiles (Custom Commands)", status: "IMPLEMENTED in Custom Commands (v34)", placement: "Defined in the org-agenda-custom-commands subsection. Each custom command sets its own org-super-agenda-groups in its settings list." }
+          - { id: 8, name: ":transformer for Item Enhancement", status: "IMPLEMENTED in Custom Commands (v34)", constraint: "O(1) string operations ONLY. No regex compilation, no property lookups beyond position 0, no recursive calls.", note: "Org Super Agenda subsection's global default groups still LACK :transformer on context groups. Must be added when that subsection is rewritten." }
+          - { id: 9, name: "org-super-agenda-header-prefix", status: "IMPLEMENTED in Global Defaults (v36)", value: '"▸ "' }
+          - { id: 10, name: "org-super-agenda-final-group-separator", status: "IMPLEMENTED in Global Defaults (v36)", value: "Unicode box-drawing horizontal line (U+2500) with leading/trailing newlines" }
+          - { id: 11, name: ":children for Project Detection", status: "IMPLEMENTED in Custom Commands (v34)", caveat_fix: "Restricted to daily/weekly/project-status agenda views ONLY. NEVER use in org-todo-list or org-tags-view (unbounded recursive child-scanning)." }
+          - { id: 12, name: ":property for Custom Metadata", status: "IMPLEMENTED in Custom Commands (v34)", mechanism: "ENERGY property (high/low) grouped in dedicated Effort-Based custom command." }
+          - { id: 13, name: "org-super-agenda-show-message Suppression", status: "IMPLEMENTED in Global Defaults (v36)", value: "nil" }
+          - { id: 14, name: "org-super-agenda-date-format", status: "IMPLEMENTED in Global Defaults (v36)", value: '"%A, %B %d" (renders as "Monday, July 20")' }
 
     - id: 4
       title: "Unified Architectural Rules & Negative Constraints"
@@ -489,7 +442,7 @@ document:
         - "NO :log After :time-grid: NEVER place a `:log` group AFTER a `:time-grid` group in the same group list. The time-grid will consume logged items first, making the :log group permanently empty."
         - "NO Emoji Codepoints in Fallback Characters: NEVER use emoji codepoints (U+1F300–U+1FAFF) or append U+FE0F presentation selectors in `fboundp` guard fallbacks. Use standard Unicode symbols from Geometric Shapes, Miscellaneous Symbols, or Dingbats blocks only."
         - "NO defconst for Mutable Group Definitions: NEVER use `defconst` for org-super-agenda group definitions that contain `nerd-icons` calls. Use `defvar` with `fboundp` guards to prevent reload warnings and load-order coupling."
-        - "NO Dotted Pairs in :property Selectors: NEVER use dotted pair syntax (\"KEY\" . \"value\") for org-super-agenda `:property` selectors. The pcase pattern requires a proper list (\"KEY\" \"value\")."
+        - 'NO Dotted Pairs in :property Selectors: NEVER use dotted pair syntax ("KEY" . "value") for org-super-agenda `:property` selectors. The pcase pattern requires a proper list ("KEY" "value").'
         - "NO Mixed Font Families: NEVER use 'Symbols Nerd Font Mono' or bare 'JetBrains Mono' in any face or font configuration. The unified family is 'JetBrainsMono Nerd Font' (v0.16+)."
         - "NO Denote Extension Before Core: NEVER load any `denote-*` extension package before the core `denote` package has fully initialized. All extensions MUST use `:after denote` or equivalent."
 
@@ -516,15 +469,18 @@ document:
         - "[v33 Note] Org-Super-Agenda :auto-parent Provisional: Project grouping via :auto-parent is provisional. May change to :ancestor-with-todo or custom :pred after Workflow Management (projection/bufferlo) finalization."
         - "[v33 Note] Org-Super-Agenda :take + keep-order: The README warns :take order is not guaranteed. Mitigated by org-super-agenda-keep-order t which re-sorts items post-grouping, preserving org-agenda-sorting-strategy order before :take selects."
         - "[v34 Fix] Custom Commands :take Nesting Bug: The original code used `:take (15 (:anything t))` which produced `group = ((:anything t))` — a list containing a list, not a valid plist. Fixed to `:take (15 :anything t)`."
-        - "[v34 Fix] Custom Commands :property Dotted Pair Bug: The original code used `:property (\"ENERGY\" . \"high\")` — a dotted pair. Fixed to proper list syntax `:property (\"ENERGY\" \"high\")`."
+        - '[v34 Fix] Custom Commands :property Dotted Pair Bug: The original code used `:property ("ENERGY" . "high")` — a dotted pair. Fixed to proper list syntax `:property ("ENERGY" "high")`.'
         - "[v34 Fix] Custom Commands defconst Reload Warning: All five group definitions used `defconst` with eager `nerd-icons-faicon` calls. Fixed to `defvar` with `fboundp` guards and Unicode symbol fallbacks."
-        - "[v34 Fix] Custom Commands Missing org-agenda-overriding-header: Four of five custom commands lacked `(org-agenda-overriding-header \"\")`. Fixed by adding it to all commands."
+        - '[v34 Fix] Custom Commands Missing org-agenda-overriding-header: Four of five custom commands lacked `(org-agenda-overriding-header "")`. Fixed by adding it to all commands.'
         - "[v34 Fix] Custom Commands :log/:discard Consumption Order: Added 3-line explanatory comment to prevent future reordering bugs."
         - "[v34 Note] Org Super Agenda Subsection Still Has 4 Bugs: The global default groups still contain: (1) defconst instead of defvar, (2) :take (15 (:anything t)) wrong nesting, (3) :property dotted pair, (4) no fboundp guards on nerd-icons calls."
         - "[v34 Note] Org Super Agenda Subsection Missing :transformer: The global default groups lack :transformer on context groups."
         - "[v34 Confirmation] No Emojis Introduced: All fallback characters are standard Unicode symbols. No emoji codepoints or U+FE0F presentation selectors were used."
         - "[v35 Note] Font Family Unification (config.org v0.16): nerd-icons-font-family changed from 'Symbols Nerd Font Mono' to 'JetBrainsMono Nerd Font'. All set-face-attribute calls changed from 'JetBrains Mono' to 'JetBrainsMono Nerd Font'. This ensures a single font family handles both code glyphs and Nerd Font icons without mid-line fallback context switches."
         - "[v35 Note] Denote Ecosystem Scope: The full Denote ecosystem (25 packages) is documented but only 5 packages are currently configured in config.org v0.16 (denote, denote-org, denote-journal, consult-denote, citar-denote). The remaining 20 packages are PLANNED and will be implemented incrementally."
+        - "[v36 Note] Org Mode Cross-Section Cleanup Completed: All 7 tasks identified in v31/v32 (org-modern type mismatches, GTD remnants in capture/weekly-review, Emacs 31 line-spacing cons-cell) have been verified as resolved in config.org v0.16."
+        - "[v36 Note] Org Capture & Keybindings Implementation: Fully implemented in config.org but retain TODO headers. Awaiting user review to mark DONE."
+        - "[v37 Correction] denote-sections Hallucination: Excised the false assumption that `denote-sections` manipulates internal AST/heading structure. Verified upstream that it is strictly a `universal-sidecar` bridge for rendering backlinks and bibliography metadata. Created dedicated `* TODO Contextual Sidebars` main section."
       architectural_decisions:
         v15: "IDE Stack Consolidation (Committed to `lsp-mode`). Workspace Management Selection: Selected `bufferlo`."
         v18: "Package Management Migration: Officially transitioned to Elpaca v0.12. Deprecated `:pin` and `:vc`."
@@ -541,6 +497,8 @@ document:
         v33: "ORG-SUPER-AGENDA ENHANCEMENT ARCHITECTURE: Codified 14-category enhancement plan. Native outline folding via TAB (no origami). :take with keep-order. :auto-parent provisional. :log caveat resolved via consumption order. :children restricted to daily views. O(1) :transformer constraint. Multiple View Profiles placed in org-agenda-custom-commands. Effort/property grouping in dedicated custom commands."
         v34: "ORG AGENDA CUSTOM COMMANDS REWRITE: Executed the full rewrite fixing 5 bugs (2 critical, 2 moderate, 1 minor). Implemented v33 Categories 2, 3, 4, 5, 7, 8, 11, 12 in the Custom Commands subsection. Changed defconst to defvar with fboundp guards. Fixed :take nesting and :property dotted pair syntax. Added org-agenda-overriding-header to all commands. Added :transformer to context groups. Added :children performance guard comment. Added :log/:discard consumption order comment. Confirmed zero emoji usage. Inventoried 4 remaining bugs in the Org Super Agenda subsection's global default groups for future rewrite."
         v35: "DENOTE ECOSYSTEM PACKAGE ORDERING & CONFIG v0.16 SYNC: Incorporated the full 25-package Denote ecosystem ordering with dependency graph, implementation order, and config.org subsection mapping. Synced project state with config.org v0.16 font family unification (JetBrainsMono Nerd Font). Added Denote Ecosystem Load-Order Rule and Font Family Consistency Rule to architectural constraints. Documented that only 5 of 25 Denote packages are currently configured."
+        v36: "ORG MODE & SECOND BRAIN SUBSECTION FINALIZATION (PARTIAL): Marked Org Agenda Custom Commands, Org Habit, Denote Core, Denote Silo, Denote Org, Denote Journal, and Denote Journal Capture as DONE. Verified implementation of Org Capture, Weekly Review, Consult Denote, Citar Denote, and Keybindings (headers remain TODO pending user review). Completed all v31/v32 Org Mode Cross-Section Cleanup tasks (org-modern type fixes, GTD remnant excision, line-spacing cons-cell). Marked Org-Super-Agenda Categories 1, 6, 9, 10, 13, and 14 as IMPLEMENTED in the global default subsection."
+        v37: "CONTEXTUAL SIDEBARS & DENOTE-SECTIONS HALLUCINATION FIX: Excised the false assumption that `denote-sections` manipulates internal AST/heading structure. Verified upstream that it is strictly a `universal-sidecar` bridge for rendering backlinks and bibliography metadata. Created dedicated `* TODO Contextual Sidebars` main section between Development Tools and Highlight TODOs. Updated Denote Ecosystem implementation order and config.org subsection mapping to reflect the new architectural placement."
       overall_progress:
         finalized:
           - "Core Emacs (13 subsections)"
@@ -558,17 +516,26 @@ document:
           - "Dynamic Directory Structure (Org Mode subsection)"
           - "Task States & Contexts (Org Mode subsection — DONE)"
           - "Better Font Faces (Org Mode subsection — DONE)"
-          - "Org Agenda Custom Commands (Org Mode subsection — REWRITTEN v34, header still TODO pending user confirmation)"
-          - "Org-Super-Agenda Enhancement Architecture (14 categories planned — v33, 8 categories implemented in Custom Commands — v34)"
+          - "Org Agenda Custom Commands (Org Mode subsection — DONE)"
+          - "Org Habit (Org Mode subsection — DONE)"
+          - "Denote Core (Org Mode subsection — DONE)"
+          - "Denote Silo (Org Mode subsection — DONE)"
+          - "Denote Sequence (Org Mode subsection — DONE)"
+          - "Denote Org (Org Mode subsection — DONE)"
+          - "Denote Journal (Org Mode subsection — DONE)"
+          - "Denote Journal Capture (Org Mode subsection — DONE)"
+          - "Org-Super-Agenda Enhancement Architecture (14 categories planned — v33, 14 categories implemented across Custom Commands & Global Defaults — v36)"
           - "Denote Ecosystem Package Ordering (25 packages documented — v35)"
           - "Font Family Unification (config.org v0.16 — JetBrainsMono Nerd Font)"
+          - "Org Mode Cross-Section Cleanup (v31/v32 Identified — COMPLETED v36)"
         in_progress:
           - "Precision Editing (Group 7: Link Hint pending)"
           - "Window Management (Winner, Popper pending)"
           - "Workflow Management (Buffer Management, Project Management, Workspaces pending)"
+          - "Contextual Sidebars (Universal Sidecar, Denote Sections, Denote Citar Sections pending)"
           - "Org Mode & Second Brain (Org Super Agenda subsection rewrite pending — 4 known bugs)"
-          - "Org Mode & Second Brain (Core Config, Capture, Agenda, Habit, Denote subsections pending)"
-          - "Denote Ecosystem (20 of 25 packages pending implementation)"
+          - "Org Mode & Second Brain (Org Capture, Weekly Review, Consult Denote, Citar Denote, Keybindings implemented but headers retain TODO pending user review)"
+          - "Denote Ecosystem (17 of 25 packages pending implementation)"
         untouched:
           - "Lexical Validation & Comparative Workflows (Group 8)"
           - "Version Control"
@@ -579,12 +546,8 @@ document:
     - id: 6
       title: "Work Checklists & Global Questions"
       remaining_work_checklists:
-        - group: "Denote Ecosystem Implementation (v35 — 20 Pending Packages)"
+        - group: "Denote Ecosystem Implementation (v37 — 17 Pending Packages)"
           tasks:
-            - { status: "pending", description: "denote-silo: Multi-silo isolation via .dir-locals.el. GNU ELPA official. Add to Denote subsection." }
-            - { status: "pending", description: "denote-journal-capture: org-capture integration for journal entries. Add to Denote Journal subsection." }
-            - { status: "pending", description: "denote-sequence: Sequential note numbering. Add to Denote subsection." }
-            - { status: "pending", description: "denote-sections: Section-based note organization. Add to Denote Management subsection (NEW)." }
             - { status: "pending", description: "denote-refs: Backlink/forward-link reference management. Add to Denote Management subsection (NEW)." }
             - { status: "pending", description: "denote-regexp: Regex-powered note filtering. Add to Consult Denote subsection." }
             - { status: "pending", description: "denote-search: Enhanced search across silos. Add to Consult Denote subsection." }
@@ -599,8 +562,10 @@ document:
             - { status: "pending", description: "denote-agenda: Chronological view of Denote notes. Add to Denote Management subsection (NEW)." }
             - { status: "pending", description: "denote-publish: Publish notes to static site generators. Add to Denote Management subsection (NEW)." }
             - { status: "pending", description: "denote-markdown: Markdown file-type support. Add to Denote Org subsection." }
-            - { status: "pending", description: "denote-citar-sections: Citar bibliography sections. Add to Citar Denote subsection." }
             - { status: "pending", description: "org-transclusion + denote: Transclude Denote content into Org. Add to Denote Org subsection." }
+            - { status: "pending", description: "universal-sidecar: Core sidecar engine. Add to Contextual Sidebars subsection." }
+            - { status: "pending", description: "denote-sections: Universal Sidecar backlinks. Add to Contextual Sidebars subsection." }
+            - { status: "pending", description: "denote-citar-sections: Universal Sidecar bibliography. Add to Contextual Sidebars subsection." }
         - group: "Org Super Agenda Subsection Rewrite (v34 — 4 Known Bugs + Missing Features)"
           tasks:
             - { status: "pending", description: "BUG 1: Change defconst to defvar with fboundp guards for all nerd-icons calls in global default groups." }
@@ -611,29 +576,20 @@ document:
             - { status: "pending", description: "FEATURE: Add :log/:discard consumption order comment." }
         - group: "Org-Super-Agenda Enhancement (v33 — Remaining Categories)"
           tasks:
-            - { status: "pending", description: "Category 1: Implement ar/org-super-agenda-toggle-group (native overlay folding) + TAB binding." }
+            - { status: "done", description: "Category 1: Implement ar/org-super-agenda-toggle-group (native overlay folding) + TAB binding." }
             - { status: "done", description: "Category 2: :take limits implemented in Custom Commands." }
             - { status: "done", description: "Category 3: :auto-parent implemented in Custom Commands. PROVISIONAL." }
             - { status: "done", description: "Category 4: Effort-Based custom command implemented." }
             - { status: "done", description: "Category 5: :log closed at order 0 before :time-grid." }
-            - { status: "pending", description: "Category 6: Bind TAB, RET, q in org-super-agenda-header-map." }
+            - { status: "done", description: "Category 6: Bind TAB, RET, q in org-super-agenda-header-map." }
             - { status: "done", description: "Category 7: Multiple View Profiles implemented (SPC a d/w/e/A/p)." }
             - { status: "done", description: "Category 8: :transformer on context groups implemented in Custom Commands." }
-            - { status: "pending", description: "Category 9: Set org-super-agenda-header-prefix to '▸ '." }
-            - { status: "pending", description: "Category 10: Set org-super-agenda-final-group-separator." }
+            - { status: "done", description: "Category 9: Set org-super-agenda-header-prefix to '▸ '." }
+            - { status: "done", description: "Category 10: Set org-super-agenda-final-group-separator." }
             - { status: "done", description: "Category 11: :children todo at order 14 in Daily + Project Status views." }
             - { status: "done", description: "Category 12: ENERGY property grouping in Effort-Based custom command." }
-            - { status: "pending", description: "Category 13: Set org-super-agenda-show-message to nil." }
-            - { status: "pending", description: "Category 14: Set org-super-agenda-date-format to '%A, %B %d'." }
-        - group: "Org Mode Cross-Section Cleanup (v31/v32 Identified)"
-          tasks:
-            - { status: "pending", description: "Rewrite Org Capture templates: Replace 'INBOX' TODO keyword and 'gtd/inbox.org' path with flat 'agenda/todo.org' + '* Inbox' heading routing." }
-            - { status: "pending", description: "Rewrite org-agenda-custom-commands in Org Capture section: Replace 'GTD-NEXT', 'GTD-WAIT', 'GTD-INBOX' keywords." }
-            - { status: "pending", description: "Rewrite ar/weekly-review: Replace 'my/org-gtd-directory' and 'GTD-NEXT' references." }
-            - { status: "pending", description: "Fix org-modern-checkbox: Change from boolean `t` to proper alist." }
-            - { status: "pending", description: "Fix org-modern-block-name: Change 3-string lists to 2-string lists." }
-            - { status: "pending", description: "Fix org-modern-star: Change from string list to 'replace + org-modern-replace-stars." }
-            - { status: "pending", description: "Implement Emacs 31 line-spacing cons-cell for org-modern badge vertical centering." }
+            - { status: "done", description: "Category 13: Set org-super-agenda-show-message to nil." }
+            - { status: "done", description: "Category 14: Set org-super-agenda-date-format to '%A, %B %d'." }
         - group: "Spatial Traversal & Inline Mutations (Group 7)"
           tasks:
             - { status: "pending", description: "Link Hint: Route Avy-backed semantic link mutations." }
@@ -666,10 +622,8 @@ document:
             - { status: "pending", description: "Woman: Extract system manpath directories for native Arch Linux manual integration." }
         - group: "Global Remaining Work"
           tasks:
-            - { status: "pending", description: "Add a doom emacs style keybinding with SPC as leader for `org-babel-remove-result-one-or-many`." }
             - { status: "pending", description: "Illustrate a workflow using iedit and evil-multiedit." }
-            - { status: "pending", description: "Customize org-agenda-finalize to customize org-agenda buffer." }
-            - { status: "pending", description: "Pressing enter on a header should move a task from TODO to DONE like doom emacs does." }
+            - { status: "pending", description: "customize org-agenda-finalize to customize org-agenda buffer." }
             - { status: "pending", description: "Implement the email setup." }
             - { status: "pending", description: "Add epithet and math-delimiters package from https://github.com/oantolin." }
             - { status: "pending", description: "Orderless only matches letters next to each other; I dont want that." }
@@ -678,8 +632,7 @@ document:
             - { status: "pending", description: "`Important`: Write a test org-mode file to practice all the writing practices in org buffers." }
             - { status: "pending", description: "I also need interactive custom functions for .dir-locals.el." }
             - { status: "pending", description: "`Important`: Determine all the related packages that are integrated together in the whole emacs config." }
-            - { status: "pending", description: "=Important=: add auto-tangle-mode package." }
-            - { status: "pending", description: "=Important=: Add denote-explore, flyover, auto-tangle-mode, treemacs-evil, treemacs-magit." }
+            - { status: "pending", description: "Add flyover package." }
             - { status: "pending", description: "Urgent: Revisit the description of every header and subheader to ensure they describe what the package actually does." }
       global_questions:
         - { status: "pending", question: "Can org-level variation only work for certain file and/or org buffers?" }

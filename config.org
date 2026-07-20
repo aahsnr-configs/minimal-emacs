@@ -5202,6 +5202,41 @@ Isolates note-taking environments and routes commands across distinct Denote dir
 #+end_src
 
 
+** DONE Denote Sequence
+Adds hierarchical numbering schemes to notes for structured parent, child, and sibling relationships.
+#+begin_src emacs-lisp
+(use-package denote-sequence
+  :defer t
+  :after denote
+  :commands (denote-sequence
+             denote-sequence-new-parent
+             denote-sequence-new-child
+             denote-sequence-new-child-of-current
+             denote-sequence-new-sibling
+             denote-sequence-new-sibling-of-current
+             denote-sequence-rename-as-parent
+             denote-sequence-reparent
+             denote-sequence-reparent-recursive
+             denote-sequence-find
+             denote-sequence-find-dired
+             denote-sequence-find-next-sibling
+             denote-sequence-find-previous-sibling
+             denote-sequence-link
+             denote-sequence-dired
+             denote-sequence-convert
+             denote-sequence-view-hierarchy)
+  :custom
+  ;; Sets the sequence scheme: numeric, alphanumeric, or alphanumeric-delimited.
+  (denote-sequence-scheme 'alphanumeric-delimited)
+  ;; Number of spaces to indent by depth in the hierarchy view.
+  (denote-sequence-hierarchy-indentation 2)
+  ;; When non-nil, moving in the hierarchy view also displays the file.
+  (denote-sequence-hierarchy-move-and-open t))
+#+end_src
+
+
+** TODO Denote Refs
+
 ** DONE Denote Org
 Bridges Denote with Org mode's dynamic blocks, subtree extraction, and deep heading links.
 #+begin_src emacs-lisp
@@ -6184,6 +6219,8 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
   "M-j" #'org-agenda-drag-line-forward
   "gd"  #'org-agenda-goto-date)
 #+end_src
+
+
 
 
 * TODO Completion Framework
@@ -7306,6 +7343,67 @@ buffer killing or garbage collection cycles."
 #+end_src
 
 
+
+
+* DONE Contextual Sidebars
+Persistent side windows displaying dynamic metadata, backlinks, and bibliography context for the active buffer.
+
+** DONE Universal Sidecar
+Provides a per-frame sidebar buffer that dynamically renders contextual metadata sections for the focused window.
+#+begin_src emacs-lisp
+(use-package universal-sidecar
+  :defer t
+  :commands (universal-sidecar-toggle
+             universal-sidecar-insinuate
+             universal-sidecar-uninsinuate
+             universal-sidecar-refresh)
+  :custom
+  ;; Buffer naming format tied to the frame description.
+  (universal-sidecar-buffer-name-format "*Sidecar: %F*")
+  ;; Enable idle timer to passively refresh sidecar contents.
+  (universal-sidecar-enable-timer t)
+  ;; Refresh interval in seconds.
+  (universal-sidecar-refresh-time 5)
+  :config
+  ;; Route the sidecar to a dedicated right-side window.
+  ;; `side-window` prevents Popper from intercepting it as a transient popup.
+  ;; `no-delete-other-windows` protects it from `delete-other-windows` (C-x 1).
+  ;; `no-other-window` prevents Popper's window cycling and C-x o from focusing it.
+  (add-to-list 'display-buffer-alist
+               '("\\*Sidecar:.*\\*"
+                 (display-buffer-in-side-window)
+                 (side . right)
+                 (window-width . 0.25)
+                 (window-parameters (no-delete-other-windows . t)
+                                    (no-other-window . t))))
+  ;; Advise core Emacs navigation functions to trigger sidecar updates.
+  (universal-sidecar-insinuate))
+#+end_src
+
+
+** DONE Denote Sections
+Injects Denote backlinks into the universal sidecar, mimicking the org-roam buffer UI without a SQLite database.
+#+begin_src emacs-lisp
+(use-package denote-sections
+  :defer t
+  :after (universal-sidecar denote)
+  :config
+  ;; Append the backlinks section to preserve rendering order.
+  (add-to-list 'universal-sidecar-sections 'denote-sections-backlinks-section t))
+#+end_src
+
+
+** DONE Denote Citar Sections
+Injects bibliography abstracts and formatted references into the universal sidecar for literature notes.
+#+begin_src emacs-lisp
+(use-package denote-citar-sections
+  :defer t
+  :after (universal-sidecar denote citar)
+  :config
+  ;; Append bibliography sections for literature notes (abstract first, then reference).
+  (add-to-list 'universal-sidecar-sections 'denote-citar-sections-abstract-section t)
+  (add-to-list 'universal-sidecar-sections 'denote-citar-sections-reference-section t))
+#+end_src
 
 
 * TODO Highlight TODOs

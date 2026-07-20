@@ -24,6 +24,7 @@ transient/
 .cache/
 straight/
 .obsidian/
+notes.md/.obsidia/
 perspective-state
 emacs-diff.md
 tmp/
