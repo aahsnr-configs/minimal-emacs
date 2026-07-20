@@ -933,21 +933,20 @@ Foundational glyph substitution and icon API. Eagerly loaded to prevent void-fun
   :demand t
   :custom
   ;; Enforces the dedicated Nerd Font symbol family for consistent glyph rendering.
-  (nerd-icons-font-family "Symbols Nerd Font Mono")
+  (nerd-icons-font-family "JetBrainsMono Nerd Font")
   ;; Enables colorized glyphs; upstream fallbacks handle terminal degradation.
   (nerd-icons-color-icons t))
 #+end_src
-
 
 ** DONE Fonts
 Configures global typography, baseline monospaced faces, fontset fallback registration, and vertical line centering.
 #+begin_src emacs-lisp
 (defun ar/setup-fonts ()
   "Apply global typography, baseline faces, and fontset fallbacks to the current frame."
-  (set-face-attribute 'default nil :font "JetBrains Mono" :height 125 :weight 'medium)
-  (set-face-attribute 'fixed-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
+  (set-face-attribute 'default nil :font "JetBrainsMono Nerd Font" :height 125 :weight 'medium)
+  (set-face-attribute 'fixed-pitch nil :font "JetBrainsMono Nerd Font" :height 125 :weight 'medium)
   ;; Maps variable-pitch to monospaced to preserve Org-mode table alignment.
-  (set-face-attribute 'variable-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
+  (set-face-attribute 'variable-pitch nil :font "JetBrainsMono Nerd Font" :height 125 :weight 'medium)
   ;; Pre-register Noto Sans for Unicode blocks used by org-modern-replace-stars.
    (set-fontset-font t '(#x25A0 . #x25FF) "Noto Sans")  ; Geometric Shapes (◉ ○ ◇ ▷)
   (set-fontset-font t '(#x2600 . #x26FF) "Noto Sans")  ; Miscellaneous Symbols
@@ -4881,10 +4880,11 @@ Groups agenda items into labeled sections by urgency, context, and status.
 
 ** TODO Org Agenda Custom Commands
 Defines named agenda views for daily planning, weekly review, effort-based selection, accomplishments, and project status.
-
 #+begin_src emacs-lisp
 (with-eval-after-load 'org-agenda
-  (defconst ar/org-sa-daily-groups
+  ;; org-super-agenda uses first-match-wins on LIST POSITION, not :order.
+  ;; If :discard runs first, it consumes all DONE items before :log can claim them.
+  (defvar ar/org-sa-daily-groups
     `((:name ,(concat (nerd-icons-faicon "nf-fa-check_circle" :v-adjust 0.02)
                       " Completed Today")
        :log closed
@@ -4892,8 +4892,7 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
       (:discard (:todo ("DONE" "CANCEL")))
       (:name ,(concat (nerd-icons-octicon "nf-oct-alert" :v-adjust 0.02)
                       " Overdue")
-       :deadline past
-       :scheduled past
+       :take (10 :deadline past :scheduled past)
        :face font-lock-warning-face
        :order 1)
       (:name ,(concat (nerd-icons-octicon "nf-oct-inbox" :v-adjust 0.02)
@@ -4917,22 +4916,32 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
       (:name ,(concat (nerd-icons-faicon "nf-fa-laptop" :v-adjust 0.02)
                       " @Computer")
        :and (:tag "@computer" :todo ("NEXT" "TODO"))
+       :transformer (string-remove-prefix "NEXT "
+                      (string-remove-prefix "TODO " it))
        :order 6)
       (:name ,(concat (nerd-icons-faicon "nf-fa-home" :v-adjust 0.02)
                       " @Home")
        :and (:tag "@home" :todo ("NEXT" "TODO"))
+       :transformer (string-remove-prefix "NEXT "
+                      (string-remove-prefix "TODO " it))
        :order 7)
       (:name ,(concat (nerd-icons-faicon "nf-fa-car" :v-adjust 0.02)
                       " @Errands")
        :and (:tag "@errands" :todo ("NEXT" "TODO"))
+       :transformer (string-remove-prefix "NEXT "
+                      (string-remove-prefix "TODO " it))
        :order 8)
       (:name ,(concat (nerd-icons-faicon "nf-fa-phone" :v-adjust 0.02)
                       " @Phone")
        :and (:tag "@phone" :todo ("NEXT" "TODO"))
+       :transformer (string-remove-prefix "NEXT "
+                      (string-remove-prefix "TODO " it))
        :order 9)
       (:name ,(concat (nerd-icons-faicon "nf-fa-brain" :v-adjust 0.02)
                       " @Deep Work")
        :and (:tag "@deep_work" :todo ("NEXT" "TODO"))
+       :transformer (string-remove-prefix "NEXT "
+                      (string-remove-prefix "TODO " it))
        :order 10)
       (:name ,(concat (nerd-icons-faicon "nf-fa-hourglass_half" :v-adjust 0.02)
                       " Waiting For")
@@ -4942,8 +4951,10 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
        :order 11)
       (:name ,(concat (nerd-icons-faicon "nf-fa-clock" :v-adjust 0.02)
                       " Due Soon")
-       :deadline (before "+7d")
+       :take (7 :deadline (before "+7d"))
        :order 12)
+      ;; :children restricted to daily/weekly agenda views only.
+      ;; NEVER use in org-todo-list or org-tags-view (O(n×depth) recursive scan).
       (:name ,(concat (nerd-icons-octicon "nf-oct-project" :v-adjust 0.02)
                       " Active Projects")
        :children todo
@@ -4953,13 +4964,13 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
        :auto-parent t
        :order 15)
       (:name ,(concat (nerd-icons-octicon "nf-oct-kebab_horizontal"
-                      :v-adjust 0.02)
+                                           :v-adjust 0.02)
                       " Other Tasks")
-       :take (15 (:anything t))
+       :take (15 :anything t)
        :order 99))
     "Groups for the Daily Dashboard command.")
 
-  (defconst ar/org-sa-weekly-groups
+  (defvar ar/org-sa-weekly-groups
     `((:name ,(concat (nerd-icons-octicon "nf-oct-inbox" :v-adjust 0.02)
                       " Inbox (Process to Zero)")
        :todo "TODO"
@@ -4978,24 +4989,24 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
        :tag "someday"
        :order 4)
       (:name ,(concat (nerd-icons-octicon "nf-oct-kebab_horizontal"
-                      :v-adjust 0.02)
+                                           :v-adjust 0.02)
                       " Everything Else")
        :anything t
        :order 99))
     "Groups for the Weekly Review command.")
 
-  (defconst ar/org-sa-effort-groups
+  (defvar ar/org-sa-effort-groups
     `((:name ,(concat (nerd-icons-faicon "nf-fa-bolt" :v-adjust 0.02)
                       " Quick Wins (< 15 min)")
        :effort< "0:15"
        :order 1)
       (:name ,(concat (nerd-icons-faicon "nf-fa-fire" :v-adjust 0.02)
                       " High Energy")
-       :property ("ENERGY" . "high")
+       :property ("ENERGY" "high")
        :order 2)
       (:name ,(concat (nerd-icons-faicon "nf-fa-leaf" :v-adjust 0.02)
                       " Low Energy")
-       :property ("ENERGY" . "low")
+       :property ("ENERGY" "low")
        :order 3)
       (:name ,(concat (nerd-icons-faicon "nf-fa-clock" :v-adjust 0.02)
                       " Medium (15–60 min)")
@@ -5006,13 +5017,13 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
        :effort> "1:00"
        :order 5)
       (:name ,(concat (nerd-icons-octicon "nf-oct-kebab_horizontal"
-                      :v-adjust 0.02)
+                                           :v-adjust 0.02)
                       " No Estimate")
        :anything t
        :order 99))
     "Groups for the Effort-Based command.")
 
-  (defconst ar/org-sa-accomplishments-groups
+  (defvar ar/org-sa-accomplishments-groups
     `((:name ,(concat (nerd-icons-faicon "nf-fa-check_circle" :v-adjust 0.02)
                       " Completed Today")
        :log closed
@@ -5027,7 +5038,7 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
        :order 3))
     "Groups for the Accomplishments command.")
 
-  (defconst ar/org-sa-project-groups
+  (defvar ar/org-sa-project-groups
     `((:name ,(concat (nerd-icons-octicon "nf-oct-project" :v-adjust 0.02)
                       " Active Projects (with open tasks)")
        :children todo
@@ -5037,48 +5048,48 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
        :auto-parent t
        :order 2)
       (:name ,(concat (nerd-icons-octicon "nf-oct-kebab_horizontal"
-                      :v-adjust 0.02)
+                                           :v-adjust 0.02)
                       " Ungrouped")
        :anything t
        :order 99))
     "Groups for the Project Status command.")
 
   (setq org-agenda-custom-commands
-        `(("d" "Daily Dashboard"
-           ((agenda ""
-             ((org-agenda-span 'day)
-              (org-agenda-start-day "0d")
-              (org-agenda-start-with-log-mode t)
-              (org-super-agenda-groups ,ar/org-sa-daily-groups)))))
-
-          ("w" "Weekly Review"
-           ((agenda ""
-             ((org-agenda-span 'week)
-              (org-agenda-start-day "-1d")
-              (org-agenda-start-with-log-mode t)
-              (org-super-agenda-groups ,ar/org-sa-weekly-groups)))))
-
-          ("e" "Effort-Based View"
-           ((alltodo ""
-             ((org-agenda-overriding-header "")
-              (org-super-agenda-groups ,ar/org-sa-effort-groups)))))
-
-          ("A" "Accomplishments (Today)"
-           ((agenda ""
-             ((org-agenda-span 'day)
-              (org-agenda-start-day "0d")
-              (org-agenda-start-with-log-mode t)
-              (org-super-agenda-groups ,ar/org-sa-accomplishments-groups)))))
-
-          ("p" "Project Status"
-           ((agenda ""
-             ((org-agenda-span 'day)
-              (org-agenda-start-day "0d")
-              (org-super-agenda-groups ,ar/org-sa-project-groups))))))))
+    `(("d" "Daily Dashboard"
+       ((agenda ""
+                ((org-agenda-overriding-header "")
+                 (org-agenda-span 'day)
+                 (org-agenda-start-day "0d")
+                 (org-agenda-start-with-log-mode t)
+                 (org-super-agenda-groups ,ar/org-sa-daily-groups)))))
+      ("w" "Weekly Review"
+       ((agenda ""
+                ((org-agenda-overriding-header "")
+                 (org-agenda-span 'week)
+                 (org-agenda-start-day "-1d")
+                 (org-agenda-start-with-log-mode t)
+                 (org-super-agenda-groups ,ar/org-sa-weekly-groups)))))
+      ("e" "Effort-Based View"
+       ((alltodo ""
+                 ((org-agenda-overriding-header "")
+                  (org-super-agenda-groups ,ar/org-sa-effort-groups)))))
+      ("A" "Accomplishments (Today)"
+       ((agenda ""
+                ((org-agenda-overriding-header "")
+                 (org-agenda-span 'day)
+                 (org-agenda-start-day "0d")
+                 (org-agenda-start-with-log-mode t)
+                 (org-super-agenda-groups ,ar/org-sa-accomplishments-groups)))))
+      ("p" "Project Status"
+       ((agenda ""
+                ((org-agenda-overriding-header "")
+                 (org-agenda-span 'day)
+                 (org-agenda-start-day "0d")
+                 (org-super-agenda-groups ,ar/org-sa-project-groups))))))))
 #+end_src
 
-
 ** TODO Org Habit
+
 #+begin_src emacs-lisp
 (use-package org-habit
   :ensure nil
@@ -5160,7 +5171,6 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
 
 
 ** TODO Denote Explore
-
 
 ** TODO Consult Denote
 #+begin_src emacs-lisp
