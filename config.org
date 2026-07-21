@@ -6843,30 +6843,98 @@ Configures Org structure templates for rapid block insertion and implements a de
 #+end_src
 
 
-** TODO Transient Template System
-- [ ] Review transient code beforehand
+** DONE Transient Template System
+Provides a centralized, context-aware dashboard for inserting Org structure blocks via a dedicated Transient menu.
 #+begin_src emacs-lisp
 (with-eval-after-load 'org
-  (defun ar/org-template-expand (str &optional mod)
-    "Expand org template STR with optional modifier MOD."
-    (let (text)
-      (when (region-active-p)
-        (setq text (buffer-substring (region-beginning) (region-end)))
-        (delete-region (region-beginning) (region-end)))
-      (insert str)
-      (org-tempo-complete-tag)
-      (when mod (insert mod) (forward-line))
-      (when text (insert text))))
+  (defun ar/org-insert-block (type &optional modifier region-text)
+    "Insert an Org block of TYPE with optional MODIFIER.
+If REGION-TEXT is provided, wrap it inside the block."
+    (let* ((beg-str (if modifier
+                        (format "#+begin_%s %s\n" type modifier)
+                      (format "#+begin_%s\n" type)))
+           (end-str (format "#+end_%s\n" type)))
+      (if region-text
+          (insert beg-str region-text "\n" end-str)
+        (insert beg-str "\n" end-str)
+        (forward-line -1)
+        (end-of-line))))
 
   (defun ar/org-insert-perl-tangled ()
+    "Insert a Perl source block configured for tangled execution."
     (interactive)
     (insert "#+HEADERS: :results output :exports both :shebang \"#!/usr/bin/env perl\"\n")
-    (ar/org-template-expand "<s" "perl"))
+    (ar/org-insert-block "src" "perl"))
 
   (defun ar/org-insert-ipython ()
+    "Insert an IPython session block."
     (interactive)
-    (ar/org-template-expand "<s" "ipython :session :exports both :results raw drawer\n$0"))
+    (ar/org-insert-block "src" "ipython :session :exports both :results raw drawer"))
 
+  (defvar ar/org-block-definitions
+    '(;; Basic blocks
+      ("a" "ascii"   "ascii"   nil)
+      ("c" "center"  "center"  nil)
+      ("C" "comment" "comment" nil)
+      ("x" "example" "example" nil)
+      ("E" "export"  "export"  nil)
+      ("h" "html"    "html"    nil)
+      ("l" "latex"   "latex"   nil)
+      ("n" "note"    "note"    nil)
+      ("o" "quote"   "quote"   nil)
+      ("v" "verse"   "verse"   nil)
+      ;; Head blocks
+      ("i" "index"   "index"   nil)
+      ("A" "ASCII"   "ASCII"   nil)
+      ("I" "INCLUDE" "INCLUDE" nil)
+      ("H" "HTML"    "HTML"    nil)
+      ("L" "LaTeX"   "LaTeX"   nil)
+      ;; Source blocks
+      ("s" "src"        "src" nil)
+      ("e" "emacs-lisp" "src" "emacs-lisp")
+      ("y" "python"     "src" "python")
+      ("w" "powershell" "src" "powershell")
+      ("r" "ruby"       "src" "ruby")
+      ("S" "sh"         "src" "sh")
+      ("g" "golang"     "src" "go :imports '(\"fmt\")")
+      ;; Misc blocks
+      ("m" "mermaid"   "src" "mermaid :file chart.png")
+      ("k" "kdl"       "src" "kdl")
+      ("u" "plantuml"  "src" "plantuml :file chart.png")
+      ("K" "kbd"       "src" "kbd")
+      ("Z" "yaml"      "src" "yaml"))
+    "List of (key description type modifier) for Org block generation.")
+
+  ;; Generate named interactive commands to prevent Transient lambda bloat.
+  (dolist (def ar/org-block-definitions)
+    (let* ((key (nth 0 def))
+           (desc (nth 1 def))
+           (type (nth 2 def))
+           (mod (nth 3 def))
+           (cmd-name (intern (format "ar/org-block-%s-%s"
+                                     key
+                                     (downcase (replace-regexp-in-string "[^a-zA-Z0-9]" "-" desc))))))
+      (defalias cmd-name
+        `(lambda ()
+           ,(format "Insert Org %s block." desc)
+           (interactive)
+           (let ((text (when (region-active-p)
+                         (prog1 (buffer-substring-no-properties (region-beginning) (region-end))
+                           (delete-region (region-beginning) (region-end))))))
+             (ar/org-insert-block ,type ,mod text))))))
+
+  (defun ar/org-smart-less-than ()
+    "Smart less-than key: trigger transient menu or insert character."
+    (interactive)
+    ;; O(1) spatial guard: check if we are at the beginning of the line.
+    (if (or (region-active-p)
+            (save-excursion (skip-chars-backward " \t") (bolp)))
+        (ar/org-template-transient)
+      (self-insert-command 1)))
+
+  (define-key org-mode-map (kbd "<") #'ar/org-smart-less-than))
+
+(with-eval-after-load 'transient
   (defun ar/org-transient-title ()
     (concat
      (if (and (fboundp 'nerd-icons-sucicon) (display-graphic-p))
@@ -6874,63 +6942,44 @@ Configures Org structure templates for rapid block insertion and implements a de
        "")
      (propertize " Org Template" 'face 'transient-heading)))
 
-  (with-eval-after-load 'transient
-    (transient-define-prefix ar/org-template-transient ()
-      "Org Mode Structure Templates"
-      [:description ar/org-transient-title
-
-       ["Basic"
-        ("a" "ascii"   (lambda () (interactive) (ar/org-template-expand "<a")))
-        ("c" "center"  (lambda () (interactive) (ar/org-template-expand "<c")))
-        ("C" "comment" (lambda () (interactive) (ar/org-template-expand "<C")))
-        ("x" "example" (lambda () (interactive) (ar/org-template-expand "<e")))
-        ("E" "export"  (lambda () (interactive) (ar/org-template-expand "<E")))
-        ("h" "html"    (lambda () (interactive) (ar/org-template-expand "<h")))
-        ("l" "latex"   (lambda () (interactive) (ar/org-template-expand "<l")))
-        ("n" "note"    (lambda () (interactive) (ar/org-template-expand "<n")))
-        ("o" "quote"   (lambda () (interactive) (ar/org-template-expand "<q")))
-        ("v" "verse"   (lambda () (interactive) (ar/org-template-expand "<v")))]
-
-       ["Head"
-        ("i" "index"   (lambda () (interactive) (ar/org-template-expand "<i")))
-        ("A" "ASCII"   (lambda () (interactive) (ar/org-template-expand "<A")))
-        ("I" "INCLUDE" (lambda () (interactive) (ar/org-template-expand "<I")))
-        ("H" "HTML"    (lambda () (interactive) (ar/org-template-expand "<H")))
-        ("L" "LaTeX"   (lambda () (interactive) (ar/org-template-expand "<L")))]
-
-       ["Source"
-        ("s" "src"       (lambda () (interactive) (ar/org-template-expand "<s")))
-        ("e" "emacs-lisp" (lambda () (interactive) (ar/org-template-expand "<s" "emacs-lisp")))
-        ("y" "python"    (lambda () (interactive) (ar/org-template-expand "<s" "python")))
-        ("w" "powershell" (lambda () (interactive) (ar/org-template-expand "<s" "powershell")))
-        ("r" "ruby"      (lambda () (interactive) (ar/org-template-expand "<s" "ruby")))
-        ("S" "sh"        (lambda () (interactive) (ar/org-template-expand "<s" "sh")))
-        ("g" "golang"    (lambda () (interactive) (ar/org-template-expand "<s" "go :imports '(\"fmt\")")))]
-
-       ["Misc"
-        ("m" "mermaid"     (lambda () (interactive) (ar/org-template-expand "<s" "mermaid :file chart.png")))
-         ("k" "kdl"         (lambda () (interactive) (ar/org-template-expand "<s" "kdl")))
-        ("u" "plantuml"    (lambda () (interactive) (ar/org-template-expand "<s" "plantuml :file chart.png")))
-         ("K" "kbd"         (lambda () (interactive) (ar/org-template-expand "<s" "kbd")))
-        ("Z" "yaml"        (lambda () (interactive) (ar/org-template-expand "<s" "yaml")))
-        ("Y" "ipython"     ar/org-insert-ipython)
-        ("P" "Perl tangled" ar/org-insert-perl-tangled)
-        ("<" "insert <"    self-insert-command)]]))
-
-  (defun ar/org-smart-less-than ()
-    "Smart less-than key: trigger transient menu or insert character."
-    (interactive)
-    (if (or (region-active-p) (looking-back "^[ \t]*" 1))
-        (if (featurep 'transient)
-            (ar/org-template-transient)
-          (require 'transient)
-          (ar/org-template-transient))
-      (self-insert-command 1)))
-
-  (define-key org-mode-map (kbd "<") #'ar/org-smart-less-than))
+  (transient-define-prefix ar/org-template-transient ()
+    "Org Mode Structure Templates"
+    [:description ar/org-transient-title
+     ["Basic"
+      ("a" "ascii"   ar/org-block-a-ascii)
+      ("c" "center"  ar/org-block-c-center)
+      ("C" "comment" ar/org-block-C-comment)
+      ("x" "example" ar/org-block-x-example)
+      ("E" "export"  ar/org-block-E-export)
+      ("h" "html"    ar/org-block-h-html)
+      ("l" "latex"   ar/org-block-l-latex)
+      ("n" "note"    ar/org-block-n-note)
+      ("o" "quote"   ar/org-block-o-quote)
+      ("v" "verse"   ar/org-block-v-verse)]
+     ["Head"
+      ("i" "index"   ar/org-block-i-index)
+      ("A" "ASCII"   ar/org-block-A-ASCII)
+      ("I" "INCLUDE" ar/org-block-I-INCLUDE)
+      ("H" "HTML"    ar/org-block-H-HTML)
+      ("L" "LaTeX"   ar/org-block-L-LaTeX)]
+     ["Source"
+      ("s" "src"        ar/org-block-s-src)
+      ("e" "emacs-lisp" ar/org-block-e-emacs-lisp)
+      ("y" "python"     ar/org-block-y-python)
+      ("w" "powershell" ar/org-block-w-powershell)
+      ("r" "ruby"       ar/org-block-r-ruby)
+      ("S" "sh"         ar/org-block-S-sh)
+      ("g" "golang"     ar/org-block-g-golang)]
+     ["Misc"
+      ("m" "mermaid"      ar/org-block-m-mermaid)
+      ("k" "kdl"          ar/org-block-k-kdl)
+      ("u" "plantuml"     ar/org-block-u-plantuml)
+      ("K" "kbd"          ar/org-block-K-kbd)
+      ("Z" "yaml"         ar/org-block-Z-yaml)
+      ("Y" "ipython"      ar/org-insert-ipython)
+      ("P" "Perl tangled" ar/org-insert-perl-tangled)
+      ("<" "insert <"     self-insert-command)]]))
 #+end_src
-
-
 
 
 ** TODO Org Src Buffer Naming
