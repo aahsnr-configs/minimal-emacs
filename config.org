@@ -344,8 +344,6 @@ Quality-of-life settings, safety guards, and core minor modes. Disables unused V
   (define-key tabulated-list-mode-map "q" #'quit-window))
 
 
-
-
 ;; Fallback major-mode associations for extensions lacking native Emacs support.
 (dolist (pair '(("\\.in\\'" . text-mode)
                 ("\\.out\\'" . text-mode)
@@ -418,19 +416,18 @@ Saves buffer contents directly to disk on idle, focus loss, and window/buffer sw
 #+end_src
 
 
-** TODO Auto Tangle
+** DONE Auto Tangle
 Automatically regenerates tangled output files when any Org buffer is saved.
 #+begin_src emacs-lisp
 (use-package org-auto-tangle
   :defer t
   :hook (org-mode . org-auto-tangle-mode)
   :custom
-  ;; Tangle asynchronously to prevent main-thread blocking on large files.
   (org-auto-tangle-async t)
-  ;; Default for ALL org buffers. Files without source blocks are unaffected.
-  ;; To opt out a specific file, add #+auto_tangle: nil to its header.
+  ;; Default for ALL org buffers. Files without source blocks are unaffected. To opt out a specific file, add #+auto_tangle: nil to its header.
   (org-auto-tangle-default t))
 #+end_src
+
 
 ** DONE Garbage Collector
 Manages garbage collection via =gcmh= idle timers. Elevates the GC threshold during active input and triggers background collection during idle periods. Disables =gcmh= on experimental MPS Incremental GC (=igc=) builds and utilizes =after-focus-change-function= for focus-out memory reclamation.
@@ -6180,6 +6177,7 @@ Tabulated-list interface for decluttered viewing, regex/keyword filtering, and e
   (define-key denote-menu-mode-map (kbd "e") #'denote-menu-export-to-dired))
 #+end_src
 
+
 ** DONE Denote Merge
 Consolidates fragmented notes by merging file contents or active regions while automatically rewiring the backlink graph.
 #+begin_src emacs-lisp
@@ -6196,15 +6194,90 @@ Consolidates fragmented notes by merging file contents or active regions while a
              denote-merge-region-markdown-quote
              denote-merge-region-markdown-fenced-block)
   :custom
-  ;; Upstream explicitly warns that auto-saving may lead to data loss during
-  ;; backlink rewiring. We leave buffers open post-merge to manually verify
-  ;; the rewired graph before executing `save-some-buffers'.
+  ;; Prevent data loss during backlink rewiring; verify graph before saving.
   (denote-merge-save-buffers nil)
+  ;; Retain buffers post-merge for manual backlink graph verification.
   (denote-merge-kill-buffers nil))
 #+end_src
 
 
-** TODO Denote Explore
+** DONE Denote Solo
+Switches the active Denote directory context globally, persisting the choice across sessions and isolating keyword completions per silo.
+#+begin_src emacs-lisp
+(use-package denote-solo
+  :ensure (:host github :repo "pavlo/denote-solo")
+  :after denote
+  :custom
+  ;; Dynamically map existing Denote silos from the Dynamic Directory Structure.
+  (denote-solo-directories
+   `(("Zettelkasten" . ,my/denote-zettelkasten-dir)
+     ("Projects"     . ,(expand-file-name "projects" my/org-directory))
+     ("Areas"        . ,(expand-file-name "areas" my/org-directory))
+     ("Resources"    . ,(expand-file-name "resources" my/org-directory))
+     ("Archives"     . ,(expand-file-name "archives" my/org-directory))
+     ("Journal"      . ,(expand-file-name "journal" my/org-directory))))
+  :config
+  ;; Customize the mode line format to match the Tokyo Night aesthetic.
+  (setq denote-solo-modeline-function
+        (lambda (name)
+          (concat " "
+                  (propertize (concat (nerd-icons-faicon "nf-fa-book" :v-adjust 0.02)
+                                      " " name)
+                              'face 'font-lock-string-face)
+                  " ")))
+  ;; Activate the global minor mode to enable state persistence and modeline rendering.
+  (denote-solo-mode 1))
+#+end_src
+
+
+** DONE Denote Review
+Schedules and tracks periodic note reviews using a dedicated chronological dashboard.
+#+begin_src emacs-lisp
+(use-package denote-review
+  :defer t
+  :after denote
+  :commands (denote-review-set-date
+             denote-review-display-list
+             denote-review-set-date-dired-marked-files))
+#+end_src
+
+
+** DONE Denote Explore
+Provides summary statistics, random walks, structural maintenance, and network visualization for Denote collections.
+#+begin_src emacs-lisp
+(use-package denote-explore
+  :defer t
+  :ensure (:host github :repo "pprevos/denote-explore")
+  :after (denote denote-regexp)
+  :commands (denote-explore-count-notes
+             denote-explore-count-keywords
+             denote-explore-list-keywords
+             denote-explore-barchart-timeline
+             denote-explore-barchart-keywords
+             denote-explore-barchart-extensions
+             denote-explore-random-note
+             denote-explore-random-regex
+             denote-explore-random-link
+             denote-explore-random-keyword
+             denote-explore-random-signature
+             denote-explore-duplicate-notes
+             denote-explore-identify-duplicate-notes-dired
+             denote-explore-missing-links
+             denote-explore-zero-keywords
+             denote-explore-single-keywords
+             denote-explore-rename-keyword
+             denote-explore-sync-metadata
+             denote-explore-isolated-notes
+             denote-explore-network
+             denote-explore-network-regenerate
+             denote-explore-barchart-degree
+             denote-explore-barchart-backlinks)
+  :custom
+  ;; Route graph artifacts (JSON/SVG) to the no-littering var directory.
+  ;; Prevents analytics exports from polluting the Zettelkasten Git repository.
+  (denote-explore-network-directory
+   (no-littering-expand-var-file-name "denote-explore/")))
+#+end_src
 
 
 ** TODO Consult Denote
@@ -6216,6 +6289,19 @@ Consolidates fragmented notes by merging file contents or active regions while a
   (consult-denote-grep-command #'consult-ripgrep)
   :config
   (consult-denote-mode 1))
+#+end_src
+
+
+** TODO Citar Denote
+
+#+begin_src emacs-lisp
+;; (use-package citar-denote
+;;   :defer t
+;;   :after (citar denote)
+;;   :custom
+;;   (citar-denote-subdir "literature")
+;;   :config
+;;   (citar-denote-mode 1))
 #+end_src
 
 
@@ -6907,14 +6993,35 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
   "n S o" '(denote-silo-open-or-create :wk "Open/create silo")
   "n S n" '(denote-silo-create-note :wk "New note in silo")
   "n S d" '(denote-silo-dired :wk "Silo dired")
+  "n S l" '(denote-solo-switch :wk "Switch solo context")
 
   ;; Explore & Analytics
   "n e"   '(:ignore t :wk "explore")
-  "n e s" '(denote-explore-statistics :wk "Statistics")
-  "n e o" '(denote-explore-orphans :wk "Orphan detection")
-  "n e r" '(denote-explore-random-note :wk "Random walk")
-  "n e n" '(denote-explore-network-keywords :wk "Keyword network")
-  "n e w" '(denote-wordcloud :wk "Word cloud")
+  ;; Statistics
+  "n e c" '(denote-explore-count-notes :wk "Count notes")
+  "n e k" '(denote-explore-count-keywords :wk "Count keywords")
+  "n e f" '(denote-explore-barchart-filetypes :wk "Filetypes barchart")
+  "n e w" '(denote-explore-barchart-keywords :wk "Keywords barchart")
+  "n e t" '(denote-explore-barchart-timeline :wk "Timeline barchart")
+  ;; Random Walks
+  "n e r" '(denote-explore-random-note :wk "Random note")
+  "n e x" '(denote-explore-random-regex :wk "Random regex")
+  "n e l" '(denote-explore-random-link :wk "Random link")
+  "n e K" '(denote-explore-random-keyword :wk "Random keyword")
+  ;; Janitor
+  "n e d" '(denote-explore-duplicate-notes :wk "Duplicate notes")
+  "n e D" '(denote-explore-duplicate-notes-dired :wk "Duplicates (Dired)")
+  "n e m" '(denote-explore-missing-links :wk "Missing links")
+  "n e z" '(denote-explore-zero-keywords :wk "Zero keywords")
+  "n e s" '(denote-explore-single-keywords :wk "Single keywords")
+  "n e R" '(denote-explore-rename-keywords :wk "Rename keywords")
+  "n e y" '(denote-explore-sync-metadata :wk "Sync metadata")
+  "n e i" '(denote-explore-isolated-files :wk "Isolated files")
+  ;; Network Graphs & Visualisation
+  "n e n" '(denote-explore-network :wk "Generate network")
+  "n e g" '(denote-explore-network-regenerate :wk "Regenerate network")
+  "n e G" '(denote-explore-barchart-degree :wk "Degree barchart")
+  "n e b" '(denote-explore-barchart-backlinks :wk "Backlinks barchart")
 
   ;; Management & Refactoring
   "n m"   '(:ignore t :wk "manage")
@@ -6922,9 +7029,8 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
   "n m f" '(denote-merge-file :wk "Merge file")
   "n m r" '(denote-merge-region :wk "Merge region")
   "n m q" '(denote-merge-region-org-quote :wk "Merge region (quote)")
-  "n m z" '(denote-solo-mode :wk "Focus mode")
-  "n m v" '(denote-review :wk "Spaced repetition")
-
+  "n m v" '(denote-review-display-list :wk "Review list")
+  "n m u" '(denote-review-set-date :wk "Update review date")
 
   ;; Bibliography & Publishing
   "n B"   '(:ignore t :wk "bibliography")
@@ -8187,13 +8293,6 @@ TODO: Uncomment when Project Management is setup
 ;;   (reftex-toc-split-windows-horizontally t)
 ;;   (reftex-toc-split-windows-fraction 0.2))
 
-;; (use-package citar-denote
-;;   :defer t
-;;   :after (citar denote)
-;;   :custom
-;;   (citar-denote-subdir "literature")
-;;   :config
-;;   (citar-denote-mode 1))
 #+end_src
 
 ** TODO Fast LaTeX Input
