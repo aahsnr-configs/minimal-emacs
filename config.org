@@ -2425,9 +2425,6 @@ Native redisplay concealment for terminal, agenda, and UI buffers. Replaces unma
                 embark-collect-mode lsp-ui-imenu-mode ghostel-mode
                 ghostel-compile-view-mode pdf-annot-list-mode))
   (add-hook (intern (format "%s-hook" mode)) #'ar/enable-hide-modeline))
-
-;; Org-agenda aggressively resets the modeline during finalization.
-(add-hook 'org-agenda-finalize-hook #'ar/enable-hide-modeline)
 #+end_src
 
 
@@ -5351,6 +5348,7 @@ Configures Org's core behavior, display, source editing, and performance setting
   (org-hide-emphasis-markers t)
   (org-fontify-whole-heading-line t)
   (org-adapt-indentation nil)
+  (org-confirm-babel-evaluate nil)
   (org-fontify-done-headline t)
   (org-fontify-quote-and-verse-blocks t)
   ;; Source blocks
@@ -5630,7 +5628,11 @@ Configures the task overview display, sorting, and window behavior.
      (tags . " %i %-12:c")
      (search . " %i %-12:c")))
   ;; Tag alignment: right-aligned at column 80.
-  (org-tags-column -80))
+  (org-tags-column -80)
+  :config
+  ;; Org-agenda aggressively resets the modeline during finalization.
+  ;; Hook injected here to obey Domain-Driven encapsulation (migrated from Hide Modeline).
+  (add-hook 'org-agenda-finalize-hook #'ar/enable-hide-modeline))
 #+end_src
 
 
@@ -6762,36 +6764,82 @@ Wires all template groups into org-capture, routes the UI to a dedicated bottom 
 #+end_src
 
 
-** TODO Org Structure Templates
+** DONE Org Structure Templates
+Configures Org structure templates for rapid block insertion and implements a deferred loading engine for Babel language backends.
 #+begin_src emacs-lisp
 (with-eval-after-load 'org
-  ;; Load org-tempo for structure templates
+  ;; Structure Templates (org-tempo)
   (require 'org-tempo)
-
-  ;; Babel language configuration
-  (setq org-confirm-babel-evaluate nil
-        org-src-fontify-natively t
-        org-src-tab-acts-natively t)
-
-  (defconst load-language-alist
-    '((emacs-lisp . t) (perl . t) (python . t) (ruby . t)
-      (js . t) (css . t) (sass . t) (C . t) (java . t) (latex . t)
-      (shell . t) (plantuml . t) (dot . t)))
-
-  (org-babel-do-load-languages 'org-babel-load-languages load-language-alist)
-
-  ;; Add Structure Templates
   (dolist (pair '(("sh" . "src shell")
                   ("el" . "src emacs-lisp")
                   ("py" . "src python")
-                  ("jpy" . "src jupyter-python")
                   ("dot" . "src dot")
                   ("plantuml" . "src plantuml")
                   ("tex" . "src latex")
                   ("yml" . "src yaml")
                   ("kbd" . "src kbd")
                   ("kdl" . "src kdl")))
-    (add-to-list 'org-structure-template-alist pair)))
+    (add-to-list 'org-structure-template-alist pair))
+
+  ;; Babel Lazy-Loading Engine
+  ;; NOTE: Jupyter/Python Paradigm Shift Deferred
+  ;; `emacs-jupyter` relies on heavy, stateful ZeroMQ kernel initialization hooks
+  ;; that expect `ob-jupyter` to be fully loaded BEFORE interacting with a block.
+  ;; The lazy-loader only triggers on execution (C-c C-c), which is mathematically
+  ;; too late for the kernel handshake. To implement `emacs-jupyter` in the future,
+  ;; explicitly `(require 'ob-jupyter)` in your Jupyter setup block, add
+  ;; `(python . jupyter)` to `ar/org-babel-mode-alist`, and map `"jpy"` to
+  ;; `"src jupyter-python"` in the structure templates above. For now, standard
+  ;; `ob-python` is utilized.
+
+  (defvar ar/org-babel-mode-alist
+    '((c . C) (cpp . C) (C++ . C) (D . C)
+      (elisp . emacs-lisp) (sh . shell) (bash . shell)
+      (matlab . octave) (rust . rustic-babel) (amm . ammonite))
+    "Alist mapping divergent block headers to their `ob-*` package names.")
+
+  (defun ar/org--babel-lazy-load (lang)
+    "Lazy load the babel package for LANG and register it."
+    (cl-check-type lang (or symbol null))
+    ;; Guard against nil languages to prevent `require` crashes during export.
+    (when lang
+      (unless (cdr (assq lang org-babel-load-languages))
+        (prog1 (or (require (intern (format "ob-%s" lang)) nil t)
+                   (require lang nil t))
+          ;; Update the registry so Org's execution engine recognizes it.
+          (add-to-list 'org-babel-load-languages (cons lang t))))))
+
+  ;; 1. EXPORT HOOK: Lazy load when exporting the document.
+  (define-advice org-babel-exp-src-block (:before (&optional element) lazy-load-export)
+    "Lazy load a babel package when a block is processed during exporting."
+    (let* ((info (org-babel-get-src-block-info nil element))
+           (lang (nth 0 info))
+           (lang (cond ((symbolp lang) lang) ((stringp lang) (intern lang))))
+           (lang (or (cdr (assq lang ar/org-babel-mode-alist)) lang)))
+      (ar/org--babel-lazy-load lang)))
+
+  ;; 2. SYNTAX HOOK: Lazy load when opening a block edit buffer (C-c ').
+  (define-advice org-src--get-lang-mode (:before (lang) lazy-load-syntax)
+    "Lazy load a babel package to ensure syntax highlighting in edit buffers."
+    (let* ((lang-str (if (stringp lang) lang (symbol-name lang)))
+           (lang-sym (intern lang-str)))
+      ;; Use `assoc-string` to correctly match string keys in `org-src-lang-modes`.
+      (unless (cdr (assoc-string lang-str org-src-lang-modes))
+        (ar/org--babel-lazy-load lang-sym))))
+
+  ;; 3. EXECUTION HOOK: Lazy load when executing the block (C-c C-c).
+  ;; Uses `:after-while` to ensure the package only loads if the user
+  ;; actually confirms execution (or if confirmation is disabled).
+  (define-advice org-babel-confirm-evaluate (:after-while (info) lazy-load-execute)
+    "Load babel libraries lazily when babel blocks are executed."
+    (let* ((lang (nth 0 info))
+           (lang (cond ((symbolp lang) lang) ((stringp lang) (intern lang))))
+           (lang (or (cdr (assq lang ar/org-babel-mode-alist)) lang)))
+      (ar/org--babel-lazy-load lang)
+      t))
+
+  ;; 4. THE OVERRIDE: Neuter the synchronous startup tax.
+  (advice-add #'org-babel-do-load-languages :override #'ignore))
 #+end_src
 
 
@@ -7725,6 +7773,9 @@ TODO: Uncomment when setting up flycheck
    '(hl-todo-DEBUG ((t (:foreground "#e0af68" :weight bold))))
    '(hl-todo-STUB ((t (:foreground "#e0af68" :weight bold))))))
 #+end_src
+
+#+RESULTS:
+| magit-todos-mode | forge-set-buffer-repository | doom-disable-line-numbers-h | +modeline-hide-in-non-status-buffer-h | gptel-magit-install | forge-bug-reference-setup |
 
 
 
