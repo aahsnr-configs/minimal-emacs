@@ -18,7 +18,7 @@
 
 - Review and audit your latest iteration of denote-sequence subsection. Find and fix any errors. Look at upstream documentations and source codes for both denote and denote-sequence packages for the review and audit. Search the web and think longer for this task and make sure you have the latest information till July 19, 2026. Then explain everything back to me.
 
-- Now determine the purpose of denote-refs and how it might improve the second brain from org mode and second brain main section. Look at denote-refs upstream documentation and source code. Search the web and think longer for this task and make sure you have the latest information till July 19, 2026. Then explain everything back to me.
+- Now determine the purpose of denote-regexp and how it might improve the second brain from org mode and second brain main section. Look at denote-regexp upstream documentation and source code. Search the web and think longer for this task and make sure you have the latest information till July 19, 2026. Then explain everything back to me.
 
 ## Python script to build and install emacs from source
 

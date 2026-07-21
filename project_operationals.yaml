@@ -1,17 +1,16 @@
 document:
-  title: "Unified AI Operational Protocol & Project State Checkpoint (v38: Contextual Sidebars Finalization & denote-refs Rejection)"
-  version: 38
+  title: "Unified AI Operational Protocol & Project State Checkpoint (v39: denote-regexp Reclassification & Headless Utility Placement)"
+  version: 39
   date: "July 21, 2026"
   description: >
     This document serves as the persistent memory anchor, behavioral boundary, and project tracker
     for the AI. It merges the system prompt protocol (rules, persona, formatting) with the project
     state (progress, architecture, checklists) to survive context window truncation.
     
-    v38 CORRECTION: Synced project state with config.org v0.17. Marked the new `Contextual Sidebars`
-    main section (Universal Sidecar, Denote Sections, Denote Citar Sections) as DONE. Formally
-    rejected `denote-refs` from the Denote ecosystem due to fragile buffer-injection mechanics,
-    write-region-annotate-functions hooks, and org-modern AST desyncs. Updated the Denote Ecosystem
-    implementation matrix, rejection list, and remaining work checklists. All AI interactions must
+    v39 CORRECTION: Reclassified `denote-regexp` from an interactive search UI tool to a headless
+    regex utility library. Updated its architectural placement from `Consult Denote` to `Denote Org`
+    to reflect its role in powering Org dynamic blocks. Explicitly documented it as a strict
+    prerequisite for `denote-explore` and downstream analytics packages. All AI interactions must
     strictly adhere to the constraints and state defined herein.
 
   sections:
@@ -33,7 +32,7 @@ document:
           - Ingest all files completely.
           - Acknowledge the current version and date from this file.
           - Scan `config.org.txt` and identify the exact next subsection lacking the `DONE` keyword.
-          - 'Output this exact phrase: "I have ingested the source-of-truth files and the unified protocol. I acknowledge the strict formatting rules, the negative constraints, and the current project state (Version 38). The next pending subsection is [Subsection Name]. I am locked in and will write zero code until you give the signal."'
+          - 'Output this exact phrase: "I have ingested the source-of-truth files and the unified protocol. I acknowledge the strict formatting rules, the negative constraints, and the current project state (Version 39). The next pending subsection is [Subsection Name]. I am locked in and will write zero code until you give the signal."'
       strict_greenlight_protocol:
         state: "You are in a READ-ONLY planning state by default."
         rule: >
@@ -192,18 +191,18 @@ document:
           dependency_graph: >
             denote (core) ─┬─► denote-org ─┬─► denote-journal ─► denote-journal-capture
                            │               ├─► denote-markdown
-                           │               └─► org-transclusion + denote
+                           │               ├─► org-transclusion + denote
+                           │               └─► denote-regexp (Headless API)
                            ├─► denote-silo
                            ├─► denote-sequence
                            ├─► denote-sections ─► denote-citar-sections
                            ├─► denote-refs [REJECTED]
-                           ├─► denote-regexp
                            ├─► denote-search
                            ├─► denote-menu
                            ├─► denote-merge
                            ├─► denote-solo
                            ├─► denote-review
-                           ├─► denote-explore
+                           ├─► denote-explore (Requires denote-regexp)
                            ├─► denote-wordcloud
                            ├─► denote-zettel-interface
                            ├─► denote-project-notes
@@ -220,13 +219,13 @@ document:
             - { order: 6, package: "denote-sequence", status: "CONFIGURED", config_subsection: "Denote Sequence", notes: "Hierarchical Folgezettel numbering schemes." }
             - { order: 7, package: "denote-sections", status: "CONFIGURED", config_subsection: "Contextual Sidebars", notes: "Universal Sidecar integration for dynamic backlinks rendering." }
             - { order: 8, package: "denote-refs", status: "REJECTED", config_subsection: "N/A", notes: "Rejected. Ghost-text injection breaks org-modern and causes I/O latency." }
-            - { order: 9, package: "denote-regexp", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Regex-powered note filtering and search." }
+            - { order: 9, package: "denote-regexp", status: "PLANNED", config_subsection: "Denote Org", notes: "Headless utility library for generating Denote file-name regexes with boolean keyword logic and `rx` integration." }
             - { order: 10, package: "denote-search", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Enhanced search across Denote silos." }
             - { order: 11, package: "denote-menu", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Tabulated-list menu interface for note management." }
             - { order: 12, package: "denote-merge", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Merge multiple notes into a single consolidated note." }
             - { order: 13, package: "denote-solo", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Single-note focus mode for distraction-free writing." }
             - { order: 14, package: "denote-review", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Spaced-repetition review scheduling for notes." }
-            - { order: 15, package: "denote-explore", status: "PLANNED", config_subsection: "Denote Explore", notes: "Analytics: random walks, statistics, orphan detection. Peter Prevos." }
+            - { order: 15, package: "denote-explore", status: "PLANNED", config_subsection: "Denote Explore", notes: "Analytics: random walks, statistics, orphan detection. Peter Prevos. Requires denote-regexp for file component parsing." }
             - { order: 16, package: "denote-wordcloud", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Keyword frequency visualization as word clouds." }
             - { order: 17, package: "denote-zettel-interface", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Zettelkasten-specific interface enhancements." }
             - { order: 18, package: "denote-project-notes", status: "PLANNED", config_subsection: "Denote (extend)", notes: "Project-scoped note management with project.el integration." }
@@ -262,13 +261,13 @@ document:
                 packages: ["denote-journal-capture"]
                 status: "DONE in config.org v0.16"
               - subsection: "Denote Org"
-                packages: ["denote-org", "denote-markdown", "org-transclusion + denote"]
-                status: "DONE in config.org v0.16 (denote-org only)"
+                packages: ["denote-org", "denote-markdown", "org-transclusion + denote", "denote-regexp"]
+                status: "DONE in config.org v0.17 (denote-org only)"
               - subsection: "Denote Explore"
                 packages: ["denote-explore", "denote-wordcloud", "denote-zettel-interface"]
                 status: "TODO in config.org v0.17 (empty)"
               - subsection: "Consult Denote"
-                packages: ["consult-denote", "denote-search", "denote-regexp"]
+                packages: ["consult-denote", "denote-search"]
                 status: "TODO in config.org v0.17 (consult-denote implemented, header TODO)"
               - subsection: "Citar Denote"
                 packages: ["citar-denote"]
@@ -286,7 +285,9 @@ document:
             - "denote-journal MUST load after denote (it uses denote's file-naming engine)."
             - "consult-denote MUST load after both consult and denote (it wires consult sources to denote-directory)."
             - "citar-denote MUST load after both citar and denote (it bridges bibliography to note creation)."
-            - "denote-explore MUST load after denote (it queries denote-directory-files)."
+            - "denote-regexp MUST load after denote (it queries denote-file-name-components-order)."
+            - "denote-regexp MUST load before denote-explore and other analytics packages that rely on it for parsing file components."
+            - "denote-explore MUST load after denote and denote-regexp."
             - "org-transclusion + denote MUST load after both org-transclusion and denote-org."
             - "universal-sidecar MUST load before denote-sections and denote-citar-sections."
             - "denote-sections MUST load after both universal-sidecar and denote."
@@ -485,8 +486,9 @@ document:
         - "[v35 Note] Denote Ecosystem Scope: The full Denote ecosystem (25 packages) is documented but only 5 packages are currently configured in config.org v0.16 (denote, denote-org, denote-journal, consult-denote, citar-denote). The remaining 20 packages are PLANNED and will be implemented incrementally."
         - "[v36 Note] Org Mode Cross-Section Cleanup Completed: All 7 tasks identified in v31/v32 (org-modern type mismatches, GTD remnants in capture/weekly-review, Emacs 31 line-spacing cons-cell) have been verified as resolved in config.org v0.16."
         - "[v36 Note] Org Capture & Keybindings Implementation: Fully implemented in config.org but retain TODO headers. Awaiting user review to mark DONE."
-        - "[v37 Correction] denote-sections Hallucination: Excised the false assumption that `denote-sections` manipulates internal AST/heading structure. Verified upstream that it is strictly a `universal-sidecar` bridge for rendering backlinks and bibliography metadata. Created dedicated `* TODO Contextual Sidebars` main section."
+        - "[v37 Correction] denote-sections Hallucination: Excised the false assumption that `denote-sections` manipulates internal AST/heading structure. Verified upstream that it is strictly a `universal-sidecar` bridge for rendering backlinks and bibliography metadata. Created dedicated `* DONE Contextual Sidebars` main section."
         - "[v38 Note] denote-refs Rejection: Formally rejected `denote-refs` from the Denote ecosystem. Its buffer-injection mechanics corrupt `org-modern` badges and trigger `super-save` I/O latency. Backlink UI is fully handled by `denote-sections` inside `universal-sidecar`."
+        - "[v39 Correction] denote-regexp Reclassification: Excised the false assumption that `denote-regexp` is an interactive search UI. Verified upstream that it is a headless API for generating regexes with boolean keyword logic. Reassigned from `Consult Denote` to `Denote Org` to power dynamic blocks and serve as a prerequisite for `denote-explore`."
       architectural_decisions:
         v15: "IDE Stack Consolidation (Committed to `lsp-mode`). Workspace Management Selection: Selected `bufferlo`."
         v18: "Package Management Migration: Officially transitioned to Elpaca v0.12. Deprecated `:pin` and `:vc`."
@@ -504,8 +506,9 @@ document:
         v34: "ORG AGENDA CUSTOM COMMANDS REWRITE: Executed the full rewrite fixing 5 bugs (2 critical, 2 moderate, 1 minor). Implemented v33 Categories 2, 3, 4, 5, 7, 8, 11, 12 in the Custom Commands subsection. Changed defconst to defvar with fboundp guards. Fixed :take nesting and :property dotted pair syntax. Added org-agenda-overriding-header to all commands. Added :transformer to context groups. Added :children performance guard comment. Added :log/:discard consumption order comment. Confirmed zero emoji usage. Inventoried 4 remaining bugs in the Org Super Agenda subsection's global default groups for future rewrite."
         v35: "DENOTE ECOSYSTEM PACKAGE ORDERING & CONFIG v0.16 SYNC: Incorporated the full 25-package Denote ecosystem ordering with dependency graph, implementation order, and config.org subsection mapping. Synced project state with config.org v0.16 font family unification (JetBrainsMono Nerd Font). Added Denote Ecosystem Load-Order Rule and Font Family Consistency Rule to architectural constraints. Documented that only 5 of 25 Denote packages are currently configured."
         v36: "ORG MODE & SECOND BRAIN SUBSECTION FINALIZATION (PARTIAL): Marked Org Agenda Custom Commands, Org Habit, Denote Core, Denote Silo, Denote Org, Denote Journal, and Denote Journal Capture as DONE. Verified implementation of Org Capture, Weekly Review, Consult Denote, Citar Denote, and Keybindings (headers remain TODO pending user review). Completed all v31/v32 Org Mode Cross-Section Cleanup tasks (org-modern type fixes, GTD remnant excision, line-spacing cons-cell). Marked Org-Super-Agenda Categories 1, 6, 9, 10, 13, and 14 as IMPLEMENTED in the global default subsection."
-        v37: "CONTEXTUAL SIDEBARS & DENOTE-SECTIONS HALLUCINATION FIX: Excised the false assumption that `denote-sections` manipulates internal AST/heading structure. Verified upstream that it is strictly a `universal-sidecar` bridge for rendering backlinks and bibliography metadata. Created dedicated `* TODO Contextual Sidebars` main section between Development Tools and Highlight TODOs. Updated Denote Ecosystem implementation order and config.org subsection mapping to reflect the new architectural placement."
+        v37: "CONTEXTUAL SIDEBARS & DENOTE-SECTIONS HALLUCINATION FIX: Excised the false assumption that `denote-sections` manipulates internal AST/heading structure. Verified upstream that it is strictly a `universal-sidecar` bridge for rendering backlinks and bibliography metadata. Created dedicated `* DONE Contextual Sidebars` main section between Development Tools and Highlight TODOs. Updated Denote Ecosystem implementation order and config.org subsection mapping to reflect the new architectural placement."
         v38: "CONTEXTUAL SIDEBARS FINALIZATION & DENOTE-REFS REJECTION: Synced with config.org v0.17. Marked Contextual Sidebars (Universal Sidecar, Denote Sections, Denote Citar Sections) as DONE. Formally rejected `denote-refs` from the Denote ecosystem due to fragile buffer-injection mechanics, write-region-annotate-functions hooks, and org-modern AST desyncs. Superseded by native denote-backlinks and universal-sidecar."
+        v39: "DENOTE-REGEXP RECLASSIFICATION & PLACEMENT: Excised the false assumption that `denote-regexp` is an interactive search tool. Verified upstream that it is a headless utility library for generating file-name regexes with boolean keyword logic. Reassigned its architectural placement from `Consult Denote` to `Denote Org` to power Org dynamic blocks and act as a strict prerequisite for `denote-explore` and downstream analytics."
       overall_progress:
         finalized:
           - "Core Emacs (13 subsections)"
@@ -533,7 +536,7 @@ document:
           - "Denote Journal Capture (Org Mode subsection — DONE)"
           - "Contextual Sidebars (Universal Sidecar, Denote Sections, Denote Citar Sections — DONE)"
           - "Org-Super-Agenda Enhancement Architecture (14 categories planned — v33, 14 categories implemented across Custom Commands & Global Defaults — v36)"
-          - "Denote Ecosystem Package Ordering (25 packages documented — v35)"
+          - "Denote Ecosystem Package Ordering (25 packages documented — v35, updated v39)"
           - "Font Family Unification (config.org v0.16 — JetBrainsMono Nerd Font)"
           - "Org Mode Cross-Section Cleanup (v31/v32 Identified — COMPLETED v36)"
         in_progress:
@@ -553,7 +556,7 @@ document:
     - id: 6
       title: "Work Checklists & Global Questions"
       remaining_work_checklists:
-        - group: "Denote Ecosystem Implementation (v38 — 14 Pending Packages, 1 Rejected)"
+        - group: "Denote Ecosystem Implementation (v39 — 14 Pending Packages, 1 Rejected)"
           tasks:
             - { status: "done", description: "denote-silo: Multi-silo isolation via .dir-locals.el. GNU ELPA official. Add to Denote subsection." }
             - { status: "done", description: "denote-journal-capture: org-capture integration for journal entries. Add to Denote Journal subsection." }
@@ -562,7 +565,7 @@ document:
             - { status: "done", description: "denote-citar-sections: Universal Sidecar bibliography. Add to Contextual Sidebars subsection." }
             - { status: "done", description: "universal-sidecar: Core sidecar engine. Add to Contextual Sidebars subsection." }
             - { status: "rejected", description: "denote-refs: Rejected due to ghost-text buffer injection and I/O latency." }
-            - { status: "pending", description: "denote-regexp: Regex-powered note filtering. Add to Consult Denote subsection." }
+            - { status: "pending", description: "denote-regexp: Headless regex utility for boolean keyword logic. Add to Denote Org subsection." }
             - { status: "pending", description: "denote-search: Enhanced search across silos. Add to Consult Denote subsection." }
             - { status: "pending", description: "denote-menu: Tabulated-list menu interface. Add to Denote Management subsection (NEW)." }
             - { status: "pending", description: "denote-merge: Merge multiple notes. Add to Denote Management subsection (NEW)." }
