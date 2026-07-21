@@ -6155,7 +6155,7 @@ Provides a headless API for generating Denote file-name regular expressions with
 #+end_src
 
 
-** TODO Denote Menu
+** DONE Denote Menu
 Tabulated-list interface for decluttered viewing, regex/keyword filtering, and exporting marked files to Dired.
 #+begin_src emacs-lisp
 (use-package denote-menu
@@ -6170,11 +6170,42 @@ Tabulated-list interface for decluttered viewing, regex/keyword filtering, and e
   :custom
   ;; Surface Folgezettel signatures and file extensions in the grid.
   (denote-menu-show-file-signature t)
-  (denote-menu-show-file-type t))
+  (denote-menu-show-file-type t)
+  :config
+  ;; Wire native filtering and export commands to the tabulated-list mode map.
+  (define-key denote-menu-mode-map (kbd "c") #'denote-menu-clear-filters)
+  (define-key denote-menu-mode-map (kbd "/ r") #'denote-menu-filter)
+  (define-key denote-menu-mode-map (kbd "/ k") #'denote-menu-filter-by-keyword)
+  (define-key denote-menu-mode-map (kbd "/ o") #'denote-menu-filter-out-keyword)
+  (define-key denote-menu-mode-map (kbd "e") #'denote-menu-export-to-dired))
+#+end_src
+
+** DONE Denote Merge
+Consolidates fragmented notes by merging file contents or active regions while automatically rewiring the backlink graph.
+#+begin_src emacs-lisp
+(use-package denote-merge
+  :defer t
+  :after denote
+  :commands (denote-merge-file
+             denote-merge-region
+             denote-merge-region-plain
+             denote-merge-region-plain-indented
+             denote-merge-region-org-src
+             denote-merge-region-org-quote
+             denote-merge-region-org-example
+             denote-merge-region-markdown-quote
+             denote-merge-region-markdown-fenced-block)
+  :custom
+  ;; Upstream explicitly warns that auto-saving may lead to data loss during
+  ;; backlink rewiring. We leave buffers open post-merge to manually verify
+  ;; the rewired graph before executing `save-some-buffers'.
+  (denote-merge-save-buffers nil)
+  (denote-merge-kill-buffers nil))
 #+end_src
 
 
 ** TODO Denote Explore
+
 
 ** TODO Consult Denote
 #+begin_src emacs-lisp
@@ -6854,8 +6885,6 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
   "n i" '(denote-link-or-create :wk "Insert link or create")
   "n b" '(denote-backlinks :wk "Backlinks")
   "n T" '(org-transclusion-add :wk "Transclude note")
-  "n r b" '(denote-refs-backlinks :wk "Back references")
-  "n r f" '(denote-refs-forward :wk "Forward references")
 
   ;; Journaling
   "n j" '(denote-journal-new-or-existing-entry :wk "Journal (today)")
@@ -6889,12 +6918,13 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
 
   ;; Management & Refactoring
   "n m"   '(:ignore t :wk "manage")
-  "n m m" '(list-notes :wk "Tabulated menu")
-  "n m e" '(denote-merge-notes :wk "Merge notes")
+  "n m m" '(list-denotes :wk "Tabulated menu")
+  "n m f" '(denote-merge-file :wk "Merge file")
+  "n m r" '(denote-merge-region :wk "Merge region")
+  "n m q" '(denote-merge-region-org-quote :wk "Merge region (quote)")
   "n m z" '(denote-solo-mode :wk "Focus mode")
-  "n m r" '(denote-review :wk "Spaced repetition")
-  "n m x" '(denote-sections-create :wk "Extract section")
-  "n m f" '(denote-refs-backlinks :wk "Back references")
+  "n m v" '(denote-review :wk "Spaced repetition")
+
 
   ;; Bibliography & Publishing
   "n B"   '(:ignore t :wk "bibliography")

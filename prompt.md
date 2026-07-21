@@ -14,11 +14,11 @@
 
 - Are you sure there are no more errors and issues in this iteration of Workspaces? And are you sure there are not any more extra configurations you need to add by search the web? Answer and explain everything to me in great detail.Search the web and think longer for this task and make sure the information you get is latest till July 2026.
 
-- Now determine the purpose of denoto-menu and how it might improve the second brain from org mode and second brain main section. Look at denoto-menu upstream documentation and source code. Search the web and think longer for this task and make sure you have the latest information till July 19, 2026. Then explain everything back to me.
+- Now determine the purpose of denoto-merge and how it might improve the second brain from org mode and second brain main section. Look at denoto-merge upstream documentation and source code. Search the web and think longer for this task and make sure you have the latest information till July 20, 2026. Then explain everything back to me.
 
-- Lets work on denote-menu subsection next. You need to come up with a plan to write a config org block from scratch. Look at denote-menu upstream documentation and source code. Search the web and think longer for this task and make sure you have the latest information till July 19, 2026. Then explain everything back to me.
+- Lets work on denote-merge subsection next. You need to come up with a plan to write a config org block from scratch. Look at denote-merge upstream documentation and source code. Search the web and think longer for this task and make sure you have the latest information till July 20, 2026. Then explain everything back to me.
 
-- Review and audit your latest iteration of denoto-menu subsection. Find any errors and issues. Look at upstream documentations and source codes for both denote and denote-menu packages for the review and audit. Search the web and think longer for this task and make sure you have the latest information till July 20, 2026. Then explain everything back to me.
+- Review and audit your latest iteration of denoto-merge subsection. Find any errors and issues. Look at upstream documentations and source codes for both denote and denote-merge packages for the review and audit. Search the web and think longer for this task and make sure you have the latest information till July 20, 2026. Then explain everything back to me.
 
 ## Python script to build and install emacs from source
 
