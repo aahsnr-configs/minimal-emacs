@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.16
+#+VERSION: 0.17
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -5235,8 +5235,6 @@ Adds hierarchical numbering schemes to notes for structured parent, child, and s
 #+end_src
 
 
-** TODO Denote Refs
-
 ** DONE Denote Org
 Bridges Denote with Org mode's dynamic blocks, subtree extraction, and deep heading links.
 #+begin_src emacs-lisp
@@ -7358,17 +7356,13 @@ Provides a per-frame sidebar buffer that dynamically renders contextual metadata
              universal-sidecar-uninsinuate
              universal-sidecar-refresh)
   :custom
-  ;; Buffer naming format tied to the frame description.
+  ;; Tie buffer name to the frame description.
   (universal-sidecar-buffer-name-format "*Sidecar: %F*")
-  ;; Enable idle timer to passively refresh sidecar contents.
+  ;; Enable passive idle timer for content refresh.
   (universal-sidecar-enable-timer t)
-  ;; Refresh interval in seconds.
   (universal-sidecar-refresh-time 5)
   :config
-  ;; Route the sidecar to a dedicated right-side window.
-  ;; `side-window` prevents Popper from intercepting it as a transient popup.
-  ;; `no-delete-other-windows` protects it from `delete-other-windows` (C-x 1).
-  ;; `no-other-window` prevents Popper's window cycling and C-x o from focusing it.
+  ;; Route to a dedicated right-side window, isolated from Popper and `C-x o`.
   (add-to-list 'display-buffer-alist
                '("\\*Sidecar:.*\\*"
                  (display-buffer-in-side-window)
@@ -7376,7 +7370,7 @@ Provides a per-frame sidebar buffer that dynamically renders contextual metadata
                  (window-width . 0.25)
                  (window-parameters (no-delete-other-windows . t)
                                     (no-other-window . t))))
-  ;; Advise core Emacs navigation functions to trigger sidecar updates.
+  ;; Advise core navigation functions to trigger sidecar updates.
   (universal-sidecar-insinuate))
 #+end_src
 
