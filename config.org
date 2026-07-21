@@ -5712,73 +5712,68 @@ Groups agenda items into labeled sections by urgency, context, and status.
                           " Completed Today")
            :log closed
            :order 0)
-
           (:discard (:todo ("DONE" "CANCEL")))
-
           (:name ,(concat (nerd-icons-octicon "nf-oct-alert" :v-adjust 0.02)
                           " Overdue")
            :deadline past
            :scheduled past
            :face font-lock-warning-face
            :order 1)
-
           (:name ,(concat (nerd-icons-octicon "nf-oct-inbox" :v-adjust 0.02)
                           " Inbox")
            :todo "TODO"
            :file-path "agenda/todo\\.org"
            :transformer (string-remove-prefix "TODO " it)
            :order 2)
-
           (:name ,(concat (nerd-icons-faicon "nf-fa-calendar" :v-adjust 0.02)
                           " Today")
            :time-grid t
            :order 3)
-
           (:name ,(concat (nerd-icons-mdicon "nf-md-chart_line" :v-adjust 0.02)
                           " Habits")
            :habit t
            :order 4)
-
           (:name ,(concat (nerd-icons-faicon "nf-fa-fire" :v-adjust 0.02)
                           " High Priority")
            :priority "A"
            :order 5)
-
           (:name ,(concat (nerd-icons-faicon "nf-fa-laptop" :v-adjust 0.02)
                           " @Computer")
            :and (:tag "@computer" :todo ("NEXT" "TODO"))
+           :transformer (string-remove-prefix "NEXT " (string-remove-prefix "TODO " it))
            :order 6)
           (:name ,(concat (nerd-icons-faicon "nf-fa-home" :v-adjust 0.02)
                           " @Home")
            :and (:tag "@home" :todo ("NEXT" "TODO"))
+           :transformer (string-remove-prefix "NEXT " (string-remove-prefix "TODO " it))
            :order 7)
           (:name ,(concat (nerd-icons-faicon "nf-fa-car" :v-adjust 0.02)
                           " @Errands")
            :and (:tag "@errands" :todo ("NEXT" "TODO"))
+           :transformer (string-remove-prefix "NEXT " (string-remove-prefix "TODO " it))
            :order 8)
           (:name ,(concat (nerd-icons-faicon "nf-fa-phone" :v-adjust 0.02)
                           " @Phone")
            :and (:tag "@phone" :todo ("NEXT" "TODO"))
+           :transformer (string-remove-prefix "NEXT " (string-remove-prefix "TODO " it))
            :order 9)
           (:name ,(concat (nerd-icons-faicon "nf-fa-brain" :v-adjust 0.02)
                           " @Deep Work")
            :and (:tag "@deep_work" :todo ("NEXT" "TODO"))
+           :transformer (string-remove-prefix "NEXT " (string-remove-prefix "TODO " it))
            :order 10)
-
           (:name ,(concat (nerd-icons-faicon "nf-fa-hourglass_half" :v-adjust 0.02)
                           " Waiting For")
            :todo "WAIT"
            :face shadow
            :transformer (string-remove-prefix "WAIT " it)
            :order 11)
-
           (:name ,(concat (nerd-icons-faicon "nf-fa-clock" :v-adjust 0.02)
                           " Due Soon")
            :deadline (before "+7d")
            :order 12)
-
           (:name ,(concat (nerd-icons-octicon "nf-oct-kebab_horizontal"
-                          :v-adjust 0.02)
+                                          :v-adjust 0.02)
                           " Other Tasks")
            :take (15 (:anything t))
            :order 99))))
@@ -6764,89 +6759,6 @@ Wires all template groups into org-capture, routes the UI to a dedicated bottom 
             (lambda ()
               (unless org-note-abort
                 (org-save-all-org-buffers)))))
-#+end_src
-
-
-** TODO Weekly Review
-Spawns a Denote note with task statistics, a structured review checklist, and reflection prompts.
-#+begin_src emacs-lisp
-(defun ar/weekly-review ()
-  "Open or create this week's Denote review note, pre-populated with stats."
-  (interactive)
-  (require 'denote)
-  (let* ((week (format-time-string "%Y-W%V"))
-         (regexp (concat "__review.*" (regexp-quote week)))
-         (files (denote-directory-files regexp)))
-    (if files
-        (find-file (car files))
-      (let* ((todo-file (expand-file-name "agenda/todo.org" my/org-directory))
-             ;; Count TODO items under the * Inbox heading in todo.org.
-             (inbox-count
-              (if (file-exists-p todo-file)
-                  (with-temp-buffer
-                    (insert-file-contents todo-file)
-                    (goto-char (point-min))
-                    (if (re-search-forward "^\\* Inbox" nil t)
-                        (let ((end (or (save-excursion
-                                         (re-search-forward "^\\* " nil t)
-                                         (match-beginning 0))
-                                       (point-max))))
-                          (count-matches "^\\*\\* TODO " (point) end))
-                      0))
-                0))
-             ;; Count NEXT actions in todo.org.
-             (next-count
-              (if (file-exists-p todo-file)
-                  (length (org-map-entries
-                           (lambda () t)
-                           "TODO=\"NEXT\""
-                           (list todo-file)))
-                0))
-             ;; Count WAIT items in todo.org.
-             (wait-count
-              (if (file-exists-p todo-file)
-                  (length (org-map-entries
-                           (lambda () t)
-                           "TODO=\"WAIT\""
-                           (list todo-file)))
-                0))
-             ;; Count Denote notes created in the last 7 days.
-             (week-start (format-time-string "%Y%m%d"
-                                             (time-subtract (current-time)
-                                                            (seconds-to-time (* 7 24 60 60)))))
-             (new-notes
-              (length (seq-filter
-                       (lambda (f)
-                         (let ((id (denote-retrieve-filename-identifier f)))
-                           (and id (string>= (substring id 0 8) week-start))))
-                       (denote-directory-files)))))
-        (denote (concat "Weekly Review " week) '("review"))
-        (goto-char (point-max))
-        (insert
-         (concat
-          "\n* Task Health Check\n"
-          (format "- Inbox items: *%d* %s\n"
-                  inbox-count
-                  (if (> inbox-count 10) "⚠ PROCESS URGENTLY" "✓"))
-          (format "- NEXT actions: *%d*\n" next-count)
-          (format "- WAIT items: *%d*\n" wait-count)
-          (format "- New Denote notes this week: *%d*\n" new-notes)
-          "* Review Checklist\n"
-          "** Task Review\n"
-          "- [ ] Process Inbox to zero\n"
-          "- [ ] Review all WAIT items\n"
-          "- [ ] Confirm each project has a NEXT action\n"
-          "- [ ] Review calendar (past week + next 2 weeks)\n"
-          "- [ ] Review Someday/Maybe\n"
-          "** Notes Review\n"
-          "- [ ] Review notes created this week\n"
-          "- [ ] Identify missing connections\n"
-          "- [ ] Rename/re-keyword any stale notes\n"
-          "* Reflections\n"
-          "** What Went Well?\n"
-          "** What Could Improve?\n"
-          "** Key Insights This Week\n"
-          "** Next Week's Focus\n"))))))
 #+end_src
 
 
