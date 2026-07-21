@@ -6279,6 +6279,75 @@ Provides summary statistics, random walks, structural maintenance, and network v
 #+end_src
 
 
+** DONE Denote Wordcloud
+Generates visual word clouds and searchable keyword lists from Denote notes.
+#+begin_src emacs-lisp
+(use-package denote-wordcloud
+  :defer t
+  :after denote
+  :commands (denote-wordcloud
+             denote-wordcloud-list
+             denote-wordcloud-list-by-frequency)
+  :custom-face
+  ;; Inject Tokyo Night colors; omit :height to inherit upstream scaling geometry.
+  (denote-wordcloud-face-0 ((t (:foreground "#7aa2f7"))))
+  (denote-wordcloud-face-1 ((t (:foreground "#e0af68"))))
+  (denote-wordcloud-face-2 ((t (:foreground "#9ece6a"))))
+  (denote-wordcloud-face-3 ((t (:foreground "#1abc9c"))))
+  (denote-wordcloud-face-4 ((t (:foreground "#bb9af7"))))
+  (denote-wordcloud-face-5 ((t (:foreground "#9d7cd8"))))
+  (denote-wordcloud-face-6 ((t (:foreground "#ff9e64"))))
+  (denote-wordcloud-face-7 ((t (:foreground "#f7768e"))))
+  (denote-wordcloud-face-8 ((t (:foreground "#7aa2f7"))))
+  (denote-wordcloud-face-9 ((t (:foreground "#e0af68")))))
+#+end_src
+
+
+** TODO Org Transclusion
+Embeds live copies of text from other files using Org links without duplicating the underlying file contents.
+#+begin_src emacs-lisp
+(use-package org-transclusion
+  :defer t
+  :after (org denote)
+  :commands (org-transclusion-add
+             org-transclusion-add-all
+             org-transclusion-make-from-link
+             org-transclusion-mode
+             org-transclusion-remove
+             org-transclusion-remove-all
+             org-transclusion-live-sync-start)
+  :custom
+  ;; Exclude property drawers and keywords to prevent Denote frontmatter duplication.
+  (org-transclusion-exclude-elements '(property-drawer keyword))
+  ;; Include the first section of the transcluded document.
+  (org-transclusion-include-first-section t)
+  :custom-face
+  ;; Tokyo Night palette for transclusion fringe and source overlays.
+  (org-transclusion-fringe ((t (:foreground "#565f89"))))
+  (org-transclusion-source-fringe ((t (:foreground "#565f89"))))
+  (org-transclusion-source ((t (:background "#292e42"))))
+  (org-transclusion-edit ((t (:background "#24283b"))))
+  :config
+  ;; Bridge: Translates `denote:` URIs to `file:` AST nodes for the transclusion engine.
+  (defun ar/denote-org-transclusion-add (link plist)
+    "Resolve `denote:' links for org-transclusion."
+    (when (string= "denote" (org-element-property :type link))
+      (let* ((path (org-element-property :path link))
+             (parts (string-split path "::"))
+             (id (car parts))
+             (search (cadr parts))
+             (file (denote-get-path-by-id id)))
+        (when file
+          (let ((new-link (with-temp-buffer
+                            (insert (concat "file:" file (when search (concat "::" search))))
+                            (goto-char (point-min))
+                            (org-element-link-parser))))
+            (org-transclusion-add-org-file new-link plist))))))
+  (cl-pushnew 'ar/denote-org-transclusion-add org-transclusion-add-functions)
+  ;; Raw `define-key` required: live-sync map is a transient map, not an Evil state map.
+  (define-key org-transclusion-live-sync-map (kbd "p") #'org-transclusion-live-sync-paste))
+#+end_src
+
 ** TODO Consult Denote
 #+begin_src emacs-lisp
 (use-package consult-denote
@@ -6996,6 +7065,7 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
 
   ;; Explore & Analytics
   "n e"   '(:ignore t :wk "explore")
+
   ;; Statistics
   "n e c" '(denote-explore-count-notes :wk "Count notes")
   "n e k" '(denote-explore-count-keywords :wk "Count keywords")
@@ -7003,12 +7073,14 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
   "n e f" '(denote-explore-barchart-filetypes :wk "Filetypes barchart")
   "n e w" '(denote-explore-barchart-keywords :wk "Keywords barchart")
   "n e t" '(denote-explore-barchart-timeline :wk "Timeline barchart")
+
   ;; Random Walks
   "n e r" '(denote-explore-random-note :wk "Random note")
   "n e x" '(denote-explore-random-regex :wk "Random regex")
   "n e l" '(denote-explore-random-link :wk "Random link")
   "n e K" '(denote-explore-random-keyword :wk "Random keyword")
   "n e S" '(denote-explore-random-signature :wk "Random signature")
+
   ;; Janitor
   "n e d" '(denote-explore-duplicate-notes :wk "Duplicate notes")
   "n e D" '(denote-explore-duplicate-notes-dired :wk "Duplicates via  Dired")
@@ -7018,11 +7090,16 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
   "n e R" '(denote-explore-rename-keyword :wk "Rename keyword")
   "n e y" '(denote-explore-sync-metadata :wk "Sync metadata")
   "n e i" '(denote-explore-isolated-files :wk "Isolated files")
+
   ;; Network Graphs & Visualisation
   "n e n" '(denote-explore-network :wk "Generate network")
   "n e g" '(denote-explore-network-regenerate :wk "Regenerate network")
   "n e G" '(denote-explore-barchart-degree :wk "Degree barchart")
   "n e b" '(denote-explore-barchart-backlinks :wk "Backlinks barchart")
+
+  ;; Wordcloud
+  "n e W" '(denote-wordcloud :wk "Wordcloud")
+  "n e F" '(denote-wordcloud-list-by-frequency :wk "Wordcloud (frequency)")
 
   ;; Management & Refactoring
   "n m"   '(:ignore t :wk "manage")
