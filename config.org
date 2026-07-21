@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.19
+#+VERSION: 0.20
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -356,78 +356,6 @@ Quality-of-life settings, safety guards, and core minor modes. Disables unused V
 
 
 
-** DONE Auto Save
-Saves buffer contents directly to disk on idle, focus loss, and window/buffer switches.
-#+begin_src emacs-lisp
-(use-package super-save
-  :config
-  (super-save-mode +1)
-  ;; Idle save after 5 seconds.
-  (setq super-save-auto-save-when-idle t
-        super-save-idle-duration 5)
-  ;; Exclude TRAMP/remote files to prevent SSH main-thread freezes.
-  (setq super-save-remote-files nil)
-  ;; Event-driven triggers at natural navigation boundaries.
-  (setq super-save-triggers
-        '(switch-to-buffer
-          other-window
-          windmove-up
-          windmove-down
-          windmove-left
-          windmove-right
-          ace-window))
-  ;; Exclude read-only, terminal, and UI buffers.
-  (setq super-save-exclude
-        '(magit-status-mode
-          magit-log-mode
-          magit-diff-mode
-          dired-mode
-          dirvish-mode
-          dirvish-directory-view-mode
-          treemacs-mode
-          dashboard-mode
-          eshell-mode
-          ghostel-mode
-          ghostel-compile-view-mode
-          vterm-mode
-          term-mode
-          eat-mode
-          compilation-mode
-          grep-mode
-          occur-mode
-          org-agenda-mode
-          xref--xref-buffer-mode
-          embark-collect-mode
-          lsp-ui-imenu-mode
-          help-mode
-          helpful-mode
-          Info-mode
-          woman-mode
-          eww-mode
-          pdf-view-mode
-          docker-container-mode
-          docker-image-mode
-          Custom-mode
-          ediff-mode
-          profiler-report-mode
-          messages-buffer-mode
-          backtrace-mode
-          special-mode)))
-#+end_src
-
-
-** DONE Auto Tangle
-Automatically regenerates tangled output files when any Org buffer is saved.
-#+begin_src emacs-lisp
-(use-package org-auto-tangle
-  :defer t
-  :hook (org-mode . org-auto-tangle-mode)
-  :custom
-  (org-auto-tangle-async t)
-  ;; Default for ALL org buffers. Files without source blocks are unaffected. To opt out a specific file, add #+auto_tangle: nil to its header.
-  (org-auto-tangle-default t))
-#+end_src
-
 
 ** DONE Garbage Collector
 Manages garbage collection via =gcmh= idle timers. Elevates the GC threshold during active input and triggers background collection during idle periods. Disables =gcmh= on experimental MPS Incremental GC (=igc=) builds and utilizes =after-focus-change-function= for focus-out memory reclamation.
@@ -621,34 +549,70 @@ Configures the window and icon title bars to display the current buffer name usi
 
 * DONE Vim Emulation
 ** DONE Undo Fu
-Linear undo/redo engine with persistent session history. Replaces branching undo to prevent history corruption. Routes state to =var/undo-fu-session/= via =no-littering=, excludes encrypted and transient files to prevent metadata leakage, hashes deep paths to bypass 255-character OS limits, and applies conditional =zstd=/=gzip= compression.
+Provides linear undo and redo actions with persistent history across Emacs sessions.
 #+begin_src emacs-lisp
-(use-package undo-fu :defer t)
+(use-package undo-fu
+  :defer t)
+#+end_src
 
+#+begin_src emacs-lisp
 (use-package undo-fu-session
-  :hook (elpaca-after-init . undo-fu-session-global-mode)
+  :defer t
   :custom
   ;; Route persistent undo history to the no-littering var directory.
   (undo-fu-session-directory (no-littering-expand-var-file-name "undo-fu-session/"))
-  ;; Exclude encrypted and transient Git files to prevent metadata leakage and I/O errors.
-  ;; Strict \\' regex anchors prevent false positives on directory names.
-  (undo-fu-session-incompatible-files '("\\.gpg\\'" "/COMMIT_EDITMSG\\'" "/git-rebase-todo\\'"))
+  ;; Align disk footprint with undo-fu's linear paradigm; ignore branching history.
+  (undo-fu-session-linear t)
+  ;; Cull oldest session files to prevent infinite filesystem bloat and I/O stutter.
+  (undo-fu-session-file-limit 500)
+  ;; Exclude transient Git files to prevent metadata leakage and I/O errors.
+  (undo-fu-session-incompatible-files
+   '("/COMMIT_EDITMSG\\'"
+     "/git-rebase-todo\\'"))
+  ;; Exclude heavy, non-text UI, VCS, and terminal buffers from session serialization.
+  (undo-fu-session-incompatible-major-modes
+   '(magit-status-mode
+     magit-log-mode
+     magit-diff-mode
+     magit-revision-mode
+     git-commit-mode
+     dired-mode
+     dirvish-mode
+     treemacs-mode
+     dashboard-mode
+     eshell-mode
+     vterm-mode
+     term-mode
+     eat-mode
+     ghostel-mode
+     compilation-mode
+     grep-mode
+     occur-mode
+     org-agenda-mode
+     pdf-view-mode
+     help-mode
+     helpful-mode
+     Info-mode
+     special-mode))
   :config
   ;; Conditional compression: prefer zstd for near-instantaneous I/O, fallback to gzip.
   (setq undo-fu-session-compression
         (cond ((executable-find "zstd") 'zst)
               ((executable-find "gzip") 'gz)
               (t nil)))
-  ;; Hash long filenames to prevent OS 255-character path limit crashes.
-  ;; Official API: `undo-fu-session-make-file-name-function` (introduced in v0.7).
+  ;; Bulletproof path hashing: utilizes stable `secure-hash` primitive to bypass OS
+  ;; 255-char limits while appending the truncated base filename for human readability.
   (defun ar/undo-fu-session-hash-path (file ext)
     "Safely hash FILE to bypass OS 255-char limits, appending EXT."
-    (let ((backup-directory-alist `((".*" . ,undo-fu-session-directory))))
-      (concat (make-backup-file-name-1 file) ext)))
-  (setq undo-fu-session-make-file-name-function #'ar/undo-fu-session-hash-path))
+    (let* ((base (file-name-nondirectory file))
+           (hash (substring (secure-hash 'sha1 file) 0 16)))
+      (expand-file-name (concat hash "-" base ext) undo-fu-session-directory)))
+  (setq undo-fu-session-make-file-name-function #'ar/undo-fu-session-hash-path)
+  ;; Activate global minor mode directly in :config per Elpaca load-order physics.
+  (undo-fu-session-global-mode 1))
 #+end_src
-
 ** DONE Goto Chg
+
 Tracks text mutations (Changelist) orthogonal to the Jump List. Powers Evil's native =COUNT=-aware =g;= and =g,= temporal navigation.
 #+begin_src emacs-lisp
 (use-package goto-chg
@@ -893,6 +857,82 @@ Centralized keybinding router establishing global and local leader prefixes for 
 
 * TODO Editor Behavior
 
+** DONE Auto Save
+Saves buffer contents directly to disk on idle, focus loss, and window/buffer switches.
+#+begin_src emacs-lisp
+(use-package super-save
+  :config
+  (super-save-mode +1)
+  ;; Idle save after 60 seconds (1 minute).
+  (setq super-save-auto-save-when-idle t
+        super-save-idle-duration 60)
+  ;; Exclude TRAMP/remote files to prevent SSH main-thread freezes.
+  (setq super-save-remote-files nil)
+  ;; Event-driven triggers at natural navigation boundaries.
+  (setq super-save-triggers
+        '(switch-to-buffer
+          other-window
+          windmove-up
+          windmove-down
+          windmove-left
+          windmove-right
+          ace-window))
+  ;; Exclude read-only, terminal, and UI buffers.
+  (setq super-save-exclude
+        '(magit-status-mode
+          magit-log-mode
+          magit-diff-mode
+          dired-mode
+          dirvish-mode
+          dirvish-directory-view-mode
+          treemacs-mode
+          dashboard-mode
+          eshell-mode
+          ghostel-mode
+          ghostel-compile-view-mode
+          vterm-mode
+          term-mode
+          eat-mode
+          compilation-mode
+          grep-mode
+          occur-mode
+          org-agenda-mode
+          xref--xref-buffer-mode
+          embark-collect-mode
+          lsp-ui-imenu-mode
+          help-mode
+          helpful-mode
+          Info-mode
+          woman-mode
+          eww-mode
+          pdf-view-mode
+          docker-container-mode
+          docker-image-mode
+          Custom-mode
+          ediff-mode
+          profiler-report-mode
+          messages-buffer-mode
+          backtrace-mode
+          special-mode)))
+#+end_src
+
+
+** DONE Auto Tangle
+Automatically regenerates tangled output files when any Org buffer is saved.
+#+begin_src emacs-lisp
+(use-package org-auto-tangle
+  :defer t
+  :hook (org-mode . org-auto-tangle-mode)
+  :custom
+  ;; CRITICAL: Synchronous tangling prevents background Emacs process race conditions
+  ;; with Elpaca's async queue and Codeberg rate limits (early EOF git clone failures).
+  (org-auto-tangle-async nil)
+  ;; Default for ALL org buffers. Files without source blocks are unaffected.
+  ;; To opt out a specific file, add #+auto_tangle: nil to its header.
+  (org-auto-tangle-default t))
+#+end_src
+
+
 ** DONE Child Frame
 Establishes the foundational child frame API and global border theming. Configures native Emacs 28+ border faces and applies fringe isolation for downstream UI packages.
 #+begin_src emacs-lisp
@@ -934,6 +974,7 @@ Foundational glyph substitution and icon API. Eagerly loaded to prevent void-fun
   ;; Enables colorized glyphs; upstream fallbacks handle terminal degradation.
   (nerd-icons-color-icons t))
 #+end_src
+
 
 ** DONE Fonts
 Configures global typography, baseline monospaced faces, fontset fallback registration, and vertical line centering.
@@ -1999,9 +2040,6 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
 
 ** TODO Vimish Fold
 #+begin_src emacs-lisp
-;; ==========================================
-;; 3. VIMISH-FOLD (Visual Region Folding)
-;; ==========================================
 (use-package vimish-fold
   :defer t
   :after evil
@@ -6303,7 +6341,7 @@ Generates visual word clouds and searchable keyword lists from Denote notes.
 #+end_src
 
 
-** TODO Org Transclusion
+** DONE Org Transclusion
 Embeds live copies of text from other files using Org links without duplicating the underlying file contents.
 #+begin_src emacs-lisp
 (use-package org-transclusion
@@ -6348,14 +6386,17 @@ Embeds live copies of text from other files using Org links without duplicating 
   (define-key org-transclusion-live-sync-map (kbd "p") #'org-transclusion-live-sync-paste))
 #+end_src
 
-** TODO Consult Denote
+
+** DONE Consult Denote
+Upgrades Denote file and search prompts with live previews and async filtering.
 #+begin_src emacs-lisp
 (use-package consult-denote
-  :defer t
   :after (consult denote)
   :custom
+  ;; Route async content search strictly to ripgrep for performance.
   (consult-denote-grep-command #'consult-ripgrep)
   :config
+  ;; Activate global advice overrides and consult-buffer sources.
   (consult-denote-mode 1))
 #+end_src
 
