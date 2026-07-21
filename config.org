@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.18
+#+VERSION: 0.19
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -6277,6 +6277,7 @@ Provides summary statistics, random walks, structural maintenance, and network v
   (denote-explore-network-directory
    (no-littering-expand-var-file-name "denote-explore/")))
 #+end_src
+
 
 ** TODO Consult Denote
 #+begin_src emacs-lisp
