@@ -1,6 +1,6 @@
 ## General Prompts
 
-- Ingest the attached 5 files. Then acknowledge that you have read all 5 files and state the versions for files that have it.
+- Ingest all the 5 attached files and acknowledge their version numbers. Acknowledge that you have read these files. Also show me somehow that you understand all the files. You, however, don't have to determine the next task.
 
 - You have the `GREEN LIGHT` to execute the rewrite.
 
@@ -10,15 +10,15 @@
 
 - Okay then you have the signal to rewrite the Session Management subsection. Follow the protocols and instructions from system-prompt-protocols.md file and make sure the documentation is very concise as well.
 
-- Now audit and review the subsection: Org Habit. Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from project_operationals.yaml file. Search the web determine if there are additional configuration settings that might be useful. Then explain everything to me in detail and present me how you plan to deal with this configuration.I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 18 2026.
+- Now audit and review the subsection: Org Capture. Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from project_operationals.yaml file. Look at upstream documentations and source codes for org-capture. Also look at the upstream code and documentation for doom emacs in https://github.com/doomemacs/modules and https://github.com/doomemacs/core . Then determine how doom emacs handles org-capture. Keep in mind this Org Capture subsection has to integrate with the entirety of Org Mode and Second Brain main sectio, Then explain everything to me in detail and present me how you plan to deal with this configuration.I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 20 2026.
 
-- Are you sure there are no more errors and issues in this iteration of Workspaces? And are you sure there are not any more extra configurations you need to add by search the web? Answer and explain everything to me in great detail.Search the web and think longer for this task and make sure the information you get is latest till July 2026.
+- Are you sure there are no more errors and issues in this iteration of Undo Fu subsection? And are you sure there are not any more extra configurations you need to add by search the web? Answer and explain everything to me in great detail.Search the web and think longer for this task and make sure the information you get is latest till July 2026.
 
 - Now determine the purpose of denote-wordcloud and how it might improve the second brain from org mode and second brain main section. Look at denote-wordcloud upstream documentation and source code. Search the web and think longer for this task and make sure you have the latest information till July 20, 2026. Then explain everything back to me.
 
-- Lets work on consult-denote subsection next. You need to come up with a plan to write a config org block from scratch. Look at upstream documentations and source codes for both denote and consult-denote packages. Search the web and think longer for this task and make sure you have the latest information till July 20, 2026. Then explain everything back to me.
+- Lets work on Undo Fu subsection again. You need to come up with a plan to write a config org block from scratch. Look at upstream documentations and source codes for both denote and consult-denote packages. Search the web and think longer for this task and make sure you have the latest information till July 20, 2026. Then explain everything back to me.
 
-- Review and audit your latest iteration of org-transclusion subsection and the revised keybindings. Find any errors and issues. Look at upstream documentations and source codes for both denote and org-transclusion packages for the review and audit. Search the web and think longer for this task and make sure you have the latest information till July 20, 2026. Then explain everything back to me.
+- Review and audit your latest iteration of consult-denote subsection and the revised keybindings. Find any errors and issues. Look at upstream documentations and source codes for both denote and consult-denote packages for the review and audit. Search the web and think longer for this task and make sure you have the latest information till July 20, 2026. Then explain everything back to me.
 
 ## Python script to build and install emacs from source
 
