@@ -4,7 +4,7 @@
 
 - You have the `GREEN LIGHT` to execute the rewrite.
 
-- Now lets review and audit the Ediff subsection. Audit and review this subsection thoroughly in great detail. Then fix any errors and issues. List all the features and functionalities of ediff. I also need to know the evil style keybindings for ediff that exists in evil collection. evil-ediff has been integrated into evil collection package. Search the web and think longer for these task and make sure you have the latest information till July 21, 2026. Explain everything in great detail for me to review.
+- Now lets review and audit the Woman subsection. Audit and review this subsection thoroughly in great detail. Then fix any errors and issues. List all the features and functionalities of ediff. I also need to know the evil style keybindings for ediff that exists in evil collection. evil-ediff has been integrated into evil collection package Search the web and think longer for these task and make sure you have the latest information till July 21, 2026. Explain everything in great detail for me to review.
 
 - Find and fix any further errors and issues in your latest rewrite of Helpful subsection. Search the web and think longer for this task and explain everything back to me.
 
