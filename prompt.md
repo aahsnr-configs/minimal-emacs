@@ -4,7 +4,7 @@
 
 - You have the `GREEN LIGHT` to execute the rewrite.
 
-- Now lets review and audit on the Tree-sitter subsection. Audit and review this subsection thoroughly in great detail. Then fix any errors and issues. Only optimize it for emacs 31 since I fully using emacs 31. Search the web and think longer for this task and make sure you have the latest information till July 20, 2026. Explain everything in great detail for me to review.
+- Now lets review and audit the Vimish Fold subsection. Audit and review this subsection thoroughly in great detail. Then fix any errors and issues. Only optimize it for emacs 31 since I fully using emacs 31. Search the web and think longer for this task and make sure you have the latest information till July 20, 2026. Explain everything in great detail for me to review.
 
 - Now lets work on the subsection. Search the web, think for longer and write a new configuration for expreg and treesit-expreg from scratch. First determine if these packages are needed together and if they work together. But do not write any config for this subsection yet. Present me a plan on how you want to approach in writing this configuration. Explain everything in great detail for me to review.
 
