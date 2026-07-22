@@ -854,7 +854,6 @@ Centralized keybinding router establishing global and local leader prefixes for 
 
 
 * TODO Editor Behavior
-
 ** DONE Auto Save
 Saves buffer contents directly to disk on idle, focus loss, and window/buffer switches.
 #+begin_src emacs-lisp
@@ -914,7 +913,6 @@ Saves buffer contents directly to disk on idle, focus loss, and window/buffer sw
           special-mode)))
 #+end_src
 
-
 ** DONE Auto Tangle
 Automatically regenerates tangled output files when any Org buffer is saved.
 #+begin_src emacs-lisp
@@ -929,7 +927,6 @@ Automatically regenerates tangled output files when any Org buffer is saved.
   ;; To opt out a specific file, add #+auto_tangle: nil to its header.
   (org-auto-tangle-default t))
 #+end_src
-
 
 ** DONE Child Frame
 Establishes the foundational child frame API and global border theming. Configures native Emacs 28+ border faces and applies fringe isolation for downstream UI packages.
@@ -960,7 +957,6 @@ Establishes the foundational child frame API and global border theming. Configur
             (- parent-height posframe-height (* 2 font-height))))))
 #+end_src
 
-
 ** DONE Nerd Icons
 Foundational glyph substitution and icon API. Eagerly loaded to prevent void-function errors in downstream UI packages lacking strict dependency declarations.
 #+begin_src emacs-lisp
@@ -972,7 +968,6 @@ Foundational glyph substitution and icon API. Eagerly loaded to prevent void-fun
   ;; Enables colorized glyphs; upstream fallbacks handle terminal degradation.
   (nerd-icons-color-icons t))
 #+end_src
-
 
 ** DONE Fonts
 Configures global typography, baseline monospaced faces, fontset fallback registration, and vertical line centering.
@@ -1002,7 +997,6 @@ Configures global typography, baseline monospaced faces, fontset fallback regist
 (setq font-lock-maximum-decoration t)
 #+end_src
 
-
 ** DONE Doom Themes
 Applies the Tokyo Night palette and integrates downstream UI enhancements. Synchronously loaded to prevent initial frame Flash of Unstyled Content (FOUC).
 #+begin_src emacs-lisp
@@ -1022,7 +1016,6 @@ Applies the Tokyo Night palette and integrates downstream UI enhancements. Synch
     (doom-themes-org-config)))
 #+end_src
 
-
 ** DONE Solaire Mode
 Swaps background faces to distinguish side-windows and popups. Deferred until the theme engine finalizes to prevent mapping race conditions.
 #+begin_src emacs-lisp
@@ -1034,7 +1027,6 @@ Swaps background faces to distinguish side-windows and popups. Deferred until th
   (solaire-global-mode +1))
 #+end_src
 
-
 ** DONE Transient
 Foundational API for ephemeral keybinding menus. Strictly deferred to respect downstream evaluation wrappers and configured for variable-pitch grid alignment.
 #+begin_src emacs-lisp
@@ -1044,7 +1036,6 @@ Foundational API for ephemeral keybinding menus. Strictly deferred to respect do
   ;; Guarantees rectangular grid alignment when invoked inside proportional Org buffers.
   (transient-align-variable-pitch t))
 #+end_src
-
 
 ** DONE Which Key
 Keystroke discovery UI overlay. Renders prefix bindings in the echo area with alphabetical sorting and optimized pagination.
@@ -1067,7 +1058,6 @@ Keystroke discovery UI overlay. Renders prefix bindings in the echo area with al
   :config
   (which-key-mode 1))
 #+end_src
-
 
 ** DONE Prettify Symbols & Ligatures
 Delegates operator ligatures to HarfBuzz via ligature.el and reserves Elisp substitution strictly for semantic keywords.
@@ -1093,7 +1083,6 @@ Delegates operator ligatures to HarfBuzz via ligature.el and reserves Elisp subs
 (global-prettify-symbols-mode 1)
 #+end_src
 
-
 ** DONE Autorevert
 Synchronizes buffers with external disk modifications via native OS file notifications. Suppresses echo-area logging and avoids interval polling to eliminate I/O overhead.
 #+begin_src emacs-lisp
@@ -1106,7 +1095,6 @@ Synchronizes buffers with external disk modifications via native OS file notific
   (global-auto-revert-mode 1))
 #+end_src
 
-
 ** DONE Subword
 Modifies word boundaries to recognize camelCase transitions. Globally enables native and Evil motions to traverse compound identifiers.
 #+begin_src emacs-lisp
@@ -1115,7 +1103,6 @@ Modifies word boundaries to recognize camelCase transitions. Globally enables na
   :config
   (global-subword-mode 1))
 #+end_src
-
 
 
 ** DONE Sudo Edit
@@ -1407,7 +1394,6 @@ Native Emacs shell with Lisp integration and AST-aware prompt navigation. Fortif
                         (all-completions "" (pcomplete-completions)))))))
 #+end_src
 
-
 ** DONE Smooth Scrolling
 Delegates hardware input to =ultra-scroll= and keyboard interpolation to =good-scroll=. Utilizes defensive safeguards to prevent boundary crashes and input hijacking.
 #+begin_src emacs-lisp
@@ -1477,7 +1463,6 @@ Delegates hardware input to =ultra-scroll= and keyboard interpolation to =good-s
 
 
 
-
 ** DONE Tree-sitter
 Downloads language parsers that power code coloring and structural navigation.
 #+begin_src emacs-lisp
@@ -1520,7 +1505,6 @@ Downloads language parsers that power code coloring and structural navigation.
                     (org "https://github.com/milisims/tree-sitter-org")))
     (setf (alist-get (car source) treesit-language-source-alist) (cdr source))))
 #+end_src
-
 
 ** DONE Electric Pair
 Native auto-pairing, O(1) prose formatting, and AST-aware re-indentation.
@@ -1586,7 +1570,6 @@ Strictly confined to `prog-mode' derivatives to prevent prose collision."
   (add-hook 'electric-indent-functions #'ar/electric-indent-words-fn))
 #+end_src
 
-
 ** DONE Evil Surround
 Provides retro-active Vim-style wrapping via =ys=, =cs=, and =ds= operators. Integrates =evil-embrace= to extend the base alist with regex-aware, multi-character, and asymmetric structural pairs for prose and LaTeX environments.
 #+begin_src emacs-lisp
@@ -1617,7 +1600,6 @@ Provides retro-active Vim-style wrapping via =ys=, =cs=, and =ds= operators. Int
   (add-hook 'markdown-mode-hook #'ar/embrace-markdown-setup)
   (add-hook 'gfm-mode-hook #'ar/embrace-markdown-setup))
 #+end_src
-
 
 ** DONE Delete Pair
 Configures the native =delete-pair= engine and provides an O(1) DWIM wrapper for adjacent, string, and nested pair deletion, strictly confined to programming modes.
@@ -1662,7 +1644,6 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
         (scan-error (user-error "Not inside a deletable pair")))))))
 #+end_src
 
-
 ** DONE Show Paren Mode
 Native delimiter highlighting and Emacs 29+ overlay context rendering.
 #+begin_src emacs-lisp
@@ -1688,7 +1669,6 @@ Native delimiter highlighting and Emacs 29+ overlay context rendering.
     (setq show-paren-not-in-comments-or-strings t)))
 #+end_src
 
-
 ** DONE Blink Matching Paren
 Event-driven visual feedback upon closing delimiter insertion. Search limits are disabled to guarantee accuracy in massive buffers.
 #+begin_src emacs-lisp
@@ -1701,7 +1681,6 @@ Event-driven visual feedback upon closing delimiter insertion. Search limits are
 (when (boundp 'blink-matching-paren-highlight-offscreen)
   (setq blink-matching-paren-highlight-offscreen t))
 #+end_src
-
 
 ** DONE Rainbow Delimiters
 Depth-based delimiter colorization. Activation is confined to code buffers and aborted in massive files to prevent main-thread blocking.
@@ -1728,7 +1707,6 @@ Depth-based delimiter colorization. Activation is confined to code buffers and a
         (not (too-long-file-p)))))
 #+end_src
 
-
 ** DONE Evil Matchit
 Extends =%= motion to jump across semantic blocks (LaTeX, HTML, code).
 #+begin_src emacs-lisp
@@ -1738,7 +1716,6 @@ Extends =%= motion to jump across semantic blocks (LaTeX, HTML, code).
   ;; Enable semantic block jumping.
   (global-evil-matchit-mode 1))
 #+end_src
-
 
 ** DONE Evil Textobj Tree-Sitter
 Maps native Tree-sitter AST nodes to Evil operator-pending text objects and Unimpaired-style goto motions. Which-key annotations are sanitized to prevent UI clutter.
@@ -1799,7 +1776,6 @@ Maps native Tree-sitter AST nodes to Evil operator-pending text objects and Unim
                  '(("" . "\\`+?evil-textobj-tree-sitter-function--\\(.*\\)\\(?:\\.inner\\|\\.outer\\)") . (nil . "\\1")))))
 #+end_src
 
-
 ** DONE Evil TS Obj
 Provides AST-aware structural manipulation via the Emacs 30 =treesit-thing= API. Refactoring operators are isolated within a Transient menu to prevent global keymap collisions.
 #+begin_src emacs-lisp
@@ -1853,7 +1829,6 @@ Provides AST-aware structural manipulation via the Emacs 30 =treesit-thing= API.
         ("<escape>" "" transient-quit-one :format " ")]])))
 #+end_src
 
-
 ** DONE Treesit Navigate Thing
 Exposes the Emacs 30 =treesit-thing= API via Unimpaired bracket motions. Provides O(1) C-level AST sibling traversal natively.
 #+begin_src emacs-lisp
@@ -1868,7 +1843,6 @@ Exposes the Emacs 30 =treesit-thing= API via Unimpaired bracket motions. Provide
    "]x" (lambda () (interactive) (ignore-errors (treesit-thing-next 'sexp)))
    "[x" (lambda () (interactive) (ignore-errors (treesit-thing-prev 'sexp)))))
 #+end_src
-
 
 ** DONE Expreg
 Provides O(1) AST-aware visual selection expansion via the native =treesit= engine. Integrates with =repeat-mode= for modifier-less tapping and preserves cursor origin on contraction.
@@ -1902,7 +1876,6 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
 #+end_src
 
 
-
 ** DONE Global Ellipsis
 #+begin_src emacs-lisp
 ;; inherited by `treesit-fold', `outline', and `hideshow'.
@@ -1911,7 +1884,6 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
 (with-eval-after-load 'org
   (setq org-ellipsis " ↴ "))
 #+end_src
-
 
 ** DONE Custom Folding Functions
 Unified folding dispatcher routing to Tree-sitter, Outline, Hideshow, or Vimish Fold based on buffer context.
@@ -1964,7 +1936,6 @@ Unified folding dispatcher routing to Tree-sitter, Outline, Hideshow, or Vimish 
   (message "All folds closed"))
 #+end_src
 
-
 ** DONE Hideshow
 Folds code blocks in languages lacking Tree-sitter grammars using Emacs 31 native indicators.
 #+begin_src emacs-lisp
@@ -1996,7 +1967,6 @@ Folds code blocks in languages lacking Tree-sitter grammars using Emacs 31 nativ
         (not (too-long-file-p)))))
 #+end_src
 
-
 ** DONE Treesit-Fold
 Folds code regions at the cursor using language-aware structure detection.
 #+begin_src emacs-lisp
@@ -2020,7 +1990,6 @@ Folds code regions at the cursor using language-aware structure detection.
   ;; Enables per-node folding in all tree-sitter supported modes.
   (global-treesit-fold-mode 1))
 #+end_src
-
 
 ** DONE Vimish Fold
 Folds manually selected text regions with persistent storage across sessions.
@@ -2050,7 +2019,6 @@ Folds manually selected text regions with persistent storage across sessions.
   (global-evil-vimish-fold-mode 1))
 #+end_src
 
-
 ** DONE Folding Keybindings
 #+begin_src emacs-lisp
 (general-define-key
@@ -2065,7 +2033,6 @@ Folds manually selected text regions with persistent storage across sessions.
  "zd" #'vimish-fold-delete
  "zE" #'vimish-fold-delete-all)
 #+end_src
-
 
 ** DONE Whitespace
 Restricts font-lock to mixed-indentation detection. Delegates trailing spaces and line limits to native display engines.
@@ -2083,7 +2050,6 @@ Restricts font-lock to mixed-indentation detection. Delegates trailing spaces an
     (or (and arg (< (prefix-numeric-value arg) 1))
         (not (too-long-file-p)))))
 #+end_src
-
 
 ** DONE Ws-Butler
 Unobtrusive trailing whitespace trimming confined to modified lines to prevent Git diff pollution. Exempts prose and terminal modes where trailing spaces carry structural meaning.
@@ -2108,7 +2074,6 @@ Unobtrusive trailing whitespace trimming confined to modified lines to prevent G
   ;; Activates global unobtrusive trimming.
   (ws-butler-global-mode 1))
 #+end_src
-
 
 ** DONE Dtrt Indent
 Heuristic indentation detection for programming buffers. Executes post-mode initialization to preempt LSP spawning and aborts on massive files.
@@ -2141,7 +2106,6 @@ Heuristic indentation detection for programming buffers. Executes post-mode init
   (add-hook 'dtrt-indent-hook
             (lambda () (setq-local evil-shift-width tab-width))))
 #+end_src
-
 
 ** DONE Indent Bars
 AST-aware vertical guides synchronizing depth colorization with rainbow-delimiters. Restricts activation to programming buffers to prevent Org-mode structural corruption.
@@ -2193,7 +2157,6 @@ AST-aware vertical guides synchronizing depth colorization with rainbow-delimite
 #+end_src
 
 
-
 ** DONE Move Text
 Provides O(1) line and region dragging. Automatically re-indents displaced lines to preserve structural integrity in whitespace-sensitive languages.
 #+begin_src emacs-lisp
@@ -2212,7 +2175,6 @@ Provides O(1) line and region dragging. Automatically re-indents displaced lines
   (advice-add #'move-text-up :after #'ar/move-text-indent-region-advice)
   (advice-add #'move-text-down :after #'ar/move-text-indent-region-advice))
 #+end_src
-
 
 ** DONE Line Numbers
 Native C-level margin rendering for spatial orientation. Utilizes hybrid relative numbering for Vim motions and aborts on massive files.
@@ -2240,14 +2202,12 @@ Native C-level margin rendering for spatial orientation. Utilizes hybrid relativ
         (not (too-long-file-p)))))
 #+end_src
 
-
 ** DONE Fill Column Indicator
 Native C-level display primitive rendering vertical boundary at =fill-column=. Confined to programming and configuration buffers.
 #+begin_src emacs-lisp
 (add-hook 'prog-mode-hook #'display-fill-column-indicator-mode)
 (add-hook 'conf-mode-hook #'display-fill-column-indicator-mode)
 #+end_src
-
 
 ** DONE Display Dividers
 Native C-level display primitive rendering vertical window boundaries. Confined to right-only placement to eliminate horizontal redundancy.
@@ -2266,7 +2226,6 @@ Native C-level display primitive rendering vertical window boundaries. Confined 
   ;; Activates synchronously to guarantee matrix registration before frame painting.
   (window-divider-mode 1))
 #+end_src
-
 
 ** DONE Active Line Highlight
 Native C-level overlay rendering for active line tracking. Confines focus to the selected window and suspends rendering during Evil visual selections and excluded major modes.
@@ -2305,7 +2264,6 @@ Native C-level overlay rendering for active line tracking. Confines focus to the
   (global-hl-line-mode 1))
 #+end_src
 
-
 ** DONE Color Visualization
 Renders hex, RGB, and named color previews via overlay stacking. Context-aware string scoping prevents false positives in non-styling codebases.
 #+begin_src emacs-lisp
@@ -2327,7 +2285,6 @@ Renders hex, RGB, and named color previews via overlay stacking. Context-aware s
     (or (and arg (< (prefix-numeric-value arg) 1))
         (not (too-long-file-p)))))
 #+end_src
-
 
 ** DONE Modeline
 Minimalist modeline engine featuring native Evil state tracking, IDE synergy, and prose word-count integration. Redundant native indicators are disabled to preserve horizontal space and prevent variable inheritance collisions.
@@ -2373,7 +2330,6 @@ Minimalist modeline engine featuring native Evil state tracking, IDE synergy, an
   (doom-modeline-mode 1))
 #+end_src
 
-
 ** DONE Hide Modeline
 Native redisplay concealment for terminal, agenda, and UI buffers. Replaces unmaintained dependencies with a zero-overhead buffer-local minor mode.
 #+begin_src emacs-lisp
@@ -2415,7 +2371,6 @@ Native redisplay concealment for terminal, agenda, and UI buffers. Replaces unma
   (add-hook (intern (format "%s-hook" mode)) #'ar/enable-hide-modeline))
 #+end_src
 
-
 ** DONE Text Scaling
 Native Emacs 29+ face-remapping engine for global typography scaling. Prevents PGTK/Wayland frame geometry expansion.
 #+begin_src emacs-lisp
@@ -2448,7 +2403,6 @@ Native Emacs 29+ face-remapping engine for global typography scaling. Prevents P
  "C-<wheel-up>" #'ar/global-zoom-in
  "C-<wheel-down>" #'ar/global-zoom-out)
 #+end_src
-
 
 
 
@@ -2506,7 +2460,6 @@ Provides an O(1) radix-tree jumping engine for long-distance spatial navigation.
   (avy-lead-face ((t (:background "#7dcfff" :foreground "#1a1b26" :weight bold)))))
 #+end_src
 
-
 ** DONE Evil Easymotion
 Wraps Avy into Evil's operator-pending grammar via a unified =gs= prefix. Bypasses =evilem-create= infinite loop traps by registering native Avy commands directly into Evil's C-level motion registry.
 #+begin_src emacs-lisp
@@ -2533,7 +2486,6 @@ Wraps Avy into Evil's operator-pending grammar via a unified =gs= prefix. Bypass
   (define-key evilem-map "l" #'ar/evil-avy-goto-line)
   (define-key evilem-map "SPC" #'ar/evil-avy-goto-char-timer))
 #+end_src
-
 
 ** DONE Evil Snipe
 Replaces native Evil character motions with incremental, regex-aware spatial jumps. Confines activation to text buffers while protecting specialized UI and terminal modes from keymap collisions.
@@ -2611,7 +2563,6 @@ Replaces native Evil character motions with incremental, regex-aware spatial jum
     (define-key evil-snipe-parent-transient-map "g" evilem-map)))
 #+end_src
 
-
 ** DONE Link Hint
 Provides Avy-backed spatial navigation and mutation commands for visible URLs, file paths, and structural buttons across diverse buffer types.
 #+begin_src emacs-lisp
@@ -2638,7 +2589,6 @@ Provides Avy-backed spatial navigation and mutation commands for visible URLs, f
   "l a" '(link-hint-copy-all-links :wk "Yank all")
   "l ." '(link-hint-open-link-at-point :wk "Open at point"))
 #+end_src
-
 
 ** DONE Ace Window
 Routes cross-window spatial jumps and dispatch actions via the Avy radix-tree engine.
@@ -2674,7 +2624,6 @@ Routes cross-window spatial jumps and dispatch actions via the Avy radix-tree en
     (ace-window-posframe-mode 1)))
 #+end_src
 
-
 ** DONE Anzu
 Displays the current match index and total match count in the mode-line during incremental searches and query replacements.
 #+begin_src emacs-lisp
@@ -2704,13 +2653,11 @@ Displays the current match index and total match count in the mode-line during i
 #+end_src
 
 
-
 ** DONE Evil Anzu
 Advises Evil's search motions to trigger Anzu's modeline match tracking.
 #+begin_src emacs-lisp
 (use-package evil-anzu :after (evil anzu))
 #+end_src
-
 
 ** DONE Iedit
 Highlights and edits all instances of a selected word or region simultaneously.
@@ -2726,7 +2673,6 @@ Highlights and edits all instances of a selected word or region simultaneously.
   ;; Renders one context line around matches.
   (iedit-occurrence-context-lines 1))
 #+end_src
-
 
 ** DONE Evil Multiedit
 Provides multiple cursor editing in Evil mode by wrapping the iedit lexical engine.
@@ -2750,7 +2696,6 @@ Provides multiple cursor editing in Evil mode by wrapping the iedit lexical engi
   "M-d" #'evil-multiedit-match-symbol-and-next
   "M-D" #'evil-multiedit-match-all)
 #+end_src
-
 
 
 
@@ -2791,7 +2736,6 @@ Finds text across files and allows direct editing of the search results to updat
     "ZZ" #'grep-edit-save
     "ZQ" #'grep-edit-abort))
 #+end_src
-
 
 
 
@@ -2883,7 +2827,6 @@ Constructs, tests, and highlights regular expressions against live buffer text.
 (ar/global-leader
   "s x" '(re-builder :wk "Regex builder"))
 #+end_src
-
 
 ** DONE Avy Transient Menu
 Provides a centralized dashboard for Avy's spatial jumping and remote text mutation APIs.
@@ -2980,7 +2923,6 @@ Provides a centralized dashboard for Avy's spatial jumping and remote text mutat
 #+end_src
 
 
-
 ** DONE Jinx
 Checks spelling as you type and highlights words that need correction.
 
@@ -3056,7 +2998,6 @@ Checks spelling as you type and highlights words that need correction.
   (global-jinx-mode 1))
 #+end_src
 
-
 ** DONE Helpful
 Shows rich documentation with source code, callers, and keybindings for any symbol.
 #+begin_src emacs-lisp
@@ -3080,7 +3021,6 @@ Shows rich documentation with source code, callers, and keybindings for any symb
   ;; Makes apropos search all symbols, not just user-facing ones.
   (apropos-do-all t))
 #+end_src
-
 
 ** DONE Ediff
 Compares and merges two or three versions of a file side by side with interactive difference navigation.
@@ -3136,42 +3076,42 @@ Compares and merges two or three versions of a file side by side with interactiv
     (transient-define-prefix ar/ediff-transient ()
       "Ediff commands - call from control panel"
       [:description ar/ediff-title
-       ["Navigate"
-        ("n" "next diff" ediff-next-difference :transient t)
-        ("p" "previous diff" ediff-previous-difference :transient t)
-        ("d" "jump to diff" ediff-jump-to-difference :transient t)
-        ("g" "goto point" ediff-jump-to-difference-at-point :transient t)
-        ("v" "scroll down" ediff-scroll-vertically :transient t)
-        ("V" "scroll up" (lambda () (interactive) (ediff-scroll-vertically '-)) :transient t)
-        ("<" "scroll left" ediff-scroll-horizontally :transient t)
-        (">" "scroll right" (lambda () (interactive) (ediff-scroll-horizontally '-)) :transient t)]
-       ["Copy & Restore"
-        ("a" "copy A → B" ediff-copy-A-to-B :transient t)
-        ("b" "copy B → A" ediff-copy-B-to-A :transient t)
-        ("r" "restore diff" ediff-restore-diff :transient t)
-        ("*" "refine region" ediff-make-or-kill-fine-diffs :transient t)]
-       ["Toggle"
-        ("h" "highlighting" ediff-toggle-hilit :transient t)
-        ("@" "auto-refine" ediff-toggle-autorefine :transient t)
-        ("#" "skip similar" ediff-toggle-skip-similar :transient t)
-        ("|" "split H/V" ediff-toggle-split :transient t)
-        ("m" "wide display" ediff-toggle-wide-display :transient t)]
-       ["Actions"
-        ("!" "update diffs" ediff-update-diffs :transient t)
-        ("w" "save buffers" ediff-save-buffer :transient t)
-        ("i" "status info" ediff-status-info :transient t)
-        ("E" "manual" ediff-documentation :transient t)]
-       ["Exit"
-        ("?" "toggle help" ediff-toggle-help :transient t)
-        ("z" "suspend" ediff-suspend)
-        ("q" "quit" ediff-quit)
-        ("<escape>" "" transient-quit-one :format " ")]]))
-    ;; Checks whether the transient menu is currently active.
-    (defun ar/ediff-transient-active-p ()
-      "Check if ediff transient is currently active."
-      (and (boundp 'transient--prefix)
-           transient--prefix
-           (eq transient-current-command 'ar/ediff-transient))))
+                    ["Navigate"
+                     ("n" "next diff" ediff-next-difference :transient t)
+                     ("p" "previous diff" ediff-previous-difference :transient t)
+                     ("d" "jump to diff" ediff-jump-to-difference :transient t)
+                     ("g" "goto point" ediff-jump-to-difference-at-point :transient t)
+                     ("v" "scroll down" ediff-scroll-vertically :transient t)
+                     ("V" "scroll up" (lambda () (interactive) (ediff-scroll-vertically '-)) :transient t)
+                     ("<" "scroll left" ediff-scroll-horizontally :transient t)
+                     (">" "scroll right" (lambda () (interactive) (ediff-scroll-horizontally '-)) :transient t)]
+                    ["Copy & Restore"
+                     ("a" "copy A → B" ediff-copy-A-to-B :transient t)
+                     ("b" "copy B → A" ediff-copy-B-to-A :transient t)
+                     ("r" "restore diff" ediff-restore-diff :transient t)
+                     ("*" "refine region" ediff-make-or-kill-fine-diffs :transient t)]
+                    ["Toggle"
+                     ("h" "highlighting" ediff-toggle-hilit :transient t)
+                     ("@" "auto-refine" ediff-toggle-autorefine :transient t)
+                     ("#" "skip similar" ediff-toggle-skip-similar :transient t)
+                     ("|" "split H/V" ediff-toggle-split :transient t)
+                     ("m" "wide display" ediff-toggle-wide-display :transient t)]
+                    ["Actions"
+                     ("!" "update diffs" ediff-update-diffs :transient t)
+                     ("w" "save buffers" ediff-save-buffer :transient t)
+                     ("i" "status info" ediff-status-info :transient t)
+                     ("E" "manual" ediff-documentation :transient t)]
+                    ["Exit"
+                     ("?" "toggle help" ediff-toggle-help :transient t)
+                     ("z" "suspend" ediff-suspend)
+                     ("q" "quit" ediff-quit)
+                     ("<escape>" "" transient-quit-one :format " ")]]))
+  ;; Checks whether the transient menu is currently active.
+  (defun ar/ediff-transient-active-p ()
+    "Check if ediff transient is currently active."
+    (and (boundp 'transient--prefix)
+         transient--prefix
+         (eq transient-current-command 'ar/ediff-transient)))
   ;; Unbinds SPC/C-c to prevent general.el leader conflicts; routes ? to transient.
   (defun ar/ediff-setup-keys ()
     "Unbind conflicting keys and route ? to the transient menu."
@@ -3179,11 +3119,11 @@ Compares and merges two or three versions of a file side by side with interactiv
     (define-key ediff-mode-map (kbd "C-c") nil)
     (when (featurep 'transient)
       (define-key ediff-mode-map (kbd "?")
-        (lambda ()
-          (interactive)
-          (if (ar/ediff-transient-active-p)
-              (ediff-toggle-help)
-            (ar/ediff-transient))))))
+                  (lambda ()
+                    (interactive)
+                    (if (ar/ediff-transient-active-p)
+                        (ediff-toggle-help)
+                      (ar/ediff-transient))))))
   (add-hook 'ediff-keymap-setup-hook #'ar/ediff-setup-keys)
   ;; Focus the control panel on session start.
   (add-hook 'ediff-startup-hook
@@ -7236,196 +7176,182 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
 
 * TODO Development Tools
 ** TODO Eglot
+Connects Emacs to external language servers for smart code navigation, error checking, and refactoring.
 #+begin_src emacs-lisp
-
-#+end_src
-
-
-** TODO apheleia
-#+begin_src emacs-lisp
-(use-package apheleia
-  :hook (after-init . apheleia-global-mode)
+(use-package eglot
+  :ensure nil
+  :hook ((prog-mode . eglot-ensure)
+         (markdown-mode . eglot-ensure)
+         (LaTeX-mode . eglot-ensure))
   :custom
-  (apheleia-log-only-errors t))
+  ;; Terminate servers when the last managed buffer is killed to prevent zombie processes.
+  (eglot-autoshutdown t)
+  ;; Bypass whole-file/on-type formatting (delegated to apheleia/electric), color, and folding.
+  ;; Keeps :documentRangeFormattingProvider active for non-Python LSP fallbacks.
+  (eglot-ignored-server-capabilities '(:documentFormattingProvider
+                                       :documentOnTypeFormattingProvider
+                                       :colorProvider
+                                       :foldingRangeProvider))
+  ;; Render the code action indicator strictly in the margin to prevent echo-area noise.
+  (eglot-code-action-indications '(margin))
+  ;; Use a simple Unicode glyph to avoid emoji rendering glitches in TTY or tree-sitter modes.
+  (eglot-code-action-indicator "⚡")
+  ;; Prevent Eglot from configuring the forbidden company-mode ecosystem.
+  ;; yasnippet is intentionally omitted to preserve LSP snippet expansion via cape/corfu.
+  (eglot-stay-out-of '("company"))
+  ;; Always prompt with a summary before applying multi-file server edits.
+  (eglot-confirm-server-edits 'summary)
+  :config
+  ;; Inject Emacs 31 native UI parity modes when a buffer becomes managed by an LSP server.
+  (add-hook 'eglot-managed-mode-hook
+            (lambda ()
+              (when (eglot-managed-p)
+                (eglot-inlay-hints-mode 1)
+                (eglot-semantic-tokens-mode 1))))
+
+  ;; LSP-Aware File Rename
+  ;; Sequences workspace/willRenameFiles, OS rename, and workspace/didRenameFiles.
+  (defun ar/eglot-rename-file (new-name)
+    "Rename current file to NEW-NAME and notify the LSP server.
+Triggers `workspace/willRenameFiles' to update imports project-wide,
+performs the OS-level rename, then sends `workspace/didRenameFiles'."
+    (interactive
+     (list (read-file-name "Rename to: "
+                           (file-name-directory (buffer-file-name))
+                           (buffer-file-name))))
+    (let* ((old-name (buffer-file-name))
+           (old-uri (eglot-path-to-uri old-name))
+           (new-uri (eglot-path-to-uri new-name))
+           (server (eglot-current-server)))
+      (unless server
+        (user-error "No active Eglot server in this buffer"))
+      (let ((edits (eglot--request
+                    server
+                    :workspace/willRenameFiles
+                    `(:files [(:oldUri ,old-uri :newUri ,new-uri)]))))
+        (when edits
+          (eglot--apply-workspace-edit server edits 'ar/eglot-rename-file)))
+      (rename-file old-name new-name 1)
+      (set-visited-file-name new-name nil t)
+      (jsonrpc-notify server :workspace/didRenameFiles
+                      `(:files [(:oldUri ,old-uri :newUri ,new-uri)]))
+      (message "Renamed %s → %s and updated LSP references"
+               (file-name-nondirectory old-name)
+               (file-name-nondirectory new-name))))
+
+  ;; Moniker Inspection (LSP 3.16+ Cross-Repo Identity)
+  (defun ar/eglot-moniker-at-point ()
+    "Display the LSP moniker for the symbol at point in the echo area."
+    (interactive)
+    (let ((server (eglot-current-server)))
+      (if (not server)
+          (user-error "No active Eglot server")
+        (eglot--async-request
+         server
+         :textDocument/moniker
+         (eglot--TextDocumentPositionParams)
+         :success-fn
+         (lambda (result)
+           (if (and result (cl-plusp (length result)))
+               (let* ((primary (aref result 0))
+                      (scheme (plist-get primary :scheme))
+                      (identifier (plist-get primary :identifier))
+                      (kind (plist-get primary :kind)))
+                 (message "Moniker [%s]: %s (Kind: %s)"
+                          scheme identifier kind))
+             (message "No moniker found for symbol at point.")))))))
+
+  (defun ar/eglot-copy-moniker ()
+    "Copy the primary moniker identifier at point to the kill-ring."
+    (interactive)
+    (let ((server (eglot-current-server)))
+      (if (not server)
+          (user-error "No active Eglot server")
+        (eglot--async-request
+         server
+         :textDocument/moniker
+         (eglot--TextDocumentPositionParams)
+         :success-fn
+         (lambda (result)
+           (if (and result (cl-plusp (length result)))
+               (let ((identifier (plist-get (aref result 0) :identifier)))
+                 (kill-new identifier)
+                 (message "Copied moniker: %s" identifier))
+             (message "No moniker found to copy."))))))))
 #+end_src
 
 
-** TODO Debug Adapter Protocol
+
+** TODO Eldoc
 #+begin_src emacs-lisp
-;; (use-package dape
-;;   :defer t
-;;   :hook
-;;   ;; Save breakpoints on quit
-;;   (kill-emacs . dape-breakpoint-save)
-;;   ;; Load breakpoints on startup
-;;   (after-init . dape-breakpoint-load)
 
-;;   :custom
-;;   (dape-breakpoint-global-mode +1)
-;;   (dape-buffer-window-arrangement 'right)
-
-;;   :config
-
-;;   (add-hook 'dape-display-source-hook #'pulse-momentary-highlight-one-line)
-;;   (add-hook 'dape-start-hook (lambda () (save-some-buffers t t)))
-;;   (add-hook 'dape-repl-mode-hook #'hide-mode-line-mode)
-;;   (add-hook 'dape-compile-hook #'kill-buffer)
-
-;;   (with-eval-after-load 'transient
-;;     (defun ar/dape-title ()
-;;       (concat
-;;        (if (fboundp 'nerd-icons-codicon)
-;;            (nerd-icons-codicon "nf-cod-debug" :face 'transient-heading :v-adjust 0.02)
-;;          "")
-;;        (propertize " Debug" 'face 'transient-heading)))
-
-;;     (transient-define-prefix ar/toggles-dape ()
-;;       "Debugger"
-;;       [:description ar/dape-title
-;;                     ["Stepping"
-;;                      ("n" "next" dape-next :transient t)
-;;                      ("s" "step in" dape-step-in :transient t)
-;;                      ("o" "step out" dape-step-out :transient t)
-;;                      ("c" "continue" dape-continue :transient t)
-;;                      ("p" "pause" dape-pause :transient t)
-;;                      ("r" "restart" dape-restart :transient t)]
-
-;;                     ["Switch"
-;;                      ("m" "memory" dape-memory :transient t)
-;;                      ("t" "thread" dape-select-thread :transient t)
-;;                      ("w" "watch" dape-watch-dwim :transient t)
-;;                      ("s" "stack" dape-select-stack :transient t)
-;;                      ("i" "info" dape-info :transient t)
-;;                      ("r" "repl" dape-repl :transient t)]
-
-;;                     ["Breakpoints"
-;;                      ("b" "toggle" dape-breakpoint-toggle :transient t)
-;;                      ("l" "log" dape-breakpoint-log :transient t)
-;;                      ("e" "expression" dape-breakpoint-expression :transient t)
-;;                      ("B" "clear" dape-breakpoint-remove-all :transient t)]
-
-;;                     ["Debug"
-;;                      ("d" "dape" dape :transient t)
-;;                      ("D" "disconnect" dape-disconnect-quit)
-;;                      ("k" "kill" dape-kill)
-;;                      ("Q" "quit" dape-quit)
-;;                      ("<escape>" "" transient-quit-one :format " ")]]))
-;;   )
 #+end_src
 
+** TODO Eldoc Box
+#+begin_src emacs-lisp
+
+#+end_src
 
 ** TODO Flymake
 #+begin_src emacs-lisp
+
+#+end_src
+
+** TODO Xref
+#+begin_src emacs-lisp
+
+#+end_src
+
+** TODO Consult-eglot
+#+begin_src emacs-lisp
+
+#+end_src
+
+** TODO Peek
+#+begin_src emacs-lisp
+
+#+end_src
+
+** TODO Apheleia
+#+begin_src emacs-lisp
+
+#+end_src
+
+** TODO Auto-rename-tage
+#+begin_src emacs-lisp
+
+#+end_src
+
+** TODO Evil MC
+#+begin_src emacs-lisp
+
+#+end_src
+
+** TODO Minimap
+#+begin_src emacs-lisp
+
+#+end_src
+
+** TODO Topsy
+#+begin_src emacs-lisp
+
+#+end_src
+
+** TODO Lazy Ruff
+#+begin_src emacs-lisp
+
+#+end_src
+
+** TODO Debug Adapter Protocol
+#+begin_src emacs-lisp
+
 #+end_src
 
 
 ** TODO Direnv
    #+begin_src emacs-lisp
 
-(use-package envrc
-  :hook (after-init . envrc-global-mode)
-  :config
-  ;; ==========================================
-  ;; 1. HOOK TIMING (The LSP Race Condition Fix)
-  ;; ==========================================
-  ;; By default, `envrc` hooks into `after-change-major-mode-hook`. This runs
-  ;; AFTER major mode hooks (like `python-mode-hook`). If `lsp-deferred` is
-  ;; in `python-mode-hook`, the LSP server starts before `envrc` applies the
-  ;; project's `VIRTUAL_ENV` or `PATH`.
-  ;; It is moved to `change-major-mode-after-body-hook`, which runs BEFORE
-  ;; major mode hooks, guaranteeing the environment is ready for LSP.
-  (add-hook 'envrc-global-mode-hook
-            (lambda ()
-              ;; Emacs 30+ / newer envrc versions renamed this internal function.
-              ;; The `fboundp` guard ensures compatibility across versions.
-              (let ((fn (if (fboundp #'envrc-global-mode-enable-in-buffers)
-                            #'envrc-global-mode-enable-in-buffers
-                          #'envrc-global-mode-enable-in-buffer)))
-                (if (not envrc-global-mode)
-                    ;; Teardown safety: remove from BOTH hooks when disabled
-                    ;; to prevent orphaned hook references.
-                    (progn
-                      (remove-hook 'change-major-mode-after-body-hook fn)
-                      (remove-hook 'after-change-major-mode-hook fn))
-                  (remove-hook 'after-change-major-mode-hook fn)
-                  (add-hook 'change-major-mode-after-body-hook fn 100)))))
-
-  ;; ==========================================
-  ;; 2. ORG BABEL ENVIRONMENT PROPAGATION (Jupyter Support)
-  ;; ==========================================
-  ;; Upstream `envrc` advises `org-babel-eval`, but Jupyter kernel initialization
-  ;; happens BEFORE that low-level shell spawn. Advising the higher-level
-  ;; `org-babel-execute-src-block` ensures Jupyter kernels and persistent
-  ;; sessions inherit the buffer-local `envrc` environment (e.g. VIRTUAL_ENV).
-  (advice-add #'org-babel-execute-src-block :around #'envrc-propagate-environment)
-
-  ;; ==========================================
-  ;; 3. GRACEFUL FAILURE (Missing Executable Guard)
-  ;; ==========================================
-  ;; Prevents `envrc-global-mode` from spamming errors on every file open
-  ;; if the `direnv` binary is not installed on the system (or over TRAMP).
-  (define-advice envrc-global-mode (:before-while (&rest _) fail-gracefully)
-    (or (executable-find envrc-direnv-executable)
-        (ignore (message "Failed to locate direnv executable; aborting envrc-global-mode"))))
-
-  ;; ==========================================
-  ;; 4. DEBOUNCE INTERNAL BUFFERS
-  ;; ==========================================
-  ;; Prevents envrc from triggering inside its own *envrc* log buffers,
-  ;; avoiding redundant processing or feedback loops.
-  (define-advice envrc--update (:before-while (&rest _) debounce)
-    (not (string-prefix-p "*envrc" (buffer-name))))
-
-  ;; ==========================================
-  ;; 5. LSP SERVER RESTART ON ENVRC RELOAD
-  ;; ==========================================
-  ;; When `.envrc` is updated, the environment changes, but the running LSP
-  ;; server is still using the old environment. This advice catches the
-  ;; update and restarts associated `lsp-mode` workspaces.
-  (with-eval-after-load 'lsp-mode
-    (when (fboundp 'envrc--mode-buffers)
-      ;; Helper to restart LSP servers for a specific environment directory
-      (defun ar/envrc--restart-lsp-workspaces (env-dir)
-        "Restart `lsp-mode' workspaces associated with ENV-DIR."
-        (let ((lsp-servers nil))
-          (dolist (buf (envrc--mode-buffers))
-            (with-current-buffer buf
-              (let ((buf-env-dir (ignore-errors (envrc--find-env-dir))))
-                (when (and buf-env-dir (string= buf-env-dir env-dir))
-                  (when (bound-and-true-p lsp-mode)
-                    (dolist (ws (lsp-workspaces))
-                      (cl-pushnew ws lsp-servers :test #'equal)))))))
-          (when lsp-servers
-            (mapc #'lsp-workspace-restart lsp-servers)
-            (message "Restarted %d LSP servers associated with direnv"
-                     (length lsp-servers)))))
-
-      ;; Standard reload vector (e.g., M-x envrc-reload)
-      (define-advice envrc--update-env (:after (env-dir) restart-lsp)
-        (ar/envrc--restart-lsp-workspaces env-dir))
-
-      ;; Bulk reload vector (e.g., M-x envrc-reload-all)
-      ;; Bypasses `envrc--update-env`, so it is caught here to restart
-      ;; all unique LSP workspaces across all active envrc buffers.
-      (define-advice envrc-reload-all (:after () restart-lsp-all)
-        (let ((lsp-servers nil))
-          (dolist (buf (envrc--mode-buffers))
-            (with-current-buffer buf
-              (when (bound-and-true-p lsp-mode)
-                (dolist (ws (lsp-workspaces))
-                  (cl-pushnew ws lsp-servers :test #'equal)))))
-          (when lsp-servers
-            (mapc #'lsp-workspace-restart lsp-servers)
-            (message "Restarted %d LSP servers after direnv bulk reload"
-                     (length lsp-servers))))))))
 #+end_src
-
-
-
-** TODO Eldoc
-- [ ] What scenarios does the doom emacs project use eldoc for? And how does it do them? Search the web thoroughly.
-
-
 
 ** TODO Transient Menu
 Provides a centralized dashboard for code actions, navigation, diagnostics, folding, and documentation lookup.
@@ -7480,6 +7406,82 @@ Provides a centralized dashboard for code actions, navigation, diagnostics, fold
       ("<escape>" "" transient-quit-one :format " ")]]))
 #+end_src
 
+
+** TODO Keybinds
+Consolidated keybindings for Development Tools packages and commands only.
+#+begin_src emacs-lisp
+(ar/global-leader
+  "c"   '(:ignore t :wk "code")
+  "c ." '(ar/toggles-devtools :wk "Dev dashboard")
+  "c a" '(eglot-code-actions :wk "Code actions (lightbulb)")
+  "c i" '(eglot-code-action-organize-imports :wk "Organize imports")
+  "c x" '(eglot-execute-command :wk "Execute server command")
+  "c r" '(eglot-rename :wk "Rename symbol")
+  "c f" '(apheleia-format-buffer :wk "Format buffer (async)")
+  "c s" '(ar/ast-refactor-transient :wk "Structure refactor")
+  "c e" '(consult-flymake :wk "Search errors (buffer)")
+  "c E" '(consult-flymake-project :wk "Search errors (project)")
+  "c B" '(flymake-show-buffer-diagnostics :wk "Buffer diagnostics")
+  "c P" '(flymake-show-project-diagnostics :wk "Project diagnostics panel")
+  "c n" '(flymake-goto-next-error :wk "Next error")
+  "c p" '(flymake-goto-prev-error :wk "Prev error")
+  "c !" '(flymake-start :wk "Force recheck")
+  "c D" '(xref-find-references :wk "Find all references")
+  "c A" '(xref-find-apropos :wk "Apropos")
+  "c h" '(eglot-show-call-hierarchy :wk "Call hierarchy")
+  "c t" '(eglot-show-type-hierarchy :wk "Type hierarchy")
+  "c p" '(:ignore t :wk "peek")
+  "c p d" '(peek-xref-definition :wk "Peek definition")
+  "c p r" '(peek-xref-references :wk "Peek references")
+  "c p h" '(peek-overlay-dwim :wk "Hide peek")
+  "c g" '(:ignore t :wk "goto")
+  "c g d" '(xref-find-definitions :wk "Definition")
+  "c g D" '(eglot-find-declaration :wk "Declaration")
+  "c g t" '(eglot-find-typeDefinition :wk "Type Definition")
+  "c g i" '(eglot-find-implementation :wk "Implementation")
+  "c m" '(ar/eglot-moniker-at-point :wk "Inspect moniker")
+  "c M" '(ar/eglot-copy-moniker :wk "Copy moniker")
+  "c S" '(consult-eglot-symbols :wk "Document symbols (outline)")
+  "c H" '(eglot-inlay-hints-mode :wk "Toggle inlay hints")
+  "c T" '(eglot-semantic-tokens-mode :wk "Toggle semantic tokens"))
+
+(ar/global-leader
+  "f R" '(ar/eglot-rename-file :wk "Rename file (LSP aware)"))
+
+(ar/global-leader
+  "s w" '(consult-eglot-symbols :wk "Workspace symbols (use C-u)"))
+
+(ar/global-leader
+  "x"   '(:ignore t :wk "execute/debug")
+  "x x" '(ar/toggles-dape :wk "Debug menu")
+  "x d" '(dape :wk "Start debugging")
+  "x b" '(dape-breakpoint-toggle :wk "Toggle breakpoint")
+  "x n" '(dape-next :wk "Next")
+  "x s" '(dape-step-in :wk "Step in")
+  "x o" '(dape-step-out :wk "Step out")
+  "x c" '(dape-continue :wk "Continue")
+  "x q" '(dape-quit :wk "Quit debugger")
+  "x k" '(dape-kill :wk "Kill debugger")
+  "x r" '(dape-restart :wk "Restart")
+  "x w" '(dape-watch-dwim :wk "Watch"))
+
+(general-define-key
+ :states 'motion
+ "g d" #'xref-find-definitions
+ "g D" #'xref-find-references
+ "g t" #'eglot-find-typeDefinition
+ "g i" #'eglot-find-implementation
+ "g ," #'xref-go-back
+ "g c" #'eglot-show-call-hierarchy
+ "g T" #'eglot-show-type-hierarchy
+ "] e" #'flymake-goto-next-error
+ "[ e" #'flymake-goto-prev-error)
+
+(general-define-key
+ :states 'normal
+ "K" #'eldoc
+ "F2" #'eglot-rename)
+#+end_src
 
 * DONE Contextual Sidebars
 Persistent side windows displaying dynamic metadata, backlinks, and bibliography context for the active buffer.
@@ -8418,6 +8420,12 @@ TODO: =Determine the difference between this preview package and preview-auto fr
 ;; (use-package company-math :defer t)
 ;; (use-package company-auctex :defer t)
 
+;; --- Eglot Server Program Registration ---
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((LaTeX-mode latex-mode)
+                 . ("texlab"))))
+
 ;; (defun ar/latex-setup-completion ()
 ;;   "Configure LaTeX completion: Eglot + AUCTeX + company-math via Cape.
 
@@ -8517,17 +8525,6 @@ TODO: =Deal with later=
   (add-to-list 'apheleia-formatters '(alejandra . ("alejandra" "-q" "-")))
   (setf (alist-get 'nix-mode apheleia-mode-alist) '(alejandra))
   (setf (alist-get 'nix-ts-mode apheleia-mode-alist) '(alejandra)))
-#+end_src
-
-** TODO Bash
-TODO: =Replace eglot with lsp-mode=
-#+begin_src emacs-lisp
-;; (with-eval-after-load 'eglot
-;;   (add-to-list 'eglot-server-programs
-;;                '((bash-mode bash-ts-mode) . ("bash-language-server" "start"))))
-
-;; ;; Enable eglot for bash-ts-mode (tree-sitter based bash mode)
-;; (add-hook 'bash-ts-mode-hook #'eglot-ensure)
 #+end_src
 
 ** TODO PlantUML
@@ -8783,32 +8780,9 @@ TODO: =Deal with later=
 
 #+end_src
 
-** TODO C/C++
-TODO: =Deal with later=
-#+begin_src emacs-lisp
-;; (with-eval-after-load 'eglot
-;;   (add-to-list 'eglot-server-programs
-;;                '((c-mode c-ts-mode c++-mode c++-ts-mode)
-;;                  . ("clangd"
-;;                     "--background-index"
-;;                     "--clang-tidy"
-;;                     "--header-insertion=never"
-;;                     "--completion-style=detailed"
-;;                     "--function-arg-placeholders=0"))))
-
-;; (with-eval-after-load 'apheleia
-;;   (setf (alist-get 'c-mode      apheleia-mode-alist) '(clang-format))
-;;   (setf (alist-get 'c-ts-mode   apheleia-mode-alist) '(clang-format))
-;;   (setf (alist-get 'c++-mode    apheleia-mode-alist) '(clang-format))
-;;   (setf (alist-get 'c++-ts-mode apheleia-mode-alist) '(clang-format)))
-
-;; (when (treesit-available-p)
-;;   (add-to-list 'auto-mode-alist '("CMakeLists\\.txt\\'" . cmake-ts-mode))
-;;   (add-to-list 'auto-mode-alist '("\\.cmake\\'"         . cmake-ts-mode)))
-#+end_src
 
 ** TODO Python
-TODO: =Add flycheck=
+Configures Python editing, LSP server routing, workspace settings, formatting, and debug adapter integration.
 #+begin_src emacs-lisp
 (use-package python
   :ensure nil
@@ -8817,17 +8791,229 @@ TODO: =Add flycheck=
   (python-shell-interpreter "python3")
   (python-indent-offset 3))
 
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               `((python-mode python-ts-mode)
+                 . ,(eglot-alternatives
+                     '(("basedpyright-langserver" "--stdio")
+                       ("pyright-langserver" "--stdio"))))))
+
+  ;; --- Workspace Configuration ---
+  (setq eglot-workspace-configuration
+        (plist-put eglot-workspace-configuration :python
+                   '(:pythonPath "python3"
+                     :analysis (:typeCheckingMode "basic"
+                                :autoImportCompletions t
+                                :useLibraryCodeForTypes t)
+
 (with-eval-after-load 'apheleia
   (setf (alist-get 'python-mode apheleia-mode-alist)
         '(ruff-isort ruff))
   (setf (alist-get 'python-ts-mode apheleia-mode-alist)
         '(ruff-isort ruff)))
 
-;; TODO: Add flycheck
-(with-eval-after-load 'dap-mode
-  (require 'dap-python)
-  (setq dap-python-debugger 'debugpy))
+;; ;; --- Debug Adapter (dape) ---
+;; ;; Configures debugpy as the Python debug adapter for dape.
+;; (with-eval-after-load 'dap-mode
+;;   (require 'dap-python)
+;;   (setq dap-python-debugger 'debugpy))
 #+end_src
+
+** TODO TypeScript & JavaScript
+Configures LSP server routing and workspace settings for TypeScript, JavaScript, TSX, and JSX buffers.
+#+begin_src emacs-lisp
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((typescript-ts-mode tsx-ts-mode
+                  javascript-ts-mode jsx-ts-mode)
+                 . ("typescript-language-server" "--stdio")))
+
+  (setq eglot-workspace-configuration
+        (plist-put eglot-workspace-configuration :typescript
+                   '(:inlayHints
+                     (:includeInlayParameterNameHints "all"
+                      :includeInlayFunctionParameterTypeHints t
+                      :includeInlayVariableTypeHints t
+                      :includeInlayPropertyDeclarationTypeHints t
+                      :includeInlayFunctionLikeReturnTypeHints t
+                      :includeInlayEnumMemberValueHints t))))
+  (setq eglot-workspace-configuration
+        (plist-put eglot-workspace-configuration :javascript
+                   '(:inlayHints
+                     (:includeInlayParameterNameHints "all"
+                      :includeInlayFunctionParameterTypeHints t
+                      :includeInlayVariableTypeHints t)))))
+#+end_src
+
+** TODO Rust
+Configures LSP server routing and workspace settings for Rust buffers via rust-analyzer.
+#+begin_src emacs-lisp
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((rust-mode rust-ts-mode)
+                 . ("rust-analyzer")))
+
+  (setq eglot-workspace-configuration
+        (plist-put eglot-workspace-configuration :rust-analyzer
+                   '(:checkOnSave (:command "clippy")
+                     :inlayHints (:typeHints t
+                                  :parameterHints t
+                                  :chainingHints t)))))
+#+end_src
+
+** TODO Go
+Configures LSP server routing and workspace settings for Go buffers via gopls.
+#+begin_src emacs-lisp
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((go-mode go-ts-mode)
+                 . ("gopls")))
+
+   (setq eglot-workspace-configuration
+        (plist-put eglot-workspace-configuration :gopls
+                   '(:hints (:assignVariableTypes t
+                             :compositeLiteralFields t
+                             :constantValues t
+                             :functionTypeParameters t
+                             :parameterNames t
+                             :rangeVariableTypes t)))))
+#+end_src
+
+** TODO C/C++
+Configures LSP server routing, formatting, and tree-sitter mode associations for C and C++ buffers.
+#+begin_src emacs-lisp
+;; --- Eglot Server Program Registration ---
+;; clangd is the official C/C++ LSP server from the LLVM project.
+;; Command-line arguments:
+;;   --background-index          — indexes the entire project in the background
+;;                                 for workspace-wide symbol search and references.
+;;   --clang-tidy                — enables clang-tidy lint diagnostics alongside
+;;                                 compiler diagnostics.
+;;   --header-insertion=never    — prevents clangd from auto-inserting #include
+;;                                 directives on completion accept (apheleia and
+;;                                 manual workflow handle this).
+;;   --completion-style=detailed — shows full function signatures in completion
+;;                                 candidates instead of abbreviated names.
+;;   --function-arg-placeholders=0 — disables argument placeholders in completion
+;;                                   (e.g. shows `foo` instead of `foo(${1:int x})`).
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((c-mode c-ts-mode c++-mode c++-ts-mode)
+                 . ("clangd"
+                    "--background-index"
+                    "--clang-tidy"
+                    "--header-insertion=never"
+                    "--completion-style=detailed"
+                    "--function-arg-placeholders=0"))))
+
+;; --- Formatting (Apheleia) ---
+;; clang-format: LLVM's canonical C/C++ formatter. Reads .clang-format
+;; from the project root for style configuration.
+(with-eval-after-load 'apheleia
+  (setf (alist-get 'c-mode      apheleia-mode-alist) '(clang-format))
+  (setf (alist-get 'c-ts-mode   apheleia-mode-alist) '(clang-format))
+  (setf (alist-get 'c++-mode    apheleia-mode-alist) '(clang-format))
+  (setf (alist-get 'c++-ts-mode apheleia-mode-alist) '(clang-format)))
+
+;; --- Tree-sitter Mode Associations ---
+;; Maps CMake files to cmake-ts-mode when tree-sitter is available.
+(when (treesit-available-p)
+  (add-to-list 'auto-mode-alist '("CMakeLists\\.txt\\'" . cmake-ts-mode))
+  (add-to-list 'auto-mode-alist '("\\.cmake\\'"         . cmake-ts-mode)))
+#+end_src
+
+** TODO Bash
+Configures LSP server routing for shell script buffers.
+#+begin_src emacs-lisp
+;; --- Eglot Server Program Registration ---
+;; bash-language-server provides LSP endpoints for shell scripts:
+;; completion (command names, flags, variables), diagnostics (shellcheck
+;; integration), navigation (go-to-definition for functions/variables),
+;; and hover documentation (man page summaries).
+;;
+;; The "start" argument tells the server to begin listening on stdio.
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((bash-ts-mode sh-mode)
+                 . ("bash-language-server" "start"))))
+#+end_src
+
+** TODO Nix
+Configures Nix editing, LSP server routing, and formatting.
+#+begin_src emacs-lisp
+(use-package nix-mode
+  :defer t
+  :mode "\\.nix\\'"
+  :hook (nix-mode . eglot-ensure))
+
+(use-package nix-ts-mode
+  :defer t
+  :mode "\\.nix\\'"
+  :hook (nix-ts-mode . eglot-ensure))
+
+(use-package nix-update
+  :defer t
+  :commands nix-update-fetch)
+
+;; --- Eglot Server Program Registration ---
+;; nixd is the Nix LSP server. Provides completion, diagnostics,
+;; navigation, and hover documentation for Nix expressions.
+;; Communicates via stdio.
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((nix-mode nix-ts-mode)
+                 . ("nixd"))))
+
+;; --- Formatting (Apheleia) ---
+;; alejandra: opinionated Nix formatter written in Rust.
+;; -q flag suppresses output noise.
+(with-eval-after-load 'apheleia
+  (add-to-list 'apheleia-formatters '(alejandra . ("alejandra" "-q" "-")))
+  (setf (alist-get 'nix-mode apheleia-mode-alist) '(alejandra))
+  (setf (alist-get 'nix-ts-mode apheleia-mode-alist) '(alejandra)))
+#+end_src
+
+** TODO JSON
+Configures LSP server routing for JSON buffers.
+#+begin_src emacs-lisp
+;; --- Eglot Server Program Registration ---
+;; vscode-json-languageserver is the JSON language server extracted from
+;; VS Code. Provides completion (schema-aware), diagnostics (schema
+;; validation), hover (schema descriptions), and document links.
+;; Communicates via stdio.
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((json-ts-mode json-mode)
+                 . ("vscode-json-languageserver" "--stdio"))))
+#+end_src
+
+** TODO YAML
+Configures YAML editing, LSP server routing, and formatting.
+#+begin_src emacs-lisp
+(use-package yaml-pro
+  :defer t
+  :hook ((yaml-ts-mode . yaml-pro-ts-mode)))
+
+(with-eval-after-load 'org
+  (add-to-list 'org-src-lang-modes '("yaml" . yaml-ts)))
+
+;; --- Eglot Server Program Registration ---
+;; yaml-language-server provides LSP endpoints for YAML files:
+;; completion (schema-aware), diagnostics (schema validation),
+;; hover (schema descriptions), and document formatting.
+;; Communicates via stdio.
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((yaml-ts-mode yaml-mode)
+                 . ("yaml-language-server" "--stdio"))))
+
+;; --- Formatting (Apheleia) ---
+;; prettier: formats YAML (and many other formats) with consistent
+;; indentation, quoting, and line width.
+(with-eval-after-load 'apheleia
+  (setf (alist-get 'yaml-ts-mode apheleia-mode-alist) '(prettier)))
+#+end_src
+
 
 ** TODO kdl
 TODO: =Deal with later=

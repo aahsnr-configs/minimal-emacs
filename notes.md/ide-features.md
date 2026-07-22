@@ -1072,7 +1072,7 @@ _VS Code feature: Jump to a symbol's declaration (distinct from definition in so
 | `Alt+Left` returns to origin                  | `M-,` (`xref-go-back`) via the native xref history ring.                                          |
 | `Ctrl+Click` on symbol                        | Emacs 31 `global-xref-mouse-mode` (`C-<mouse-1>`).                                                |
 
-### Emacs 31 Specific Enhancements
+ ### Emacs 31 Specific Enhancements
 
 - **`xref-mouse-mode` (NEW):** Emacs 31 introduces native mouse-driven code navigation. Enabling `global-xref-mouse-mode` binds `C-<down-mouse-1>` to xref jumps, perfectly mirroring VS Code's Ctrl+Click convention without requiring third-party mouse-click advice.
 - **Editable Xref Buffers:** Emacs 31's `xref-change-to-xref-edit-mode` (bound to `e` in `*xref*` buffers) turns declaration lists into writable surfaces. If a symbol has multiple forward declarations across headers, you can press `e`, edit them simultaneously using standard Emacs text manipulation, and save. The changes propagate back to the originating header files natively.

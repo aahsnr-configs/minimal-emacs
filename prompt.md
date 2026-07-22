@@ -24,6 +24,8 @@
 
 - Review and audit your latest iteration of Org Eldoc subsection and the custom ar-org-eldoc.el file. Find any errors and issues. Search the web and think longer for this task and make sure you have the latest information till July 20, 2026. Then explain everything back to me.
 
+- Now we are going to work on the Development Tools main section. First ingest the attached ide-features.md, acknowledge that you have ingested this file and show me some how that you understand everything in this file.
+
 ## Python script to build and install emacs from source
 
 - Write a python script to build and install emacs from source. It will specifically install emacs-pretest package for now until emacs 31 has been released. It must have the following features and functionalities:
