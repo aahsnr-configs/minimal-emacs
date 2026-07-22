@@ -698,8 +698,6 @@ Injects standardized Vim bindings into non-text buffers. Enables Unimpaired brac
   ;; Standardize LSP/xref find-references bindings across all modes.
   (setq evil-collection-want-find-usages-bindings-p t)
   :config
-  ;; Exclude `ediff` to prevent keymap collisions with the custom Transient Ediff block.
-  (setq evil-collection-mode-list (delete 'ediff evil-collection-mode-list))
   ;; Initialize bindings. Minibuffer integration defaults to `nil`,
   ;; protecting the Vertico type-to-filter paradigm.
   (evil-collection-init))
@@ -3083,50 +3081,50 @@ Shows rich documentation with source code, callers, and keybindings for any symb
 #+end_src
 
 
-** TODO Ediff
-- [ ] List all the features and functionalities of ediff
-- [ ] I also need to know the evil style keybindings for ediff that exists in evil collection. evil-ediff has been integrated into evil collection package
-- [ ] I also need to know the correct format for how to add commands to :commands()
-
+** DONE Ediff
+Compares and merges two or three versions of a file side by side with interactive difference navigation.
 #+begin_src emacs-lisp
 (use-package ediff
   :ensure nil
-  :defer t
-  :commands (ediff ediff-files ediff-buffers ediff-files3 ediff-buffers3
-             ediff-revision ediff-current-file ediff-merge ediff-merge-with-ancestor
-             ediff-patch-file ediff-patch-buffer)
-
-  :init
-  ;; Window and display configuration
-  (setq ediff-window-setup-function 'ediff-setup-windows-plain
-        ediff-split-window-function 'split-window-horizontally
-        ediff-merge-split-window-function 'split-window-horizontally)
-
-  ;; Start with minimal control panel
-  (setq ediff-use-long-help-message nil)
-
-  ;; Highlight options
-  (setq ediff-highlight-all-diffs t)
-
+  :commands (ediff
+             ediff-files
+             ediff-buffers
+             ediff-files3
+             ediff-buffers3
+             ediff-revision
+             ediff-current-file
+             ediff-merge
+             ediff-merge-with-ancestor
+             ediff-patch-file
+             ediff-patch-buffer)
+  :custom
+  ;; Side-by-side layout in the current frame, no separate control frame.
+  (ediff-window-setup-function 'ediff-setup-windows-plain)
+  (ediff-split-window-function 'split-window-horizontally)
+  (ediff-merge-split-window-function 'split-window-horizontally)
+  ;; Suppress verbose startup message.
+  (ediff-use-long-help-message nil)
+  ;; Highlight all differences simultaneously for full visual context.
+  (ediff-highlight-all-diffs t)
+  ;; Kill variant buffers on quit to prevent buffer bloat.
+  (ediff-keep-variants nil)
+  ;; Word-level refinement threshold for large diff regions.
+  (ediff-auto-refine-limit 2000)
   :config
-  ;; Window configuration management
+  ;; Save and restore window configuration across ediff sessions.
   (defvar ar/ediff-window-config nil
     "Window configuration before ediff.")
-
   (defun ar/ediff-save-window-config ()
     "Save current window configuration before ediff."
     (setq ar/ediff-window-config (current-window-configuration)))
-
   (defun ar/ediff-restore-window-config ()
     "Restore window configuration after ediff."
     (when ar/ediff-window-config
       (set-window-configuration ar/ediff-window-config)
       (setq ar/ediff-window-config nil)))
-
   (add-hook 'ediff-before-setup-hook #'ar/ediff-save-window-config)
   (add-hook 'ediff-quit-hook #'ar/ediff-restore-window-config)
-
-  ;; Define transient menu
+  ;; Transient control panel for ediff operations.
   (with-eval-after-load 'transient
     (defun ar/ediff-title ()
       (concat
@@ -3134,11 +3132,9 @@ Shows rich documentation with source code, callers, and keybindings for any symb
            (nerd-icons-faicon "nf-fa-columns" :face 'transient-heading :v-adjust 0.02)
          "")
        (propertize " Ediff Control Panel" 'face 'transient-heading)))
-
     (transient-define-prefix ar/ediff-transient ()
       "Ediff commands - call from control panel"
       [:description ar/ediff-title
-
        ["Navigate"
         ("n" "next diff" ediff-next-difference :transient t)
         ("p" "previous diff" ediff-previous-difference :transient t)
@@ -3148,57 +3144,38 @@ Shows rich documentation with source code, callers, and keybindings for any symb
         ("V" "scroll up" (lambda () (interactive) (ediff-scroll-vertically '-)) :transient t)
         ("<" "scroll left" ediff-scroll-horizontally :transient t)
         (">" "scroll right" (lambda () (interactive) (ediff-scroll-horizontally '-)) :transient t)]
-
        ["Copy & Restore"
         ("a" "copy A → B" ediff-copy-A-to-B :transient t)
         ("b" "copy B → A" ediff-copy-B-to-A :transient t)
         ("r" "restore diff" ediff-restore-diff :transient t)
         ("*" "refine region" ediff-make-or-kill-fine-diffs :transient t)]
-
        ["Toggle"
         ("h" "highlighting" ediff-toggle-hilit :transient t)
         ("@" "auto-refine" ediff-toggle-autorefine :transient t)
         ("#" "skip similar" ediff-toggle-skip-similar :transient t)
         ("|" "split H/V" ediff-toggle-split :transient t)
         ("m" "wide display" ediff-toggle-wide-display :transient t)]
-
        ["Actions"
         ("!" "update diffs" ediff-update-diffs :transient t)
         ("w" "save buffers" ediff-save-buffer :transient t)
         ("i" "status info" ediff-status-info :transient t)
         ("E" "manual" ediff-documentation :transient t)]
-
        ["Exit"
         ("?" "toggle help" ediff-toggle-help :transient t)
         ("z" "suspend" ediff-suspend)
         ("q" "quit" ediff-quit)
-        ("<escape>" "" transient-quit-one :format " ")]])
-
-    ;; Function to check if transient is active
+        ("<escape>" "" transient-quit-one :format " ")]]))
+    ;; Checks whether the transient menu is currently active.
     (defun ar/ediff-transient-active-p ()
       "Check if ediff transient is currently active."
       (and (boundp 'transient--prefix)
            transient--prefix
            (eq transient-current-command 'ar/ediff-transient))))
-
-  ;; Setup custom keybindings in control panel
+  ;; Unbinds SPC/C-c to prevent general.el leader conflicts; routes ? to transient.
   (defun ar/ediff-setup-keys ()
-    "Setup custom keybindings for ediff control panel.
-This function unbinds SPC and other keys that conflict with general.el,
-and sets up vim-style navigation."
-    ;; CRITICAL: Unbind SPC to prevent conflicts with general.el leader key
+    "Unbind conflicting keys and route ? to the transient menu."
     (define-key ediff-mode-map (kbd "SPC") nil)
-
-    ;; Unbind other potentially conflicting keys
     (define-key ediff-mode-map (kbd "C-c") nil)
-
-    ;; Vim-style navigation (j/k for next/previous)
-    (define-key ediff-mode-map (kbd "j") 'ediff-next-difference)
-    (define-key ediff-mode-map (kbd "k") 'ediff-previous-difference)
-    (define-key ediff-mode-map (kbd "h") 'ediff-previous-difference)
-    (define-key ediff-mode-map (kbd "l") 'ediff-next-difference)
-
-    ;; Bind transient menu to ? (toggles between transient and help)
     (when (featurep 'transient)
       (define-key ediff-mode-map (kbd "?")
         (lambda ()
@@ -3206,17 +3183,12 @@ and sets up vim-style navigation."
           (if (ar/ediff-transient-active-p)
               (ediff-toggle-help)
             (ar/ediff-transient))))))
-
   (add-hook 'ediff-keymap-setup-hook #'ar/ediff-setup-keys)
-
-  ;; Ensure control panel gets focus on startup
+  ;; Focus the control panel on session start.
   (add-hook 'ediff-startup-hook
             (lambda ()
               (select-window (get-buffer-window ediff-control-buffer)))))
 #+end_src
-
-#+RESULTS:
-
 
 ** TODO Woman
 Extracts system =manpath= directories to guarantee native Emacs =woman= can locate modern Arch Linux manuals without external dependencies.
