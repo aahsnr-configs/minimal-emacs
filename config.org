@@ -2983,6 +2983,7 @@ Provides a centralized dashboard for Avy's spatial jumping and remote text mutat
 
 ** DONE Jinx
 Checks spelling as you type and highlights words that need correction.
+
 #+begin_src emacs-lisp
 (use-package jinx
   :init
@@ -3190,12 +3191,11 @@ Compares and merges two or three versions of a file side by side with interactiv
               (select-window (get-buffer-window ediff-control-buffer)))))
 #+end_src
 
-** TODO Woman
+** DONE Woman
 Extracts system =manpath= directories to guarantee native Emacs =woman= can locate modern Arch Linux manuals without external dependencies.
 #+begin_src emacs-lisp
 (use-package woman
   :ensure nil
-  :defer t
   :commands (woman)
   :config
   ;; Extract system manpath to guarantee `woman` locates modern Arch Linux manuals.
