@@ -4,7 +4,7 @@
 
 - You have the `GREEN LIGHT` to execute the rewrite.
 
-- Now lets work on the Misc subsection. Review this section thoroughly in great detail. Then fix any errors and issues. But do not rewrite the Misc subsection yet under any circumstances. Explain everything in great detail for me to review.
+- Now lets review and audit on the Tree-sitter subsection. Audit and review this subsection thoroughly in great detail. Then fix any errors and issues. Only optimize it for emacs 31 since I fully using emacs 31. Search the web and think longer for this task and make sure you have the latest information till July 20, 2026. Explain everything in great detail for me to review.
 
 - Now lets work on the subsection. Search the web, think for longer and write a new configuration for expreg and treesit-expreg from scratch. First determine if these packages are needed together and if they work together. But do not write any config for this subsection yet. Present me a plan on how you want to approach in writing this configuration. Explain everything in great detail for me to review.
 
@@ -20,7 +20,7 @@
 
 - Lets work on Undo Fu subsection again. You need to come up with a plan to write a config org block from scratch. Look at upstream documentations and source codes for both denote and consult-denote packages. Search the web and think longer for this task and make sure you have the latest information till July 20, 2026. Then explain everything back to me.
 
-- Review and audit your latest iteration of consult-denote subsection and the revised keybindings. Find any errors and issues. Look at upstream documentations and source codes for both denote and consult-denote packages for the review and audit. Search the web and think longer for this task and make sure you have the latest information till July 20, 2026. Then explain everything back to me.
+- Review and audit your latest iteration of Org Eldoc subsection and the custom ar-org-eldoc.el file. Find any errors and issues. Search the web and think longer for this task and make sure you have the latest information till July 20, 2026. Then explain everything back to me.
 
 ## Python script to build and install emacs from source
 

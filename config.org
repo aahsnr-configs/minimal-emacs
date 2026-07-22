@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.20
+#+VERSION: 0.21
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -1029,6 +1029,7 @@ Applies the Tokyo Night palette and integrates downstream UI enhancements. Synch
 Swaps background faces to distinguish side-windows and popups. Deferred until the theme engine finalizes to prevent mapping race conditions.
 #+begin_src emacs-lisp
 (use-package solaire-mode
+  :demand t
   :after doom-themes
   :hook ((change-major-mode after-revert ediff-prepare-buffer org-capture-mode) . turn-on-solaire-mode)
   :config
@@ -1480,25 +1481,31 @@ Delegates hardware input to =ultra-scroll= and keyboard interpolation to =good-s
 
 
 ** TODO Tree-sitter
-- [ ] Optimize it for emacs 31.
-Configures the native C-level AST engine and routes grammar binaries to the =no-littering= var directory. Implements defensive version-forking to support Emacs 30 manual remapping and Emacs 31 native auto-installation.
+Provides advanced syntax highlighting and code navigation by managing language definitions.
 #+begin_src emacs-lisp
 (use-package treesit
   :ensure nil
   :if (treesit-available-p)
   :mode (("\\.tsx\\'" . tsx-ts-mode))
   :init
-  ;; Route grammar binaries to the no-littering var directory.
+  ;; Stores downloaded language definitions in the designated cache directory.
   (defvar ar/treesit-grammar-dir
     (no-littering-expand-var-file-name "tree-sitter/")
     "Target directory for compiled tree-sitter grammars.")
+  ;; Ensures the directory exists before downloading definitions.
   (unless (file-exists-p ar/treesit-grammar-dir)
     (make-directory ar/treesit-grammar-dir t))
-  (add-to-list 'treesit-extra-load-path ar/treesit-grammar-dir)
+  :custom
+  ;; Directs the grammar loader to the designated cache directory.
+  (treesit-extra-load-path (list ar/treesit-grammar-dir))
+  ;; Enables automatic downloading of missing language definitions.
+  (treesit-auto-install-grammar t)
+  ;; Automatically uses advanced modes for supported file types.
+  (treesit-enabled-modes t)
   :config
-  ;; Maximize syntax highlighting decoration across all AST buffers.
+  ;; Enables the highest level of syntax highlighting detail.
   (setq treesit-font-lock-level 4)
-  ;; Additive merging of upstream C-source repositories.
+  ;; Registers official grammar repositories for automatic downloading.
   (dolist (source '((python "https://github.com/tree-sitter/tree-sitter-python")
                     (bash "https://github.com/tree-sitter/tree-sitter-bash")
                     (c "https://github.com/tree-sitter/tree-sitter-c")
@@ -1518,43 +1525,7 @@ Configures the native C-level AST engine and routes grammar binaries to the =no-
                     (org "https://github.com/milisims/tree-sitter-org")
                     (typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
                     (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")))
-    (setf (alist-get (car source) treesit-language-source-alist) (cdr source)))
-  ;; Emacs 31+ native auto-installation and mode routing.
-  (when emacs/>=31p
-    (when (boundp 'treesit-auto-install-grammar)
-      (setq treesit-auto-install-grammar t))
-    (when (boundp 'treesit-enabled-modes)
-      (setq treesit-enabled-modes t)))
-  ;; Emacs 30 manual major mode remapping and install path enforcement.
-  (unless emacs/>=31p
-    (dolist (remap '((python-mode . python-ts-mode)
-                     (json-mode . json-ts-mode)
-                     (js-mode . js-ts-mode)
-                     (bash-mode . bash-ts-mode)
-                     (sh-mode . bash-ts-mode)
-                     (typescript-mode . typescript-ts-mode)
-                     (css-mode . css-ts-mode)
-                     (dockerfile-mode . dockerfile-ts-mode)
-                     (yaml-mode . yaml-ts-mode)
-                     (toml-mode . toml-ts-mode)
-                     (conf-toml-mode . toml-ts-mode)
-                     (c-mode . c-ts-mode)
-                     (c++-mode . c++-ts-mode)
-                     (java-mode . java-ts-mode)))
-      (setf (alist-get (car remap) major-mode-remap-alist) (cdr remap)))
-    ;; Force manual grammar installations to the no-littering directory.
-    (defun ar/treesit--install-to-var-dir (fn lang &optional out-dir &rest args)
-      "Force tree-sitter grammar installation to `ar/treesit-grammar-dir'."
-      (apply fn lang (or out-dir ar/treesit-grammar-dir) args))
-    (when (>= emacs-major-version 30)
-      (advice-add #'treesit-install-language-grammar :around #'ar/treesit--install-to-var-dir)
-      (advice-add #'treesit--build-grammar :around #'ar/treesit--install-to-var-dir)))
-  ;; Prevent specific ts-modes from clobbering global file associations.
-  (dolist (mode '(python-ts-mode csharp-ts-mode))
-    (advice-add mode :around
-                (lambda (fn &rest args)
-                  (let (auto-mode-alist interpreter-mode-alist)
-                    (apply fn args))))))
+    (setf (alist-get (car source) treesit-language-source-alist) (cdr source))))
 #+end_src
 
 
@@ -1775,6 +1746,7 @@ Extends =%= motion to jump across semantic blocks (LaTeX, HTML, code).
   (global-evil-matchit-mode 1))
 #+end_src
 
+
 ** DONE Evil Textobj Tree-Sitter
 Maps native Tree-sitter AST nodes to Evil operator-pending text objects and Unimpaired-style goto motions. Which-key annotations are sanitized to prevent UI clutter.
 #+begin_src emacs-lisp
@@ -1834,6 +1806,7 @@ Maps native Tree-sitter AST nodes to Evil operator-pending text objects and Unim
                  '(("" . "\\`+?evil-textobj-tree-sitter-function--\\(.*\\)\\(?:\\.inner\\|\\.outer\\)") . (nil . "\\1")))))
 #+end_src
 
+
 ** DONE Evil TS Obj
 Provides AST-aware structural manipulation via the Emacs 30 =treesit-thing= API. Refactoring operators are isolated within a Transient menu to prevent global keymap collisions.
 #+begin_src emacs-lisp
@@ -1887,6 +1860,7 @@ Provides AST-aware structural manipulation via the Emacs 30 =treesit-thing= API.
         ("<escape>" "" transient-quit-one :format " ")]])))
 #+end_src
 
+
 ** DONE Treesit Navigate Thing
 Exposes the Emacs 30 =treesit-thing= API via Unimpaired bracket motions. Provides O(1) C-level AST sibling traversal natively.
 #+begin_src emacs-lisp
@@ -1901,6 +1875,7 @@ Exposes the Emacs 30 =treesit-thing= API via Unimpaired bracket motions. Provide
    "]x" (lambda () (interactive) (ignore-errors (treesit-thing-next 'sexp)))
    "[x" (lambda () (interactive) (ignore-errors (treesit-thing-prev 'sexp)))))
 #+end_src
+
 
 ** DONE Expreg
 Provides O(1) AST-aware visual selection expansion via the native =treesit= engine. Integrates with =repeat-mode= for modifier-less tapping and preserves cursor origin on contraction.
@@ -1944,28 +1919,25 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
   (setq org-ellipsis " ↴ "))
 #+end_src
 
-** DONE Custom Folding Functions
-#+begin_src emacs-lisp
-(defun ar/hs-overlay-line-count (ov)
-  "Append hidden line count to the native ellipsis for visual feedback."
-  (when (eq 'code (overlay-get ov 'hs))
-    (let* ((start (overlay-start ov))
-           (end (overlay-end ov))
-           (lines (count-lines start end)))
-      (overlay-put ov 'display
-                   (format "%s [%d lines]" truncate-string-ellipsis lines)))))
 
+** DONE Custom Folding Functions
+Unified folding dispatcher routing to Tree-sitter, Outline, Hideshow, or Vimish Fold based on buffer context.
+#+begin_src emacs-lisp
 (defun ar/fold-toggle ()
+  "Toggle code fold at point using the best available folding engine."
   (interactive)
   (cond ((bound-and-true-p treesit-fold-mode) (treesit-fold-toggle))
         ((bound-and-true-p outline-minor-mode) (outline-cycle))
-        ((bound-and-true-p hs-minor-mode) (hs-toggle-hiding))
+        ((bound-and-true-p hs-minor-mode)
+         ;; Emacs 31+: Prefer `hs-cycle` for intelligent visibility cycling.
+         (if (fboundp 'hs-cycle) (hs-cycle) (hs-toggle-hiding)))
         ((fboundp 'vimish-fold-toggle)
          (condition-case nil (vimish-fold-toggle)
            (error (user-error "No foldable region at point"))))
         (t (user-error "No foldable region at point"))))
 
 (defun ar/fold-open ()
+  "Open code fold at point."
   (interactive)
   (cond ((bound-and-true-p treesit-fold-mode) (treesit-fold-open))
         ((bound-and-true-p outline-minor-mode) (outline-show-subtree))
@@ -1974,6 +1946,7 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
         (t (user-error "No foldable region at point"))))
 
 (defun ar/fold-close ()
+  "Close code fold at point."
   (interactive)
   (cond ((bound-and-true-p treesit-fold-mode) (treesit-fold-close))
         ((bound-and-true-p outline-minor-mode) (outline-hide-subtree))
@@ -1981,6 +1954,7 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
         (t (user-error "No foldable region at point"))))
 
 (defun ar/fold-open-all ()
+  "Open all code folds in the current buffer."
   (interactive)
   (cond ((bound-and-true-p treesit-fold-mode) (treesit-fold-open-all))
         ((bound-and-true-p outline-minor-mode) (outline-show-all))
@@ -1989,6 +1963,7 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
   (message "All folds opened"))
 
 (defun ar/fold-close-all ()
+  "Close all code folds in the current buffer."
   (interactive)
   (cond ((bound-and-true-p treesit-fold-mode) (treesit-fold-close-all))
         ((bound-and-true-p outline-minor-mode) (outline-hide-body))
@@ -1996,24 +1971,36 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
   (message "All folds closed"))
 #+end_src
 
-** TODO Hideshow
+
+** DONE Hideshow
+Folds code blocks in languages lacking Tree-sitter grammars using Emacs 31 native indicators.
 #+begin_src emacs-lisp
 (use-package hideshow
   :ensure nil
   :defer t
-  :commands (hs-toggle-hiding hs-hide-block hs-show-block hs-hide-all hs-show-all)
+  :commands (hs-toggle-hiding
+             hs-hide-block
+             hs-show-block
+             hs-hide-all
+             hs-show-all
+             hs-hide-level
+             hs-cycle
+             hs-toggle-all)
+  :custom
+  ;; Hide comments when hiding all blocks.
+  (hs-hide-comments-when-hiding-all nil)
+  ;; Emacs 31+: Native hidden line count next to ellipsis.
+  (hs-display-lines-hidden t)
+  ;; Emacs 31+: Clickable fringe indicators for block toggling.
+  (hs-show-indicators t)
+  (hs-indicator-type 'fringe)
   :config
-  (setq hs-hide-comments-when-hiding-all nil
-        hs-set-up-overlay #'ar/hs-overlay-line-count)
+  ;; Emacs 31+: `hs-hide-block` hides the innermost block the line belongs to.
+  ;; Set `hs-hide-block-behavior` to 'after-cursor to restore legacy behavior.
   ;; Aborts activation in massive buffers to prevent main-thread freezing.
   (define-advice hs-minor-mode (:before-while (&optional arg) guard-large-files)
     (or (and arg (< (prefix-numeric-value arg) 1))
-        (not (too-long-file-p))))
-  ;; Generic fold-marker fallback for languages lacking tree-sitter grammars.
-  (unless (assq 't hs-special-modes-alist)
-    (setq hs-special-modes-alist
-          (append hs-special-modes-alist
-                  '((t "{{{" "}}}" nil nil))))))
+        (not (too-long-file-p)))))
 #+end_src
 
 
@@ -2046,7 +2033,6 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
   :defer t
   :after evil
   :init
-  ;; Route cache to no-littering var directory to prevent ~/.emacs.d pollution.
   (setq vimish-fold-dir (no-littering-expand-var-file-name "vimish-fold/")
         vimish-fold-indication-mode 'right-fringe)
   :config
@@ -2624,7 +2610,7 @@ Replaces native Evil character motions with incremental, regex-aware spatial jum
 #+end_src
 
 
-** TODO Link Hint
+** DONE Link Hint
 Provides Avy-backed spatial navigation and mutation commands for visible URLs, file paths, and structural buttons across diverse buffer types.
 #+begin_src emacs-lisp
 (use-package link-hint
@@ -2642,7 +2628,7 @@ Provides Avy-backed spatial navigation and mutation commands for visible URLs, f
                      (progn (embark-dwim) t)
                    (error nil))))))
 
- (ar/global-leader
+(ar/global-leader
   "l"   '(:ignore t :wk "links")
   "l o" '(link-hint-open-link :wk "Open link")
   "l y" '(link-hint-copy-link :wk "Yank link")
@@ -2650,8 +2636,6 @@ Provides Avy-backed spatial navigation and mutation commands for visible URLs, f
   "l a" '(link-hint-copy-all-links :wk "Yank all")
   "l ." '(link-hint-open-link-at-point :wk "Open at point"))
 #+end_src
-
-
 
 
 ** DONE Ace Window
@@ -2809,15 +2793,15 @@ Finds text across files and allows direct editing of the search results to updat
 
 
 
-** DONE Re-Builder
-Provides an interactive visual workspace to construct, test, and highlight complex search patterns against live buffer text before execution.
+** DONE Re-builder
+Constructs, tests, and highlights regular expressions against live buffer text.
 #+begin_src emacs-lisp
 (use-package re-builder
   :ensure nil
   :commands (re-builder
              regexp-builder)
   :custom
-  ;; Eliminates double-escaping ("backslash hell") for external tool parity.
+  ;; Eliminates double-escaping for external tool parity.
   (reb-re-syntax 'string)
   ;; Caps overlay rendering to prevent main-thread freezing on large buffers.
   (reb-auto-match-limit 2000)
@@ -2827,6 +2811,7 @@ Provides an interactive visual workspace to construct, test, and highlight compl
   ;; Guarantees immediate typing when switching to `read` or `rx` syntax.
   (when (boundp 'reb-lisp-mode)
     (evil-set-initial-state 'reb-lisp-mode 'insert))
+
   ;; Strips Elisp string quotes/escapes for direct use in `query-replace-regexp` or CLI tools.
   (defun ar/re-builder-copy-interactive ()
     "Copy current regex to kill-ring without Elisp string escaping."
@@ -2838,6 +2823,7 @@ Provides an interactive visual workspace to construct, test, and highlight compl
                    (string-trim raw "\"" "\""))))
       (kill-new clean)
       (message "Copied interactive regex: %s" clean)))
+
   ;; Executes `occur` against the target buffer using the constructed regex.
   (defun ar/re-builder-occur ()
     "Run `occur' with the current regex in the target buffer."
@@ -2851,6 +2837,7 @@ Provides an interactive visual workspace to construct, test, and highlight compl
       (reb-quit)
       (switch-to-buffer target)
       (occur regex)))
+
   ;; Injects custom Transient menu for unified regex manipulation.
   (with-eval-after-load 'transient
     (defun ar/re-builder-title ()
@@ -2863,6 +2850,7 @@ Provides an interactive visual workspace to construct, test, and highlight compl
                                (buffer-name reb-target-buffer)
                              "No Target"))
                    'face 'transient-heading)))
+
     (transient-define-prefix ar/re-builder-transient ()
       "Regex Builder Control Panel"
       [:description ar/re-builder-title
@@ -2882,7 +2870,8 @@ Provides an interactive visual workspace to construct, test, and highlight compl
         ("w" "Interactive" ar/re-builder-copy-interactive :transient t)]
        ["Exit"
         ("q" "Quit Builder" reb-quit)
-        ("<escape>" "" transient-quit-one :format " ")]]
+        ("<escape>" "" transient-quit-one :format " ")]])
+
     ;; Routes `C-o` to summon the Transient menu from within the builder buffer.
     (define-key reb-mode-map (kbd "C-o") #'ar/re-builder-transient)
     (when (boundp 'reb-lisp-mode-map)
@@ -3179,18 +3168,6 @@ and sets up vim-style navigation."
             (lambda ()
               (select-window (get-buffer-window ediff-control-buffer)))))
 #+end_src
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 ** TODO Woman
@@ -3893,8 +3870,6 @@ Bypasses the interactive `yes-or-no-p` prompt natively via the NO-CONFIRM argume
 #+end_src
 
 *** TODO Projection
-- [ ] What features does Projection add to project.el to mimic projectile
-
 =projection= extends the native workspace detector with Projectile-like abstractions. It injects project-specific buffer hooks, exposes transient menus for build systems, and enables intelligent file jumping across diverse language ecosystems.
 #+begin_src emacs-lisp
 (use-package projection
@@ -5243,7 +5218,6 @@ Defines base directories and bootstrap utilities.
 #+end_src
 
 
-
 *** Denote Library Scaffolding
 Creates note-taking folders and isolates them with local configuration files.
 #+begin_src emacs-lisp
@@ -5290,7 +5264,6 @@ Creates note-taking folders and isolates them with local configuration files.
 (my/ensure-org-dir "archives/")
 (my/ensure-org-dir "journal/")
 #+end_src
-
 
 *** Task Management & Ephemeral Routing
 Creates folders and starter files for task management and temporary downloads.
@@ -6993,15 +6966,13 @@ If REGION-TEXT is provided, wrap it inside the block."
 
 
 ** TODO Org Eldoc
+High-performance, O(1) contextual router for Org mode echo-area metadata. Excises heavy AST parsing and breadcrumb generation, delegating structural context to `breadcrumb.el` and focusing strictly on src-block headers, in-block language delegation, link targets, and property drawers.
 #+begin_src emacs-lisp
-
+;; Ensure the local library is loaded and hooked into Org mode.
+;; (with-eval-after-load 'org
+;;   (require 'ar-org-eldoc)
+;;   (add-hook 'org-mode-hook #'ar/org-eldoc-load))
 #+end_src
-
-
-
-
-
-
 
 ** TODO Keybindings
 Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motions, and the complete 25-package Denote ecosystem matrix.
