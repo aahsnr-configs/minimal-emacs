@@ -1,56 +1,40 @@
-;;; eglot.el -*- lexical-binding: t; -*-
+```elisp
+;; ARCHITECTURAL ROLE:
+;; eglot sits between the language server process (e.g. basedpyright, clangd)  and Emacs' native subsystems:
+;; - completion-at-point-functions  → corfu / cape  (IntelliSense)
+;; - flymake                        → diagnostics    (squiggles, Problems panel)
+;; - xref                           → navigation     (go-to-definition, references)
+;; - eldoc                          → hover / signature help
+;; - imenu                          → document symbols / outline
+;; - project.el                     → workspace root detection
 ;;
-;; Copyright (C) 2026 Ahsanur Rahman
-;;
-;; Author: Ahsanur Rahman <ahsanur041@proton.me>
-;; Maintainer: Ahsanur Rahman <ahsanur041@proton.me>
-;; Created: July 22, 2026
-;; Modified: July 22, 2026
-;; Version: 0.0.1
-;; Keywords: abbrev bib c calendar comm convenience data docs emulations extensions faces files frames games hardware help hypermedia i18n internal languages lisp local maint mail matching mouse multimedia news outlines processes terminals tex text tools unix vc
-;; Homepage: https://github.com/ahsan/eglot
-;; Package-Requires: ((emacs "24.3"))
-;;
-;; This file is not part of GNU Emacs.
-;;
-;;; Commentary:
-;;
-;;
-;;
-;;; Code:
 (use-package eglot
-  :ensure nil
-  :hook ((prog-mode . eglot-ensure)
-         (markdown-mode . eglot-ensure)
-         (LaTeX-mode . eglot-ensure))
+  :hook (prog-mode . eglot-ensure)
   :custom
-  ;; Terminate servers when the last managed buffer is killed to prevent zombie processes.
-  (eglot-autoshutdown t)
-  ;; Bypass whole-file/on-type formatting (delegated to apheleia/electric), color, and folding.
-  ;; Keeps :documentRangeFormattingProvider active for non-Python LSP fallbacks.
-  (eglot-ignored-server-capabilities '(:documentFormattingProvider
-                                       :documentOnTypeFormattingProvider
-                                       :colorProvider
-                                       :foldingRangeProvider))
-  ;; Render the code action indicator strictly in the margin to prevent echo-area noise.
+
+  (eglot-stay-out-of '("company" "yasnippet"))
   (eglot-code-action-indications '(margin))
-  ;; Use a simple Unicode glyph to avoid emoji rendering glitches in TTY or tree-sitter modes.
-  (eglot-code-action-indicator "⚡")
-  ;; Prevent Eglot from configuring the forbidden company-mode ecosystem.
-  ;; yasnippet is intentionally omitted to preserve LSP snippet expansion via cape/corfu.
-  (eglot-stay-out-of '("company"))
-  ;; Always prompt with a summary before applying multi-file server edits.
-  (eglot-confirm-server-edits 'summary)
+  (eglot-events-buffer-config '(:size 0 :format full))
+  (eglot-autoshutdown t)
+
+  (eglot-confirm-server-edits t)
+  (eglot-ignored-server-capabilities
+   '(:documentFormattingProvider
+     :documentRangeFormattingProvider
+     :documentOnTypeFormattingProvider
+     :colorProvider
+     :foldingRangeProvider))
+
   :config
-  ;; Inject Emacs 31 native UI parity modes when a buffer becomes managed by an LSP server.
+  (setq eglot-code-action-indicator "💡")
+
+  (setq eglot-max-file-watches 10000)
   (add-hook 'eglot-managed-mode-hook
             (lambda ()
               (when (eglot-managed-p)
-                (eglot-inlay-hints-mode 1)
-                (eglot-semantic-tokens-mode 1))))
+                (eglot-semantic-tokens-mode 1)
+                (eglot-inlay-hints-mode 1))))
 
-  ;; LSP-Aware File Rename
-  ;; Sequences workspace/willRenameFiles, OS rename, and workspace/didRenameFiles.
   (defun ar/eglot-rename-file (new-name)
     "Rename current file to NEW-NAME and notify the LSP server.
 Triggers `workspace/willRenameFiles' to update imports project-wide,
@@ -70,7 +54,7 @@ performs the OS-level rename, then sends `workspace/didRenameFiles'."
                     :workspace/willRenameFiles
                     `(:files [(:oldUri ,old-uri :newUri ,new-uri)]))))
         (when edits
-          (eglot--apply-workspace-edit server edits 'ar/eglot-rename-file)))
+          (eglot--apply-workspace-edit edits 'ar/eglot-rename-file)))
       (rename-file old-name new-name 1)
       (set-visited-file-name new-name nil t)
       (jsonrpc-notify server :workspace/didRenameFiles
@@ -79,19 +63,22 @@ performs the OS-level rename, then sends `workspace/didRenameFiles'."
                (file-name-nondirectory old-name)
                (file-name-nondirectory new-name))))
 
-  ;; Moniker Inspection (LSP 3.16+ Cross-Repo Identity)
   (defun ar/eglot-moniker-at-point ()
     "Display the LSP moniker for the symbol at point in the echo area."
     (interactive)
     (let ((server (eglot-current-server)))
       (if (not server)
           (user-error "No active Eglot server")
+        ;; eglot--async-request sends the request and returns immediately.
+        ;; The :success-fn lambda runs when the server responds.
         (eglot--async-request
          server
          :textDocument/moniker
+         ;; Construct standard LSP position parameters for the current point.
          (eglot--TextDocumentPositionParams)
          :success-fn
          (lambda (result)
+           ;; result is a vector of Moniker plists, or nil/empty.
            (if (and result (cl-plusp (length result)))
                (let* ((primary (aref result 0))
                       (scheme (plist-get primary :scheme))
@@ -115,10 +102,9 @@ performs the OS-level rename, then sends `workspace/didRenameFiles'."
          (lambda (result)
            (if (and result (cl-plusp (length result)))
                (let ((identifier (plist-get (aref result 0) :identifier)))
+                 ;; kill-new adds the string to the kill ring (clipboard).
                  (kill-new identifier)
                  (message "Copied moniker: %s" identifier))
              (message "No moniker found to copy."))))))))
 
-
-(provide 'eglot)
-;;; eglot.el ends here
+```
