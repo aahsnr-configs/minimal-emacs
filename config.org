@@ -2983,63 +2983,67 @@ Provides a centralized dashboard for Avy's spatial jumping and remote text mutat
 
 
 
-** TODO Jinx
+** DONE Jinx
 Checks spelling as you type and highlights words that need correction.
 #+begin_src emacs-lisp
 (use-package jinx
   :init
-  ;; defvar (not defcustom): must use setq in :init, not :custom.
-  (setq jinx-disabled-modes
-        '(prog-mode
-          conf-mode
-          emacs-lisp-mode
-          dired-mode
-          ibuffer-mode
-          neotree-mode
-          treemacs-mode
-          magit-status-mode
-          magit-log-mode
-          magit-diff-mode
-          magit-branch-mode
-          org-agenda-mode
-          org-src-mode
-          dashboard-mode
-          which-key-mode
-          help-mode
-          Info-mode
-          embark-collect-mode
-          vterm-mode
-          ghostel-mode
-          term-mode
-          pdf-view-mode))
-  ;; Inline case-insensitive exclusions replacing the dict.txt file.
+  ;; jinx-disabled-modes was removed in Jinx v2.8; define a custom list.
+  (defvar ar/jinx-disabled-modes
+    '(prog-mode
+      conf-mode
+      emacs-lisp-mode
+      dired-mode
+      ibuffer-mode
+      neotree-mode
+      treemacs-mode
+      magit-status-mode
+      magit-log-mode
+      magit-diff-mode
+      magit-branch-mode
+      org-agenda-mode
+      org-src-mode
+      dashboard-mode
+      which-key-mode
+      help-mode
+      Info-mode
+      embark-collect-mode
+      vterm-mode
+      term-mode
+      pdf-view-mode)
+    "Modes in which Jinx should not activate.")
+  ;; Inline exclusions replacing the dict.txt file.
   (defvar ar/jinx-personal-words
-    "Emacs Elisp use-package defvar defcustom defun dolist setq let progn
-     lambda nil org-mode prog-mode conf-mode text-mode
+    "emacs elisp use-package org-mode prog-mode conf-mode text-mode
      eglot eldoc flymake corfu vertico orderless consult embark
      denote treemacs dirvish magit evil avy anzu jinx
-     Tokyo Night JetBrainsMono Nerd Font PGTK Wayland
-     TRAMP SSH JSON YAML TOML LSP DAP AST"
-    "Personal vocabulary accepted case-insensitively by Jinx.")
+     tokyo night jetbrainsmono nerd font pgtk wayland
+     tramp ssh json yaml toml lsp dap ast"
+    "Personal vocabulary for Jinx session words. Write entries in lowercase for broadest coverage.")
   :custom
   ;; Deterministic English regardless of system locale.
   (jinx-languages "en")
-  ;; Accepts camelCase and PascalCase identifiers in code buffers.
-  (jinx-camel-modes '(prog-mode conf-mode))
-  ;; Structural exclusions: URLs, emails, LaTeX commands, Org keywords, file paths.
+  ;; Upstream defaults preserved; custom Org/LaTeX/path entries appended.
   (jinx-exclude-regexps
    '((emacs-lisp-mode "Package-Requires:.*$")
      (org-mode "^#\\+\\w+.*$" "\\\\[a-zA-Z]+")
      (LaTeX-mode "\\\\[a-zA-Z]+")
-     (t "[a-zA-Z]+://\\S-+"
-        "<?[-+_.~a-zA-Z][-+_.~a-zA-Z]*@[-a-zA-Z0-9_.]+>?"
-        "\\(Local variables\\|End\\):[[:space:]]*$"
+     (t "[A-Z]+\\>"
+        "-+\\>"
+        "\\w*?[0-9]\\w*\\>"
+        "[a-z]+://\\S-+"
+        "<?[-+_.~a-zA-Z][-+_.~:a-zA-Z0-9]*@[-.a-zA-Z0-9]+>?"
+        "\\(?:Local Variables\\|End\\):\\s-*$"
+        "jinx-\\(?:languages\\|local-words\\):\\s-+.*$"
         "[/~][a-zA-Z0-9._/-]+")))
   :config
   ;; Aborts activation in massive buffers to prevent main-thread freezing.
-  (define-advice jinx--mode (:before-while (&optional arg) guard-large-files)
+  (define-advice jinx-mode (:before-while (&optional arg) guard-large-files)
     (or (and arg (< (prefix-numeric-value arg) 1))
         (not (too-long-file-p))))
+  ;; Enforces custom disabled modes (jinx-disabled-modes removed in v2.8).
+  (define-advice jinx--on (:before-while () guard-disabled-modes)
+    (not (apply #'derived-mode-p ar/jinx-disabled-modes)))
   ;; Injects personal vocabulary into prose and markup buffers.
   (dolist (mode '(org-mode
                   LaTeX-mode
@@ -3050,7 +3054,7 @@ Checks spelling as you type and highlights words that need correction.
               (lambda ()
                 (setq-local jinx-local-words ar/jinx-personal-words))))
   ;; Activates global spell-checking directly per Elpaca load-order physics.
-  (jinx-mode 1))
+  (global-jinx-mode 1))
 #+end_src
 
 ** TODO Helpful
