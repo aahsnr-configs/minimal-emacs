@@ -2024,7 +2024,7 @@ Folds code regions at the cursor using language-aware structure detection.
 #+end_src
 
 
-** TODO Vimish Fold
+** DONE Vimish Fold
 Folds manually selected text regions with persistent storage across sessions.
 #+begin_src emacs-lisp
 (use-package vimish-fold
@@ -2051,6 +2051,7 @@ Folds manually selected text regions with persistent storage across sessions.
   :config
   (global-evil-vimish-fold-mode 1))
 #+end_src
+
 
 ** DONE Folding Keybindings
 #+begin_src emacs-lisp
@@ -2983,39 +2984,74 @@ Provides a centralized dashboard for Avy's spatial jumping and remote text mutat
 
 
 ** TODO Jinx
-- [ ] Instead of a dict.txt file, I prefer to have every exclusion written here and it should be case-insensitive
+Checks spelling as you type and highlights words that need correction.
 #+begin_src emacs-lisp
 (use-package jinx
-  :hook (elpaca-after-init . jinx-mode)
+  :init
+  ;; defvar (not defcustom): must use setq in :init, not :custom.
+  (setq jinx-disabled-modes
+        '(prog-mode
+          conf-mode
+          emacs-lisp-mode
+          dired-mode
+          ibuffer-mode
+          neotree-mode
+          treemacs-mode
+          magit-status-mode
+          magit-log-mode
+          magit-diff-mode
+          magit-branch-mode
+          org-agenda-mode
+          org-src-mode
+          dashboard-mode
+          which-key-mode
+          help-mode
+          Info-mode
+          embark-collect-mode
+          vterm-mode
+          ghostel-mode
+          term-mode
+          pdf-view-mode))
+  ;; Inline case-insensitive exclusions replacing the dict.txt file.
+  (defvar ar/jinx-personal-words
+    "Emacs Elisp use-package defvar defcustom defun dolist setq let progn
+     lambda nil org-mode prog-mode conf-mode text-mode
+     eglot eldoc flymake corfu vertico orderless consult embark
+     denote treemacs dirvish magit evil avy anzu jinx
+     Tokyo Night JetBrainsMono Nerd Font PGTK Wayland
+     TRAMP SSH JSON YAML TOML LSP DAP AST"
+    "Personal vocabulary accepted case-insensitively by Jinx.")
   :custom
-  (jinx-disabled-modes
-   '(prog-mode
-     conf-mode
-     emacs-lisp-mode
-     dired-mode
-     ibuffer-mode
-     neotree-mode
-     treemacs-mode
-     magit-status-mode
-     magit-log-mode
-     magit-diff-mode
-     magit-branch-mode
-     org-agenda-mode
-     org-src-mode
-     dashboard-mode
-     which-key-mode
-     help-mode
-     Info-mode
-     embark-collect-mode
-     vterm-mode
-     term-mode
-     pdf-view-mode))
-
-  (let ((dict-file (expand-file-name "dict.txt" user-emacs-directory)))
-    (unless (file-exists-p dict-file)
-      (write-region "" nil dict-file))))
+  ;; Deterministic English regardless of system locale.
+  (jinx-languages "en")
+  ;; Accepts camelCase and PascalCase identifiers in code buffers.
+  (jinx-camel-modes '(prog-mode conf-mode))
+  ;; Structural exclusions: URLs, emails, LaTeX commands, Org keywords, file paths.
+  (jinx-exclude-regexps
+   '((emacs-lisp-mode "Package-Requires:.*$")
+     (org-mode "^#\\+\\w+.*$" "\\\\[a-zA-Z]+")
+     (LaTeX-mode "\\\\[a-zA-Z]+")
+     (t "[a-zA-Z]+://\\S-+"
+        "<?[-+_.~a-zA-Z][-+_.~a-zA-Z]*@[-a-zA-Z0-9_.]+>?"
+        "\\(Local variables\\|End\\):[[:space:]]*$"
+        "[/~][a-zA-Z0-9._/-]+")))
+  :config
+  ;; Aborts activation in massive buffers to prevent main-thread freezing.
+  (define-advice jinx--mode (:before-while (&optional arg) guard-large-files)
+    (or (and arg (< (prefix-numeric-value arg) 1))
+        (not (too-long-file-p))))
+  ;; Injects personal vocabulary into prose and markup buffers.
+  (dolist (mode '(org-mode
+                  LaTeX-mode
+                  markdown-mode
+                  gfm-mode
+                  text-mode))
+    (add-hook (intern (format "%s-hook" mode))
+              (lambda ()
+                (setq-local jinx-local-words ar/jinx-personal-words))))
+  ;; Activates global spell-checking directly per Elpaca load-order physics.
+  (jinx-mode 1))
 #+end_src
-
 
 ** TODO Helpful
 - [ ] How does doom emacs configure the helpful package and what keybinding does doom emacs have?
@@ -4405,40 +4441,6 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
 #+end_src
 
 ** TODO Vertico
-=VERTical Interactively COmpletion= serves as the minimalist, high-performance UI for the Emacs minibuffer. Rather than relying on a static, one-size-fits-all dropdown, this configuration transforms =vertico= into a deeply integrated, context-aware navigation engine by leveraging its bundled extensions.
-
-1. *The Context-Aware UI (=vertico-multiform=):*
-Instead of forcing every command into a 10-line vertical dropdown, =vertico-multiform= acts as a traffic controller to dynamically adapt the UI based on the executed command:
-- =vertico-buffer=: Used for massive document structures (=consult-imenu=, =consult-outline=, =consult-line-multi=). It temporarily hijacks the main editing window to provide a full-screen overview of the codebase.
-- =vertico-grid=: Used for =consult-yasnippet=. Snippet names are short and uniform; a multi-column grid eliminates unnecessary vertical scrolling.
-- =vertico-unobtrusive=: Can be used for =execute-extended-command= (=M-x=) to completely hide the candidate list and render only the top match inline next to the prompt, reclaiming screen space. (Currently disabled in favor of the standard 10-line dropdown).
-
-2. *The Evil/Vim Minibuffer Trap (Crucial):*
-When =vertico-buffer= takes over the main window, keyboard focus remains in the minibuffer to allow continuous filter query typing. Forcing the minibuffer into =evil-normal-state= to enable =j=/=k= scrolling is a catastrophic error; it breaks the type-to-filter paradigm and forces the user to press =i= before typing any search character.
-*The Fix:* The minibuffer is intentionally left in =insert= state, relying strictly on native arrow keys (=<up>= and =<down>=) for candidate navigation. By avoiding =hjkl= bindings entirely in the =vertico-map=, flawless scrolling muscle memory is preserved without ever interrupting the ability to type or risking conflicts with search queries.
-
-3. *Avy-Style Jumping (=vertico-quick=):*
-For workflows heavily reliant on =avy= for buffer navigation, the muscle memory is wired for "look at the screen, type 1 or 2 characters, jump." The =vertico-quick= extension implements this exact algorithm natively inside the minibuffer, independent of the external =avy= package. Pressing =M-q= overlays jump-characters next to every candidate, allowing instant selection of distant items in long lists without repetitive keystrokes.
-
-4. *The Safety Net (=vertico-repeat=):*
-When popup managers or custom keybindings intercept =C-g=, it is easy to accidentally abort complex queries (e.g., =consult-ripgrep= or =find-file=). The =vertico-repeat= extension records the exact state of the last completion session, allowing instant resurrection of cancelled queries.
-
-5. *Load-Order Guarantee:*
-Standard Emacs configurations often place extension requires in the =:config= block while binding their functions in =:bind=. Because =:bind= evaluates before =:config= during startup, this causes fatal =void-function= errors. All =require= statements for Vertico extensions are strictly placed in the =:init= block to guarantee functions are loaded into memory before keybindings are wired.
-
-6. *Popper & TRAMP Non-Interference:*
-- =vertico-buffer= utilizes the main window rather than a dedicated popup buffer, ensuring popup management regex filters completely ignore it (resulting in zero UI flickering).
-- =completion-category-overrides= remains unaltered here, as the =orderless= configuration correctly handles TRAMP and file paths.
-
-7. *Group Navigation:*
-To prevent repetitive keystrokes when skipping over long lists of candidates, =C-<down>= and =C-<up>= are mapped to =vertico-next-group= and =vertico-previous-group=. This allows instant teleportation between candidate categories (e.g., jumping from "Open Buffers" directly to "Recent Files" in =consult-buffer=).
-
-8. *Visual Transforms:*
-A robust =cl-defmethod= approach is used to dynamically colorize candidates based on their category. Directories are tinted with a distinct face so they do not blend in with regular files, and enabled minor/major modes are highlighted in =font-lock-constant-face= when using =M-x=, allowing for instant visual scanning.
-
-9. *Embark Grid Synergy:*
-To replace the legacy =which-key= hack for Embark actions, =vertico-multiform= is instructed to render the =embark-keybinding= category as a multi-column grid. This provides a searchable action menu that integrates seamlessly with Orderless filtering.
-
 #+begin_src emacs-lisp
 (use-package vertico
   :custom
@@ -4626,14 +4628,6 @@ To replace the legacy =which-key= hack for Embark actions, =vertico-multiform= i
 #+end_src
 
 ** TODO Marginalia
-=marginalia= enriches Emacs' minibuffer completions with rich, contextual metadata (annotations). When paired with =vertico= and =consult=, it transforms a simple list of strings into a deeply informative dashboard, showing file sizes, modification dates, command keybindings, and variable types directly in the completion UI.
-
-1. *Absolute Timestamps for Developer Precision:*
-   By default, Marginalia uses relative time for recent files (e.g., '2 hours ago', '3 days ago'). We set 'marginalia-max-relative-age' to '0'. This forces Marginalia to always display exact, absolute timestamps (e.g., '2026-07-04 14:30'). Relative timestamps are ambiguous; absolute timestamps provide the mathematical precision required when scanning recent files or buffer lists to determine exactly when a file was last touched.
-
-2. *Right-Edge Alignment:*
-   We set 'marginalia-align' to 'right'. This keeps the primary candidate names (file names, command names) strictly left-aligned for fast vertical scanning, while pushing the secondary metadata (file sizes, dates, docstrings) to the far right edge of the minibuffer. This creates a clean, tabular-like UI that prevents long annotations from visually colliding with the candidate names.
-
 #+begin_src emacs-lisp
 (use-package marginalia
   ;; Enable Marginalia globally on startup.
@@ -4662,23 +4656,6 @@ Adds Nerd Font icons to minibuffer completion candidates. We hook it directly in
 #+end_src
 
 ** TODO Consult
-=consult= provides search and navigation commands built on Emacs' native =completing-read= API. It replaces standard Emacs commands with asynchronous, interactive, and preview-enabled alternatives. This configuration strictly integrates =consult= with =persp-mode= for workspace isolation and =projectile= for project root detection, while optimizing the preview engine for performance and visual clarity.
-
-1. *Strict Projectile Reliance:*
-   By default, =consult= falls back to Emacs' native =project.el= to detect project roots. We explicitly override =consult-project-function= to rely solely on =projectile-project-root=. This ensures that =consult-ripgrep= and =consult-find= strictly respect Projectile's known projects and caching mechanisms, preventing accidental searches in random =.git= directories outside of your workflow.
-
-2. *Vim-Style Line Search:*
-   We set =consult-line-start-from-top= to =t=. By default, =consult-line= only shows matches below the current cursor position. Setting this to =t= forces it to search the entire buffer from top to bottom (mimicking Vim's =/= search behavior), while still intelligently highlighting the match closest to your cursor as the default selection.
-
-3. *Hidden Files & Git Exclusion:*
-   We configure =consult-ripgrep-args= and =consult-fd-args= to include the =--hidden= flag, allowing you to search configuration files (like =.env=, =.github/=, =.gitignore=). Crucially, we append =--glob '!.git'= (for ripgrep) and =--exclude .git= (for fd) to strictly ignore the massive =.git/objects= directory, preventing your async searches from freezing. We also dynamically link =consult-fd= to the exact =fd= or =fdfind= executable you already detected in your Projectile configuration.
-
-4. *Live Preview Font-Locking:*
-   When scrolling through =consult-ripgrep= or =consult-line= candidates, Consult temporarily loads the file to show a live preview. We add =hl-todo-mode= to =consult-preview-allowed-hooks= so your =TODO=, =FIXME=, and =HACK= tags remain beautifully color-coded during the preview. This is mathematically safe because Consult's internal =consult-fontify-max-size= (default 1MB) automatically disables font-lock for massive files, preventing any CPU stuttering.
-
-5. *Persp-Mode Buffer Isolation:*
-   We completely replace the default =consult-buffer-sources= list with a custom =consult--source-persp-file-visiting-buffer= source. This guarantees that =consult-buffer= strictly shows file-visiting buffers from your current =persp-mode= workspace, alongside recent files and bookmarks. We include a safe =let= guard to prevent fatal =wrong-type-argument= crashes when querying buffers from the global =nil= ("main") perspective.
-
 #+begin_src emacs-lisp
 (use-package consult
   :bind (;; Buffer switching
@@ -4960,16 +4937,7 @@ Adds Nerd Font icons to minibuffer completion candidates. We hook it directly in
 #+end_src
 
 ** TODO Basic Completion
-This subsection configures the foundational, native Emacs completion variables found in =simple.el= and =minibuffer.el=. While packages like =corfu= and =vertico= provide the visual UI, they ultimately rely on these core Emacs settings to dictate when and how the underlying completion engine is triggered.
 
-1. *The Indent-Then-Complete Paradigm (=tab-always-indent=):*
-By setting =tab-always-indent= to ='complete=, the =TAB= key adopts a dual-role behavior. If the code is not properly indented, =TAB= indents it. If the code is already indented, =TAB= triggers =completion-at-point=, summoning the Corfu popup. This creates a seamless, context-aware workflow where indentation and code completion share a single keystroke.
-
-2. *Dictionary Spam Prevention (=text-mode-ispell-word-completion=):*
-By default, Emacs binds =M-TAB= (and sometimes =TAB= in text modes) to =ispell-complete-word=, which triggers a synchronous dictionary lookup. In modern workflows utilizing asynchronous Capfs (Completion at Point Functions) like =cape-dict= or LSP servers, this legacy behavior causes UI stuttering and unwanted dictionary popups. Setting this to =nil= disables the legacy Ispell integration.
-
-3. *Context-Aware =M-x= Decluttering (=read-extended-command-predicate=):*
-The =M-x= (=execute-extended-command=) menu often contains hundreds of commands that are entirely irrelevant to the current major mode (e.g., =magit-status= in a Python buffer). By setting the predicate to =#'command-completion-default-include-p=, Emacs filters the =M-x= candidate list to only show commands that explicitly declare compatibility with the current buffer's major mode, drastically reducing visual noise.
 #+begin_src emacs-lisp
 (use-package emacs
   :ensure nil
@@ -4993,12 +4961,6 @@ The =M-x= (=execute-extended-command=) menu often contains hundreds of commands 
 #+end_src
 
 ** TODO Nerd Icons Corfu
-=corfu= intentionally omits native icon rendering to maintain its minimalistic, high-performance footprint. Instead, it exposes a margin-formatter API (=corfu-margin-formatters=) that allows external packages to inject visual glyphs into the completion popup.
-
-=nerd-icons-corfu= bridges this gap by mapping LSP and Tree-sitter completion categories (e.g., variables, functions, classes, snippets) to their corresponding Nerd Font glyphs. This creates visual parity with the minibuffer, where =nerd-icons-completion= renders identical icons next to =vertico= candidates.
-
-*Load-Order Physics:* The formatter function (=#'nerd-icons-corfu-formatter=) must be registered in the =:init= block. If deferred to =:config=, the registration will occur after Corfu has already initialized its rendering engine, causing the first few completion popups to render without icons until the internal cache is invalidated.
-
 #+begin_src emacs-lisp
 (use-package nerd-icons-corfu
   :after corfu
@@ -5010,29 +4972,6 @@ The =M-x= (=execute-extended-command=) menu often contains hundreds of commands 
 #+end_src
 
 ** TODO Cape
-=cape= (Completion At Point Extensions) provides a suite of modular Completion at Point Functions (Capfs) and transformer utilities. It acts as the backend engine for =corfu=, supplying candidates from diverse sources like file paths, dictionary words, shell history, and buffer text.
-
-This configuration strictly implements a /Lean Pipeline Architecture/ optimized for a heavy IDE workflow (Python, C/C++, Rust, Web Dev, and Bash). The =completion-at-point-functions= hook is evaluated by Emacs on almost every keystroke. Adding heavy or overly aggressive Capfs to this global hook causes micro-stutters and completion boundary shadowing (where the first Capf to return a candidate halts the engine, hiding subsequent candidates).
-
-1. *The Lean Global Pipeline (Defensive Boundary Guards):*
-Only lightweight Capfs with strict internal boundary guards are added to the global hook:
-- =cape-elisp-block=: Natively handles Elisp completion inside Org and Markdown source blocks with zero overhead outside of them.
-- =cape-file=: Wrapped in =cape-capf-inside-string=. This mathematically restricts file path completion to trigger /only/ when the cursor is inside a string literal. This is critical for Python, C/C++, Rust, and Web Dev, preventing =cape-file= from aggressively hijacking the completion boundary when typing standard code operators like division (=/=), regex, or object access (=.=).
-- =cape-dabbrev=: Wrapped in =cape-capf-prefix-length= with a minimum threshold of 2 characters. This prevents Dabbrev from scanning all open buffers and spamming the UI when only a single character has been typed.
-
-2. *The Bash/Shell Hybrid Approach:*
-While string-literal restriction is mathematically perfect for compiled and interpreted programming languages, shell scripts (Bash) frequently utilize unquoted file paths (e.g., =cp src/ dest/=). To support this without polluting the global pipeline, the unwrapped =cape-file= Capf is injected exclusively into the buffer-local hooks of =sh-mode= and =bash-ts-mode=.
-
-3. *Context-Specific Local Hooks (=cape-history=):*
-=cape-history= is computationally expensive and only relevant in environments with an active history ring. It is strictly relegated to =comint-mode-hook= (powering history completion for inferior Python, Rust, and Node REPLs) and =minibuffer-setup-hook=.
-
-4. *On-Demand Specialized Capfs (=cape-prefix-map=):*
-Heavy or highly specific Capfs (=cape-line=, =cape-emoji=, =cape-dict=, =cape-keyword=, =cape-tex=) are completely removed from the automatic global pipeline. They are exposed on-demand via the =cape-prefix-map= bound to =C-c p=, guaranteeing zero typing stutter while providing instant mnemonic access to the entire Cape arsenal.
-
-5. *LSP & Comint Merging Engine (=cape-wrap-nonexclusive= & =cape-wrap-noninterruptible=):*
-By default, Emacs Capfs are exclusive (the first to return wins) and interruptible (aborted if the user types during computation). LSP network requests are inherently slow.
-- =cape-wrap-noninterruptible= shields =lsp-completion-at-point= from =quit= signals triggered by =input-pending-p=, forcing the main thread to wait for the network payload and preventing the "stutter-and-vanish" popup bug.
-- =cape-wrap-nonexclusive= tells the completion engine to accept LSP/Comint results but continue evaluating the rest of the Capf list, merging network candidates with local Dabbrev and File candidates into a single, unified Corfu popup.
 #+begin_src emacs-lisp
 (use-package cape
   ;; Bind prefix keymap providing all Cape commands under a mnemonic key.
@@ -5110,22 +5049,6 @@ By default, Emacs Capfs are exclusive (the first to return wins) and interruptib
 #+end_src
 
 ** TODO Dabbrev
-=dabbrev= (Dynamic Abbreviation) provides native, buffer-scanning word completion. While modern setups often rely on =cape-dabbrev= for asynchronous integration with the Corfu UI, the underlying =dabbrev= engine must be rigorously configured to prevent main-thread freezing, secure sensitive credentials, and eliminate noise pollution from machine-generated buffers.
-
-1. *Defensive Buffer Sizing & Scanning Limits:*
-The custom =ar/dabbrev-friend-buffer-p= function prevents =dabbrev= from freezing the main thread when it attempts to scan massive buffers like minified JSON, huge log files, or compiled artifacts. A strict =buffer-live-p= guard is mathematically required to prevent =wrong-type-argument= crashes during asynchronous buffer killing or garbage collection cycles.
-
-2. *Security & Noise Pollution Safeguards:*
-By default, =dabbrev= scans all open buffers for word matches. If an =authinfo= or =.netrc= file is open, plaintext passwords and API tokens will silently leak into the Corfu completion popup. =authinfo-mode= is explicitly added to the ignored modes list to guarantee credential isolation. Additionally, machine-generated output buffers (=compilation-mode=, =magit-status-mode=, =magit-log-mode=, and the catch-all =special-mode=) are excluded to prevent garbage text (e.g., =warning:=, =commit=) from polluting the candidate list.
-
-3. *Corfu Synergy (Keybinding Inversion):*
-The legacy Emacs binding for =M-/ = is =dabbrev-expand=, which blindly inserts the first matching word inline, bypassing the Corfu UI and Orderless filtering. The bindings are swapped: =M-/ = is mapped to =dabbrev-completion= (summoning the Corfu popup), while =C-M-/ = falls back to the legacy inline =dabbrev-expand= for instant insertion.
-
-4. *Cross-Buffer Scanning Parity:*
-=dabbrev-check-other-buffers= is explicitly set to =t=. This guarantees that native =M-/ = behavior perfectly mirrors the =cape-dabbrev= Capf configured in the Cape subsection, allowing both engines to scan adjacent and project buffers for word matches.
-
-5. *Case-Sensitivity Preservation:*
-=dabbrev-upcase-means-case-search= is set to =t=. This ensures that typing an uppercase letter forces =dabbrev= to only match uppercase candidates, preserving case-sensitivity when explicitly requested.
 #+begin_src emacs-lisp
 (defcustom ar/dabbrev-buffer-scanning-size-limit (* 1 1024 1024) ; 1 MB
   "Size limit in characters for a buffer to be scanned by `cape-dabbrev'/`dabbrev'."
