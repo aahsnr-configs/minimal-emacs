@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.21
+#+VERSION: 0.22
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -1480,51 +1480,46 @@ Delegates hardware input to =ultra-scroll= and keyboard interpolation to =good-s
 
 
 
-** TODO Tree-sitter
-Provides advanced syntax highlighting and code navigation by managing language definitions.
+** DONE Tree-sitter
+Downloads language parsers that power code coloring and structural navigation.
 #+begin_src emacs-lisp
 (use-package treesit
   :ensure nil
   :if (treesit-available-p)
-  :mode (("\\.tsx\\'" . tsx-ts-mode))
-  :init
-  ;; Stores downloaded language definitions in the designated cache directory.
+  :preface
+  ;; Must precede :custom (load-order constraint).
   (defvar ar/treesit-grammar-dir
     (no-littering-expand-var-file-name "tree-sitter/")
     "Target directory for compiled tree-sitter grammars.")
-  ;; Ensures the directory exists before downloading definitions.
+  :init
+  ;; Ensures the grammar directory exists before any download occurs.
   (unless (file-exists-p ar/treesit-grammar-dir)
     (make-directory ar/treesit-grammar-dir t))
   :custom
-  ;; Directs the grammar loader to the designated cache directory.
+  ;; First directory is the default install target for auto-installation.
   (treesit-extra-load-path (list ar/treesit-grammar-dir))
-  ;; Enables automatic downloading of missing language definitions.
-  (treesit-auto-install-grammar t)
-  ;; Automatically uses advanced modes for supported file types.
+  ;; Silently installs missing grammars without prompting.
+  (treesit-auto-install-grammar 'always)
+  ;; Routes all supported file types to their tree-sitter modes.
   (treesit-enabled-modes t)
   :config
-  ;; Enables the highest level of syntax highlighting detail.
+  ;; Maximum syntax highlighting detail level.
   (setq treesit-font-lock-level 4)
-  ;; Registers official grammar repositories for automatic downloading.
+  ;; Registers non-built-in grammar sources (Emacs 31 ships typescript, toml, yaml, dockerfile, rust).
   (dolist (source '((python "https://github.com/tree-sitter/tree-sitter-python")
                     (bash "https://github.com/tree-sitter/tree-sitter-bash")
                     (c "https://github.com/tree-sitter/tree-sitter-c")
                     (cpp "https://github.com/tree-sitter/tree-sitter-cpp")
                     (css "https://github.com/tree-sitter/tree-sitter-css")
-                    (dockerfile "https://github.com/camdencheek/tree-sitter-dockerfile")
                     (html "https://github.com/tree-sitter/tree-sitter-html")
                     (json "https://github.com/tree-sitter/tree-sitter-json")
                     (latex "https://github.com/latex-lsp/tree-sitter-latex")
                     (bibtex "https://github.com/latex-lsp/tree-sitter-bibtex")
                     (nix "https://github.com/nix-community/tree-sitter-nix")
-                    (yaml "https://github.com/tree-sitter-grammars/tree-sitter-yaml")
-                    (toml "https://github.com/tree-sitter-grammars/tree-sitter-toml")
                     (java "https://github.com/tree-sitter/tree-sitter-java")
                     (make "https://github.com/tree-sitter-grammars/tree-sitter-make")
-                    (awk "https://github.com/Beaglefoot/tree-sitter-awk")
-                    (org "https://github.com/milisims/tree-sitter-org")
-                    (typescript "https://github.com/tree-sitter/tree-sitter-typescript" "master" "typescript/src")
-                    (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "master" "tsx/src")))
+                    (awk "https://github.com/BeagleFoot/tree-sitter-awk")
+                    (org "https://github.com/milisims/tree-sitter-org")))
     (setf (alist-get (car source) treesit-language-source-alist) (cdr source))))
 #+end_src
 
@@ -2004,50 +1999,58 @@ Folds code blocks in languages lacking Tree-sitter grammars using Emacs 31 nativ
 #+end_src
 
 
-** TODO Treesit-Fold
-- [ ] Optimize for emacs 31
+** DONE Treesit-Fold
+Folds code regions at the cursor using language-aware structure detection.
 #+begin_src emacs-lisp
 (use-package treesit-fold
   :if (treesit-available-p)
-  :defer t
-  :hook ((prog-mode text-mode conf-mode) . ar/treesit-fold-maybe-enable)
-  :init
-  ;; Guards activation against Lisp modes to prevent missing grammar warnings, strictly enforcing the "Non-Lisp AST Stack" architectural boundary.
-  (defun ar/treesit-fold-maybe-enable ()
-    (unless (derived-mode-p 'lisp-mode 'emacs-lisp-mode 'lisp-interaction-mode 'lisp-data-mode)
-      (treesit-fold-mode 1)))
+  :custom
+  ;; Shows first line of folded comments/docstrings inline.
+  (treesit-fold-summary-show t)
+  ;; Displays hidden line count next to the ellipsis.
+  (treesit-fold-line-count-show t)
   :config
-  (global-treesit-fold-indicators-mode 1)
-  ;; Lower priority prevents fringe indicator collisions with diff-hl/flymake.
-  (setq treesit-fold-indicators-priority -1)
+  ;; Excludes Lisp modes (no tree-sitter grammar in this config).
+  (define-advice treesit-fold-mode (:before-while (&optional arg) guard-lisp-modes)
+    (or (and arg (< (prefix-numeric-value arg) 1))
+        (not (derived-mode-p 'lisp-mode 'emacs-lisp-mode
+                             'lisp-interaction-mode 'lisp-data-mode))))
   ;; Aborts activation in massive buffers to prevent main-thread freezing.
   (define-advice treesit-fold-mode (:before-while (&optional arg) guard-large-files)
     (or (and arg (< (prefix-numeric-value arg) 1))
-        (not (too-long-file-p)))))
+        (not (too-long-file-p))))
+  ;; Enables per-node folding in all tree-sitter supported modes.
+  (global-treesit-fold-mode 1))
 #+end_src
 
 
 ** TODO Vimish Fold
+Folds manually selected text regions with persistent storage across sessions.
 #+begin_src emacs-lisp
 (use-package vimish-fold
   :defer t
-  :after evil
-  :init
-  (setq vimish-fold-dir (no-littering-expand-var-file-name "vimish-fold/")
-        vimish-fold-indication-mode 'right-fringe)
+  :custom
+  ;; Routes fold persistence to the no-littering var directory.
+  (vimish-fold-dir (no-littering-expand-var-file-name "vimish-fold/"))
+  ;; Places fold indicators in the right fringe to avoid left-fringe conflicts.
+  (vimish-fold-indication-mode 'right-fringe)
   :config
+  ;; Aborts activation in massive buffers to prevent main-thread freezing.
+  (define-advice vimish-fold-mode (:before-while (&optional arg) guard-large-files)
+    (or (and arg (< (prefix-numeric-value arg) 1))
+        (not (too-long-file-p))))
   (vimish-fold-global-mode 1))
 
 (use-package evil-vimish-fold
-  :defer t
   :after vimish-fold
   :init
-  (setq evil-vimish-fold-mode-lighter " ↴"
-        evil-vimish-fold-target-modes '(prog-mode conf-mode text-mode))
+  ;; Matches the Global Ellipsis character for visual consistency.
+  (setq evil-vimish-fold-mode-lighter " ↴")
+  ;; Enables manual region folding in code, config, and prose buffers.
+  (setq evil-vimish-fold-target-modes '(prog-mode conf-mode text-mode))
   :config
   (global-evil-vimish-fold-mode 1))
 #+end_src
-
 
 ** DONE Folding Keybindings
 #+begin_src emacs-lisp
