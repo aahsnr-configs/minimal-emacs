@@ -3057,19 +3057,18 @@ Checks spelling as you type and highlights words that need correction.
   (global-jinx-mode 1))
 #+end_src
 
-** TODO Helpful
-- [ ] How does doom emacs configure the helpful package and what keybinding does doom emacs have?
-- [ ] It must integrate with the main development tools sections
-- [ ] Revisit it again after writing development tools
+
+** DONE Helpful
+Shows rich documentation with source code, callers, and keybindings for any symbol.
 #+begin_src emacs-lisp
 (use-package helpful
-  :defer t
   :commands (helpful-callable
              helpful-variable
              helpful-key
              helpful-command
              helpful-at-point
-             helpful-function)
+             helpful-function
+             helpful-symbol)
   :bind
   ([remap describe-command] . helpful-command)
   ([remap describe-function] . helpful-callable)
@@ -3077,7 +3076,10 @@ Checks spelling as you type and highlights words that need correction.
   ([remap describe-symbol] . helpful-symbol)
   ([remap describe-variable] . helpful-variable)
   :custom
-  (helpful-max-buffers 7))
+  ;; Limits open helpful buffers; kills least-recently-used beyond this count.
+  (helpful-max-buffers 7)
+  ;; Makes apropos search all symbols, not just user-facing ones.
+  (apropos-do-all t))
 #+end_src
 
 
@@ -3085,6 +3087,7 @@ Checks spelling as you type and highlights words that need correction.
 - [ ] List all the features and functionalities of ediff
 - [ ] I also need to know the evil style keybindings for ediff that exists in evil collection. evil-ediff has been integrated into evil collection package
 - [ ] I also need to know the correct format for how to add commands to :commands()
+
 #+begin_src emacs-lisp
 (use-package ediff
   :ensure nil
@@ -3211,6 +3214,8 @@ and sets up vim-style navigation."
             (lambda ()
               (select-window (get-buffer-window ediff-control-buffer)))))
 #+end_src
+
+#+RESULTS:
 
 
 ** TODO Woman
@@ -7451,6 +7456,7 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
 
 
 ** TODO Transient Menu
+Provides a centralized dashboard for code actions, navigation, diagnostics, folding, and documentation lookup.
 #+begin_src emacs-lisp
 (with-eval-after-load 'transient
   (defun ar/devtools-title ()
@@ -7459,12 +7465,9 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
          (nerd-icons-faicon "nf-fa-laptop_code" :face 'transient-heading :v-adjust 0.02)
        "")
      (propertize " Development Tools" 'face 'transient-heading)))
-
   (transient-define-prefix ar/toggles-devtools ()
     "Development Tools Dashboard"
     [:description ar/devtools-title
-
-     ;; Group 1: LSP Code Actions
      ["Actions"
       ("a" "Code Action" eglot-code-actions)
       ("r" "Rename Symb" eglot-rename)
@@ -7472,8 +7475,6 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
       ("i" "Org Imports" eglot-code-action-organize-imports)
       ("h" "Toggle Hint" eglot-inlay-hints-mode :transient t :if (lambda () (fboundp 'eglot-inlay-hints-mode)))
       ("R" "Reconn LSP" eglot-reconnect)]
-
-     ;; Group 2: Navigation & Lookup
      ["Navigate"
       ("d" "Define" xref-find-definitions)
       ("D" "Refer" xref-find-references)
@@ -7481,40 +7482,31 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
       ("I" "Implem" eglot-find-implementation)
       ("A" "Apropos" xref-find-apropos)
       ("." "Go Back" xref-go-back)]
-
-     ;; Group 3: Search & Outline
      ["Search"
       ("s" "LSP Symbols" consult-eglot-symbols)
       ("o" "Outline" consult-outline)
       ("m" "Imenu" consult-imenu)
       ("M" "Imenu Multi" consult-imenu-multi)
       ("l" "Search Line" consult-line)]
-
-     ;; Group 4: Error Management
      ["Diagn"
       ("n" "Next Err" ar/flymake-next-error :transient t)
       ("p" "Prev Err" ar/flymake-prev-error :transient t)
       ("e" "Buf Err" flymake-show-buffer-diagnostics)
       ("E" "Proj Err" consult-flymake)
       ("!" "Check" flymake-start :transient t)]
-
-     ;; Group 5: Code Folding
      ["Folding"
       ("TAB" "Toggle" treesit-fold-toggle :transient t)
       ("O" "Open All" treesit-fold-open-all :transient t)
       ("C" "Close All" treesit-fold-close-all :transient t)
       ("v" "Vim Toggle" vimish-fold-toggle :transient t)]
-
-     ;; Group 6: Documentation
      ["Docs"
+      ("h" "Helpful at point" helpful-at-point)
       ("k" "Hover Box" eldoc-box-help-at-point :transient t)
       ("K" "Echo Doc" eldoc)
       ("?" "Info Man" consult-info)
       ("M" "Man Page" woman)
       ("<escape>" "" transient-quit-one :format " ")]]))
 #+end_src
-
-
 
 
 * DONE Contextual Sidebars
