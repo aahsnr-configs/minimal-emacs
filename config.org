@@ -974,10 +974,10 @@ Configures global typography, baseline monospaced faces, fontset fallback regist
 #+begin_src emacs-lisp
 (defun ar/setup-fonts ()
   "Apply global typography, baseline faces, and fontset fallbacks to the current frame."
-  (set-face-attribute 'default nil :font "JetBrainsMono Nerd Font" :height 125 :weight 'medium)
-  (set-face-attribute 'fixed-pitch nil :font "JetBrainsMono Nerd Font" :height 125 :weight 'medium)
+  (set-face-attribute 'default nil :font "JetBrainsMono Nerd Font" :height 123 :weight 'medium)
+  (set-face-attribute 'fixed-pitch nil :font "JetBrainsMono Nerd Font" :height 123 :weight 'medium)
   ;; Maps variable-pitch to monospaced to preserve Org-mode table alignment.
-  (set-face-attribute 'variable-pitch nil :font "JetBrainsMono Nerd Font" :height 125 :weight 'medium)
+  (set-face-attribute 'variable-pitch nil :font "JetBrainsMono Nerd Font" :height 123 :weight 'medium)
   ;; Pre-register Noto Sans for Unicode blocks used by org-modern-replace-stars.
    (set-fontset-font t '(#x25A0 . #x25FF) "Noto Sans")  ; Geometric Shapes (◉ ○ ◇ ▷)
   (set-fontset-font t '(#x2600 . #x26FF) "Noto Sans")  ; Miscellaneous Symbols
@@ -3149,7 +3149,6 @@ Extracts system =manpath= directories to guarantee native Emacs =woman= can loca
 
 
 * TODO Workflow Management
-- [ ] Must revisit dired and dirvish workflows
 
 ** DONE Dired
 Provides a visual directory editor and file manager for navigating the filesystem, copying, moving, and deleting files.
@@ -5064,7 +5063,6 @@ Defines base directories and bootstrap utilities.
     full-path))
 #+end_src
 
-
 *** Denote Library Scaffolding
 Creates note-taking folders and isolates them with local configuration files.
 #+begin_src emacs-lisp
@@ -5460,7 +5458,6 @@ Configures the task overview display, sorting, and window behavior.
 Groups agenda items into labeled sections by urgency, context, and status.
 #+begin_src emacs-lisp
 (use-package org-super-agenda
-  :defer t
   :after org-agenda
   :hook (org-agenda-mode . (lambda () (org-super-agenda-mode 1)))
   :custom
@@ -5475,7 +5472,7 @@ Groups agenda items into labeled sections by urgency, context, and status.
   (org-super-agenda-date-format "%A, %B %d")
   :config
   (set-face-attribute 'org-super-agenda-header nil
-    :inherit 'font-lock-keyword-face :weight 'bold :height 1.05)
+                      :inherit 'font-lock-keyword-face :weight 'bold :height 1.05)
 
   (defun ar/org-super-agenda-toggle-group ()
     "Toggle visibility of the current agenda group at point."
@@ -5521,11 +5518,11 @@ Groups agenda items into labeled sections by urgency, context, and status.
                  (user-error "Empty group")))))
 
   (define-key org-super-agenda-header-map (kbd "TAB")
-    #'ar/org-super-agenda-toggle-group)
+              #'ar/org-super-agenda-toggle-group)
   (define-key org-super-agenda-header-map (kbd "RET")
-    #'ar/org-super-agenda-goto-first-item)
+              #'ar/org-super-agenda-goto-first-item)
   (define-key org-super-agenda-header-map (kbd "q")
-    #'org-agenda-quit)
+              #'org-agenda-quit)
 
   ;; :log closed MUST precede :discard; both match DONE items and
   ;; first-match-wins would otherwise empty the Completed group.
@@ -5595,10 +5592,10 @@ Groups agenda items into labeled sections by urgency, context, and status.
            :deadline (before "+7d")
            :order 12)
           (:name ,(concat (nerd-icons-octicon "nf-oct-kebab_horizontal"
-                                          :v-adjust 0.02)
+                                              :v-adjust 0.02)
                           " Other Tasks")
-           :take (15 (:anything t))
-           :order 99))))
+                 :take (15 (:anything t))
+                 :order 99))))
 #+end_src
 
 
@@ -5639,31 +5636,31 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
                       " @Computer")
        :and (:tag "@computer" :todo ("NEXT" "TODO"))
        :transformer (string-remove-prefix "NEXT "
-                      (string-remove-prefix "TODO " it))
+                                          (string-remove-prefix "TODO " it))
        :order 6)
       (:name ,(concat (nerd-icons-faicon "nf-fa-home" :v-adjust 0.02)
                       " @Home")
        :and (:tag "@home" :todo ("NEXT" "TODO"))
        :transformer (string-remove-prefix "NEXT "
-                      (string-remove-prefix "TODO " it))
+                                          (string-remove-prefix "TODO " it))
        :order 7)
       (:name ,(concat (nerd-icons-faicon "nf-fa-car" :v-adjust 0.02)
                       " @Errands")
        :and (:tag "@errands" :todo ("NEXT" "TODO"))
        :transformer (string-remove-prefix "NEXT "
-                      (string-remove-prefix "TODO " it))
+                                          (string-remove-prefix "TODO " it))
        :order 8)
       (:name ,(concat (nerd-icons-faicon "nf-fa-phone" :v-adjust 0.02)
                       " @Phone")
        :and (:tag "@phone" :todo ("NEXT" "TODO"))
        :transformer (string-remove-prefix "NEXT "
-                      (string-remove-prefix "TODO " it))
+                                          (string-remove-prefix "TODO " it))
        :order 9)
       (:name ,(concat (nerd-icons-faicon "nf-fa-brain" :v-adjust 0.02)
                       " @Deep Work")
        :and (:tag "@deep_work" :todo ("NEXT" "TODO"))
        :transformer (string-remove-prefix "NEXT "
-                      (string-remove-prefix "TODO " it))
+                                          (string-remove-prefix "TODO " it))
        :order 10)
       (:name ,(concat (nerd-icons-faicon "nf-fa-hourglass_half" :v-adjust 0.02)
                       " Waiting For")
@@ -5686,10 +5683,10 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
        :auto-parent t
        :order 15)
       (:name ,(concat (nerd-icons-octicon "nf-oct-kebab_horizontal"
-                                           :v-adjust 0.02)
+                                          :v-adjust 0.02)
                       " Other Tasks")
-       :take (15 :anything t)
-       :order 99))
+	     :take (15 :anything t)
+	     :order 99))
     "Groups for the Daily Dashboard command.")
 
   (defvar ar/org-sa-weekly-groups
@@ -5711,10 +5708,10 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
        :tag "someday"
        :order 4)
       (:name ,(concat (nerd-icons-octicon "nf-oct-kebab_horizontal"
-                                           :v-adjust 0.02)
+                                          :v-adjust 0.02)
                       " Everything Else")
-       :anything t
-       :order 99))
+	     :anything t
+	     :order 99))
     "Groups for the Weekly Review command.")
 
   (defvar ar/org-sa-effort-groups
@@ -5732,17 +5729,17 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
        :order 3)
       (:name ,(concat (nerd-icons-faicon "nf-fa-clock" :v-adjust 0.02)
                       " Medium (15–60 min)")
-       :and (:not (:effort< "0:15")) (:not (:effort> "1:00")))
+       :and ((:not (:effort< "0:15")) (:not (:effort> "1:00")))
        :order 4)
       (:name ,(concat (nerd-icons-faicon "nf-fa-brain" :v-adjust 0.02)
                       " Deep Work (> 1 hr)")
        :effort> "1:00"
        :order 5)
       (:name ,(concat (nerd-icons-octicon "nf-oct-kebab_horizontal"
-                                           :v-adjust 0.02)
+                                          :v-adjust 0.02)
                       " No Estimate")
-       :anything t
-       :order 99))
+	     :anything t
+	     :order 99))
     "Groups for the Effort-Based command.")
 
   (defvar ar/org-sa-accomplishments-groups
@@ -5770,44 +5767,44 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
        :auto-parent t
        :order 2)
       (:name ,(concat (nerd-icons-octicon "nf-oct-kebab_horizontal"
-                                           :v-adjust 0.02)
+                                          :v-adjust 0.02)
                       " Ungrouped")
-       :anything t
-       :order 99))
+	     :anything t
+	     :order 99))
     "Groups for the Project Status command.")
 
   (setq org-agenda-custom-commands
-    `(("d" "Daily Dashboard"
-       ((agenda ""
-                ((org-agenda-overriding-header "")
-                 (org-agenda-span 'day)
-                 (org-agenda-start-day "0d")
-                 (org-agenda-start-with-log-mode t)
-                 (org-super-agenda-groups ,ar/org-sa-daily-groups)))))
-      ("w" "Weekly Review"
-       ((agenda ""
-                ((org-agenda-overriding-header "")
-                 (org-agenda-span 'week)
-                 (org-agenda-start-day "-1d")
-                 (org-agenda-start-with-log-mode t)
-                 (org-super-agenda-groups ,ar/org-sa-weekly-groups)))))
-      ("e" "Effort-Based View"
-       ((alltodo ""
-                 ((org-agenda-overriding-header "")
-                  (org-super-agenda-groups ,ar/org-sa-effort-groups)))))
-      ("A" "Accomplishments (Today)"
-       ((agenda ""
-                ((org-agenda-overriding-header "")
-                 (org-agenda-span 'day)
-                 (org-agenda-start-day "0d")
-                 (org-agenda-start-with-log-mode t)
-                 (org-super-agenda-groups ,ar/org-sa-accomplishments-groups)))))
-      ("p" "Project Status"
-       ((agenda ""
-                ((org-agenda-overriding-header "")
-                 (org-agenda-span 'day)
-                 (org-agenda-start-day "0d")
-                 (org-super-agenda-groups ,ar/org-sa-project-groups))))))))
+        `(("d" "Daily Dashboard"
+           ((agenda ""
+                    ((org-agenda-overriding-header "")
+                     (org-agenda-span 'day)
+                     (org-agenda-start-day "0d")
+                     (org-agenda-start-with-log-mode t)
+                     (org-super-agenda-groups ,ar/org-sa-daily-groups)))))
+          ("w" "Weekly Review"
+           ((agenda ""
+                    ((org-agenda-overriding-header "")
+                     (org-agenda-span 'week)
+                     (org-agenda-start-day "-1d")
+                     (org-agenda-start-with-log-mode t)
+                     (org-super-agenda-groups ,ar/org-sa-weekly-groups)))))
+          ("e" "Effort-Based View"
+           ((alltodo ""
+                     ((org-agenda-overriding-header "")
+                      (org-super-agenda-groups ,ar/org-sa-effort-groups)))))
+          ("A" "Accomplishments (Today)"
+           ((agenda ""
+                    ((org-agenda-overriding-header "")
+                     (org-agenda-span 'day)
+                     (org-agenda-start-day "0d")
+                     (org-agenda-start-with-log-mode t)
+                     (org-super-agenda-groups ,ar/org-sa-accomplishments-groups)))))
+          ("p" "Project Status"
+           ((agenda ""
+                    ((org-agenda-overriding-header "")
+                     (org-agenda-span 'day)
+                     (org-agenda-start-day "0d")
+                     (org-super-agenda-groups ,ar/org-sa-project-groups))))))))
 #+end_src
 
 
@@ -6040,6 +6037,7 @@ Tabulated-list interface for decluttered viewing, regex/keyword filtering, and e
 Consolidates fragmented notes by merging file contents or active regions while automatically rewiring the backlink graph.
 #+begin_src emacs-lisp
 (use-package denote-merge
+  :ensure(:host github :repo "protesilaos/denote-merge")
   :defer t
   :after denote
   :commands (denote-merge-file
@@ -7431,13 +7429,77 @@ Displays documentation in a floating popup window anchored to the cursor, strict
 #+end_src
 
 
-** TODO Flymake
+** DONE Flymake
+Native on-the-fly syntax checking and diagnostic aggregation with inline overlay rendering.
+#+begin_src emacs-lisp
+;; Foundational diagnostic aggregator and LSP payload router.
+(use-package flymake
+  :ensure nil
+  :custom
+  ;; Disable native EOL to prevent spatial stacking collisions with flyover.
+  (flymake-show-diagnostics-at-end-of-line nil)
+  (flymake-indicator-type 'fringes)
+  (flymake-fringe-indicator-position 'left-fringe)
+  (flymake-suppress-zero-counters t)
+  (flymake-wrap-around t)
+  ;; (flymake-indicator-type 'margins)
+  ;; (flymake-margin-indicators-string '((error "●" flymake-error-fringe)
+  ;;                                     (warning "▲" flymake-warning-fringe)
+  ;;                                     (note "■" flymake-note-fringe)))
+  :custom-face
+  (flymake-error ((t (:underline (:style line :color "#f7768e" :position t)))))
+  (flymake-warning ((t (:underline (:style line :color "#e0af68" :position t)))))
+  (flymake-note ((t (:underline (:style line :color "#7aa2f7" :position t)))))
+  (flymake-error-fringe ((t (:foreground "#f7768e"))))
+  (flymake-warning-fringe ((t (:foreground "#e0af68"))))
+  (flymake-note-fringe ((t (:foreground "#7aa2f7"))))
+  :config
+  (add-hook 'prog-mode-hook #'flymake-mode))
+
+;; Community-maintained diagnostic backends for stylistic linting.
+(use-package flymake-collection
+  :hook (elpaca-after-init . flymake-collection-hook-setup))
+
+;; Aesthetic inline overlay engine for diagnostic messages.
+(use-package flyover
+  :defer t
+  :after flymake
+  :hook (flymake-mode . flyover-mode)
+  :custom
+  (flyover-checkers '(flymake))
+  (flyover-levels '(error warning info))
+  :custom-face
+  (flyover-error ((t (:foreground "#f7768e" :background "#292e42" :height 0.9))))
+  (flyover-warning ((t (:foreground "#e0af68" :background "#292e42" :height 0.9))))
+  (flyover-info ((t (:foreground "#7aa2f7" :background "#292e42" :height 0.9)))))
+
+;; Project-wide diagnostic search wrapper for consult-flymake.
+(defun consult-flymake-project ()
+  "Invoke consult-flymake across all project buffers."
+  (interactive)
+  (consult-flymake t))
+#+end_src
+
+
+** TODO Xref
 #+begin_src emacs-lisp
 
 #+end_src
 
 
-** TODO Xref
+** TODO Nerd Icons Xref
+#+begin_src emacs-lisp
+
+#+end_src
+
+
+** TODO Xref Rst
+#+begin_src emacs-lisp
+
+#+end_src
+
+
+** TODO xref-union
 #+begin_src emacs-lisp
 
 #+end_src
@@ -7461,7 +7523,7 @@ Displays documentation in a floating popup window anchored to the cursor, strict
 #+end_src
 
 
-** TODO Auto-rename-tage
+** TODO Auto-rename-tags
 #+begin_src emacs-lisp
 
 #+end_src
@@ -7561,59 +7623,60 @@ Provides a centralized dashboard for code actions, navigation, diagnostics, fold
 Consolidated keybindings for Development Tools packages and commands only.
 #+begin_src emacs-lisp
 (ar/global-leader
-  "c"   '(:ignore t :wk "code")
-  "c ." '(ar/toggles-devtools :wk "Dev dashboard")
-  "c a" '(eglot-code-actions :wk "Code actions (lightbulb)")
-  "c i" '(eglot-code-action-organize-imports :wk "Organize imports")
-  "c x" '(eglot-execute-command :wk "Execute server command")
-  "c r" '(eglot-rename :wk "Rename symbol")
-  "c f" '(apheleia-format-buffer :wk "Format buffer (async)")
-  "c s" '(ar/ast-refactor-transient :wk "Structure refactor")
-  "c e" '(consult-flymake :wk "Search errors (buffer)")
-  "c E" '(consult-flymake-project :wk "Search errors (project)")
-  "c B" '(flymake-show-buffer-diagnostics :wk "Buffer diagnostics")
-  "c P" '(flymake-show-project-diagnostics :wk "Project diagnostics panel")
-  "c n" '(flymake-goto-next-error :wk "Next error")
-  "c p" '(flymake-goto-prev-error :wk "Prev error")
-  "c !" '(flymake-start :wk "Force recheck")
-  "c D" '(xref-find-references :wk "Find all references")
-  "c A" '(xref-find-apropos :wk "Apropos")
-  "c h" '(eglot-show-call-hierarchy :wk "Call hierarchy")
-  "c t" '(eglot-show-type-hierarchy :wk "Type hierarchy")
-  "c p" '(:ignore t :wk "peek")
-  "c p d" '(peek-xref-definition :wk "Peek definition")
-  "c p r" '(peek-xref-references :wk "Peek references")
-  "c p h" '(peek-overlay-dwim :wk "Hide peek")
-  "c g" '(:ignore t :wk "goto")
-  "c g d" '(xref-find-definitions :wk "Definition")
-  "c g D" '(eglot-find-declaration :wk "Declaration")
-  "c g t" '(eglot-find-typeDefinition :wk "Type Definition")
-  "c g i" '(eglot-find-implementation :wk "Implementation")
-  "c m" '(ar/eglot-moniker-at-point :wk "Inspect moniker")
-  "c M" '(ar/eglot-copy-moniker :wk "Copy moniker")
-  "c S" '(consult-eglot-symbols :wk "Document symbols (outline)")
-  "c H" '(eglot-inlay-hints-mode :wk "Toggle inlay hints")
-  "c T" '(eglot-semantic-tokens-mode :wk "Toggle semantic tokens"))
+ "c"   '(:ignore t :wk "code")
+ "c ." '(ar/toggles-devtools :wk "Dev dashboard")
+ "c a" '(eglot-code-actions :wk "Code actions (lightbulb)")
+ "c i" '(eglot-code-action-organize-imports :wk "Organize imports")
+ "c x" '(eglot-execute-command :wk "Execute server command")
+ "c r" '(eglot-rename :wk "Rename symbol")
+ "c f" '(apheleia-format-buffer :wk "Format buffer (async)")
+ "c s" '(ar/ast-refactor-transient :wk "Structure refactor")
+ "c e" '(consult-flymake :wk "Search errors (buffer)")
+ "c E" '(consult-flymake-project :wk "Search errors (project)")
+ "c B" '(flymake-show-buffer-diagnostics :wk "Buffer diagnostics")
+ "c P" '(flymake-show-project-diagnostics :wk "Project diagnostics panel")
+ "c n" '(flymake-goto-next-error :wk "Next error")
+ "c p" '(flymake-goto-prev-error :wk "Prev error")
+ "c !" '(flymake-start :wk "Force recheck")
+ "c o" '(flymake-collection-change-checker :wk "Change checker")
+ "c D" '(xref-find-references :wk "Find all references")
+ "c A" '(xref-find-apropos :wk "Apropos")
+ "c h" '(eglot-show-call-hierarchy :wk "Call hierarchy")
+ "c t" '(eglot-show-type-hierarchy :wk "Type hierarchy")
+ "c p" '(:ignore t :wk "peek")
+ "c p d" '(peek-xref-definition :wk "Peek definition")
+ "c p r" '(peek-xref-references :wk "Peek references")
+ "c p h" '(peek-overlay-dwim :wk "Hide peek")
+ "c g" '(:ignore t :wk "goto")
+ "c g d" '(xref-find-definitions :wk "Definition")
+ "c g D" '(eglot-find-declaration :wk "Declaration")
+ "c g t" '(eglot-find-typeDefinition :wk "Type Definition")
+ "c g i" '(eglot-find-implementation :wk "Implementation")
+ "c m" '(ar/eglot-moniker-at-point :wk "Inspect moniker")
+ "c M" '(ar/eglot-copy-moniker :wk "Copy moniker")
+ "c S" '(consult-eglot-symbols :wk "Document symbols (outline)")
+ "c H" '(eglot-inlay-hints-mode :wk "Toggle inlay hints")
+ "c T" '(eglot-semantic-tokens-mode :wk "Toggle semantic tokens"))
 
 (ar/global-leader
-  "f R" '(ar/eglot-rename-file :wk "Rename file (LSP aware)"))
+ "f R" '(ar/eglot-rename-file :wk "Rename file (LSP aware)"))
 
 (ar/global-leader
-  "s w" '(consult-eglot-symbols :wk "Workspace symbols (use C-u)"))
+ "s w" '(consult-eglot-symbols :wk "Workspace symbols (use C-u)"))
 
 (ar/global-leader
-  "x"   '(:ignore t :wk "execute/debug")
-  "x x" '(ar/toggles-dape :wk "Debug menu")
-  "x d" '(dape :wk "Start debugging")
-  "x b" '(dape-breakpoint-toggle :wk "Toggle breakpoint")
-  "x n" '(dape-next :wk "Next")
-  "x s" '(dape-step-in :wk "Step in")
-  "x o" '(dape-step-out :wk "Step out")
-  "x c" '(dape-continue :wk "Continue")
-  "x q" '(dape-quit :wk "Quit debugger")
-  "x k" '(dape-kill :wk "Kill debugger")
-  "x r" '(dape-restart :wk "Restart")
-  "x w" '(dape-watch-dwim :wk "Watch"))
+ "x"   '(:ignore t :wk "execute/debug")
+ "x x" '(ar/toggles-dape :wk "Debug menu")
+ "x d" '(dape :wk "Start debugging")
+ "x b" '(dape-breakpoint-toggle :wk "Toggle breakpoint")
+ "x n" '(dape-next :wk "Next")
+ "x s" '(dape-step-in :wk "Step in")
+ "x o" '(dape-step-out :wk "Step out")
+ "x c" '(dape-continue :wk "Continue")
+ "x q" '(dape-quit :wk "Quit debugger")
+ "x k" '(dape-kill :wk "Kill debugger")
+ "x r" '(dape-restart :wk "Restart")
+ "x w" '(dape-watch-dwim :wk "Watch"))
 
 (general-define-key
  :states 'motion
