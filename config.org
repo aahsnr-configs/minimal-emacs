@@ -974,10 +974,10 @@ Configures global typography, baseline monospaced faces, fontset fallback regist
 #+begin_src emacs-lisp
 (defun ar/setup-fonts ()
   "Apply global typography, baseline faces, and fontset fallbacks to the current frame."
-  (set-face-attribute 'default nil :font "JetBrainsMono Nerd Font" :height 123 :weight 'medium)
-  (set-face-attribute 'fixed-pitch nil :font "JetBrainsMono Nerd Font" :height 123 :weight 'medium)
+  (set-face-attribute 'default nil :font "JetBrains Mono" :height 123 :weight 'medium)
+  (set-face-attribute 'fixed-pitch nil :font "JetBrains Mono" :height 123 :weight 'medium)
   ;; Maps variable-pitch to monospaced to preserve Org-mode table alignment.
-  (set-face-attribute 'variable-pitch nil :font "JetBrainsMono Nerd Font" :height 123 :weight 'medium)
+  (set-face-attribute 'variable-pitch nil :font "JetBrains Mono" :height 123 :weight 'medium)
   ;; Pre-register Noto Sans for Unicode blocks used by org-modern-replace-stars.
    (set-fontset-font t '(#x25A0 . #x25FF) "Noto Sans")  ; Geometric Shapes (◉ ○ ◇ ▷)
   (set-fontset-font t '(#x2600 . #x26FF) "Noto Sans")  ; Miscellaneous Symbols
