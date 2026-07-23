@@ -7175,7 +7175,7 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
 
 
 * TODO Development Tools
-** TODO Eglot
+** DONE Eglot
 Connects Emacs to external language servers for smart code navigation, error checking, and refactoring.
 #+begin_src emacs-lisp
 (use-package eglot
@@ -7187,17 +7187,15 @@ Connects Emacs to external language servers for smart code navigation, error che
   ;; Terminate servers when the last managed buffer is killed to prevent zombie processes.
   (eglot-autoshutdown t)
   ;; Bypass whole-file/on-type formatting (delegated to apheleia/electric), color, and folding.
-  ;; Keeps :documentRangeFormattingProvider active for non-Python LSP fallbacks.
   (eglot-ignored-server-capabilities '(:documentFormattingProvider
                                        :documentOnTypeFormattingProvider
                                        :colorProvider
                                        :foldingRangeProvider))
-  ;; Render the code action indicator strictly in the margin to prevent echo-area noise.
+  ;; Render the code action indicators strictly in the margin to prevent echo-area noise.
   (eglot-code-action-indications '(margin))
   ;; Use a simple Unicode glyph to avoid emoji rendering glitches in TTY or tree-sitter modes.
   (eglot-code-action-indicator "⚡")
   ;; Prevent Eglot from configuring the forbidden company-mode ecosystem.
-  ;; yasnippet is intentionally omitted to preserve LSP snippet expansion via cape/corfu.
   (eglot-stay-out-of '("company"))
   ;; Always prompt with a summary before applying multi-file server edits.
   (eglot-confirm-server-edits 'summary)
@@ -7209,138 +7207,199 @@ Connects Emacs to external language servers for smart code navigation, error che
                 (eglot-inlay-hints-mode 1)
                 (eglot-semantic-tokens-mode 1))))
 
-  ;; LSP-Aware File Rename
-  ;; Sequences workspace/willRenameFiles, OS rename, and workspace/didRenameFiles.
+  ;; LSP-aware file rename sequencing will/didRenameFiles payloads.
   (defun ar/eglot-rename-file (new-name)
-    "Rename current file to NEW-NAME and notify the LSP server.
-Triggers `workspace/willRenameFiles' to update imports project-wide,
-performs the OS-level rename, then sends `workspace/didRenameFiles'."
+    "Rename current file to NEW-NAME and notify the LSP server."
     (interactive
      (list (read-file-name "Rename to: "
                            (file-name-directory (buffer-file-name))
                            (buffer-file-name))))
     (let* ((old-name (buffer-file-name))
-           (old-uri (eglot-path-to-uri old-name))
-           (new-uri (eglot-path-to-uri new-name))
            (server (eglot-current-server)))
+      (unless old-name
+        (user-error "Buffer is not visiting a file"))
       (unless server
         (user-error "No active Eglot server in this buffer"))
-      (let ((edits (eglot--request
-                    server
-                    :workspace/willRenameFiles
-                    `(:files [(:oldUri ,old-uri :newUri ,new-uri)]))))
-        (when edits
-          (eglot--apply-workspace-edit server edits 'ar/eglot-rename-file)))
-      (rename-file old-name new-name 1)
-      (set-visited-file-name new-name nil t)
-      (jsonrpc-notify server :workspace/didRenameFiles
-                      `(:files [(:oldUri ,old-uri :newUri ,new-uri)]))
-      (message "Renamed %s → %s and updated LSP references"
-               (file-name-nondirectory old-name)
-               (file-name-nondirectory new-name))))
+      (let* ((old-uri (eglot-path-to-uri old-name))
+             (new-uri (eglot-path-to-uri new-name))
+             (dir (file-name-directory new-name)))
+        (unless (file-directory-p dir)
+          (make-directory dir t))
+        (ignore-errors
+          (let ((edits (eglot--request
+                        server
+                        :workspace/willRenameFiles
+                        `(:files [(:oldUri ,old-uri :newUri ,new-uri)]))))
+            (when edits
+              (eglot--apply-workspace-edit server edits 'ar/eglot-rename-file))))
+        (rename-file old-name new-name 1)
+        (set-visited-file-name new-name nil t)
+        (jsonrpc-notify server :workspace/didRenameFiles
+                        `(:files [(:oldUri ,old-uri :newUri ,new-uri)]))
+        (message "Renamed %s → %s and updated LSP references"
+                 (file-name-nondirectory old-name)
+                 (file-name-nondirectory new-name)))))
 
-  ;; Moniker Inspection (LSP 3.16+ Cross-Repo Identity)
+  ;; Moniker inspection for LSP 3.16+ cross-repository identity.
   (defun ar/eglot-moniker-at-point ()
     "Display the LSP moniker for the symbol at point in the echo area."
     (interactive)
     (let ((server (eglot-current-server)))
       (if (not server)
           (user-error "No active Eglot server")
-        (eglot--async-request
-         server
-         :textDocument/moniker
-         (eglot--TextDocumentPositionParams)
-         :success-fn
-         (lambda (result)
-           (if (and result (cl-plusp (length result)))
-               (let* ((primary (aref result 0))
-                      (scheme (plist-get primary :scheme))
-                      (identifier (plist-get primary :identifier))
-                      (kind (plist-get primary :kind)))
-                 (message "Moniker [%s]: %s (Kind: %s)"
-                          scheme identifier kind))
-             (message "No moniker found for symbol at point.")))))))
+        (if (not (eglot-server-capable :monikerProvider))
+            (message "Server does not support monikers")
+          (eglot--async-request
+           server
+           :textDocument/moniker
+           (eglot--TextDocumentPositionParams)
+           :success-fn
+           (lambda (result)
+             (if (and result (cl-plusp (length result)))
+                 (let* ((primary (aref result 0))
+                        (scheme (plist-get primary :scheme))
+                        (identifier (plist-get primary :identifier))
+                        (kind (plist-get primary :kind)))
+                   (message "Moniker [%s]: %s (Kind: %s)"
+                            scheme identifier kind))
+               (message "No moniker found for symbol at point."))))))))
 
+  ;; Moniker copying for external indexer integration.
   (defun ar/eglot-copy-moniker ()
     "Copy the primary moniker identifier at point to the kill-ring."
     (interactive)
     (let ((server (eglot-current-server)))
       (if (not server)
           (user-error "No active Eglot server")
-        (eglot--async-request
-         server
-         :textDocument/moniker
-         (eglot--TextDocumentPositionParams)
-         :success-fn
-         (lambda (result)
-           (if (and result (cl-plusp (length result)))
-               (let ((identifier (plist-get (aref result 0) :identifier)))
-                 (kill-new identifier)
-                 (message "Copied moniker: %s" identifier))
-             (message "No moniker found to copy."))))))))
+        (if (not (eglot-server-capable :monikerProvider))
+            (message "Server does not support monikers")
+          (eglot--async-request
+           server
+           :textDocument/moniker
+           (eglot--TextDocumentPositionParams)
+           :success-fn
+           (lambda (result)
+             (if (and result (cl-plusp (length result)))
+                 (let ((identifier (plist-get (aref result 0) :identifier)))
+                   (kill-new identifier)
+                   (message "Copied moniker: %s" identifier))
+               (message "No moniker found to copy."))))))))
 #+end_src
 
 
-
-** TODO Eldoc
+** DONE Eldoc
+Displays function signatures, variable documentation, and contextual help in the echo area or a dedicated buffer.
 #+begin_src emacs-lisp
-
+(use-package eldoc
+  :ensure nil
+  :custom
+  (eldoc-help-at-pt t)
+  (eldoc-echo-area-prefer-doc-buffer 'maybe)
+  (eldoc-echo-area-use-multiline-p t)
+  (eldoc-idle-delay 0.1)
+  :config
+  (global-eldoc-mode 1)
+  ;; Overrides Eglot's blocking composition with eager rendering.
+  (add-hook 'eglot-managed-mode-hook
+            (lambda ()
+              (when (eglot-managed-p)
+                (setq-local eldoc-documentation-strategy #'eldoc-documentation-compose-eagerly)))))
 #+end_src
 
-** TODO Eldoc Box
+
+** DONE Eldoc Box
+Displays documentation in a floating popup window anchored to the cursor or screen corner.
 #+begin_src emacs-lisp
-
+(use-package eldoc-box
+  :init
+  ;; Guards activation against TTY/SSH sessions to prevent childframe rendering crashes.
+  (defun ar/eldoc-box-maybe-enable ()
+    "Enable `eldoc-box-hover-at-point-mode' only on graphical displays."
+    (when (display-graphic-p)
+      (eldoc-box-hover-at-point-mode 1)))
+  :hook (prog-mode . ar/eldoc-box-maybe-enable)
+  :custom
+  (eldoc-box-only-multi-line t)
+  ;; Clears the popup instantly when the cursor moves off the symbol.
+  (eldoc-box-clear-with-C-g t)
+  ;; Reduces the cleanup interval for snappy dismissal.
+  (eldoc-box-cleanup-interval 0.5)
+  (eldoc-box-max-pixel-width 900)
+  (eldoc-box-max-pixel-height 800)
+  :custom-face
+  (eldoc-box-border ((t (:background "#292e42"))))
+  (eldoc-box-body ((t (:background "#24283b" :foreground "#c0caf5"))))
+  (eldoc-box-markdown-separator ((t (:inherit shadow :strike-through t :height 0.4))))
+  :config
+  ;; Injects comfortable internal padding.
+  (setf (alist-get 'internal-border-width eldoc-box-frame-parameters) 12)
+  ;; Strips fringes via hook to bypass upstream hardcoded frame parameter appends.
+  (add-hook 'eldoc-box-frame-hook
+            (lambda (_main-frame)
+              (set-frame-parameter nil 'left-fringe 0)
+              (set-frame-parameter nil 'right-fringe 0))))
 #+end_src
+
 
 ** TODO Flymake
 #+begin_src emacs-lisp
 
 #+end_src
 
+
 ** TODO Xref
 #+begin_src emacs-lisp
 
 #+end_src
+
 
 ** TODO Consult-eglot
 #+begin_src emacs-lisp
 
 #+end_src
 
+
 ** TODO Peek
 #+begin_src emacs-lisp
 
 #+end_src
+
 
 ** TODO Apheleia
 #+begin_src emacs-lisp
 
 #+end_src
 
+
 ** TODO Auto-rename-tage
 #+begin_src emacs-lisp
 
 #+end_src
+
 
 ** TODO Evil MC
 #+begin_src emacs-lisp
 
 #+end_src
 
+
 ** TODO Minimap
 #+begin_src emacs-lisp
 
 #+end_src
+
 
 ** TODO Topsy
 #+begin_src emacs-lisp
 
 #+end_src
 
+
 ** TODO Lazy Ruff
 #+begin_src emacs-lisp
 
 #+end_src
+
 
 ** TODO Debug Adapter Protocol
 #+begin_src emacs-lisp
@@ -7352,6 +7411,7 @@ performs the OS-level rename, then sends `workspace/didRenameFiles'."
    #+begin_src emacs-lisp
 
 #+end_src
+
 
 ** TODO Transient Menu
 Provides a centralized dashboard for code actions, navigation, diagnostics, folding, and documentation lookup.
@@ -7482,6 +7542,7 @@ Consolidated keybindings for Development Tools packages and commands only.
  "K" #'eldoc
  "F2" #'eglot-rename)
 #+end_src
+
 
 * DONE Contextual Sidebars
 Persistent side windows displaying dynamic metadata, backlinks, and bibliography context for the active buffer.
