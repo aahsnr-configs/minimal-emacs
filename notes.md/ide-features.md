@@ -405,16 +405,16 @@ In the context of the Emacs 31 `eglot`-only stack documented in this project, `e
 - **Protocol Compliance:** The architectural mandate of this stack prioritizes native Emacs primitives over third-party child-frame managers to reduce memory overhead and Wayland/PGTK rendering glitches.
 
 **The One Remaining UI Distinction:**
-The only technical reason a user might still seek out `eldoc-box` on Emacs 31 is UI physics. Emacs 31's native ephemeral buffer relies on standard window management (`display-buffer`), which can cause window splits or layout shifts when displaying long documentation. `eldoc-box` uses child frames, which overlay the screen without altering the window tree. However, for a strictly minimal, native-first configuration, Emacs 31's native ephemeral routing is the mathematically correct choice.
+The only technical reason a user might still seek out a childframe on Emacs 31 is UI physics. Emacs 31's native ephemeral buffer relies on standard window management (`display-buffer`), which can cause window splits or layout shifts when displaying long documentation. A childframe overlays the screen without altering the window tree. However, for a strictly minimal, native-first configuration, Emacs 31's native ephemeral routing is the mathematically correct choice. Where a childframe is genuinely desired, this project now provides one via a local fork rather than upstream `eldoc-box` — see [Hover Info (Childframe Variant)](#hover-info-childframe-variant).
 
-#### Analysis: `peek` vs. `eldoc-box` for Hover Documentation
+#### Analysis: `peek` vs. Childframe Engines for Hover Documentation
 
 They do not serve the same UI function. They rely on fundamentally different Emacs rendering engines, which dictates their use case:
 
-- **`eldoc-box` (Childframes):** Spawns a true GUI childframe (a separate, floating OS-level window managed by Emacs). It hovers above the text without altering the buffer's layout, shifting lines, or causing redisplay jitter. This perfectly mimics VS Code's floating hover tooltip. It requires a GUI environment (PGTK/Wayland/X11).
+- **Childframe engines (e.g. `eldoc-box`, or this project's `eldoc-childframe` local fork):** Spawn a true GUI childframe (a separate, floating OS-level window managed by Emacs). It hovers above the text without altering the buffer's layout, shifting lines, or causing redisplay jitter. This perfectly mimics VS Code's floating hover tooltip. It requires a GUI environment (PGTK/Wayland/X11).
 - **`peek` (Overlays):** As explicitly noted in the `peek` source repository's "Future Plan" section: _"Child frame. (Currently Peek only support overlay.)"_ It renders _inline_ within the current buffer using `before-string` / `after-string` overlays or by physically shifting buffer text downward. This mimics VS Code's "Peek Definition" inline panel (Alt+F12), which expands _inside_ the editor viewport.
 
-**Conclusion:** Using `peek` for LSP Hover Info would cause severe visual jitter, text-shifting, and main-thread redisplay overhead on every cursor movement. `eldoc-box` is the mathematically correct package for Hover Info (floating tooltips), while `peek` is strictly reserved for Peek Definition / Peek References (inline structural panels).
+**Conclusion:** Using `peek` for LSP Hover Info would cause severe visual jitter, text-shifting, and main-thread redisplay overhead on every cursor movement. A childframe-based engine is the mathematically correct choice for Hover Info (floating tooltips), while `peek` is strictly reserved for Peek Definition / Peek References (inline structural panels).
 
 ---
 
@@ -422,63 +422,84 @@ They do not serve the same UI function. They rely on fundamentally different Ema
 
 _VS Code feature: Tooltip with type info, docs, and signatures on mouse-hover or keyboard shortcut._
 
+> **v49 update:** This variant previously ran on the upstream `eldoc-box` package. It has been superseded by a custom local fork, `lisp/eldoc-childframe.el`, which adds a Flymake Firewall, Evil motion spatial debouncing, and strict TTY degradation guards on top of the original childframe behavior.
+
 ### Feature Overview
 
-| Attribute          | Value                                                                     |
-| ------------------ | ------------------------------------------------------------------------- |
-| Feature            | Hover info                                                                |
-| VS Code equivalent | Floating tooltip with rich markdown, type info, and signatures            |
-| Status             | 🟢 working · `eldoc-box` (GUI childframe) + native `eldoc` (TTY fallback) |
-| Category           | Completion & Intelligence                                                 |
-| LSP methods        | `textDocument/hover`                                                      |
-| Emacs routing      | `eglot` → `eldoc` → `eldoc-box` (childframe) OR `*eldoc*` buffer (TTY)    |
+| Attribute          | Value                                                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------------------------- |
+| Feature            | Hover info                                                                                                |
+| VS Code equivalent | Floating tooltip with rich markdown, type info, and signatures                                           |
+| Status             | 🟢 working · `eldoc-childframe` (local fork, `lisp/eldoc-childframe.el`) + native `eldoc` (TTY fallback) |
+| Category           | Completion & Intelligence                                                                                 |
+| LSP methods        | `textDocument/hover`                                                                                      |
+| Emacs routing      | `eglot` → `eldoc` → `eldoc-childframe` (childframe) OR `*eldoc*` buffer (TTY, strictly guarded)          |
 
 ### Implementation Stack
 
-| Layer                  | Component                     | Role                                                                                                                          |
-| ---------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| LSP Client             | `eglot` (built-in, Emacs 31)  | Drives `textDocument/hover`, returning Markdown payloads natively via `eglot-hover-eldoc-function`.                           |
-| Documentation Router   | `eldoc` (built-in)            | Aggregates hover payloads and routes them to the active display backend.                                                      |
-| GUI Rendering Engine   | `eldoc-box`                   | Spawns a floating _childframe_ anchored to the cursor, rendering rich markdown without shifting buffer text (VS Code parity). |
-| TTY Fallback Engine    | `eldoc` (Emacs 31 native)     | Routes payloads to an ephemeral `*eldoc*` buffer or echo area when childframes are unavailable (e.g., over SSH/TTY).          |
-| Markdown Fontification | `markdown-ts-mode` (built-in) | Provides C-level tree-sitter syntax highlighting for code blocks inside the hover tooltip.                                    |
+| Layer                     | Component                                                    | Role                                                                                                                                                                        |
+| ------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| LSP Client                | `eglot` (built-in, Emacs 31)                                    | Drives `textDocument/hover`, returning Markdown payloads natively via `eglot-hover-eldoc-function`.                                                                          |
+| Documentation Router      | `eldoc` (built-in)                                              | Aggregates hover payloads and routes them to the active display backend.                                                                                                     |
+| GUI Rendering Engine      | `eldoc-childframe` (local fork, `lisp/eldoc-childframe.el`)     | Spawns a floating _childframe_ anchored to the cursor, rendering rich markdown without shifting buffer text (VS Code parity). Forked from `eldoc-box`.                       |
+| Diagnostic Isolation      | Flymake Firewall (origin-based routing, built into the fork)   | Refuses to spawn or refresh the childframe when the pending eldoc payload originates from `flymake-eldoc-function`, preventing diagnostic text from bleeding into the tooltip. |
+| Navigation Responsiveness | Evil motion spatial debounce (built into the fork)              | Replaces the upstream fixed 0.5s timer-based inhibition with a point-distance threshold, so rapid Evil normal-state motions no longer stall or flicker the childframe.       |
+| TTY Fallback Engine       | `eldoc` (Emacs 31 native), guarded by the fork                  | Routes payloads to an ephemeral `*eldoc*` buffer or echo area when childframes are unavailable; the fork refuses to even attempt childframe creation on non-graphic frames.  |
+| Markdown Fontification    | `markdown-ts-mode` (built-in)                                   | Provides C-level tree-sitter syntax highlighting for code blocks inside the hover tooltip.                                                                                    |
 
 ### Commands & Keybindings
 
-| Action                    | Command                        | Keybinding             | Notes                                                            |
-| ------------------------- | ------------------------------ | ---------------------- | ---------------------------------------------------------------- |
-| Hover at point (keyboard) | `eldoc`                        | `K` (Evil normal)      | Triggers `textDocument/hover` and spawns the childframe.         |
-| Help at point             | `help-at-point`                | `C-h .`                | Native Emacs help surfacing via `eldoc-help-at-pt`.              |
-| Scroll hover tooltip      | `eldoc-box-scroll-up` / `down` | `C-M-v` / `C-M-S-v`    | Scrolls the childframe when docstrings exceed the viewport.      |
-| Toggle candidate docs     | `corfu-popupinfo-toggle`       | `M-h` (in `corfu-map`) | Shows/hides childframe docs for the active completion candidate. |
+| Action                    | Command                                | Keybinding             | Notes                                                            |
+| ------------------------- | ----------------------------------------- | ---------------------- | ------------------------------------------------------------------ |
+| Hover at point (keyboard) | `eldoc`                                  | `K` (Evil normal)      | Triggers `textDocument/hover` and spawns the childframe.         |
+| Help at point             | `help-at-point`                          | `C-h .`                | Native Emacs help surfacing via `eldoc-help-at-pt`.              |
+| Scroll hover tooltip      | `eldoc-childframe-scroll-up` / `down`    | `C-M-v` / `C-M-S-v`    | Scrolls the childframe when docstrings exceed the viewport.      |
+| Toggle candidate docs     | `corfu-popupinfo-toggle`                 | `M-h` (in `corfu-map`) | Shows/hides childframe docs for the active completion candidate. |
 
 ### Configuration
 
-This configuration enforces a strict boundary: GUI frames utilize `eldoc-box` for floating childframes, while TTY/daemon frames gracefully degrade to Emacs 31's native ephemeral buffers.
+This configuration enforces a strict boundary: GUI frames utilize the local `eldoc-childframe` fork for floating childframes, while TTY/daemon frames gracefully degrade to Emacs 31's native ephemeral buffers. The fork lives at `lisp/eldoc-childframe.el` and loads like any other local library.
 
 ```elisp
 ;; ==========================================
-;; 1. ELDOC-BOX (GUI Childframe Hover)
+;; 1. ELDOC-CHILDFRAME (Local Fork — GUI Childframe Hover)
 ;; ==========================================
-(use-package eldoc-box
-  :ensure t
+;; Local fork of eldoc-box (lisp/eldoc-childframe.el). Adds a Flymake
+;; Firewall, Evil motion spatial debouncing, and strict TTY guards.
+(use-package eldoc-childframe
+  :ensure nil
+  :load-path "lisp/"
   :after eglot
   :custom
   ;; Clear the childframe immediately when the cursor moves off the symbol.
-  (eldoc-box-clear-after-use t)
+  (eldoc-childframe-clear-after-use t)
   ;; Only spawn the childframe for multi-line payloads. Single-line signatures
   ;; remain in the echo area to prevent UI flicker and childframe spam.
-  (eldoc-box-only-multi-line t)
+  (eldoc-childframe-only-multi-line t)
   ;; Position the childframe slightly offset from the cursor to prevent occlusion.
-  (eldoc-box-offset '(10 10 10))
+  (eldoc-childframe-offset '(10 10 10))
+  ;; Flymake Firewall: block childframe spawn/refresh when the pending
+  ;; eldoc payload originates from flymake, so diagnostics never bleed
+  ;; into the hover tooltip.
+  (eldoc-childframe-block-origins '(flymake-eldoc-function))
+  ;; Evil motion spatial debounce: gate refresh on cursor DISTANCE moved
+  ;; rather than a fixed wall-clock delay, eliminating the upstream 0.5s
+  ;; inhibition trap that punished normal-state navigation.
+  (eldoc-childframe-debounce-strategy 'spatial)
+  (eldoc-childframe-spatial-threshold 2)
   :custom-face
   ;; Tokyo Night synergy: Match the childframe background and border to the theme.
-  (eldoc-box-border ((t (:background "#292e42"))))
-  (eldoc-box-default-face ((t (:background "#1a1b26" :foreground "#c0caf5"))))
+  (eldoc-childframe-border ((t (:background "#292e42"))))
+  (eldoc-childframe-default-face ((t (:background "#1a1b26" :foreground "#c0caf5"))))
   :config
+  ;; Strict TTY degradation guard: never attempt childframe creation on a
+  ;; non-graphic frame. Control passes straight to eldoc's native ephemeral
+  ;; buffer instead of erroring or flashing on TTY/daemon frames.
+  (unless (display-graphic-p)
+    (setq eldoc-childframe-hover-at-point-mode nil))
   ;; Enable hover-at-point tracking. The childframe appears automatically
-  ;; when the cursor rests on a documentable symbol.
-  (eldoc-box-hover-at-point-mode 1))
+  ;; when the cursor rests on a documentable symbol (GUI frames only).
+  (eldoc-childframe-hover-at-point-mode 1))
 
 ;; ==========================================
 ;; 2. ELDOC CORE (Emacs 31 TTY Fallback & Routing)
@@ -488,9 +509,9 @@ This configuration enforces a strict boundary: GUI frames utilize `eldoc-box` fo
   :custom
   ;; Emacs 31 NEW: Surface `help-at-point-kbd-string` through the eldoc pipeline.
   (eldoc-help-at-pt t)
-  ;; Emacs 31 NEW: TTY Fallback. When `eldoc-box` cannot spawn a childframe
-  ;; (e.g., over SSH or in a terminal), route long docs to the ephemeral
-  ;; `*eldoc*` buffer instead of truncating them in the echo area.
+  ;; Emacs 31 NEW: TTY Fallback. When `eldoc-childframe` cannot spawn a
+  ;; childframe (e.g., over SSH or in a terminal), route long docs to the
+  ;; ephemeral `*eldoc*` buffer instead of truncating them in the echo area.
   (eldoc-echo-area-prefer-doc-buffer t)
   ;; Truncate echo-area messages to prevent modeline clobbering.
   (eldoc-echo-area-use-multiline-p t)
@@ -515,32 +536,39 @@ This configuration enforces a strict boundary: GUI frames utilize `eldoc-box` fo
   (setq corfu-popupinfo-delay nil))
 ```
 
-### Why This Approach (vs. `peek` / `lsp-ui-doc`)
+### Why This Approach (vs. `eldoc-box` / `peek` / `lsp-ui-doc`)
 
-| Consideration       | `eldoc-box` (chosen)                               | `peek` (rejected for hover)                            | `lsp-ui-doc` (rejected)                |
-| ------------------- | -------------------------------------------------- | ------------------------------------------------------ | -------------------------------------- |
-| Rendering Engine    | _Childframe_ (Floating GUI window)                 | _Overlay_ (Inline buffer shift)                        | Childframe (Heavy lsp-mode dependency) |
-| UI Physics          | Floats _above_ text; zero layout shift.            | Shifts buffer text down; causes redisplay jitter.      | Floats above text.                     |
-| Protocol Compliance | Works with _any_ eldoc backend (eglot).            | Works with xref/eldoc, but designed for inline panels. | Hard-bound to forbidden `lsp-mode`.    |
-| Use Case Parity     | _Hover Info_ (VS Code Tooltip).                    | _Peek Definition_ (VS Code Alt+F12 panel).             | Hover Info.                            |
-| Performance         | Lightweight, respects `eldoc-box-only-multi-line`. | High redisplay overhead if used for idle hover.        | Heavy child-frame pipeline.            |
+| Consideration        | `eldoc-childframe` local fork (chosen)                             | `eldoc-box` upstream (superseded)                   | `peek` (rejected for hover)                            | `lsp-ui-doc` (rejected)                |
+| -------------------- | ------------------------------------------------------------------ | --------------------------------------------------- | ------------------------------------------------------ | -------------------------------------- |
+| Rendering Engine     | _Childframe_ (Floating GUI window)                                 | _Childframe_ (Floating GUI window)                  | _Overlay_ (Inline buffer shift)                        | Childframe (Heavy lsp-mode dependency) |
+| UI Physics           | Floats _above_ text; zero layout shift.                            | Floats above text; zero layout shift.               | Shifts buffer text down; causes redisplay jitter.      | Floats above text.                     |
+| Diagnostic Isolation | Flymake Firewall blocks flymake-origin payloads from the tooltip.  | No origin filtering — diagnostics can bleed in.     | N/A                                                    | N/A                                    |
+| Evil Responsiveness  | Spatial debounce — no delay penalty on rapid normal-state motion.  | Fixed 0.5s timer inhibits rapid Evil motions.       | N/A                                                    | N/A                                    |
+| TTY Behavior         | Strict guard — refuses childframe creation outright on TTY frames. | Attempts childframe creation; may misbehave on TTY. | Works on TTY (overlay-based).                          | Requires forbidden `lsp-mode`.         |
+| Protocol Compliance  | Works with _any_ eldoc backend (eglot).                            | Works with _any_ eldoc backend (eglot).             | Works with xref/eldoc, but designed for inline panels. | Hard-bound to forbidden `lsp-mode`.    |
+| Use Case Parity      | _Hover Info_ (VS Code Tooltip).                                    | _Hover Info_ (VS Code Tooltip).                     | _Peek Definition_ (VS Code Alt+F12 panel).             | Hover Info.                            |
+| Maintenance          | Local fork — fixes land immediately for this stack.                | Community-maintained — upstream fixes take time.    | High redisplay overhead if used for idle hover.        | Heavy child-frame pipeline.            |
 
 ### Behavioral Parity Matrix
 
-| VS Code behavior                  | Emacs 31 equivalent                                                                |
-| --------------------------------- | ---------------------------------------------------------------------------------- |
-| Floating tooltip on cursor idle   | `eldoc-box-hover-at-point-mode` spawns childframe after `eldoc-idle-delay`.        |
-| Rich markdown rendering           | `markdown-ts-mode` fontifies code blocks inside the `eldoc-box` childframe.        |
-| Tooltip disappears on cursor move | `eldoc-box-clear-after-use t` destroys the childframe instantly.                   |
-| Single-line hints in status bar   | `eldoc-box-only-multi-line t` keeps 1-liners in the echo area.                     |
-| Scroll long documentation         | `C-M-v` / `C-M-S-v` scrolls the `eldoc-box` childframe window.                     |
-| Hover on completion candidate     | `corfu-popupinfo-toggle` (`M-h`) spawns a childframe for `completionItem/resolve`. |
-| Works over SSH / Terminal         | Emacs 31 `eldoc-echo-area-prefer-doc-buffer` routes to `*eldoc*` buffer natively.  |
+| VS Code behavior                  | Emacs 31 equivalent                                                                                              |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Floating tooltip on cursor idle   | `eldoc-childframe-hover-at-point-mode` spawns the childframe after `eldoc-idle-delay`.                                |
+| Rich markdown rendering           | `markdown-ts-mode` fontifies code blocks inside the `eldoc-childframe` childframe.                                     |
+| Tooltip disappears on cursor move | `eldoc-childframe-clear-after-use t` destroys the childframe instantly.                                                |
+| Single-line hints in status bar   | `eldoc-childframe-only-multi-line t` keeps 1-liners in the echo area.                                                   |
+| Scroll long documentation         | `C-M-v` / `C-M-S-v` scrolls the `eldoc-childframe` childframe window.                                                  |
+| Hover on completion candidate     | `corfu-popupinfo-toggle` (`M-h`) spawns a childframe for `completionItem/resolve`.                                     |
+| Rapid Evil normal-state motion    | Spatial debounce keeps the frame stable instead of stalling on every `j` / `k` / `w` / `b` keystroke.                 |
+| Diagnostics stay separate         | Flymake Firewall keeps `flymake` diagnostic text out of the hover childframe entirely.                                 |
+| Works over SSH / Terminal         | Strict TTY guard skips childframe creation outright; native `eldoc-echo-area-prefer-doc-buffer` routes to `*eldoc*` instead. |
 
 ### Emacs 31 Specific Enhancements
 
-- **PGTK Child-Frame Pixel Accuracy:** Emacs 31 fixes severe child-frame positioning bugs on Wayland (PGTK builds). `eldoc-box` tooltips now anchor perfectly to the cursor baseline without drifting or clipping off-screen under GNOME/mutter.
-- **Native TTY Degradation:** If `eldoc-box` detects a TTY frame (where childframes are unsupported), Emacs 31's native `eldoc-echo-area-prefer-doc-buffer` seamlessly intercepts the payload and routes it to a split `*eldoc*` buffer, ensuring hover info is never lost over SSH.
+- **Flymake Firewall:** The local fork inspects the origin of each pending eldoc payload and refuses to spawn or refresh the childframe when it comes from `flymake-eldoc-function`, keeping hover documentation and inline diagnostics on strictly separate UI surfaces.
+- **Evil Motion Spatial Debounce:** Replaces the upstream `eldoc-box` fixed-delay timer with a cursor-distance threshold, eliminating the 0.5s inhibition trap that made rapid Evil normal-state navigation (`j` / `k` / `w` / `b`) feel laggy or caused the childframe to flicker.
+- **Strict TTY Degradation Guards:** On a non-graphic frame, the fork refuses to attempt childframe creation at all rather than failing silently or erroring; control passes immediately to Emacs 31's native `eldoc-echo-area-prefer-doc-buffer` routing.
+- **PGTK Child-Frame Pixel Accuracy:** Emacs 31 fixes severe child-frame positioning bugs on Wayland (PGTK builds). The childframe now anchors perfectly to the cursor baseline without drifting or clipping off-screen under GNOME/mutter.
 - **`markdown-ts-mode` Integration:** Emacs 31's native tree-sitter markdown mode fontifies the childframe buffer at C-speed, providing syntax-highlighted code blocks inside the hover tooltip without requiring the heavy `markdown-mode` package.
 
 ---

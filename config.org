@@ -6816,9 +6816,9 @@ If REGION-TEXT is provided, wrap it inside the block."
 High-performance, O(1) contextual router for Org mode echo-area metadata. Excises heavy AST parsing and breadcrumb generation, delegating structural context to `breadcrumb.el` and focusing strictly on src-block headers, in-block language delegation, link targets, and property drawers.
 #+begin_src emacs-lisp
 ;; Ensure the local library is loaded and hooked into Org mode.
-;; (with-eval-after-load 'org
-;;   (require 'ar-org-eldoc)
-;;   (add-hook 'org-mode-hook #'ar/org-eldoc-load))
+(with-eval-after-load 'org
+  (require 'ar-org-eldoc)
+  (add-hook 'org-mode-hook #'ar/org-eldoc-load))
 #+end_src
 
 ** TODO Keybindings
@@ -7174,7 +7174,112 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
 
 
 
+* TODO Markdown
+Configures a high-perf Markdown IDE via =gfm-mode= for native GFM syntax (intra-word underscores, strikethroughs, task lists). Toolchain:
+- =marksman= (=lsp-mode=): Structural diagnostics (links/headings) + completions.
+- =markdownlint-cli2= (=flycheck=): Stylistic linting (line length, heading increments).
+- =prettierd= (=apheleia=): Async format-on-save.
+
+** Core Configuration & Appear Mode
+Maps Markdown to =gfm-mode= with native rendering. Defines and hooks the O(1) Appear engine into =gfm-mode=.
+#+begin_src emacs-lisp
+(use-package markdown-mode
+  :defer t
+  ;; FORCE GFM: Map all standard markdown extensions exclusively to gfm-mode.
+  :mode (("README\\.md\\'" . gfm-mode)
+         ("\\.md\\'" . gfm-mode)
+         ("\\.markdown\\'" . gfm-mode))
+  :init
+  ;; Core Rendering & Behavior
+  (setq markdown-italic-underscore t
+        markdown-asymmetric-header t
+        markdown-fontify-code-blocks-natively t
+        markdown-gfm-uppercase-checkbox t
+        markdown-enable-math nil
+        markdown-hide-urls t
+        markdown-hide-markup t)
+
+  ;; List & Indentation
+  (setq markdown-list-indent-width 2)
+
+  ;; Performance: Disable expensive whole-line and block fontifications
+  (setq markdown-fontify-whole-heading-line nil
+        markdown-fontify-quote-and-verse-blocks nil)
+
+  :hook ((gfm-mode . lsp-deferred)
+         (gfm-mode . visual-line-mode)
+         (gfm-mode . ar/markdown-appear-mode))
+
+  :config
+  (defvar-local ar/md-appear--last-bounds nil
+    "Cached (start . end) of the currently revealed markdown element.")
+
+  (defun ar/md-appear--post-command ()
+    "O(1) Markdown Appear engine. Bypasses regex parsing entirely."
+    ;; 1. THE SPATIAL GUARD (O(1) Integer Math)
+    (if (and ar/md-appear--last-bounds
+             (>= (point) (car ar/md-appear--last-bounds))
+             (<= (point) (cdr ar/md-appear--last-bounds)))
+        nil ; Do nothing, stay inside the revealed zone.
+
+      ;; 2. CURSOR MOVED: Handle leaving the old element.
+      (when ar/md-appear--last-bounds
+        (font-lock-flush (car ar/md-appear--last-bounds)
+                         (cdr ar/md-appear--last-bounds))
+        (setq ar/md-appear--last-bounds nil))
+
+      ;; 3. PROPERTY INTERROGATION (O(1) C-Level Lookup)
+      (let ((inv (get-text-property (point) 'invisible))
+            (disp (get-text-property (point) 'display))
+            (comp (get-text-property (point) 'composition)))
+
+        (when (or inv disp comp)
+          ;; 4. C-LEVEL BOUNDARY SCANNING
+          (let* ((prop (cond (inv 'invisible) (disp 'display) (t 'composition)))
+                 (start (previous-single-char-property-change (point) prop))
+                 (end   (next-single-char-property-change (point) prop)))
+
+            (remove-text-properties start end '(invisible nil display nil composition nil))
+            (setq ar/md-appear--last-bounds (cons start end)))))))
+
+  (define-minor-mode ar/markdown-appear-mode
+    "O(1) dynamic markup revealing for Markdown/GFM modes."
+    :init-value nil
+    :lighter " MD-Appear"
+    (if ar/markdown-appear-mode
+        (add-hook 'post-command-hook #'ar/md-appear--post-command nil t)
+      (remove-hook 'post-command-hook #'ar/md-appear--post-command t)
+      (when ar/md-appear--last-bounds
+        (font-lock-flush (car ar/md-appear--last-bounds)
+                         (cdr ar/md-appear--last-bounds))
+        (setq ar/md-appear--last-bounds nil))
+      (font-lock-flush (point-min) (point-max))))
+
+  ;; ==========================================
+  ;; IMENU & NAVIGATION
+  ;; ==========================================
+  (setq markdown-imenu-generic-expression
+        '(("^\\(.*\\)[ \t]*\n=+$" 1)
+          ("^\\(.*\\)[ \t]*\n-+$" 1)
+          ("^\\(#+ .*\\)" 1))))
+#+end_src
+
+** Markdown TOC
+Auto-generates and syncs heading-derived TOC.
+#+begin_src emacs-lisp
+(use-package markdown-toc
+  :defer t
+  :after markdown-mode
+  :hook (gfm-mode . markdown-toc-mode)
+  :config
+  (setq markdown-toc-header-toc-title "\n## Table of Contents"
+        markdown-toc-user-toc-structure-manipulation-fn 'cdr))
+#+end_src
+
+
+
 * TODO Development Tools
+
 ** DONE Eglot
 Connects Emacs to external language servers for smart code navigation, error checking, and refactoring.
 #+begin_src emacs-lisp
@@ -7184,15 +7289,13 @@ Connects Emacs to external language servers for smart code navigation, error che
          (markdown-mode . eglot-ensure)
          (LaTeX-mode . eglot-ensure))
   :custom
-  ;; Terminate servers when the last managed buffer is killed to prevent zombie processes.
   (eglot-autoshutdown t)
-  ;; Bypass whole-file/on-type formatting (delegated to apheleia/electric), color, and folding.
   (eglot-ignored-server-capabilities '(:documentFormattingProvider
                                        :documentOnTypeFormattingProvider
                                        :colorProvider
                                        :foldingRangeProvider))
   ;; Render the code action indicators strictly in the margin to prevent echo-area noise.
-  (eglot-code-action-indications '(margin))
+  (eglot-code-action-indications '(eldoc-hint))
   ;; Use a simple Unicode glyph to avoid emoji rendering glitches in TTY or tree-sitter modes.
   (eglot-code-action-indicator "⚡")
   ;; Prevent Eglot from configuring the forbidden company-mode ecosystem.
@@ -7307,37 +7410,24 @@ Displays function signatures, variable documentation, and contextual help in the
 #+end_src
 
 
-** DONE Eldoc Box
-Displays documentation in a floating popup window anchored to the cursor or screen corner.
+** DONE Eldoc Childframe
+Displays documentation in a floating popup window anchored to the cursor, strictly isolated from diagnostic overlays.
 #+begin_src emacs-lisp
-(use-package eldoc-box
-  :init
-  ;; Guards activation against TTY/SSH sessions to prevent childframe rendering crashes.
-  (defun ar/eldoc-box-maybe-enable ()
-    "Enable `eldoc-box-hover-at-point-mode' only on graphical displays."
-    (when (display-graphic-p)
-      (eldoc-box-hover-at-point-mode 1)))
-  :hook (prog-mode . ar/eldoc-box-maybe-enable)
+(use-package eldoc-childframe
+  :ensure nil
+  :hook (prog-mode . eldoc-childframe-hover-at-point-mode)
   :custom
-  (eldoc-box-only-multi-line t)
-  ;; Clears the popup instantly when the cursor moves off the symbol.
-  (eldoc-box-clear-with-C-g t)
-  ;; Reduces the cleanup interval for snappy dismissal.
-  (eldoc-box-cleanup-interval 0.5)
-  (eldoc-box-max-pixel-width 900)
-  (eldoc-box-max-pixel-height 800)
+  ;; Only spawn the popup for multi-line payloads to prevent UI flicker.
+  (eldoc-childframe-only-multi-line t)
+  ;; Clear the popup instantly when the cursor moves off the symbol.
+  (eldoc-childframe-clear-with-C-g t)
+  ;; Expand maximum dimensions for massive Rust/C++ generic type signatures.
+  (eldoc-childframe-max-pixel-width 900)
+  (eldoc-childframe-max-pixel-height 800)
   :custom-face
-  (eldoc-box-border ((t (:background "#292e42"))))
-  (eldoc-box-body ((t (:background "#24283b" :foreground "#c0caf5"))))
-  (eldoc-box-markdown-separator ((t (:inherit shadow :strike-through t :height 0.4))))
-  :config
-  ;; Injects comfortable internal padding.
-  (setf (alist-get 'internal-border-width eldoc-box-frame-parameters) 12)
-  ;; Strips fringes via hook to bypass upstream hardcoded frame parameter appends.
-  (add-hook 'eldoc-box-frame-hook
-            (lambda (_main-frame)
-              (set-frame-parameter nil 'left-fringe 0)
-              (set-frame-parameter nil 'right-fringe 0))))
+  (eldoc-childframe-border ((t (:background "#292e42"))))
+  (eldoc-childframe-body ((t (:background "#24283b" :foreground "#c0caf5"))))
+  (eldoc-childframe-markdown-separator ((t (:inherit shadow :strike-through t :height 0.4)))))
 #+end_src
 
 
@@ -9113,158 +9203,6 @@ TODO: =Replace eglot with lsp-mode=
 ;;   ;; so it is available before any org buffer tries to fontify a kbd block.
 ;;   (with-eval-after-load 'org
 ;;     (add-to-list 'org-src-lang-modes '("kbd" . kbd))))
-#+end_src
-
-** TODO Markdown
-Configures a high-perf Markdown IDE via =gfm-mode= for native GFM syntax (intra-word underscores, strikethroughs, task lists). Toolchain:
-- =marksman= (=lsp-mode=): Structural diagnostics (links/headings) + completions.
-- =markdownlint-cli2= (=flycheck=): Stylistic linting (line length, heading increments).
-- =prettierd= (=apheleia=): Async format-on-save.
-
-*** Core Configuration & Appear Mode
-Maps Markdown to =gfm-mode= with native rendering. Defines and hooks the O(1) Appear engine into =gfm-mode=.
-#+begin_src emacs-lisp
-(use-package markdown-mode
-  :defer t
-  ;; FORCE GFM: Map all standard markdown extensions exclusively to gfm-mode.
-  :mode (("README\\.md\\'" . gfm-mode)
-         ("\\.md\\'" . gfm-mode)
-         ("\\.markdown\\'" . gfm-mode))
-  :init
-  ;; Core Rendering & Behavior
-  (setq markdown-italic-underscore t
-        markdown-asymmetric-header t
-        markdown-fontify-code-blocks-natively t
-        markdown-gfm-uppercase-checkbox t
-        markdown-enable-math nil
-        markdown-hide-urls t
-        markdown-hide-markup t)
-
-  ;; List & Indentation
-  (setq markdown-list-indent-width 2)
-
-  ;; Performance: Disable expensive whole-line and block fontifications
-  (setq markdown-fontify-whole-heading-line nil
-        markdown-fontify-quote-and-verse-blocks nil)
-
-  :hook ((gfm-mode . lsp-deferred)
-         (gfm-mode . visual-line-mode)
-         (gfm-mode . ar/markdown-appear-mode))
-
-  :config
-  ;; ==========================================
-  ;; LSP INTEGRATION (Marksman via lsp-marksman)
-  ;; ==========================================
-  (require 'lsp-marksman)
-  (with-eval-after-load 'lsp-mode
-    (add-to-list 'lsp-language-id-configuration '(gfm-mode . "markdown"))
-    (add-to-list 'lsp-language-id-configuration '(markdown-mode . "markdown")))
-
-  ;; ==========================================
-  ;; APHELEIA (Formatting via Prettierd)
-  ;; ==========================================
-  (with-eval-after-load 'apheleia
-    (setf (alist-get 'prettierd apheleia-formatters)
-          '("prettierd" filepath))
-    (setf (alist-get 'gfm-mode apheleia-mode-alist) '(prettierd))
-    (setf (alist-get 'markdown-mode apheleia-mode-alist) '(prettierd)))
-
-  ;; TODO Renable when setting up flycheck
-  ;; ;; ==========================================
-  ;; ;; FLYCHECK (Linting via Markdownlint-CLI2 + LSP)
-  ;; ;; ==========================================
-  ;; (with-eval-after-load 'flycheck
-  ;;   (flycheck-define-checker markdown-markdownlint-cli2
-  ;;     "A Markdown syntax and style checker using markdownlint-cli2."
-  ;;     :command ("markdownlint-cli2" source-original)
-  ;;     :error-patterns
-  ;;     ((warning line-start
-  ;;               (file-name) ":" line ":" column " "
-  ;;               (id (one-or-more (not (any " ")))) " "
-  ;;               (message (one-or-more (not (any "\n"))))
-  ;;               line-end))
-  ;;     :modes (markdown-mode gfm-mode))
-
-  ;;   (add-to-list 'flycheck-checkers 'markdown-markdownlint-cli2)
-
-  ;;   ;; THE DEFINITIVE FIX FOR "lsp is not a valid syntax checker":
-  ;;   ;; lsp-mode registers the `lsp` checker dynamically via `lsp-diagnostics-flycheck-enable`
-  ;;   ;; ONLY when an LSP server connects to a buffer. If we try to chain `lsp` globally
-  ;;   ;; before that happens, Flycheck throws an error because `lsp` isn't in its registry yet.
-  ;;   ;; By explicitly requiring `lsp-diagnostics` and calling the enable function here,
-  ;;   ;; we force the `lsp` checker to register immediately, making it safe to chain.
-  ;;   ;; (This exact same logic fixes Python/Ruff/Mypy chaining issues).
-  ;;   (with-eval-after-load 'lsp-mode
-  ;;     (require 'lsp-diagnostics)
-  ;;     (lsp-diagnostics-flycheck-enable)
-  ;;     (flycheck-add-next-checker 'lsp 'markdown-markdownlint-cli2)))
-
-  ;; ==========================================
-  ;; O(1) MARKDOWN APPEAR ENGINE
-  ;; ==========================================
-  (defvar-local ar/md-appear--last-bounds nil
-    "Cached (start . end) of the currently revealed markdown element.")
-
-  (defun ar/md-appear--post-command ()
-    "O(1) Markdown Appear engine. Bypasses regex parsing entirely."
-    ;; 1. THE SPATIAL GUARD (O(1) Integer Math)
-    (if (and ar/md-appear--last-bounds
-             (>= (point) (car ar/md-appear--last-bounds))
-             (<= (point) (cdr ar/md-appear--last-bounds)))
-        nil ; Do nothing, stay inside the revealed zone.
-
-      ;; 2. CURSOR MOVED: Handle leaving the old element.
-      (when ar/md-appear--last-bounds
-        (font-lock-flush (car ar/md-appear--last-bounds)
-                         (cdr ar/md-appear--last-bounds))
-        (setq ar/md-appear--last-bounds nil))
-
-      ;; 3. PROPERTY INTERROGATION (O(1) C-Level Lookup)
-      (let ((inv (get-text-property (point) 'invisible))
-            (disp (get-text-property (point) 'display))
-            (comp (get-text-property (point) 'composition)))
-
-        (when (or inv disp comp)
-          ;; 4. C-LEVEL BOUNDARY SCANNING
-          (let* ((prop (cond (inv 'invisible) (disp 'display) (t 'composition)))
-                 (start (previous-single-char-property-change (point) prop))
-                 (end   (next-single-char-property-change (point) prop)))
-
-            (remove-text-properties start end '(invisible nil display nil composition nil))
-            (setq ar/md-appear--last-bounds (cons start end)))))))
-
-  (define-minor-mode ar/markdown-appear-mode
-    "O(1) dynamic markup revealing for Markdown/GFM modes."
-    :init-value nil
-    :lighter " MD-Appear"
-    (if ar/markdown-appear-mode
-        (add-hook 'post-command-hook #'ar/md-appear--post-command nil t)
-      (remove-hook 'post-command-hook #'ar/md-appear--post-command t)
-      (when ar/md-appear--last-bounds
-        (font-lock-flush (car ar/md-appear--last-bounds)
-                         (cdr ar/md-appear--last-bounds))
-        (setq ar/md-appear--last-bounds nil))
-      (font-lock-flush (point-min) (point-max))))
-
-  ;; ==========================================
-  ;; IMENU & NAVIGATION
-  ;; ==========================================
-  (setq markdown-imenu-generic-expression
-        '(("^\\(.*\\)[ \t]*\n=+$" 1)
-          ("^\\(.*\\)[ \t]*\n-+$" 1)
-          ("^\\(#+ .*\\)" 1))))
-#+end_src
-
-*** Markdown TOC
-Auto-generates and syncs heading-derived TOC.
-#+begin_src emacs-lisp
-(use-package markdown-toc
-  :defer t
-  :after markdown-mode
-  :hook (gfm-mode . markdown-toc-mode)
-  :config
-  (setq markdown-toc-header-toc-title "\n## Table of Contents"
-        markdown-toc-user-toc-structure-manipulation-fn 'cdr))
 #+end_src
 
 

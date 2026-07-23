@@ -26,6 +26,8 @@
 
 - Now we are going to work on the Development Tools main section. First ingest the attached ide-features.md, acknowledge that you have ingested this file and show me some how that you understand everything in this file.
 
+- Ingest the attached files, acknowledge that you ingest and state their version numbers. You don't have to know what task is next though.
+
 ## Python script to build and install emacs from source
 
 - Write a python script to build and install emacs from source. It will specifically install emacs-pretest package for now until emacs 31 has been released. It must have the following features and functionalities:
