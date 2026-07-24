@@ -28,6 +28,8 @@
 
 - Ingest the attached files, acknowledge that you ingest and state their version numbers. You don't have to know what task is next though.
 
+- Now ingest the attached ide-features.md file and the source code file for flymake attached as a txt file. Acknowledge that you understand everything.
+
 ## Python script to build and install emacs from source
 
 - Write a python script to build and install emacs from source. It will specifically install emacs-pretest package for now until emacs 31 has been released. It must have the following features and functionalities:
