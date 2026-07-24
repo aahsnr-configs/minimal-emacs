@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.22
+#+VERSION: 0.23
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -402,7 +402,7 @@ Enforces UTF-8 across all I/O boundaries. Excludes the selection coding system o
 
 
 ** DONE Session Management
-Persists cursor positions, recent files, and minibuffer history across sessions. Excludes TRAMP paths and unmounted symlinks to prevent I/O hangs. Utilizes a lazy cache for =org-agenda-files= to prevent filesystem thrashing, and injects a background timer to flush the =recentf= cache periodically, mitigating data loss in daemon environments.
+Saves your cursor positions, recently opened files, and minibuffer history between sessions.
 #+begin_src emacs-lisp
 (use-package saveplace
   :ensure nil
@@ -424,12 +424,14 @@ Persists cursor positions, recent files, and minibuffer history across sessions.
   ;; Custom predicate functions must exist in memory before mode activation.
   (defvar ar/recentf-org-agenda-cache nil
     "Cached list of resolved org-agenda file paths.")
+
   (defun ar/update-recentf-org-agenda-cache ()
     "Update the recentf exclusion cache for org-agenda files."
     (when (bound-and-true-p org-agenda-files)
       (setq ar/recentf-org-agenda-cache
             (mapcar #'file-truename
                     (seq-filter #'file-exists-p (org-agenda-files t))))))
+
   (defun ar/exclude-org-agenda-files-p (file)
     "Return t if FILE is an org-agenda file, using the cached list."
     (and (not (file-remote-p file))
@@ -439,19 +441,19 @@ Persists cursor positions, recent files, and minibuffer history across sessions.
   :config
   (recentf-mode 1)
   (push (expand-file-name recentf-save-file) recentf-exclude)
-  ;; Exclude no-littering housekeeping files.
   (add-to-list 'recentf-exclude (recentf-expand-file-name no-littering-var-directory))
   (add-to-list 'recentf-exclude (recentf-expand-file-name no-littering-etc-directory))
   ;; Exclude TRAMP/remote paths to prevent SSH timeouts during cleanup.
   (add-to-list 'recentf-exclude #'file-remote-p)
   ;; Remove `file-truename` to prevent I/O hangs on unmounted symlink targets.
   (setq recentf-filename-handlers '(abbreviate-file-name))
-  ;; Daemon-safe periodic flush (every 5 minutes) to prevent data loss
-  ;; when Emacs daemon crashes or receives SIGKILL without triggering `kill-emacs-hook`.
+  ;; Daemon-safe periodic flush to prevent data loss on SIGKILL.
   (run-at-time 300 300 #'recentf-save-list)
   (add-to-list 'recentf-exclude #'ar/exclude-org-agenda-files-p)
-  (add-hook 'org-mode-hook #'ar/update-recentf-org-agenda-cache)
-  (run-with-idle-timer 30 t #'ar/update-recentf-org-agenda-cache))
+  ;; Defer org-agenda cache updates until org is actually loaded.
+  (with-eval-after-load 'org
+    (add-hook 'org-mode-hook #'ar/update-recentf-org-agenda-cache)
+    (run-with-idle-timer 30 t #'ar/update-recentf-org-agenda-cache)))
 
 (use-package savehist
   :ensure nil
@@ -466,7 +468,6 @@ Persists cursor positions, recent files, and minibuffer history across sessions.
   :config
   (savehist-mode 1))
 #+end_src
-
 
 
 ** DONE Misc
@@ -974,10 +975,10 @@ Configures global typography, baseline monospaced faces, fontset fallback regist
 #+begin_src emacs-lisp
 (defun ar/setup-fonts ()
   "Apply global typography, baseline faces, and fontset fallbacks to the current frame."
-  (set-face-attribute 'default nil :font "JetBrains Mono" :height 123 :weight 'medium)
-  (set-face-attribute 'fixed-pitch nil :font "JetBrains Mono" :height 123 :weight 'medium)
+  (set-face-attribute 'default nil :font "JetBrainsMono Nerd Font" :height 123 :weight 'medium)
+  (set-face-attribute 'fixed-pitch nil :font "JetBrainsMono Nerd Font" :height 123 :weight 'medium)
   ;; Maps variable-pitch to monospaced to preserve Org-mode table alignment.
-  (set-face-attribute 'variable-pitch nil :font "JetBrains Mono" :height 123 :weight 'medium)
+  (set-face-attribute 'variable-pitch nil :font "JetBrainsMono Nerd Font" :height 123 :weight 'medium)
   ;; Pre-register Noto Sans for Unicode blocks used by org-modern-replace-stars.
    (set-fontset-font t '(#x25A0 . #x25FF) "Noto Sans")  ; Geometric Shapes (◉ ○ ◇ ▷)
   (set-fontset-font t '(#x2600 . #x26FF) "Noto Sans")  ; Miscellaneous Symbols
@@ -2925,7 +2926,6 @@ Provides a centralized dashboard for Avy's spatial jumping and remote text mutat
 
 ** DONE Jinx
 Checks spelling as you type and highlights words that need correction.
-
 #+begin_src emacs-lisp
 (use-package jinx
   :init
@@ -6219,18 +6219,6 @@ Upgrades Denote file and search prompts with live previews and async filtering.
 #+end_src
 
 
-** TODO Citar Denote
-
-#+begin_src emacs-lisp
-;; (use-package citar-denote
-;;   :defer t
-;;   :after (citar denote)
-;;   :custom
-;;   (citar-denote-subdir "literature")
-;;   :config
-;;   (citar-denote-mode 1))
-#+end_src
-
 
 ** DONE Org Capture
 Routes quick entries to the flat task registry, spawns Denote notes, and provides a hierarchical dispatcher for all capture workflows.
@@ -6813,10 +6801,10 @@ If REGION-TEXT is provided, wrap it inside the block."
 ** TODO Org Eldoc
 High-performance, O(1) contextual router for Org mode echo-area metadata. Excises heavy AST parsing and breadcrumb generation, delegating structural context to `breadcrumb.el` and focusing strictly on src-block headers, in-block language delegation, link targets, and property drawers.
 #+begin_src emacs-lisp
-;; Ensure the local library is loaded and hooked into Org mode.
-(with-eval-after-load 'org
-  (require 'ar-org-eldoc)
-  (add-hook 'org-mode-hook #'ar/org-eldoc-load))
+;; ;; Ensure the local library is loaded and hooked into Org mode.
+;; (with-eval-after-load 'org
+;;   (require 'ar-org-eldoc)
+;;   (add-hook 'org-mode-hook #'ar/org-eldoc-load))
 #+end_src
 
 ** TODO Keybindings
@@ -6848,6 +6836,7 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
     (kbd "RET") #'ar/org-return-dwim))
 
 (use-package evil-org-agenda
+  :ensure nil
   :defer t
   :after evil-org
   :hook (org-agenda-mode . evil-org-agenda-mode)
@@ -8498,6 +8487,13 @@ TODO: Uncomment when Project Management is setup
 ;;   (reftex-toc-split-windows-horizontally t)
 ;;   (reftex-toc-split-windows-fraction 0.2))
 
+;; (use-package citar-denote
+;;   :defer t
+;;   :after (citar denote)
+;;   :custom
+;;   (citar-denote-subdir "literature")
+;;   :config
+;;   (citar-denote-mode 1))
 #+end_src
 
 ** TODO Fast LaTeX Input
