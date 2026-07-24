@@ -4331,8 +4331,7 @@ Provides flexible, multi-component fuzzy matching for minibuffer and in-buffer c
           ar/orderless-disambiguation-dispatch)))
 #+end_src
 
-
-** TODO Vertico
+** DONE Vertico
 Renders completion candidates in a vertical, interactive dropdown list.
 #+begin_src emacs-lisp
 (use-package vertico
@@ -4379,20 +4378,20 @@ Renders completion candidates in a vertical, interactive dropdown list.
           (consult-line-multi buffer)
           (consult-yasnippet grid)))
   ;; Dynamically applies text properties to candidates based on category.
-  (defvar +vertico-transform-functions nil)
+  (defvar ar/vertico-transform-functions nil)
   (cl-defmethod vertico--format-candidate :around
-    (cand prefix suffix index start &context ((not +vertico-transform-functions) null))
-    (dolist (fun (ensure-list +vertico-transform-functions))
+    (cand prefix suffix index start &context ((not ar/vertico-transform-functions) null))
+    (dolist (fun (ensure-list ar/vertico-transform-functions))
       (setq cand (funcall fun cand)))
     (cl-call-next-method cand prefix suffix index start))
   ;; Highlights directories with a trailing slash.
-  (defun +vertico-highlight-directory-fn (file)
+  (defun ar/vertico-highlight-directory-fn (file)
     "Highlight FILE as a directory if it ends with a slash."
     (when (string-suffix-p "/" file)
       (add-face-text-property 0 (length file) 'dired-directory 'append file))
     file)
   ;; Highlights enabled modes in M-x.
-  (defun +vertico-highlight-enabled-mode-fn (cmd)
+  (defun ar/vertico-highlight-enabled-mode-fn (cmd)
     "Highlight CMD if the corresponding mode is enabled."
     (let ((sym (intern cmd)))
       (with-current-buffer (nth 1 (buffer-list))
@@ -4404,10 +4403,10 @@ Renders completion candidates in a vertical, interactive dropdown list.
       cmd))
   ;; Applies directory highlighting to the file category.
   (add-to-list 'vertico-multiform-categories
-               '(file (+vertico-transform-functions . +vertico-highlight-directory-fn)))
+               '(file (ar/vertico-transform-functions . ar/vertico-highlight-directory-fn)))
   ;; Applies mode highlighting to M-x.
   (add-to-list 'vertico-multiform-commands
-               '(execute-extended-command (+vertico-transform-functions . +vertico-highlight-enabled-mode-fn)))
+               '(execute-extended-command (ar/vertico-transform-functions . ar/vertico-highlight-enabled-mode-fn)))
   ;; Renders Embark's action menu as a searchable grid.
   (add-to-list 'vertico-multiform-categories '(embark-keybinding grid))
   ;; Remaps C-s to fuzzy-search minibuffer input history.
@@ -4424,17 +4423,19 @@ Renders completion candidates in a vertical, interactive dropdown list.
       (define-key (symbol-value keymap) (kbd "C-s") #'consult-history))))
 #+end_src
 
-** TODO Marginalia
+** DONE Marginalia
 Appends rich metadata annotations to completion candidates.
 #+begin_src emacs-lisp
 (use-package marginalia
-  :hook (after-init . marginalia-mode)
   :config
-  ;; Forces absolute timestamps for mathematical precision.
+  ;; Forces absolute timestamps instead of relative ages.
   (setq marginalia-max-relative-age 0
         ;; Aligns annotations to the right edge of the minibuffer.
-        marginalia-align 'right))
+        marginalia-align 'right)
+  ;; Activates the core Marginalia engine post-load.
+  (marginalia-mode 1))
 #+end_src
+
 
 ** TODO Nerd Icons Completion
 Injects visual file and mode glyphs into completion annotations.
