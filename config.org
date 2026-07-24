@@ -4279,8 +4279,7 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
 #+end_src
 
 
-* TODO Completion Framework
-
+* DONE Completion Framework
 ** DONE Orderless
 Provides flexible, multi-component fuzzy matching for minibuffer and in-buffer completions.
 #+begin_src emacs-lisp
@@ -4436,19 +4435,20 @@ Appends rich metadata annotations to completion candidates.
   (marginalia-mode 1))
 #+end_src
 
-
-** TODO Nerd Icons Completion
+** DONE Nerd Icons Completion
 Injects visual file and mode glyphs into completion annotations.
 #+begin_src emacs-lisp
 (use-package nerd-icons-completion
   :after marginalia
   :config
-  (nerd-icons-completion-mode)
+  ;; Activates the icon injection engine unconditionally.
+  (nerd-icons-completion-mode 1)
+  ;; Synchronizes icon state if Marginalia is toggled manually later.
   (add-hook 'marginalia-mode-hook #'nerd-icons-completion-marginalia-setup))
 #+end_src
 
-** TODO Consult
-Supplies async search, navigation, and preview commands for the completion framework.
+** DONE Consult
+Supplies async search, directory navigation, and live preview commands.
 #+begin_src emacs-lisp
 (use-package consult
   :bind (;; Buffer switching
@@ -4463,7 +4463,7 @@ Supplies async search, navigation, and preview commands for the completion frame
          ([remap bookmark-jump] . consult-bookmark))
   :hook (completion-list-mode . consult-preview-at-point-mode)
   :init
-  ;; Improves register preview with Consult formatting.
+  ;; Routes register previews through Consult's formatting engine.
   (setq register-preview-delay 0.5
         register-preview-function #'consult-register-format)
   (advice-add #'register-preview :override #'consult-register-window)
@@ -4498,17 +4498,17 @@ Supplies async search, navigation, and preview commands for the completion frame
   (define-key consult-narrow-map (vconcat consult-narrow-key "?") #'consult-narrow-help))
 #+end_src
 
-** TODO Consult Dir
-Extends directory navigation with spatial jumping and async file discovery.
 #+begin_src emacs-lisp
 (use-package consult-dir
-  :defer t
+  :after consult
+  :commands (consult-dir
+             consult-dir-jump-file)
   :custom
   ;; Routes async directory jumps to consult-fd for faster discovery.
   (consult-dir-jump-file-command #'consult-fd))
 #+end_src
 
-** TODO Embark
+** DONE Embark
 Provides context-aware action menus for minibuffer candidates and buffer targets.
 #+begin_src emacs-lisp
 (use-package embark
@@ -4521,6 +4521,7 @@ Provides context-aware action menus for minibuffer candidates and buffer targets
    ("C-c C-;" . embark-export)
    ("C-c C-l" . embark-collect))
   :init
+  ;; Replaces which-key prefix discovery with Embark's target discovery.
   (setq which-key-use-C-h-commands nil
         prefix-help-command #'embark-prefix-help-command)
   :config
@@ -4536,26 +4537,21 @@ Provides context-aware action menus for minibuffer candidates and buffer targets
           embark-isearch-highlight-indicator)))
 #+end_src
 
-** TODO Embark Consult
-Bridges Embark collections with Consult's live preview engine.
 #+begin_src emacs-lisp
 (use-package embark-consult
-  :defer t
   :after (embark consult)
   :hook
   ;; Enables live preview in Embark Collect buffers from Consult searches.
   (embark-collect-mode . consult-preview-at-point-mode))
 #+end_src
 
-** TODO Embark Org
-Injects Org-mode specific targets and actions into the Embark framework.
 #+begin_src emacs-lisp
 (use-package embark-org
   :ensure nil
   :after (embark org))
 #+end_src
 
-** TODO Corfu
+** DONE Corfu
 Renders in-buffer completion candidates in a minimal, unobtrusive popup.
 #+begin_src emacs-lisp
 (use-package corfu
@@ -4628,7 +4624,7 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
               ("M-Q" . corfu-quick-complete)))
 #+end_src
 
-** TODO Basic Completion
+** DONE Basic Completion
 Configures native Emacs completion styles and indentation triggers.
 #+begin_src emacs-lisp
 (use-package emacs
@@ -4642,30 +4638,28 @@ Configures native Emacs completion styles and indentation triggers.
   (read-extended-command-predicate #'command-completion-default-include-p))
 #+end_src
 
-** TODO Nerd Icons Corfu
+** DONE Nerd Icons Corfu
 Appends visual glyphs to in-buffer completion candidates.
 #+begin_src emacs-lisp
 (use-package nerd-icons-corfu
   :after corfu
-  :init
-  ;; Registers the formatter with Corfu's margin API pre-load.
+  :config
+  ;; Registers the formatter with Corfu's margin API.
   (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
 #+end_src
 
-** TODO Cape
+** DONE Cape
 Wraps and merges completion-at-point functions for global and local pipelines.
 #+begin_src emacs-lisp
 (use-package cape
   :bind ("C-c p" . cape-prefix-map)
-  :init
+  :config
   ;; Injects Elisp completion inside Org and Markdown source blocks.
   (add-hook 'completion-at-point-functions #'cape-elisp-block)
   ;; Confines file completion strictly to string literals globally.
   (add-hook 'completion-at-point-functions (cape-capf-inside-string #'cape-file))
-  ;; Requires a 2-character prefix for Dabbrev to prevent UI spam.
-  (setq cape-dabbrev-check-other-buffers t)
+  ;; Enforces a 2-character prefix threshold for Dabbrev.
   (add-hook 'completion-at-point-functions (cape-capf-prefix-length #'cape-dabbrev 2))
-  :config
   ;; Injects history completion into Comint and minibuffer environments.
   (add-hook 'comint-mode-hook
             (lambda () (add-hook 'completion-at-point-functions #'cape-history nil t)))
@@ -4686,7 +4680,7 @@ Wraps and merges completion-at-point functions for global and local pipelines.
   (advice-add #'pcomplete-completions-at-point :around #'cape-wrap-nonexclusive))
 #+end_src
 
-** TODO Dabbrev
+** DONE Dabbrev
 Provides dynamic abbreviation expansion from open buffers.
 #+begin_src emacs-lisp
 (defcustom ar/dabbrev-buffer-scanning-size-limit (* 1 1024 1024)
@@ -4701,13 +4695,13 @@ Provides dynamic abbreviation expansion from open buffers.
 
 (use-package dabbrev
   :ensure nil
-  :bind (;; Swaps M-/ and C-M-/ for Corfu popup synergy.
+  :bind (;; Swaps M-/ and C-M-/ for in-buffer completion routing.
          ("M-/" . dabbrev-completion)
          ("C-M-/" . dabbrev-expand))
   :config
   (setq dabbrev-friend-buffer-function #'ar/dabbrev-friend-buffer-p
         dabbrev-upcase-means-case-search t
-        ;; Enables cross-buffer scanning to mirror cape-dabbrev.
+        ;; Enables cross-buffer scanning for global word discovery.
         dabbrev-check-other-buffers t)
   ;; Ignores hidden and internal Emacs buffers.
   (add-to-list 'dabbrev-ignored-buffer-regexps "\\` ")
