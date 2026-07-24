@@ -4280,6 +4280,7 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
 
 
 * TODO Completion Framework
+
 ** TODO Orderless
 Provides flexible, multi-component fuzzy matching for minibuffer and in-buffer completions.
 #+begin_src emacs-lisp
@@ -4287,8 +4288,6 @@ Provides flexible, multi-component fuzzy matching for minibuffer and in-buffer c
   :custom
   ;; Global completion styles with =basic= as a dynamic fallback.
   (completion-styles '(orderless basic))
-  ;; File category overrides for TRAMP, partial paths, and fuzzy matching.
-  (completion-category-overrides '((file (styles basic partial-completion orderless))))
   ;; Disables default category overrides to prevent external style injection.
   (completion-category-defaults nil)
   ;; Emacs 31+: Enables substring-like behavior for partial-completion.
@@ -4296,6 +4295,12 @@ Provides flexible, multi-component fuzzy matching for minibuffer and in-buffer c
   ;; Strict global matching styles, omitting flex and initialism for performance.
   (orderless-matching-styles '(orderless-regexp orderless-literal))
   :config
+  ;; Consolidates all category routing into a single alist to prevent
+  ;; Elpaca async load-order overwrites from fragmented =add-to-list= calls.
+  (setq completion-category-overrides
+        `((file (styles basic partial-completion orderless))
+          (eglot (styles ,@completion-styles))
+          (eglot-capf (styles ,@completion-styles))))
   ;; Explicit affix dictionary for predictable Vim-like dispatch routing.
   (setq orderless-affix-dispatch-alist
         `((?! . orderless-without-literal)
@@ -4326,6 +4331,7 @@ Provides flexible, multi-component fuzzy matching for minibuffer and in-buffer c
         '(orderless-affix-dispatch
           ar/orderless-disambiguation-dispatch)))
 #+end_src
+
 
 ** TODO Vertico
 Renders completion candidates in a vertical, interactive dropdown list.
@@ -4549,7 +4555,6 @@ Injects Org-mode specific targets and actions into the Embark framework.
   :after (embark org))
 #+end_src
 
-
 ** TODO Corfu
 Renders in-buffer completion candidates in a minimal, unobtrusive popup.
 #+begin_src emacs-lisp
@@ -4590,11 +4595,6 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
   :config
   ;; Activates the global Corfu engine post-load.
   (global-corfu-mode 1)
-  ;; Routes Orderless styles to Eglot's in-buffer and minibuffer categories.
-  (add-to-list 'completion-category-overrides
-               `(eglot (styles ,@completion-styles)))
-  (add-to-list 'completion-category-overrides
-               `(eglot-capf (styles ,@completion-styles)))
   ;; Closes the popup on insert state exit or buffer save.
   (add-hook 'evil-insert-state-exit-hook #'corfu-quit)
   (add-hook 'before-save-hook #'corfu-quit))
@@ -4651,7 +4651,6 @@ Appends visual glyphs to in-buffer completion candidates.
   ;; Registers the formatter with Corfu's margin API pre-load.
   (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
 #+end_src
-
 
 ** TODO Cape
 Wraps and merges completion-at-point functions for global and local pipelines.
