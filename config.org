@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.24
+#+VERSION: 0.25
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -625,21 +625,21 @@ Tracks text mutations (Changelist) orthogonal to the Jump List. Powers Evil's na
 #+end_src
 
 ** DONE Evil
-Core Vim emulation engine. Provides modal editing, operator-pending motions, and ex commands. Configured for strict Vim parity, state-dependent cursor shapes, and native minibuffer history cycling. Foundational dependency; loaded synchronously to prevent downstream keybinding voids.
+Core Vim emulation engine providing modal editing, operator-pending motions, and ex commands.
 #+begin_src emacs-lisp
 (use-package evil
   :ensure (:wait t)
   :demand t
   :init
-  ;; Core Settings (Must be set before load)
+  ;; Core settings required before package load.
   (setq evil-want-integration t
         evil-want-keybinding nil
-        evil-want-minibuffer t
+        evil-want-minibuffer nil
         evil-mode-line-format nil
         evil-kbd-macro-suppress-motion-error t
         evil-symbol-word-search t
         evil-kill-on-visual-paste nil)
-  ;; Extended Keybindings Configuration
+  ;; Extended keybindings and behavioral toggles.
   (setq evil-want-C-g-bindings t
         evil-want-C-i-jump nil
         evil-want-C-u-scroll t
@@ -648,9 +648,8 @@ Core Vim emulation engine. Provides modal editing, operator-pending motions, and
         evil-want-Y-yank-to-eol t
         evil-want-abbrev-expand-on-insert-exit nil
         evil-respect-visual-line-mode nil
-        ;; Load-order fix: Must be in :init to register before keymap generation.
         evil-want-C-h-delete t)
-  ;; State-Dependent Cursor Shapes
+  ;; State-dependent cursor shapes.
   (setq evil-normal-state-cursor '(box)
         evil-insert-state-cursor '(bar)
         evil-visual-state-cursor '(hollow)
@@ -664,12 +663,12 @@ Core Vim emulation engine. Provides modal editing, operator-pending motions, and
   (evil-move-cursor-back nil)
   (evil-v$-excludes-newline t)
   (evil-want-fine-undo t)
-  ;; Vim Parity: Prevent cursor from moving past EOL.
+  ;; Prevents cursor from moving past EOL.
   (evil-move-beyond-eol nil)
   (evil-search-wrap t)
   (select-enable-clipboard t)
   (evil-visual-update-x-selection-p nil)
-  ;; Search Improvements
+  ;; Search behavior and highlighting.
   (evil-ex-search-case 'smart)
   (evil-ex-search-incremental t)
   (evil-ex-search-highlight-all t)
@@ -677,31 +676,52 @@ Core Vim emulation engine. Provides modal editing, operator-pending motions, and
   (evil-mode 1)
   (evil-select-search-module 'evil-search-module 'evil-search)
   (setq-default evil-shift-width tab-width)
-  ;; Ex & Search History Cycling (Arrow Keys & Emacs bindings)
-  (dolist (keymap (list evil-ex-completion-map evil-ex-search-keymap))
+  ;; Ex and search history cycling via arrow keys and Emacs bindings.
+  (dolist (keymap (list evil-ex-completion-map
+                        evil-ex-search-keymap))
     (define-key keymap (kbd "<up>") #'previous-history-element)
     (define-key keymap (kbd "<down>") #'next-history-element)
     (define-key keymap (kbd "C-p") #'previous-history-element)
     (define-key keymap (kbd "C-n") #'next-history-element))
-  ;; Better Initial States
+  ;; Forces normal state in read-only UI buffers.
   (evil-set-initial-state 'messages-buffer-mode 'normal)
   (evil-set-initial-state 'dashboard-mode 'normal))
 #+end_src
 
 ** DONE Evil Collection
-Injects standardized Vim bindings into non-text buffers. Enables Unimpaired bracket navigation and unified LSP reference jumping. Minibuffer integration is strictly omitted to protect the Vertico type-to-filter paradigm.
+Injects standardized Vim bindings into non-text buffers with Unimpaired bracket navigation.
 #+begin_src emacs-lisp
 (use-package evil-collection
   :after evil
   :init
-  ;; Enable Unimpaired bracket navigation (e.g., [e/]e for errors).
+  ;; Enables Unimpaired bracket navigation.
   (setq evil-collection-want-unimpaired-p t)
-  ;; Standardize LSP/xref find-references bindings across all modes.
+  ;; Standardizes LSP and xref find-references bindings.
   (setq evil-collection-want-find-usages-bindings-p t)
   :config
-  ;; Initialize bindings. Minibuffer integration defaults to `nil`,
-  ;; protecting the Vertico type-to-filter paradigm.
+  ;; Initializes bindings; minibuffer integration is omitted to protect Vertico.
   (evil-collection-init))
+#+end_src
+
+** DONE Minibuffer & Ex Escape
+Binds single-press =<escape>= to abort the minibuffer and Evil Ex command line.
+#+begin_src emacs-lisp
+;; Registry of all minibuffer and Ex command keymaps requiring escape-to-abort.
+(defvar ar/minibuffer-escape-maps
+  '(minibuffer-local-map
+    minibuffer-local-ns-map
+    minibuffer-local-completion-map
+    minibuffer-local-must-match-map
+    minibuffer-local-isearch-map
+    read-expression-map
+    evil-ex-completion-map
+    evil-ex-search-keymap)
+  "Exhaustive list of all minibuffer keymaps requiring escape-to-abort.")
+
+;; Binds escape on base keymaps; safe to evaluate before general.el loads.
+(dolist (map-sym ar/minibuffer-escape-maps)
+  (when (boundp map-sym)
+    (define-key (symbol-value map-sym) (kbd "<escape>") #'abort-recursive-edit)))
 #+end_src
 
 ** DONE Evil Commentary
@@ -712,19 +732,6 @@ Provides =gc= and =gcc= operators via native APIs. Supersedes custom commenting 
   :config
   ;; Register gc/gcc operators.
   (evil-commentary-mode 1))
-#+end_src
-
-** DONE Evil Multiedit
-Wraps =iedit= in a dedicated Evil state for localized multi-cursor refactoring.
-#+begin_src emacs-lisp
-(use-package evil-multiedit
-  :defer t
-  :commands (evil-multiedit-match-symbol-and-next
-             evil-multiedit-match-all
-             evil-multiedit-toggle-or-restrict-region)
-  :config
-  ;; Configure internal state navigation. Global bindings managed via general.el.
-  (evil-multiedit-default-keybinds))
 #+end_src
 
 ** DONE Evil Args
@@ -838,7 +845,6 @@ Centralized keybinding router establishing global and local leader prefixes for 
     :states '(normal insert visual emacs)
     :prefix "SPC"
     :global-prefix "C-SPC")
-
   ;; Establishes the local leader prefix (SPC m) for major-mode-specific commands.
   (general-create-definer ar/local-leader
     :states '(normal insert visual emacs)
@@ -846,11 +852,31 @@ Centralized keybinding router establishing global and local leader prefixes for 
     :global-prefix "C-SPC m"))
 
 (ar/global-leader
- "SPC" '(execute-extended-command :wk "M-x")
- ":" '(eval-expression :wk "Eval")
- "u" '(universal-argument :wk "Universal arg")
- "!" '(shell-command :wk "Shell cmd")
- "X" '(org-capture :wk "Org capture"))
+  "SPC" '(execute-extended-command :wk "M-x")
+  ":"   '(eval-expression :wk "Eval")
+  "u"   '(universal-argument :wk "Universal arg")
+  "!"   '(shell-command :wk "Shell cmd")
+  "X"   '(org-capture :wk "Org capture"))
+
+;; ──────────────────────────────────────────────────────────────
+;; BELT-AND-SUSPENDERS: Bind <escape> in ALL Evil states via
+;; general.el across every minibuffer keymap. If a rogue downstream
+;; hook re-enables evil-local-mode in the minibuffer, Evil's
+;; per-state auxiliary keymaps would be consulted. This binding
+;; ensures <escape> still fires abort-recursive-edit regardless of
+;; which Evil state is active.
+;;
+;; CRITICAL: `:keymaps ar/minibuffer-escape-maps` is UNQUOTED.
+;; A quoted symbol ('ar/minibuffer-escape-maps) would pass the
+;; symbol to general.el, which resolves it to the LIST, then tries
+;; to use that list as a single keymap → wrong-type-argument error.
+;; Unquoted, the variable evaluates to the list at call-site and
+;; general.el correctly iterates each symbol individually.
+;; ──────────────────────────────────────────────────────────────
+(general-define-key
+ :states '(normal insert emacs motion)
+ :keymaps ar/minibuffer-escape-maps
+ "<escape>" #'abort-recursive-edit)
 #+end_src
 
 
@@ -1105,13 +1131,11 @@ Modifies word boundaries to recognize camelCase transitions. Globally enables na
   (global-subword-mode 1))
 #+end_src
 
-
 ** DONE Sudo Edit
 Reopens the current buffer with elevated privileges via TRAMP's native sudo method.
 #+begin_src emacs-lisp
 (use-package sudo-edit :defer t)
 #+end_src
-
 
 ** TODO Ghostel
 Terminal emulation powered by =libghostty-vt=, rendering as a persistent 30% bottom drawer with strict Evil integration and automatic TRAMP support.
@@ -1195,7 +1219,6 @@ Terminal emulation powered by =libghostty-vt=, rendering as a persistent 30% bot
   :after ghostel
   :hook (elpaca-after-init . ghostel-comint-global-mode))
 #+end_src
-
 
 ** DONE Eshell
 Native Emacs shell with Lisp integration and AST-aware prompt navigation. Fortified with undo protection, read-only output enforcement, and modern syntax highlighting.
@@ -1461,7 +1484,6 @@ Delegates hardware input to =ultra-scroll= and keyboard interpolation to =good-s
       (funcall fn arg)))
   (advice-add #'scroll-down :around #'ar/good-scroll--scroll-down-around))
 #+end_src
-
 
 
 ** DONE Tree-sitter
@@ -1863,17 +1885,17 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
     "-" #'expreg-contract
     "_" #'expreg-contract)
   (put 'expreg-expand 'repeat-map 'expreg-repeat-map)
-  (put 'expreg-contract 'repeat-map 'expreg-repeat-map)
-  ;; Visual State Routing: Hijacks `v` for seamless AST expansion loops.
-  (general-define-key
-   :states 'visual
-   "v" #'expreg-expand)
-  ;; Global Fallback: Maps `M-=` (Doom's expand-region mnemonic) and modifier combinations.
-  (general-define-key
-   :states '(normal visual motion)
-   "M-=" #'expreg-expand
-   "C-M-+" #'expreg-expand
-   "C-M--" #'expreg-contract))
+  (put 'expreg-contract 'repeat-map 'expreg-repeat-map))
+
+(general-define-key
+ :states 'visual
+ "v" #'expreg-expand)
+
+(general-define-key
+ :states '(normal visual motion)
+ "M-=" #'expreg-expand
+ "C-M-+" #'expreg-expand
+ "C-M--" #'expreg-contract)
 #+end_src
 
 
@@ -2923,13 +2945,11 @@ Provides a centralized dashboard for Avy's spatial jumping and remote text mutat
   "y s" '(avy-goto-symbol-1 :wk "Symbol"))
 #+end_src
 
-
 ** DONE Jinx
 Checks spelling as you type and highlights words that need correction.
 #+begin_src emacs-lisp
 (use-package jinx
   :init
-  ;; jinx-disabled-modes was removed in Jinx v2.8; define a custom list.
   (defvar ar/jinx-disabled-modes
     '(prog-mode
       conf-mode
@@ -2949,6 +2969,7 @@ Checks spelling as you type and highlights words that need correction.
       help-mode
       Info-mode
       embark-collect-mode
+      ghostel-mode
       vterm-mode
       term-mode
       pdf-view-mode)
@@ -2956,28 +2977,30 @@ Checks spelling as you type and highlights words that need correction.
   ;; Inline exclusions replacing the dict.txt file.
   (defvar ar/jinx-personal-words
     "emacs elisp use-package org-mode prog-mode conf-mode text-mode
-     eglot eldoc flymake corfu vertico orderless consult embark
-     denote treemacs dirvish magit evil avy anzu jinx
-     tokyo night jetbrainsmono nerd font pgtk wayland
-     tramp ssh json yaml toml lsp dap ast"
+eglot eldoc flymake corfu vertico orderless consult embark
+denote treemacs dirvish magit evil avy anzu jinx
+tokyo night jetbrainsmono nerd font pgtk wayland
+tramp ssh json yaml toml lsp dap ast"
     "Personal vocabulary for Jinx session words. Write entries in lowercase for broadest coverage.")
   :custom
   ;; Deterministic English regardless of system locale.
   (jinx-languages "en")
-  ;; Upstream defaults preserved; custom Org/LaTeX/path entries appended.
-  (jinx-exclude-regexps
-   '((emacs-lisp-mode "Package-Requires:.*$")
-     (org-mode "^#\\+\\w+.*$" "\\\\[a-zA-Z]+")
-     (LaTeX-mode "\\\\[a-zA-Z]+")
-     (t "[A-Z]+\\>"
-        "-+\\>"
-        "\\w*?[0-9]\\w*\\>"
-        "[a-z]+://\\S-+"
-        "<?[-+_.~a-zA-Z][-+_.~:a-zA-Z0-9]*@[-.a-zA-Z0-9]+>?"
-        "\\(?:Local Variables\\|End\\):\\s-*$"
-        "jinx-\\(?:languages\\|local-words\\):\\s-+.*$"
-        "[/~][a-zA-Z0-9._/-]+")))
   :config
+  ;; Dynamically construct exclude regexps to hide dangerous backslashes
+  ;; and `#+` sequences from Org-mode's LaTeX and keyword parsers.
+  (setq jinx-exclude-regexps
+        `((emacs-lisp-mode "Package-Requires:.*$")
+          (org-mode ,(rx bol "#+" (+ word) (* any) eol)
+                    ,(rx "\\" (+ alpha)))
+          (LaTeX-mode ,(rx "\\" (+ alpha)))
+          (t "[A-Z]+\\>"
+             "-+\\>"
+             "\\w*?[0-9]\\w*\\>"
+             "[a-z]+://\\S-+"
+             "<?[-+_.~a-zA-Z][-+_.~:a-zA-Z0-9]*@[-.a-zA-Z0-9]+>?"
+             "\\(?:Local Variables\\|End\\):\\s-*$"
+             "jinx-\\(?:languages\\|local-words\\):\\s-+.*$"
+             "[/~][a-zA-Z0-9._/-]+")))
   ;; Aborts activation in massive buffers to prevent main-thread freezing.
   (define-advice jinx-mode (:before-while (&optional arg) guard-large-files)
     (or (and arg (< (prefix-numeric-value arg) 1))
@@ -4334,6 +4357,7 @@ Provides flexible, multi-component fuzzy matching for minibuffer and in-buffer c
 Renders completion candidates in a vertical, interactive dropdown list.
 #+begin_src emacs-lisp
 (use-package vertico
+  :demand t
   :custom
   ;; Reserves exactly 10 lines of vertical space for the dropdown.
   (vertico-count 10)
@@ -4342,84 +4366,120 @@ Renders completion candidates in a vertical, interactive dropdown list.
   ;; Allows cycling from the bottom of the list back to the top.
   (vertico-cycle t)
   :bind (:map vertico-map
-              ;; Ido-like directory navigation.
-              ("RET" . vertico-directory-enter)
-              ("DEL" . vertico-directory-delete-char)
-              ("M-DEL" . vertico-directory-delete-word)
               ;; Group navigation via arrow keys.
               ("C-<down>" . vertico-next-group)
-              ("C-<up>" . vertico-previous-group)
-              ;; Avy-style minibuffer jumps.
-              ("M-q" . vertico-quick-jump)
-              ("M-Q" . vertico-quick-exit)
-              ("M-i" . vertico-quick-insert))
-  :hook (;; Cleans up shadowed directory paths.
-         (rfn-eshadow-update-overlay . vertico-directory-tidy)
-         ;; Saves minibuffer state for session recovery.
-         (minibuffer-setup . vertico-repeat-save))
+              ("C-<up>"   . vertico-previous-group))
   :config
   ;; Prevents cursor wandering behind the read-only prompt text.
   (setq minibuffer-prompt-properties
         '(read-only t cursor-intangible t face minibuffer-prompt))
   (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
-  ;; Allows opening a minibuffer inside a minibuffer.
-  (setq enable-recursive-minibuffers t)
+  ;; Recursive minibuffers are enabled in the savehist section.
   ;; Displays depth indicator for nested recursive minibuffers.
   (minibuffer-depth-indicate-mode 1)
   ;; Activates the core Vertico engine post-load.
-  (vertico-mode 1)
-  ;; Activates the multiform extension mode.
-  (vertico-multiform-mode 1)
-  ;; Context-aware UI rules per command.
+  (vertico-mode 1))
+#+end_src
+
+** DONE Vertico Directory
+Provides directory navigation commands for the minibuffer.
+#+begin_src emacs-lisp
+(use-package vertico-directory
+  :ensure nil
+  :after vertico
+  :bind (:map vertico-map
+              ("RET"   . vertico-directory-enter)
+              ("DEL"   . vertico-directory-delete-char)
+              ("M-DEL" . vertico-directory-delete-word))
+  :hook (rfn-eshadow-update-overlay . vertico-directory-tidy))
+#+end_src
+
+** DONE Vertico Quick
+Enables rapid candidate selection via Avy-style shortcuts.
+#+begin_src emacs-lisp
+(use-package vertico-quick
+  :ensure nil
+  :after vertico
+  :bind (:map vertico-map
+              ("M-q" . vertico-quick-jump)
+              ("M-Q" . vertico-quick-exit)
+              ("M-i" . vertico-quick-insert)))
+#+end_src
+
+** DONE Vertico Repeat
+Saves and replays minibuffer completion sessions.
+#+begin_src emacs-lisp
+(use-package vertico-repeat
+  :ensure nil
+  :after vertico
+  :hook (minibuffer-setup . vertico-repeat-save))
+#+end_src
+
+** DONE Vertico Multiform
+Configures display rules and candidate transformations per command and category.
+#+begin_src emacs-lisp
+(use-package vertico-multiform
+  :ensure nil
+  :after vertico
+  :config
+  ;; Intercepts candidate formatting to apply per-category text transformations.
+  (defvar ar/vertico-transform-functions nil)
+  (cl-defmethod vertico--format-candidate :around
+    (cand prefix suffix index start
+          &context ((not ar/vertico-transform-functions) null))
+    (dolist (fun (ensure-list ar/vertico-transform-functions))
+      (setq cand (funcall fun cand)))
+    (cl-call-next-method cand prefix suffix index start))
+
+  ;; Highlights directories with a trailing slash.
+  (defun ar/vertico-highlight-directory-fn (file)
+    (if (string-suffix-p "/" file)
+        (propertize file 'face 'dired-directory)
+      file))
+
+  ;; Highlights already-enabled modes in M-x using the originating buffer.
+  (defun ar/vertico-highlight-enabled-mode-fn (cmd)
+    (let ((sym (intern-soft cmd)))
+      (when sym
+        (let ((origin-buf (window-buffer (minibuffer-selected-window))))
+          (when (and origin-buf (buffer-live-p origin-buf))
+            (with-current-buffer origin-buf
+              (when (or (eq sym major-mode)
+                        (and (memq sym minor-mode-list)
+                             (boundp sym)
+                             (symbol-value sym)))
+                (add-face-text-property 0 (length cmd)
+                                        'font-lock-constant-face 'append cmd)))))))
+    cmd)
+
+  ;; Configures per-command and per-category display rules.
   (setq vertico-multiform-commands
         '((consult-imenu buffer)
           (consult-outline buffer)
           (consult-line-multi buffer)
-          (consult-yasnippet grid)))
-  ;; Dynamically applies text properties to candidates based on category.
-  (defvar ar/vertico-transform-functions nil)
-  (cl-defmethod vertico--format-candidate :around
-    (cand prefix suffix index start &context ((not ar/vertico-transform-functions) null))
-    (dolist (fun (ensure-list ar/vertico-transform-functions))
-      (setq cand (funcall fun cand)))
-    (cl-call-next-method cand prefix suffix index start))
-  ;; Highlights directories with a trailing slash.
-  (defun ar/vertico-highlight-directory-fn (file)
-    "Highlight FILE as a directory if it ends with a slash."
-    (when (string-suffix-p "/" file)
-      (add-face-text-property 0 (length file) 'dired-directory 'append file))
-    file)
-  ;; Highlights enabled modes in M-x.
-  (defun ar/vertico-highlight-enabled-mode-fn (cmd)
-    "Highlight CMD if the corresponding mode is enabled."
-    (let ((sym (intern cmd)))
-      (with-current-buffer (nth 1 (buffer-list))
-        (if (or (eq sym major-mode)
-                (and (memq sym minor-mode-list)
-                     (boundp sym)
-                     (symbol-value sym)))
-            (add-face-text-property 0 (length cmd) 'font-lock-constant-face 'append cmd)))
-      cmd))
-  ;; Applies directory highlighting to the file category.
-  (add-to-list 'vertico-multiform-categories
-               '(file (ar/vertico-transform-functions . ar/vertico-highlight-directory-fn)))
-  ;; Applies mode highlighting to M-x.
-  (add-to-list 'vertico-multiform-commands
-               '(execute-extended-command (ar/vertico-transform-functions . ar/vertico-highlight-enabled-mode-fn)))
-  ;; Renders Embark's action menu as a searchable grid.
-  (add-to-list 'vertico-multiform-categories '(embark-keybinding grid))
-  ;; Remaps C-s to fuzzy-search minibuffer input history.
-  (defvar ar/minibuffer-maps
-    '(minibuffer-local-map
-      minibuffer-local-ns-map
-      minibuffer-local-completion-map
-      minibuffer-local-must-match-map
-      minibuffer-local-isearch-map
-      read-expression-map)
-    "List of minibuffer keymaps.")
-  (with-eval-after-load 'consult
-    (dolist (keymap ar/minibuffer-maps)
-      (define-key (symbol-value keymap) (kbd "C-s") #'consult-history))))
+          (consult-yasnippet grid)
+          (execute-extended-command
+           (ar/vertico-transform-functions . ar/vertico-highlight-enabled-mode-fn))))
+  (setq vertico-multiform-categories
+        '((file
+           (ar/vertico-transform-functions . ar/vertico-highlight-directory-fn))
+          (embark-keybinding grid)))
+  ;; Activates the multiform engine post-load.
+  (vertico-multiform-mode 1))
+
+;; Remaps C-s to fuzzy-search minibuffer input history.
+(defvar ar/minibuffer-maps
+  '(minibuffer-local-map
+    minibuffer-local-ns-map
+    minibuffer-local-completion-map
+    minibuffer-local-must-match-map
+    minibuffer-local-isearch-map
+    read-expression-map)
+  "List of minibuffer keymaps.")
+
+(with-eval-after-load 'consult
+  (dolist (keymap ar/minibuffer-maps)
+    (define-key (symbol-value keymap) (kbd "C-s") #'consult-history)))
 #+end_src
 
 ** DONE Marginalia
@@ -7110,9 +7170,28 @@ Searches for workspace symbols and integrates with Embark actions.
 #+end_src
 
 
-** TODO Peek
+** DONE Peek
+Renders inline definition and reference panels below the cursor using native overlays.
 #+begin_src emacs-lisp
-
+(use-package peek
+  :ensure nil
+  :commands (peek-xref-definition
+             peek-xref-references
+             peek-overlay-dwim)
+  :custom
+  ;; Render the peek view below the cursor to avoid obscuring the current line.
+  (peek-overlay-position 'below)
+  ;; Distance in lines between the cursor and the peek overlay.
+  (peek-overlay-distance 2)
+  ;; Number of surrounding lines to include for context.
+  (peek-definition-surrounding-above-lines 1)
+  ;; Automatically update the peek view if the source buffer changes.
+  (peek-live-update t)
+  ;; Eldoc integration is disabled to prevent UI flicker and diagnostic bleed.
+  (peek-enable-eldoc-display-integration nil)
+  :config
+  ;; Activate the global peek engine.
+  (global-peek-mode 1))
 #+end_src
 
 
@@ -7122,7 +7201,7 @@ Searches for workspace symbols and integrates with Embark actions.
 #+end_src
 
 
-** TODO Auto-rename-tags
+** TODO Auto Rename Tag
 #+begin_src emacs-lisp
 
 #+end_src
@@ -7357,8 +7436,11 @@ Injects bibliography abstracts and formatted references into the universal sidec
 #+begin_src emacs-lisp
 (use-package hl-todo
   :defer t
-  :commands (hl-todo-rg-project hl-todo-rgrep hl-todo-next hl-todo-previous hl-todo-occur)
-
+  :commands (hl-todo-rg-project
+             hl-todo-rgrep
+             hl-todo-next
+             hl-todo-previous
+             hl-todo-occur)
   :custom-face
   (hl-todo ((t (:inherit default :height 0.9 :width condensed :weight bold :underline nil :inverse-video nil))))
 
