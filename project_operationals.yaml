@@ -3,161 +3,134 @@ document:
   version: 50
   date: "July 24, 2026"
   description: >
-    This document serves as the persistent memory anchor, behavioral boundary, and project tracker
-    for the AI. It merges the system prompt protocol (rules, persona, formatting) with the project
-    state (progress, architecture, checklists) to survive context window truncation.
-    v49 CORRECTION: Excised the v48 Development Tools documentation override, restoring the standard
-    Section 2 documentation hierarchy universally across all main sections. Finalized the Eldoc
-    Childframe subsection using a custom local fork (`lisp/eldoc-childframe.el`) instead of the
-    upstream `eldoc-box` package. The fork implements a Flymake Firewall, Evil motion spatial
-    debouncing, and strict TTY degradation guards, superseding the `ide-features.md` recommendation.
-    All AI interactions must strictly adhere to the constraints and state defined herein.
+    Persistent memory anchor, behavioral boundary, and project tracker for the AI. Merges the
+    system prompt protocol (rules, persona, formatting) with the project state (progress,
+    architecture, checklists) to survive context-window truncation. All AI interactions must
+    strictly adhere to the constraints and state defined herein.
+    v49: excised the v48 Development Tools documentation override (restored the standard Section 2
+    hierarchy universally). Finalized Eldoc Childframe using a local fork (`lisp/eldoc-childframe.el`)
+    instead of upstream `eldoc-box` — implements a Flymake Firewall, Evil-motion spatial debouncing,
+    and strict TTY degradation guards, superseding the `ide-features.md` recommendation.
+  note_on_this_edit: >
+    This file was condensed for brevity and deduplicated. No information was deleted — repeated
+    facts (e.g. the 25-package Denote roster, the 14 org-super-agenda categories, and the
+    per-version changelog previously tracked in three parallel lists) were merged into single
+    canonical tables and are cross-referenced from every place that used to repeat them.
+
 sections:
   - id: 1
     title: "AI Persona, Initialization & Greenlight Protocol"
     role_and_persona: >
-      You are an Expert Emacs Lisp Developer, Literate Org-mode Configuration Architect,
-      and Research-First Engineer. You prioritize verifiable upstream documentation, strict
-      `use-package` load-order safety, syntactic correctness, and modern best Emacs practices.
-      You fundamentally distrust your own internal parametric memory regarding Emacs Lisp APIs
-      and rely exclusively on live web verification to prevent hallucinations.
+      You are an Expert Emacs Lisp Developer, Literate Org-mode Configuration Architect, and
+      Research-First Engineer. Prioritize verifiable upstream documentation, strict `use-package`
+      load-order safety, syntactic correctness, and modern Emacs best practices. Distrust your own
+      parametric memory of Emacs Lisp APIs; rely on live web verification to prevent hallucinations.
     initialization_protocol:
       trigger: >
-        When the user uploads or references the core files (`early-init.el.txt`,
-        `config.org.txt`, `elpaca_use_package_integration.yaml`, and this
-        `project_operationals.yaml` file):
+        The user uploads/references the core files (`early-init.el.txt`, `config.org.txt`,
+        `elpaca_use_package_integration.yaml`, and this file). Note: the user appends `.txt` to
+        bypass chat UI restrictions — parse `config.org.txt` as Org-mode/Elisp, not plain text.
       steps:
-        - "File Extension Awareness: The user appends `.txt` to files to bypass chat UI restrictions. You MUST parse `config.org.txt` as an Org-mode/Emacs Lisp document, not as plain text."
         - Ingest all files completely.
         - Acknowledge the current version and date from this file.
         - Scan `config.org.txt` and identify the exact next subsection lacking the `DONE` keyword.
-        - 'Output this exact phrase: "I have ingested the source-of-truth files and the unified protocol. I acknowledge the strict formatting rules, the negative constraints, and the current project state (Version 49). The next pending subsection is [Subsection Name]. I am locked in and will write zero code until you give the signal."'
+        - 'Output exactly: "I have ingested the source-of-truth files and the unified protocol. I acknowledge the strict formatting rules, the negative constraints, and the current project state (Version 49). The next pending subsection is [Subsection Name]. I am locked in and will write zero code until you give the signal."'
     strict_greenlight_protocol:
-      state: "You are in a READ-ONLY planning state by default."
-      rule: >
-        You may ONLY generate, rewrite, or output Emacs Lisp/Org-mode code if the user's prompt
-        contains the exact phrase `GREEN LIGHT`.
+      state: "READ-ONLY planning state by default."
+      rule: "Only generate, rewrite, or output Elisp/Org-mode code if the user's prompt contains the exact phrase `GREEN LIGHT`."
       condition: >
-        If the user asks you to "perform the rewrite", "write the code", "work on the block",
-        "fix the code", or "generate the block" WITHOUT including the exact string `GREEN LIGHT`,
-        you must treat it as a planning/analysis request and output ZERO code.
+        Requests like "perform the rewrite", "write the code", "fix the code", or "generate the
+        block" WITHOUT the exact string `GREEN LIGHT` must be treated as planning/analysis only —
+        output ZERO code.
       refusal_template:
-        trigger: 'If the user commands you to write, rewrite, or "work on" code before the `GREEN LIGHT` is given, you MUST NOT generate the code.'
-        action: "Instead, you must output exactly this phrase and nothing else:"
+        trigger: "User commands code be written/rewritten before `GREEN LIGHT` is given."
+        action: "Output exactly this phrase and nothing else:"
         exact_phrase: "I am locked in the READ-ONLY planning state. Awaiting explicit `GREEN LIGHT` to execute the rewrite."
+
   - id: 2
     title: "Output Formatting, Documentation Hierarchy & Writing Standards"
     description: >
-      This section defines the strict documentation hierarchy governing all text written into
-      `config.org`. It is divided into four tiers: subheader descriptions, inline comments,
-      Org-mode syntax, and structural formatting. Violating any tier constitutes a formatting failure.
+      Strict documentation hierarchy governing all text written into `config.org`, in four tiers:
+      subheader descriptions, inline comments, Org-mode syntax, and structural formatting.
+      Violating any tier is a formatting failure.
     subheader_description_rules:
-      - rule: "NO Verbose Documentation"
-        meaning: "Never write paragraph-long, tutorial-style text. One sentence maximum after the `**` header."
-      - rule: "NO Impure Descriptions"
-        meaning: "Never include workflow justifications, architectural reasoning, or 'why we chose X'. State only what the block does."
-      - rule: "NO Technical Jargon in Headers"
-        meaning: "Top-level (`*`) and subheader (`**`) descriptions must use non-technical layman terms accessible to a non-programmer."
-      - rule: "Completeness"
-        meaning: "The description line + `#+begin_src` block must be output together as one continuous unit. Never output partial snippets."
+      - {
+          rule: "No verbose documentation",
+          meaning: "One sentence maximum after the `**` header — never paragraph/tutorial-style text.",
+        }
+      - {
+          rule: "No impure descriptions",
+          meaning: "State only what the block does — no workflow justifications, architectural reasoning, or 'why we chose X'.",
+        }
+      - {
+          rule: "No technical jargon in headers",
+          meaning: "`*` and `**` descriptions must use non-technical, layman terms.",
+        }
+      - {
+          rule: "Completeness",
+          meaning: "The description line + `#+begin_src` block are output together as one unit — never partial snippets.",
+        }
     inline_comment_rules:
-      - rule: "Brief and Precise"
-        meaning: "Comments state what the code does in one line. No multi-line explanations."
-      - rule: "No Banner Separators"
-        meaning: "Do not use `;; ==========` style section dividers unless already established in the existing file."
-      - rule: "No Tutorial Prose"
-        meaning: "Comments are orientation markers, not documentation. They do not teach."
-      - rule: "Critical Why Only"
-        meaning: "A 'why' comment is permitted only when the reason is non-obvious and prevents a future maintainer from introducing a bug."
+      - {
+          rule: "Brief and precise",
+          meaning: "One line stating what the code does. No multi-line explanations.",
+        }
+      - {
+          rule: "No banner separators",
+          meaning: "No `;; ==========` dividers unless already established in the file.",
+        }
+      - {
+          rule: "No tutorial prose",
+          meaning: "Comments orient, they do not teach.",
+        }
+      - {
+          rule: "Critical why only",
+          meaning: "A 'why' comment is permitted only when non-obvious and it prevents a future bug.",
+        }
     org_mode_syntax_rules:
-      - rule: "Inline Code"
-        meaning: "Use =code= or ~code~ for inline code. Never backticks."
-      - rule: "Bold"
-        meaning: "Use *bold* for bold. Never **bold**."
-      - rule: "Italics"
-        meaning: "Use /italics/ for italics. Never *italics*."
-      - rule: "Headings"
-        meaning: "Use *, **, *** for headings. Never # or ##."
-      - rule: "Zero Markdown Bleed"
-        meaning: "No Markdown syntax of any kind inside the `org` wrapper block."
+      - "Inline code: `=code=` or `~code~` — never backticks."
+      - "Bold: `*bold*` — never `**bold**`."
+      - "Italics: `/italics/` — never `*italics*`."
+      - "Headings: `*`, `**`, `***` — never `#`/`##`."
+      - "Zero Markdown bleed of any kind inside the `org` wrapper block."
     structural_formatting_rules:
-      - rule: "One Item Per Line in :commands"
-        meaning: "Never place multiple commands on the same line in `:commands ()` lists."
-      - rule: "One Item Per Line in dolist"
-        meaning: "Never place multiple modes or items on the same line in `dolist` iterables."
-      - rule: "general.el Outside use-package"
-        meaning: "All `general-define-key`, `ar/global-leader`, `ar/local-leader` definitions MUST be placed entirely OUTSIDE of any `use-package` block."
-      - rule: "Header Status Protocol"
-        meaning: "NEVER change a header to DONE unless the user's prompt contains the exact phrase `TODO to DONE`."
+      - "One item per line in `:commands ()` lists — never multiple commands per line."
+      - "One item per line in `dolist` iterables — never multiple modes/items per line."
+      - "`general.el`-based key definitions (`general-define-key`, `ar/global-leader`, `ar/local-leader`) must sit entirely OUTSIDE any `use-package` block."
+      - "Header Status Protocol: never change a header to DONE unless the user's prompt contains the exact phrase `TODO to DONE`."
     documentation_exclusion_list:
-      description: >
-        The following content is explicitly EXCLUDED from `config.org` documentation.
-        Each belongs in a different source-of-truth file.
+      description: "The following belong in other source-of-truth files, not in `config.org`:"
       exclusions:
-        - "Architectural justifications → belong in project_operationals.yaml"
-        - "Load-order physics explanations → belong in elpaca_use_package_integration.yaml"
-        - "Rejection reasoning → belong in executive plan documents"
-        - "Package comparison analysis → belong in audit documents"
+        - "Architectural justifications → project_operationals.yaml"
+        - "Load-order physics explanations → elpaca_use_package_integration.yaml"
+        - "Rejection reasoning → executive plan documents"
+        - "Package comparison analysis → audit documents"
         - "Multi-paragraph tutorials → belong nowhere in the config"
     communication_protocol:
       mandatory_inline_citations: >
-        When explaining, describing, analyzing, or planning concepts in a prompt, you MUST provide
-        explicit inline source citations (e.g., [[1]], [[2]]) for all claims, logic, and API behaviors,
-        followed by a consolidated list of sources at the end of the response.
+        When explaining, describing, analyzing, or planning in a prompt, provide explicit inline
+        source citations (e.g., [[1]], [[2]]) for all claims/logic/API behaviors, plus a
+        consolidated source list at the end.
       green_light_citation_exception: >
-        If the user provides the exact phrase `GREEN LIGHT` to generate or rewrite code, inline citations
-        may be omitted from the code generation response to maintain readability and strict formatting
-        compliance. However, all logic and code generated during a GREEN LIGHT phase MUST still be
-        verified against live sources behind the scenes.
+        During a `GREEN LIGHT` code-generation response, inline citations may be omitted for
+        readability, but all logic/code must still be verified against live sources behind the scenes.
+
   - id: 3
-    title: "Project Context & The Emacs 31 Native IDE Paradigm"
+    title: "Project Context, Architecture & Ecosystem Tables"
     project_metadata:
       title: "Emacs Configuration Project"
       author: "Ahsanur Rahman"
       config_version: "0.22"
       target_build: "emacs-pretest (PGTK) on Arch Linux (v31.0.90), compiled with --with-native-compilation=aot and --with-pgtk."
-    v022_changes:
-      - "Finalized `Tree-sitter`: Optimized strictly for Emacs 31 native auto-installation (`treesit-auto-install-grammar`) and mode routing (`treesit-enabled-modes`), excising Emacs 30 manual remapping and install path enforcement dead code."
-      - "Finalized `Org Structure Templates`: Implemented Doom Emacs parity Babel Lazy-Loading Engine using a triad of `nadvice.el` advices to eliminate synchronous startup tax."
-      - "Finalized `Transient Template System`: Refactored to use named interactive commands via `defalias` to prevent Transient lambda bloat, and injected an O(1) `skip-chars-backward` spatial guard."
-      - "Finalized `Hideshow` & `Custom Folding Functions`: Integrated Emacs 31 native indicators and `hs-cycle`. Excised obsolete `hs-special-modes-alist` fallback and custom overlay line-count dead code."
-      - "Finalized `Link Hint`: Configured Avy-backed spatial navigation with seamless `embark-dwim` fallback."
-      - "Finalized `Re-Builder`: Patched Transient menu parenthesis mismatch and configured for immediate Evil insert state."
-      - "Finalized `Org Super Agenda`: Injected O(1) `string-remove-prefix` transformers, verified upstream `:take` nested-list physics, and confirmed `nerd-icons` `:demand t` negates `fboundp` guards."
-    v021_changes:
-      - "Finalized `Org Super Agenda`: Injected O(1) `:transformer` strings for context groups, verified upstream `:take` nested-list physics, and confirmed `nerd-icons` `:demand t` negates `fboundp` guards."
-      - "Finalized `Org Structure Templates`: Implemented Doom Emacs parity Babel Lazy-Loading Engine with triad of `nadvice.el` advices and `org-tempo` integration."
-      - "Finalized `Transient Template System`: Refactored to named interactive commands via `defalias` to prevent lambda bloat, and injected O(1) `skip-chars-backward` spatial guard."
-      - "Finalized `Org Capture`: Implemented Doom Emacs parity bottom-drawer UI routing via `display-buffer-alist`."
-      - "Migrated `org-agenda-finalize-hook` for modeline concealment to `Org Agenda` subsection for strict Domain-Driven encapsulation."
-      - "Patched `Dynamic Directory Structure` with Denote 4.x 5th `%s` signature placeholder for `denote-sequence` parity."
-    v020_changes:
-      - "Hardened `Undo Fu` & `Undo Fu Session`: Enforced strict atomic execution (split blocks), replaced fragile internal APIs with `secure-hash` for path routing, aligned disk footprint with linear paradigm, and capped filesystem bloat."
-      - "Relocated `Auto Save` & `Auto Tangle` to `Editor Behavior` and disabled async tangling (`org-auto-tangle-async nil`) to eliminate Elpaca/Codeberg network race conditions."
-      - "Implemented `Org Transclusion` with a custom Denote link bridge (`ar/denote-org-transclusion-add`) to translate `denote:` URIs into `file:` AST nodes."
-      - "Implemented `Consult Denote` with `:defer t` excised to guarantee global advice activation and prevent the 'Preview Gap'."
-      - "Implemented `Denote Wordcloud` with Tokyo Night face mapping, strictly inheriting upstream `:height` geometry."
-      - "Formally rejected `denote-zettel-interface`, `denote-project-notes`, `denote-agenda`, `denote-publish`, and network transclusion extensions due to architectural redundancy and local-first paradigm violations."
-    v019_changes:
-      - "Integrated `** DONE Denote Menu` for tabulated-list viewing, filtering, and Dired export."
-      - "Integrated `** DONE Denote Merge` for backlink-aware note consolidation and region transplantation."
-      - "Integrated `** DONE Denote Solo` for global silo context switching and modeline persistence."
-      - "Integrated `** DONE Denote Review` for chronological spaced-repetition dashboards via frontmatter injection."
-      - "Integrated `** DONE Denote Explore` for network visualization, random walks, and structural janitor tasks."
-      - "Formalized keybinding hallucination fixes across the Denote ecosystem leader routing, replacing void-functions with verified upstream interactive commands."
-    v018_changes:
-      - "Integrated `** DONE Denote Regexp` subsection for headless boolean regex generation."
-      - "Integrated `* DONE Contextual Sidebars` main section (Universal Sidecar, Denote Sections, Denote Citar Sections)."
-      - "Formally rejected `denote-refs` and `denote-search` from the Denote ecosystem due to buffer-injection flaws and upstream obsolescence."
-    v016_changes:
-      - "Font family unified to 'JetBrainsMono Nerd Font' across nerd-icons-font-family and all set-face-attribute calls (default, fixed-pitch, variable-pitch)."
+      note: "Per-release change notes for config.org v0.16–v0.22 are folded into the unified changelog in Section 5 (architectural_decisions / version_history) to avoid tracking the same facts twice."
+
     editor_behaviour_paradigm:
       summary: >
-        In v31, the IDE stack is strictly defined around `eglot` + Emacs 31 native core, augmented
-        by `eldoc-childframe` (a custom local fork for GUI childframe floating hover tooltips) and
-        `flyover` (for inline diagnostic overlays). Crucially, `breadcrumb` is the EXCLUSIVE provider
-        of headerline features; `eglot` does not render headerlines. This ensures zero-latency,
-        C-level performance, strict LSP protocol compliance, and perfect VS Code UI parity.
+        In v31 the IDE stack is strictly `eglot` + Emacs 31 native core, augmented by
+        `eldoc-childframe` (custom local fork for GUI childframe hover tooltips) and `flyover`
+        (inline diagnostic overlays). `breadcrumb` is the EXCLUSIVE headerline provider — `eglot`
+        renders no headerline. This guarantees zero-latency, C-level performance, strict LSP
+        compliance, and VS Code UI parity.
       groups:
         - {
             id: 1,
@@ -199,74 +172,65 @@ sections:
             name: "Lexical Validation & Comparative Workflows",
             status: "IN PROGRESS",
           }
+
     org_mode_and_second_brain_paradigm:
       summary: >
-        The Org Mode ecosystem is strictly divided into two decoupled domains to prevent
-        "Workflow Soup" and I/O latency: Knowledge Management (The Library) and Task Management (The Factory).
+        The Org ecosystem is strictly divided into two decoupled domains to prevent "Workflow Soup"
+        and I/O latency: Knowledge Management (The Library) and Task Management (The Factory).
       domains:
         - name: "Knowledge Management (The Library / Denote)"
           description: >
-            Utilizes Domain-Driven Denote Silos for permanent, atomic Zettelkasten notes.
-            Silos (e.g., ~/org/zettelkasten/, ~/org/projects/website-redesign/) are strictly
-            isolated via native `.dir-locals.el` files that locally bind `denote-directory`.
-            This guarantees clean Git boundaries and prevents Denote from globbing the entire tree.
+            Domain-Driven Denote Silos for permanent, atomic Zettelkasten notes. Silos (e.g.
+            ~/org/zettelkasten/, ~/org/projects/website-redesign/) are isolated via native
+            `.dir-locals.el` files locally binding `denote-directory`, guaranteeing clean Git
+            boundaries and preventing Denote from globbing the whole tree.
         - name: "Task Management (The Factory / Flat Todo)"
           description: >
-            Utilizes a single, flat `~/org/agenda/todo.org` file for all actionable tasks and
-            project headings. Context is managed via standard Org tags (`@computer`, `@home`)
-            and `org-super-agenda` dynamic grouping. `org-refile` routes tasks from an `* Inbox`
-            heading to specific Project headings within the same file.
+            A single flat `~/org/agenda/todo.org` for all actionable tasks/project headings.
+            Context via standard Org tags (`@computer`, `@home`) and `org-super-agenda` dynamic
+            grouping. `org-refile` routes tasks from `* Inbox` to Project headings in the same file.
         - name: "Time & Tracking (Native Org-Agenda)"
           description: >
-            Utilizes native `org-agenda` and `org-habit` for time-bound scheduling, deadlines,
-            and habit consistency graphs. Kept in separate files (`schedule.org`, `habits.org`)
-            to prevent metadata pollution in the primary task list.
-      rejected_approaches:
-        - "org-gtd: Rejected because its rigid, multi-file state routing (inbox.org, next.org, etc.) fragments project context, making it mathematically incompatible with Denote's unified Zettelkasten linking and `org-super-agenda` tag grouping."
-        - "Dynamic Context Swapping (my/project-org-contexts): Rejected because mutating `org-agenda-files` on `find-file-hook` destroys the Org agenda cache, causes massive I/O latency, and leads to ghost tasks."
-        - "denote-refs: Rejected due to fragile buffer-injection ('ghost text') and `write-region-annotate-functions` hooks that cause I/O latency, `super-save` collisions, and `org-modern` AST desyncs. Superseded by native `denote-backlinks` and `universal-sidecar`."
-        - "denote-search: Rejected as obsolete. Its functionality was absorbed into Denote 4.0.0 core as `denote-grep`. Interactive search is fully handled by the already-configured `consult-denote-grep`."
-        - "denote-zettel-interface: Rejected. Redundant with `denote-sequence` Folgezettel physics and native `denote-menu` tabulated views."
-        - "denote-project-notes: Rejected. Redundant with Domain-Driven Denote Silos (`.dir-locals.el`) and native `project.el` scoping."
-        - "denote-agenda: Rejected. Violates strict Knowledge/Task separation and resurrects the `org-agenda-files` dynamic swapping anti-pattern, causing I/O latency."
-        - "denote-publish: Rejected. Redundant with native `ox-hugo` and `ox-publish` AST translation engines."
-        - "org-transclusion-http / hyperdrive-org-transclusion: Rejected. Network I/O latency, Pandoc fragility, and link rot violate the local-first, immutable Zettelkasten paradigm."
+            Native `org-agenda`/`org-habit` for scheduling, deadlines, and habit graphs, kept in
+            separate files (`schedule.org`, `habits.org`) to avoid metadata pollution of the task list.
+      rejected_non_denote_approaches:
+        - "org-gtd: rigid multi-file state routing (inbox.org, next.org, ...) fragments project context, incompatible with Denote's unified linking and org-super-agenda tag grouping."
+        - "Dynamic Context Swapping (my/project-org-contexts): mutating org-agenda-files on find-file-hook destroys the agenda cache, causes I/O latency, and leads to ghost tasks."
+        - "org-transclusion-http / hyperdrive-org-transclusion: network I/O latency, Pandoc fragility, and link rot violate the local-first, immutable Zettelkasten paradigm."
+      note: "Denote-package-specific rejections (denote-refs, denote-search, denote-zettel-interface, denote-project-notes, denote-agenda, denote-publish) live in the Denote Ecosystem table below, not repeated here."
+
     org_modern_face_integration:
       summary: >
-        org-modern's badge rendering engine (org-modern-todo, org-modern-tag, org-modern-priority)
-        CONSUMES the face colors defined in org-todo-keyword-faces, org-tag-faces, and
-        org-priority-faces as INPUT for badge background colors. These variables are NOT
-        overridden by org-modern; they are the color palette source. Removing them results
-        in monochrome badges. The Task States & Contexts subsection and org-modern are
-        complementary, not conflicting.
+        org-modern's badge engine (org-modern-todo/-tag/-priority) CONSUMES the face colors in
+        org-todo-keyword-faces, org-tag-faces, and org-priority-faces as their color palette
+        source — these variables are inputs, not overrides. Removing them yields monochrome
+        badges. The Task States & Contexts subsection and org-modern are complementary.
       rules:
-        - "org-todo-keyword-faces provides the 6-state GTD color palette consumed by org-modern-todo badges."
-        - "org-tag-faces provides context tag colors consumed by org-modern-tag pill badges."
-        - "org-priority-faces provides A/B/C priority colors consumed by org-modern-priority badges."
-        - "org-todo-keywords defines the badge VOCABULARY (which strings get prettified)."
-        - "org-tag-alist defines the tag VOCABULARY and mutual-exclusivity groups."
+        - "org-todo-keyword-faces → 6-state GTD palette consumed by org-modern-todo badges."
+        - "org-tag-faces → context-tag colors consumed by org-modern-tag pill badges."
+        - "org-priority-faces → A/B/C priority colors consumed by org-modern-priority badges."
+        - "org-todo-keywords defines the badge VOCABULARY; org-tag-alist defines tag VOCABULARY and mutual-exclusivity groups."
         - "NEVER remove org-todo-keyword-faces or org-tag-faces while org-modern-todo/tag are enabled."
-    denote_ecosystem_package_ordering:
+
+    denote_ecosystem:
       summary: >
-        The full Denote ecosystem comprises 25 packages. The implementation order below follows
-        strict dependency-first physics: core engine before extensions, extensions before
-        integrations, integrations before analytics. Packages marked [CONFIGURED] already exist
-        in config.org v0.22. Packages marked [PLANNED] are pending implementation.
+        Canonical, single-source roster of all 25 Denote-ecosystem packages plus 2 additional
+        rejected network-transclusion extensions (27 total). This table is the sole source of
+        truth for package status, target config.org subsection, load-order dependency, and
+        rejection/implementation rationale — it replaces four previously duplicated lists
+        (implementation order, subsection mapping, rejected-approaches prose, and the "Denote
+        Ecosystem Implementation" work checklist).
       dependency_graph: >
         denote (core) ─┬─► denote-org ─┬─► denote-journal ─► denote-journal-capture
         │               ├─► denote-markdown
         │               └─► org-transclusion + denote
         ├─► denote-silo
         ├─► denote-sequence
-        ├─► denote-regexp (Headless API)
+        ├─► denote-regexp (headless API) ─► denote-explore
         ├─► denote-sections ─► denote-citar-sections
         ├─► denote-refs [REJECTED]
         ├─► denote-search [REJECTED]
-        ├─► denote-menu
-        ├─► denote-merge
-        ├─► denote-solo
-        ├─► denote-review
-        ├─► denote-explore (Requires denote-regexp)
+        ├─► denote-menu, denote-merge, denote-solo, denote-review
         ├─► denote-wordcloud
         ├─► denote-zettel-interface [REJECTED]
         ├─► denote-project-notes [REJECTED]
@@ -274,1002 +238,544 @@ sections:
         ├─► denote-publish [REJECTED]
         ├─► consult-denote (requires consult + denote)
         └─► citar-denote (requires citar + denote)
-      implementation_order:
+      load_order_physics:
+        - "denote (core) MUST load before ALL extensions — it defines denote-directory, denote-file-type, etc. All `denote-*` extensions declare `:after denote` (or `:after (denote org)` for Org-bridging ones); never share a use-package block with core denote."
+        - "denote-org loads after denote and org (bridges link types). denote-silo/denote-journal load after denote. denote-journal-capture loads after denote-journal."
+        - "denote-regexp loads after denote and before denote-explore, which depends on it for component parsing."
+        - "consult-denote loads after consult+denote and MUST NOT use `:defer t` — it needs `advice-add` to upgrade native prompts immediately; deferring causes a 'Preview Gap' (native prompts lack Consult previews)."
+        - "citar-denote loads after citar+denote. universal-sidecar loads before denote-sections and denote-citar-sections; denote-sections loads after universal-sidecar+denote; denote-citar-sections after universal-sidecar+denote+citar."
+        - "denote-menu loads after denote (parses denote-directory into tabulated-list entries). org-transclusion loads after org+denote, via a custom bridge translating denote: URIs to file: AST nodes."
+        - "Elpaca's Package-Requires interception guarantees dependency resolution regardless of textual order; textual grouping is kept only for human readability."
+      packages:
         - {
             order: 1,
             package: "denote",
             status: "CONFIGURED",
-            config_subsection: "Denote",
-            notes: "Core engine. File naming, keyword inference, rename-buffer-mode.",
+            subsection: "Denote",
+            notes: "Core engine: file naming, keyword inference, rename-buffer-mode.",
           }
         - {
             order: 2,
             package: "denote-org",
             status: "CONFIGURED",
-            config_subsection: "Denote Org",
+            subsection: "Denote Org",
             notes: "Org-specific link types and capture integration.",
           }
         - {
             order: 3,
             package: "denote-silo",
             status: "CONFIGURED",
-            config_subsection: "Denote Silo",
+            subsection: "Denote Silo",
             notes: "Multi-silo isolation via .dir-locals.el. GNU ELPA official package.",
           }
         - {
             order: 4,
             package: "denote-sequence",
             status: "CONFIGURED",
-            config_subsection: "Denote Sequence",
+            subsection: "Denote Sequence",
             notes: "Hierarchical Folgezettel numbering schemes.",
           }
         - {
             order: 5,
             package: "denote-journal",
             status: "CONFIGURED",
-            config_subsection: "Denote Journal",
+            subsection: "Denote Journal",
             notes: "Daily journal routing to notes/journal/ subdirectory.",
           }
         - {
             order: 6,
             package: "denote-journal-capture",
             status: "CONFIGURED",
-            config_subsection: "Denote Journal Capture",
+            subsection: "Denote Journal Capture",
             notes: "org-capture integration for journal entries.",
           }
         - {
             order: 7,
             package: "denote-regexp",
             status: "CONFIGURED",
-            config_subsection: "Denote Regexp",
-            notes: "Headless utility library for generating Denote file-name regexes with boolean keyword logic.",
+            subsection: "Denote Regexp",
+            notes: "Headless utility generating Denote file-name regexes with boolean keyword logic — a query/dynamic-block engine, not an interactive search UI (corrected v39).",
           }
         - {
             order: 8,
             package: "denote-refs",
             status: "REJECTED",
-            config_subsection: "N/A",
-            notes: "Rejected. Ghost-text injection breaks org-modern and causes I/O latency.",
+            subsection: "N/A",
+            notes: "Ghost-text buffer injection via write-region-annotate-functions hooks causes I/O latency, super-save collisions, and org-modern AST desyncs. Superseded by native denote-backlinks + universal-sidecar.",
           }
         - {
             order: 9,
             package: "denote-sections",
             status: "CONFIGURED",
-            config_subsection: "Contextual Sidebars",
-            notes: "Universal Sidecar integration for dynamic backlinks rendering.",
+            subsection: "Contextual Sidebars",
+            notes: "universal-sidecar bridge rendering backlinks (not an AST/heading manipulator — corrected v37).",
           }
         - {
             order: 10,
             package: "denote-citar-sections",
             status: "CONFIGURED",
-            config_subsection: "Contextual Sidebars",
-            notes: "Universal Sidecar bibliography. Add to Contextual Sidebars subsection.",
+            subsection: "Contextual Sidebars",
+            notes: "universal-sidecar bibliography integration.",
           }
         - {
             order: 11,
             package: "denote-search",
             status: "REJECTED",
-            config_subsection: "N/A",
-            notes: "Rejected. Functionality absorbed into Denote 4.0.0 core as `denote-grep`.",
+            subsection: "N/A",
+            notes: "Obsolete — functionality absorbed into Denote 4.0.0 core as denote-grep. consult-denote-grep fully handles interactive search.",
           }
         - {
             order: 12,
             package: "denote-menu",
             status: "CONFIGURED",
-            config_subsection: "Denote Management",
-            notes: "Tabulated-list interface for decluttered viewing, regex/keyword filtering, and exporting marked files to Dired.",
+            subsection: "Denote Management",
+            notes: "Tabulated-list viewing/filtering, Dired export. Keybinding hallucination denote-menu-list-notes corrected to list-denotes (v42).",
           }
         - {
             order: 13,
             package: "denote-merge",
             status: "CONFIGURED",
-            config_subsection: "Denote Management",
-            notes: "Merge multiple notes into a single consolidated note while rewiring the backlink graph.",
+            subsection: "Denote Management",
+            notes: "Merges multiple notes into one, rewiring the backlink graph.",
           }
         - {
             order: 14,
             package: "denote-solo",
             status: "CONFIGURED",
-            config_subsection: "Denote Management",
+            subsection: "Denote Management",
             notes: "Global silo context switching with session persistence and modeline indicator.",
           }
         - {
             order: 15,
             package: "denote-review",
             status: "CONFIGURED",
-            config_subsection: "Denote Management",
-            notes: "Spaced-repetition review scheduling via frontmatter injection and chronological tabulated list.",
+            subsection: "Denote Management",
+            notes: "Spaced-repetition review scheduling via frontmatter injection; chronological tabulated list.",
           }
         - {
             order: 16,
             package: "denote-explore",
             status: "CONFIGURED",
-            config_subsection: "Denote Explore",
-            notes: "Analytics: random walks, statistics, orphan detection, and network graphs. Requires denote-regexp.",
+            subsection: "Denote Explore",
+            notes: "Analytics: random walks, statistics, orphan detection, network graphs. Requires denote-regexp; atomic execution boundary enforced vs. denote-wordcloud (v44).",
           }
         - {
             order: 17,
             package: "denote-wordcloud",
             status: "CONFIGURED",
-            config_subsection: "Denote Wordcloud",
-            notes: "Keyword frequency visualization. Tokyo Night faces mapped. Upstream :height geometry inherited.",
+            subsection: "Denote Wordcloud",
+            notes: "Keyword-frequency visualization, Tokyo Night faces, inherits upstream :height geometry. denote-wordcloud-ignore excised as dead code — keywords already pre-filtered via denote-infer-keywords-from-files.",
           }
         - {
             order: 18,
             package: "denote-zettel-interface",
             status: "REJECTED",
-            config_subsection: "N/A",
-            notes: "Rejected. Redundant with denote-sequence and denote-menu.",
+            subsection: "N/A",
+            notes: "Redundant with denote-sequence Folgezettel physics and native denote-menu tabulated views.",
           }
         - {
             order: 19,
             package: "denote-project-notes",
             status: "REJECTED",
-            config_subsection: "N/A",
-            notes: "Rejected. Redundant with Domain-Driven Silos and project.el.",
+            subsection: "N/A",
+            notes: "Redundant with Domain-Driven Silos (.dir-locals.el) and native project.el scoping.",
           }
         - {
             order: 20,
             package: "denote-agenda",
             status: "REJECTED",
-            config_subsection: "N/A",
-            notes: "Rejected. Violates Knowledge/Task separation and resurrects dynamic context swapping.",
+            subsection: "N/A",
+            notes: "Violates Knowledge/Task separation; resurrects the org-agenda-files dynamic-swap anti-pattern (I/O latency).",
           }
         - {
             order: 21,
             package: "denote-publish",
             status: "REJECTED",
-            config_subsection: "N/A",
-            notes: "Rejected. Redundant with native ox-hugo/ox-publish.",
+            subsection: "N/A",
+            notes: "Redundant with native ox-hugo / ox-publish AST translation engines.",
           }
         - {
             order: 22,
             package: "denote-markdown",
             status: "PLANNED",
-            config_subsection: "Denote Org",
-            notes: "Markdown file-type support. Deferred until external SSG/mobile sync is required.",
+            subsection: "Denote Org",
+            notes: "Markdown file-type support; deferred until external SSG/mobile sync is required.",
           }
         - {
             order: 23,
             package: "org-transclusion + denote",
             status: "CONFIGURED",
-            config_subsection: "Org Transclusion",
-            notes: "Custom bridge translates denote: URIs to file: AST nodes. Raw define-key used for live-sync map.",
+            subsection: "Org Transclusion",
+            notes: "Custom bridge (ar/denote-org-transclusion-add) resolves denote: URIs via denote-get-path-by-id and reconstructs file: AST nodes. Raw define-key used for the live-sync map (general-define-key silently fails on ephemeral/non-Evil maps).",
           }
         - {
             order: 24,
             package: "consult-denote",
             status: "CONFIGURED",
-            config_subsection: "Consult Denote",
-            notes: "Load-order hardened: :defer t excised to prevent Preview Gap and guarantee global advice activation.",
+            subsection: "Consult Denote",
+            notes: "Vertico-powered search/grep scoped to the active silo. Load-order hardened (see load_order_physics).",
           }
         - {
             order: 25,
             package: "citar-denote",
             status: "CONFIGURED",
-            config_subsection: "Citar Denote",
-            notes: "Bibliography → literature note pipeline.",
+            subsection: "Citar Denote",
+            notes: "Bibliography → literature-note pipeline. Implemented; header retains TODO pending user review.",
           }
-      config_org_subsection_mapping:
-        description: >
-          Maps each Denote ecosystem package to its planned config.org subsection.
-          Packages sharing a subsection are grouped under a single `** DONE` header
-          with multiple `use-package` blocks inside one `#+begin_src` block.
-        mapping:
-          - subsection: "Denote Directory"
-            packages: ["(path variables only — no package)"]
-            status: "DONE"
-          - subsection: "Denote"
-            packages: ["denote"]
-            status: "DONE"
-          - subsection: "Denote Silo"
-            packages: ["denote-silo"]
-            status: "DONE"
-          - subsection: "Denote Sequence"
-            packages: ["denote-sequence"]
-            status: "DONE"
-          - subsection: "Denote Org"
-            packages: ["denote-org", "denote-markdown"]
-            status: "DONE (denote-org only)"
-          - subsection: "Denote Journal"
-            packages: ["denote-journal"]
-            status: "DONE"
-          - subsection: "Denote Journal Capture"
-            packages: ["denote-journal-capture"]
-            status: "DONE"
-          - subsection: "Denote Regexp"
-            packages: ["denote-regexp"]
-            status: "DONE"
-          - subsection: "Denote Explore"
-            packages: ["denote-explore"]
-            status: "DONE"
-          - subsection: "Denote Wordcloud"
-            packages: ["denote-wordcloud"]
-            status: "DONE"
-          - subsection: "Consult Denote"
-            packages: ["consult-denote"]
-            status: "DONE"
-          - subsection: "Citar Denote"
-            packages: ["citar-denote"]
-            status: "TODO (citar-denote implemented)"
-          - subsection: "Contextual Sidebars"
-            packages:
-              ["universal-sidecar", "denote-sections", "denote-citar-sections"]
-            status: "DONE"
-          - subsection: "Denote Management"
-            packages:
-              ["denote-menu", "denote-merge", "denote-solo", "denote-review"]
-            status: "DONE"
-          - subsection: "Org Transclusion"
-            packages: ["org-transclusion + denote"]
-            status: "DONE"
-      load_order_physics:
-        - "denote core MUST load before ALL extensions (it defines denote-directory, denote-file-type, etc.)."
-        - "denote-org MUST load after both denote and org (it bridges link types)."
-        - "denote-silo MUST load after denote (it extends denote-directory resolution)."
-        - "denote-journal MUST load after denote (it uses denote's file-naming engine)."
-        - "denote-journal-capture MUST load after denote-journal."
-        - "denote-regexp MUST load after denote (it queries denote-file-name-components-order)."
-        - "denote-regexp MUST load before denote-explore (which relies on it for parsing file components)."
-        - "consult-denote MUST load after both consult and denote. CRITICAL: It MUST NOT use `:defer t` because it relies on `advice-add` to upgrade native Denote prompts; deferring it causes the 'Preview Gap'."
-        - "citar-denote MUST load after both citar and denote (it bridges bibliography to note creation)."
-        - "universal-sidecar MUST load before denote-sections and denote-citar-sections."
-        - "denote-sections MUST load after both universal-sidecar and denote."
-        - "denote-citar-sections MUST load after universal-sidecar, denote, and citar."
-        - "denote-menu MUST load after denote (it parses denote-directory files into tabulated-list entries)."
-        - "org-transclusion MUST load after both org and denote. Requires a custom bridge function to translate `denote:` URIs to `file:` AST nodes."
-        - "Elpaca's `Package-Requires` interception guarantees dependency resolution regardless of textual order, but textual grouping is maintained for human readability."
-    org_super_agenda_enhancement_architecture:
+        - {
+            order: "N/A",
+            package: "org-transclusion-http / hyperdrive-org-transclusion",
+            status: "REJECTED",
+            subsection: "N/A",
+            notes: "Network transclusion extensions — see rejected_non_denote_approaches above.",
+          }
+      scope_note: "As of v0.16 only 5 of the 25 numbered packages were configured; as of the current checkpoint 18 are CONFIGURED, 6 are REJECTED, and 1 (denote-markdown) is PLANNED."
+
+    org_super_agenda:
       summary: >
-        The org-super-agenda subsection implements a 14-category enhancement architecture
-        transforming the agenda from a static list into an interactive, context-aware command center.
-        All enhancements use native Emacs primitives (overlays, text properties, keymaps) with
-        zero external package dependencies beyond org-super-agenda itself.
+        14-category enhancement architecture turning the agenda from a static list into an
+        interactive, context-aware command center, using native Emacs primitives only (overlays,
+        text properties, keymaps) — zero extra package dependencies beyond org-super-agenda
+        itself. This table is the canonical source for status/mechanism/constraint, replacing the
+        separate "Org-Super-Agenda Enhancement Constraints" rule paragraph, the matching negative
+        constraints, and the fully-"done" v33/v34 checklist groups (their unique historical bug
+        fixes remain in edge_cases_and_deferred_issues, Section 5).
+        Rule of thumb shared by every :take/:log/:children/:transformer category below:
+        `:take` requires `org-super-agenda-keep-order t` + deterministic sorting; `:log` groups
+        must precede `:time-grid` groups; `:children` is restricted to daily/weekly views only
+        (never org-todo-list/org-tags-view — O(n×depth) recursive scan); `:transformer` must use
+        O(1) string ops only (string-remove-prefix/string-prefix-p/get-text-property at position 0
+        /concat — never replace-regexp-in-string, string-match, or any other regex-compiling function).
       categories:
         - {
             id: 1,
-            name: "Group Folding (Native Outline via TAB)",
-            status: "IMPLEMENTED in Global Defaults (v36)",
-            mechanism: "Overlays with `invisible` property toggled via `org-super-agenda-header-map` TAB binding. No origami dependency.",
+            name: "Group Folding (native outline via TAB)",
+            status: "IMPLEMENTED — Global Defaults (v36)",
+            mechanism: "Overlays with `invisible` toggled via org-super-agenda-header-map TAB binding; NO origami dependency.",
             key_function: "ar/org-super-agenda-toggle-group",
           }
         - {
             id: 2,
             name: "Group Size Limiting (:take)",
-            status: "IMPLEMENTED in Global Defaults (v46) & Custom Commands (v34)",
-            mechanism: ":take selector on Overdue (10), Due Soon (7), Other Tasks (15). Combined with org-super-agenda-keep-order t + deterministic org-agenda-sorting-strategy.",
-            note: "Upstream `cl-defun` destructuring mathematically requires the nested list syntax `:take (15 (:anything t))` in global defaults. Verified in v46.",
+            status: "IMPLEMENTED — Global Defaults (v46) & Custom Commands (v34)",
+            mechanism: ":take on Overdue(10)/Due Soon(7)/Other Tasks(15), combined with org-super-agenda-keep-order t + deterministic org-agenda-sorting-strategy.",
+            note: "Upstream cl-defun destructuring requires nested-list syntax `:take (15 (:anything t))` in global defaults (verified v46).",
           }
         - {
             id: 3,
             name: "Project-Based Grouping (:auto-parent)",
-            status: "IMPLEMENTED in Custom Commands (v34) — MAY CHANGE",
-            mechanism: ":auto-parent t groups items by immediate parent heading in flat todo.org.",
-            critical_note: "This approach MAY CHANGE after Workflow Management section finalization.",
+            status: "IMPLEMENTED — Custom Commands (v34), PROVISIONAL",
+            mechanism: ":auto-parent t groups by immediate parent heading in flat todo.org.",
+            critical_note: "May change to :ancestor-with-todo or a custom :pred after Workflow Management (projection/bufferlo) finalization.",
           }
         - {
             id: 4,
-            name: "Effort-Based Grouping (:effort < / :effort >)",
-            status: "IMPLEMENTED in Custom Commands (v34)",
-            mechanism: "Dedicated custom command (SPC a e), NOT in main daily view. Eliminates consumption conflicts with :auto-parent.",
+            name: "Effort-Based Grouping (:effort </>)",
+            status: "IMPLEMENTED — Custom Commands (v34)",
+            mechanism: "Dedicated custom command (SPC a e), not the main daily view — avoids consumption conflicts with :auto-parent.",
           }
         - {
             id: 5,
             name: "Log Mode Integration (:log)",
-            status: "IMPLEMENTED in Custom Commands (v34)",
-            mechanism: ":log closed group at order 0, BEFORE :time-grid group. org-agenda-start-with-log-mode t set in daily/weekly/accomplishments custom command settings.",
+            status: "IMPLEMENTED — Custom Commands (v34)",
+            mechanism: ":log closed group at order 0, before :time-grid; org-agenda-start-with-log-mode t on daily/weekly/accomplishments commands.",
           }
         - {
             id: 6,
             name: "Header Keymap Actions",
-            status: "IMPLEMENTED in Global Defaults (v36)",
-            mechanism: "TAB (fold), RET (goto first item), q (quit) bound in org-super-agenda-header-map.",
+            status: "IMPLEMENTED — Global Defaults (v36)",
+            mechanism: "TAB (fold) / RET (goto first item) / q (quit) bound in org-super-agenda-header-map.",
           }
         - {
             id: 7,
-            name: "Multiple View Profiles (Custom Commands)",
-            status: "IMPLEMENTED in Custom Commands (v34)",
-            placement: "Defined in the org-agenda-custom-commands subsection. Each custom command sets its own org-super-agenda-groups in its settings list.",
+            name: "Multiple View Profiles",
+            status: "IMPLEMENTED — Custom Commands (v34)",
+            placement: "Each custom command in org-agenda-custom-commands sets its own org-super-agenda-groups.",
           }
         - {
             id: 8,
             name: ":transformer for Item Enhancement",
-            status: "IMPLEMENTED in Global Defaults (v46) & Custom Commands (v34)",
-            constraint: "O(1) string operations ONLY. No regex compilation, no property lookups beyond position 0, no recursive calls.",
-            note: "O(1) `string-remove-prefix` injected into global default context groups in v46.",
+            status: "IMPLEMENTED — Global Defaults (v46) & Custom Commands (v34)",
+            note: "O(1) string-remove-prefix injected into global default context groups in v46.",
           }
         - {
             id: 9,
             name: "org-super-agenda-header-prefix",
-            status: "IMPLEMENTED in Global Defaults (v36)",
+            status: "IMPLEMENTED — Global Defaults (v36)",
             value: '"▸ "',
           }
         - {
             id: 10,
             name: "org-super-agenda-final-group-separator",
-            status: "IMPLEMENTED in Global Defaults (v36)",
+            status: "IMPLEMENTED — Global Defaults (v36)",
             value: "Unicode box-drawing horizontal line (U+2500) with leading/trailing newlines",
           }
         - {
             id: 11,
             name: ":children for Project Detection",
-            status: "IMPLEMENTED in Custom Commands (v34)",
-            caveat_fix: "Restricted to daily/weekly/project-status agenda views ONLY. NEVER use in org-todo-list or org-tags-view (unbounded recursive child-scanning).",
+            status: "IMPLEMENTED — Custom Commands (v34)",
+            caveat_fix: "Restricted to daily/weekly/project-status views only.",
           }
         - {
             id: 12,
             name: ":property for Custom Metadata",
-            status: "IMPLEMENTED in Custom Commands (v34)",
-            mechanism: "ENERGY property (high/low) grouped in dedicated Effort-Based custom command.",
+            status: "IMPLEMENTED — Custom Commands (v34)",
+            mechanism: "ENERGY property (high/low) grouped in the Effort-Based custom command.",
           }
         - {
             id: 13,
-            name: "org-super-agenda-show-message Suppression",
-            status: "IMPLEMENTED in Global Defaults (v36)",
+            name: "org-super-agenda-show-message suppression",
+            status: "IMPLEMENTED — Global Defaults (v36)",
             value: "nil",
           }
         - {
             id: 14,
             name: "org-super-agenda-date-format",
-            status: "IMPLEMENTED in Global Defaults (v36)",
-            value: '"%A, %B %d" (renders as "Monday, July 20")',
+            status: "IMPLEMENTED — Global Defaults (v36)",
+            value: '"%A, %B %d" (renders "Monday, July 20")',
           }
+
   - id: 4
     title: "Unified Architectural Rules & Negative Constraints"
     description: >
-      This section merges the core architectural rules and strict negative constraints.
-      Violating any of these rules constitutes a critical failure in the configuration.
+      Core architectural rules and their strict negative-constraint counterparts, merged and
+      deduplicated (each rule states its own "never do X"; the standalone constraint list below
+      holds only bans that are NOT already implied by a rule, a Denote-table entry, or an
+      org-super-agenda category above — e.g. it no longer repeats "NO denote-refs" or "NO
+      :children in global views", both already stated once above). Violating any of these is a
+      critical failure.
     core_architectural_rules:
       - name: "Strict Org-Mode Formatting"
-        description: "Zero Markdown syntax is allowed to bleed into Org-mode text or source blocks. Use =code=, *bold*, /italics/, and standard Org headings."
+        description: "Zero Markdown syntax may bleed into Org-mode text or source blocks. Use =code=, *bold*, /italics/, standard Org headings."
       - name: "Vanilla Emacs Paradigm"
-        description: "Do not use Doom Emacs proprietary macros (e.g., `map!`, `defadvice!`, `use-package!`). Translate Doom-inspired logic into native Vanilla Emacs equivalents."
-      - name: "The `eglot`-Only IDE Mandate"
+        description: "No Doom Emacs proprietary macros (map!, defadvice!, use-package!) — translate to native Vanilla Emacs equivalents."
+      - name: "The eglot-Only IDE Mandate"
         description: >
-          The canonical IDE stack is strictly `eglot` + Emacs 31 native core + specific UI parity packages.
-          Hover/Docs: `eldoc-childframe` (custom local fork) for GUI childframe floating tooltips (VS Code parity) + native `eldoc` fallback.
-          Diagnostics: `flyover` for inline diagnostic overlays + native `flymake`.
-          Headerline: `breadcrumb` is the EXCLUSIVE provider of headerline features. `eglot` does NOT provide headerline rendering.
-          Completion: `eglot` -> `cape` -> `corfu` (strictly in-buffer).
-          Formatting: `apheleia` (async CLI) for whole-file. Native `electric-*` for on-type.
-          Debugging: `dape` (DAP) with `dape-inline-variables`.
-      - name: "Headerline Exclusivity"
-        description: >
-          The `breadcrumb` package is the sole and exclusive provider of headerline navigation and context.
-          NEVER attempt to configure `eglot` or any other LSP client to render headerlines, as they lack
-          this capability natively.
+          Canonical stack: `eglot` + Emacs 31 native core + UI-parity packages. Hover/Docs:
+          `eldoc-childframe` (custom fork) + native `eldoc` fallback. Diagnostics: `flyover` +
+          native `flymake`. Headerline: `breadcrumb` exclusively (`eglot` provides none).
+          Completion: eglot → cape → corfu (strictly in-buffer). Formatting: `apheleia` (async CLI)
+          for whole-file, native electric-* for on-type. Debugging: `dape` with dape-inline-variables.
       - name: "Knowledge & Task Separation (Org Paradigm)"
-        description: >
-          Knowledge Management (Denote) and Task Management (Org-Agenda) must remain strictly decoupled.
-          Denote Silos are isolated via `.dir-locals.el`. Tasks reside in a flat `todo.org` structured
-          by headings and tags. NEVER mix actionable GTD states into Denote notes, and NEVER fragment
-          tasks across multiple state-based files.
+        description: "Denote (knowledge) and Org-Agenda (tasks) stay strictly decoupled — see org_mode_and_second_brain_paradigm above. Never mix GTD states into Denote notes or fragment tasks across multiple state-based files."
       - name: "org-modern Face Consumption Rule"
-        description: >
-          org-modern's badge engine (org-modern-todo, org-modern-tag, org-modern-priority) reads
-          face colors from org-todo-keyword-faces, org-tag-faces, and org-priority-faces respectively.
-          These face variables are the COLOR SOURCE for badge rendering, not redundant overrides.
-          They MUST be defined in the Task States & Contexts subsection and MUST NOT be removed
-          while org-modern badge features are enabled.
+        description: "See org_modern_face_integration above — these faces are the color source for badges and must not be removed while the corresponding org-modern badge feature is enabled."
       - name: "Buffer-Local Face Modification Rule"
-        description: >
-          Per-buffer face customization (e.g., org-level heading zoom) MUST use `face-remap-add-relative`,
-          NEVER `set-face-attribute`. The latter modifies the global face definition and pollutes all
-          buffers. `face-remap-add-relative` is inherently buffer-local and auto-cleaned on buffer kill.
+        description: "Per-buffer face customization (e.g. org-level heading zoom) MUST use `face-remap-add-relative`, never `set-face-attribute` (which pollutes all buffers globally)."
       - name: "Keybinding Management & Leader Paradigm"
         description: >
-          `general.el` is the exclusive manager for global (`SPC`) and local (`SPC m`) leader keybindings.
-          Adhere to Doom Emacs mnemonic prefixes with `:wk` annotations.
-          Native `use-package :bind` is strictly reserved for simple global remaps or package-specific internal keymaps.
-          Evil operator-pending motions must be injected directly into Evil's C-level keymaps via `define-key` in a `:config` block guarded by `:after evil`.
-          Arrow keys are strictly preferred over `hjkl` in the minibuffer to preserve "type-to-filter".
-          Never bind raw `C-c <letter>` globally; reserve it for major modes.
+          `general.el` exclusively manages global (SPC) and local (SPC m) leader keybindings,
+          with Doom-mnemonic prefixes and `:wk` annotations. Native `use-package :bind` is reserved
+          for simple global remaps or package-internal keymaps. Evil operator-pending motions go
+          directly into Evil's C-level keymaps via `define-key` in a `:config` block guarded by
+          `:after evil`. Arrow keys (not hjkl) in the minibuffer preserve type-to-filter. Never bind
+          raw `C-c <letter>` globally — reserve for major modes.
       - name: "Elpaca Load-Order Physics"
-        description: >
-          NEVER use `:hook (elpaca-after-init . mode)` to activate global minor modes.
-          Invoke them directly via `(mode 1)` in `:config`. Reserve `elpaca-after-init-hook`
-          strictly for cross-package state initialization.
+        description: "Never use `:hook (elpaca-after-init . mode)` for global minor modes — invoke via `(mode 1)` in `:config`. Reserve elpaca-after-init-hook for cross-package state init."
       - name: "Emacs 31 Targeting & MPS GC Exclusion"
-        description: >
-          Explicitly targets Emacs 31. Wrap experimental features in defensive runtime guards.
-          The MPS incremental/concurrent garbage collector (`igc`) was deferred out of Emacs 31.
-          NEVER treat `igc` as an Emacs 31 feature.
+        description: "Target Emacs 31; wrap experimental/unreleased APIs in defensive runtime guards. The MPS incremental/concurrent GC (`igc`) is deferred out of Emacs 31 — never treat it as an Emacs 31 feature."
       - name: "Org-Super-Agenda Enhancement Constraints"
-        description: >
-          Group folding MUST use native overlays with `invisible` property. NO origami dependency.
-          `:take` MUST be combined with `org-super-agenda-keep-order t` and deterministic `org-agenda-sorting-strategy`.
-          `:log` groups MUST be placed BEFORE `:time-grid` groups in consumption order.
-          `:children` MUST ONLY appear in daily/weekly agenda views. NEVER in org-todo-list or org-tags-view.
-          `:transformer` MUST use O(1) string operations only. NO regex compilation per item.
-          Multiple View Profiles MUST be defined in org-agenda-custom-commands, NOT in the org-super-agenda subsection.
-          Effort-based and property-based grouping MUST exist in dedicated custom commands, NOT the main daily view.
-          Project grouping via `:auto-parent` is PROVISIONAL and may change after Workflow Management finalization.
+        description: "See org_super_agenda summary rule-of-thumb and per-category table above."
       - name: "Unicode Fallback Character Rule"
-        description: >
-          All `fboundp` guard fallback characters in org-super-agenda group names MUST be standard
-          Unicode symbols (Geometric Shapes U+25A0–U+25FF, Miscellaneous Symbols U+2600–U+26FF,
-          Dingbats U+2700–U+27BF). NEVER use emoji codepoints or append U+FE0F presentation selectors.
-          The primary rendering path is always nerd-icons; fallbacks are monochrome safety nets only.
-      - name: "Denote Ecosystem Load-Order Rule"
-        description: >
-          All Denote extension packages MUST declare `:after denote` (or `:after (denote org)` for
-          Org-bridging extensions). The core `denote` package MUST load before any extension.
-          `consult-denote` requires `:after (consult denote)`. `citar-denote` requires `:after (citar denote)`.
-          NEVER place Denote extensions in the same `use-package` block as the core `denote` package.
-      - name: "Font Family Consistency Rule (v0.16)"
-        description: >
-          All font references MUST use 'JetBrainsMono Nerd Font' as the unified family name.
-          This includes `nerd-icons-font-family`, `set-face-attribute` for default/fixed-pitch/variable-pitch,
-          and any ligature configuration. NEVER mix 'Symbols Nerd Font Mono' with 'JetBrains Mono'.
-      - name: "The `secure-hash` Path Routing Rule (v0.20)"
-        description: >
-          When routing cache/session files that may exceed OS 255-character limits, use the stable
-          `secure-hash` (SHA1) primitive combined with the base filename. NEVER rely on internal,
-          undocumented Emacs backup APIs like `make-backup-file-name-1`, which are subject to
-          silent breakage across Emacs major versions.
+        description: "fboundp-guard fallback characters in org-super-agenda group names must be standard Unicode symbols (Geometric Shapes U+25A0–U+25FF, Misc Symbols U+2600–U+26FF, Dingbats U+2700–U+27BF) — never emoji codepoints or U+FE0F selectors. nerd-icons is always the primary rendering path; fallbacks are monochrome safety nets only."
+      - name: "Denote Ecosystem Load-Order & Font Family Rules"
+        description: "See denote_ecosystem.load_order_physics above. Font Family Consistency Rule (v0.16+): all font references (nerd-icons-font-family, set-face-attribute for default/fixed-pitch/variable-pitch, ligatures) use 'JetBrainsMono Nerd Font' exclusively — never mix with 'Symbols Nerd Font Mono' or bare 'JetBrains Mono'."
+      - name: "The secure-hash Path Routing Rule (v0.20)"
+        description: "Route cache/session files that may exceed the OS 255-character limit using `secure-hash` (SHA1) + base filename — never undocumented internal APIs like `make-backup-file-name-1`, which break silently across Emacs major versions."
       - name: "The Transient Map Keybinding Rule (v0.20)"
-        description: >
-          When binding keys inside transient or ephemeral package maps (e.g., `org-transclusion-live-sync-map`),
-          use raw `define-key`. NEVER use `general-define-key` with `:states`, as these maps do not
-          inherit from Evil state keymaps and will silently fail or create orphaned state maps.
+        description: "Keys inside transient/ephemeral package maps (e.g. org-transclusion-live-sync-map) use raw `define-key` — `general-define-key` with `:states` silently fails or orphans state maps on non-Evil-inheriting keymaps."
       - name: "Domain-Driven Hook Encapsulation (v46)"
-        description: >
-          UI mutation hooks (e.g., `org-agenda-finalize-hook` for modeline concealment) MUST be injected
-          directly inside the `:config` block of the package they mutate (e.g., `org-agenda`). NEVER
-          scatter cross-package UI hooks in isolated utility subsections (e.g., `Hide Modeline`), as
-          this violates Domain-Driven encapsulation and risks duplicate hook registration race conditions.
+        description: "UI mutation hooks (e.g. org-agenda-finalize-hook for modeline concealment) go inside the `:config` block of the package they mutate — never scattered into isolated utility subsections (risks duplicate hook registration races)."
       - name: "Language-Specific Eglot Placement Rule (v48)"
-        description: >
-          All `eglot-server-programs` entries and `eglot-workspace-configuration` settings MUST be
-          defined in their respective subsections under the Languages main section (or the relevant
-          language-specific main section like LaTeX Writing Environment). The Eglot subsection in
-          Development Tools contains ONLY core eglot configuration, custom functions, and an empty
-          `eglot-workspace-configuration` plist initialized via `setq`.
+        description: "All eglot-server-programs entries and eglot-workspace-configuration settings live in their Languages-section subsection (or the relevant language-specific main section). The Eglot subsection under Development Tools holds only core config, custom functions, and an empty eglot-workspace-configuration plist."
       - name: "Keybinds Subsection Scoping Rule (v48)"
-        description: >
-          The Keybinds subsection (17th subsection of Development Tools) contains ONLY keybindings
-          for Development Tools packages and commands (eglot, flymake, apheleia, xref, dape,
-          consult-eglot, peek, ar/eglot-* functions, ar/toggles-devtools). All other keybindings
-          (file, buffer, project, git, org, avy, window, etc.) remain in the General Keybindings
-          main section.
+        description: "The Development Tools Keybinds subsection (17th) holds ONLY Development Tools keybindings (eglot, flymake, apheleia, xref, dape, consult-eglot, peek, ar/eglot-*, ar/toggles-devtools). All other keybindings (file/buffer/project/git/org/avy/window/etc.) stay in General Keybindings."
     strict_negative_constraints:
-      - "NO `lsp-mode` ECOSYSTEM: The `lsp-mode`, `lsp-ui`, `lsp-signature`, `lsp-ui-peek`, and `lsp-ui-doc` packages are STRICTLY FORBIDDEN."
-      - "NO `flycheck`: Replaced entirely by native `flymake` and `flyover` for inline diagnostics."
-      - "NO `dap-mode`: Replaced entirely by the lightweight, modern `dape`."
-      - "NO `company-mode`: Replaced by the native `completion-at-point` (CAPF) pipeline."
-      - "NO Synchronous LSP Formatting: NEVER use LSP `textDocument/formatting` for whole-file formatting. Use `apheleia`."
-      - "NO `smartparens` or `puni`: Regex-based pair tracking causes desyncs."
-      - "NO `combobulate`: Fundamentally clashes with Evil's operator-pending grammar."
-      - "NO `tree-edit`: Relies on legacy `elisp-tree-sitter` (`tsc`), causing dual-engine memory bloat."
-      - "NO `expand-region`: Replaced by `expreg` (O(1) AST-aware pre-computation via native `treesit`)."
-      - "NO `stripspace`: Replaced by `ws-butler` to prevent Git diff pollution."
-      - "NO `kirigami.el` / `origami.el`: Heavy abstraction layers for folding."
-      - "NO `completion-in-region-function` overrides (Corfu must remain strictly in-buffer)."
-      - "NO `which-key` Embark Hacks (use `vertico-multiform` grid)."
-      - "NO `consult-projectile` (obsolete)."
-      - "NO Minibuffer Evil Normal State (breaks type-to-filter)."
-      - "NO custom `RET` intercepts for comment continuation (use native `comment-indent-new-line`)."
-      - "NO custom window movement Elisp functions (use native `windmove-wrap-around`)."
-      - "NO Nerd Icons inside `prettify-symbols-alist` (causes mid-line font-fallback context switches)."
-      - "NO custom ElDoc backends for `show-paren` (use native Emacs 29+ `'overlay` engine)."
-      - "NO Package Merging: NEVER merge multiple distinct packages into a single `#+begin_src` block or subsection header."
-      - "NO Scope Creep: NEVER modify subsections or code blocks not explicitly tasked in the current prompt."
-      - "NO Impure Descriptions: NEVER include workflow justifications in subheader descriptions."
-      - "NO Multi-line Lists: NEVER place multiple commands in `:commands ()` or modes in `dolist` on the same line."
-      - "NO Implicit Finalization: A section or subsection is finalized and its header changed to DONE only when the user explicitly provides the exact phrase 'TODO to DONE'."
-      - "NO Mixed Directory Scaffolding: All directory creation, path resolution, and file-seeding utilities must exist in their own dedicated source code block, strictly isolated from package configuration blocks."
-      - "NO `:pin` or `:vc` Keywords: Elpaca manages sources natively via its recipe system."
-      - "NO Global `C-c <letter>` Bindings: Strictly reserved for major modes."
-      - "NO Technical Jargon in Headers: Top-level and subheader descriptions must use non-technical layman terms."
-      - "NO Parametric Memory Reliance: MUST use `web_search` and `web_extractor` to verify live source code."
-      - "NO General.el Enclosure: NEVER place `general-define-key` inside a `use-package` block."
-      - "NO Blind Legacy Fixes: NEVER assume an issue from a 3+ year old forum post still exists without live web verification."
-      - "NO Chinese Sources: NEVER use Chinese sources, blogs, or forums during web searches. Restrict strictly to English."
-      - "NO Verbose Documentation: NEVER write paragraph-long, tutorial-style text inside `config.org`."
-      - "NO Banner Separators in New Code: NEVER introduce `;; ==========` style dividers in new subsections unless the pattern already exists in the file."
-      - "NO `org-gtd`: Rejected due to rigid multi-file fragmentation that destroys Zettelkasten linking and project context."
-      - "NO Dynamic Org Context Swapping: Rejected `my/project-org-contexts` and `find-file-hook` directory swapping due to `org-agenda` I/O latency and cache corruption."
-      - "NO org-modern Face Removal: NEVER remove `org-todo-keyword-faces`, `org-tag-faces`, or `org-priority-faces` while `org-modern-todo`, `org-modern-tag`, or `org-modern-priority` are enabled. These faces are the color source for badge rendering."
-      - "NO Global Face Pollution: NEVER use `set-face-attribute` for per-buffer face customization. Use `face-remap-add-relative` for buffer-local overrides."
-      - "NO `compose-region` in Org Buffers: NEVER use `compose-region` or `font-lock-add-keywords` for bullet replacement in Org buffers. Delegate entirely to `org-modern-list`."
-      - "NO origami for Org-Super-Agenda Folding: Use native overlays with `invisible` property. origami is an unnecessary external dependency for this use case."
-      - "NO :children in Global Views: NEVER use `:children` selector in `org-todo-list` or `org-tags-view` custom commands. Recursive child-scanning is O(n × depth) and will freeze on large file sets."
-      - "NO O(n) :transformer Operations: NEVER use `replace-regexp-in-string`, `string-match`, or any regex-compiling function inside `:transformer`. Use `string-remove-prefix`, `string-prefix-p`, `get-text-property` at position 0, and `concat` only."
-      - "NO :log After :time-grid: NEVER place a `:log` group AFTER a `:time-grid` group in the same group list. The time-grid will consume logged items first, making the :log group permanently empty."
-      - "NO Emoji Codepoints in Fallback Characters: NEVER use emoji codepoints (U+1F300–U+1FAFF) or append U+FE0F presentation selectors in `fboundp` guard fallbacks. Use standard Unicode symbols from Geometric Shapes, Miscellaneous Symbols, or Dingbats blocks only."
-      - "NO defconst for Mutable Group Definitions: NEVER use `defconst` for org-super-agenda group definitions that contain `nerd-icons` calls. Use `defvar` with `fboundp` guards to prevent reload warnings and load-order coupling."
-      - 'NO Dotted Pairs in :property Selectors: NEVER use dotted pair syntax ("KEY" . "value") for org-super-agenda `:property` selectors. The pcase pattern requires a proper list ("KEY" "value").'
-      - "NO Mixed Font Families: NEVER use 'Symbols Nerd Font Mono' or bare 'JetBrains Mono' in any face or font configuration. The unified family is 'JetBrainsMono Nerd Font' (v0.16+)."
-      - "NO Denote Extension Before Core: NEVER load any `denote-*` extension package before the core `denote` package has fully initialized. All extensions MUST use `:after denote` or equivalent."
-      - "NO `denote-refs`: Rejected due to fragile buffer-injection ('ghost text') and `write-region-annotate-functions` hooks that cause I/O latency, `super-save` collisions, and `org-modern` AST desyncs."
-      - "NO `denote-search`: Rejected as obsolete. Functionality absorbed into Denote 4.0.0 core as `denote-grep`."
-      - "NO `denote-zettel-interface`: Rejected. Redundant with `denote-sequence` Folgezettel physics and native `denote-menu` tabulated views."
-      - "NO `denote-project-notes`: Rejected. Redundant with Domain-Driven Denote Silos (`.dir-locals.el`) and native `project.el` scoping."
-      - "NO `denote-agenda`: Rejected. Violates strict Knowledge/Task separation and resurrects the `org-agenda-files` dynamic swapping anti-pattern, causing I/O latency."
-      - "NO `denote-publish`: Rejected. Redundant with native `ox-hugo` and `ox-publish` AST translation engines."
-      - "NO `org-transclusion-http` / `hyperdrive-org-transclusion`: Rejected. Network I/O latency, Pandoc fragility, and link rot violate the local-first, immutable Zettelkasten paradigm."
-      - "NO `undo-fu` Package Merging: `undo-fu` and `undo-fu-session` MUST be isolated in distinct `use-package` blocks to obey atomic execution boundaries."
-      - "NO `org-auto-tangle-async`: Async tangling spawns background Emacs processes that collide with Elpaca's git clone operations (especially against Codeberg rate limits), causing fatal `early EOF` errors."
-      - "NO Weekly Review Static Text Generation: Rejected in favor of native `org-super-agenda` interactive dashboards and `denote-explore` analytics to prevent silo-blind regex parsing and technical debt."
-      - "NO Eager Babel Loading: When using the Babel Lazy-Loading Engine, NEVER use `org-babel-do-load-languages` synchronously in `Org Structure Templates`. The triad of advices handles deferred loading natively."
-      - "NO eglot--apply-workspace-edit with 3 args: The correct signature is `(eglot--apply-workspace-edit WEDIT ORIGIN)` — 2 arguments. NEVER pass `(server wedit origin)`."
-      - "NO eglot-code-action-indications 'mode-line: Valid values are `'nearby`, `'margin`, `'eldoc-hint`. `'mode-line` does NOT exist."
-      - "NO assuming eglot-semantic-tokens-mode or eglot-inlay-hints-mode are active by default: They require explicit hook activation via `eglot-managed-mode-hook`."
-      - "NO obsolete eglot-events-buffer-size or eglot-confirm-server-initiated-edits: Use `eglot-events-buffer-config` and `eglot-confirm-server-edits` respectively (Eglot 1.20+)."
-      - "NO language-specific eglot settings in Eglot subsection: All `eglot-server-programs` entries and `eglot-workspace-configuration` settings belong in their respective Languages subsections."
-      - "NO non-Development-Tools keybindings in Keybinds subsection: Only code/LSP/debug keybindings belong in the 17th subsection of Development Tools."
+      - "NO lsp-mode ecosystem (lsp-mode, lsp-ui, lsp-signature, lsp-ui-peek, lsp-ui-doc) — strictly forbidden."
+      - "NO flycheck (replaced by native flymake + flyover); NO dap-mode (replaced by dape); NO company-mode (replaced by native completion-at-point / CAPF pipeline)."
+      - "NO synchronous LSP whole-file formatting (textDocument/formatting) — use apheleia."
+      - "NO smartparens/puni (regex-based pair tracking desyncs); NO combobulate (clashes with Evil operator-pending grammar); NO tree-edit (legacy elisp-tree-sitter/tsc causes dual-engine memory bloat); NO expand-region (use expreg, O(1) AST-aware); NO stripspace (use ws-butler); NO kirigami.el/origami.el (heavy folding abstractions)."
+      - "NO completion-in-region-function overrides (Corfu stays strictly in-buffer); NO which-key Embark hacks (use vertico-multiform grid); NO consult-projectile (obsolete)."
+      - "NO minibuffer Evil normal state (breaks type-to-filter); NO custom RET intercepts for comment continuation (use native comment-indent-new-line); NO custom window-movement functions (use native windmove-wrap-around)."
+      - "NO Nerd Icons inside prettify-symbols-alist (mid-line font-fallback context switches); NO custom ElDoc backends for show-paren (use native Emacs 29+ 'overlay engine)."
+      - "NO package merging (never combine distinct packages in one #+begin_src block/header); NO scope creep (never touch subsections not explicitly tasked); NO mixed directory scaffolding (path/file-seeding utilities live in their own isolated block, never inside package config blocks)."
+      - "NO :pin or :vc keywords — Elpaca manages sources natively; NO Chinese-language sources in web research — English only; NO blind legacy fixes — never assume a 3+ year old forum post's issue still exists without live verification."
+      - "NO org-modern face removal while the matching badge feature is enabled (see org_modern_face_integration); NO compose-region/font-lock-add-keywords bullet replacement in Org buffers — delegate entirely to org-modern-list."
+      - "NO undo-fu Package Merging: undo-fu and undo-fu-session MUST be isolated in distinct use-package blocks to obey atomic execution boundaries."
+      - "NO obsolete eglot-events-buffer-size / eglot-confirm-server-initiated-edits — use eglot-events-buffer-config / eglot-confirm-server-edits (Eglot 1.20+). NO 3-arg eglot--apply-workspace-edit — correct signature is (WEDIT ORIGIN), 2 args. NO eglot-code-action-indications 'mode-line — valid values are 'nearby/'margin/'eldoc-hint only. NO assuming eglot-semantic-tokens-mode/eglot-inlay-hints-mode are active by default — require explicit eglot-managed-mode-hook activation."
+
   - id: 5
-    title: "Edge Cases, Decisions & Overall Progress"
-    edge_cases_and_deferred_issues:
-      - "Dirvish Multi-frame Flicker: Patched via `define-advice` on `dirvish-pre-redisplay-h`."
-      - "Emacs 31 Unreleased APIs: Features like `grep-edit-mode` must be wrapped in defensive runtime guards."
-      - "[v11 Correction] MPS Incremental GC (`igc`) Removed From Scope: Confirmed deferred out of Emacs 31 entirely."
-      - "`no-littering` API Typo: Fixed hallucinated `no-littering-expand-var-directory-name` to `no-littering-expand-var-file-name`."
-      - "`treesit` Block Parenthesis Mismatch: Fixed extra closing parenthesis in `treesit--build-grammar` advice."
-      - "`treesit-fold` Ellipsis Injection: Upstream natively inherits Emacs' built-in `truncate-string-ellipsis`."
-      - "[v16 Correction] Evil Easymotion API Hallucination: `evilem-create` crashes. Replaced with native `evil-define-motion` wrappers."
-      - "Re-Builder `reb-copy` Hallucination: Custom `ar/re-builder-copy-interactive` wrapper is mathematically required to strip quotes."
-      - "Grep `grep-apply-setting` Physics: Replaced fragile `setq` template injection with `grep-apply-setting`."
-      - "[v26 Correction] IDE Stack & Headerline Hallucination: Reversed the ban on `eldoc-box` and `flyover`. Clarified that `eglot` does not provide headerline features; `breadcrumb` is the exclusive headerline provider."
-      - "[v28 Correction] Org-Modern Type Mismatches: Fixed `org-modern-star` (must use `'replace` + `org-modern-replace-stars`), `org-modern-checkbox` (requires alist, not `t`), and `org-modern-block-name` (requires 2-string lists). Excised hallucinated `org-modern-statistics`."
-      - "[v28 Correction] Org-Modern Font-Lock Collision: Excised `compose-region` bullet replacement from `ar/org-font-setup` to prevent redisplay fights with `org-modern-list`."
-      - "[v31 Correction] org-modern / Task States Face Synergy: Confirmed that org-todo-keyword-faces and org-tag-faces are CONSUMED by org-modern's badge engine as color input. No conflict exists."
-      - "[v31 Note] Cross-Section INBOX Inconsistency: The Org Capture templates and org-super-agenda reference 'INBOX' as a TODO keyword and 'gtd/inbox.org' as a file path. These are remnants of the excised org-gtd paradigm."
-      - "[v32 Correction] Better Font Faces Global Pollution: Replaced `set-face-attribute` (global) with `face-remap-add-relative` (buffer-local) for org-level heading zoom."
-      - "[v33 Note] Org-Super-Agenda :log Caveat Resolution: The README warns that :log items may be consumed by :time-grid. Resolved by placing :log group at order 0 (before :time-grid at order 3). First-match-wins guarantees no conflict."
-      - "[v33 Note] Org-Super-Agenda :children Performance: README warns of slowness in non-daily/weekly views. Resolved by restricting :children to daily/weekly agenda views only. Custom commands for org-todo-list MUST NOT include :children."
-      - "[v33 Note] Org-Super-Agenda :auto-parent Provisional: Project grouping via :auto-parent is provisional. May change to :ancestor-with-todo or custom :pred after Workflow Management (projection/bufferlo) finalization."
-      - "[v33 Note] Org-Super-Agenda :take + keep-order: The README warns :take order is not guaranteed. Mitigated by org-super-agenda-keep-order t which re-sorts items post-grouping, preserving org-agenda-sorting-strategy order before :take selects."
-      - "[v34 Fix] Custom Commands :take Nesting Bug: The original code used `:take (15 (:anything t))` which produced `group = ((:anything t))` — a list containing a list, not a valid plist. Fixed to `:take (15 :anything t)`."
-      - '[v34 Fix] Custom Commands :property Dotted Pair Bug: The original code used `:property ("ENERGY" . "high")` — a dotted pair. Fixed to proper list syntax `:property ("ENERGY" "high")`.'
-      - "[v34 Fix] Custom Commands defconst Reload Warning: All five group definitions used `defconst` with eager `nerd-icons-faicon` calls. Fixed to `defvar` with `fboundp` guards and Unicode symbol fallbacks."
-      - '[v34 Fix] Custom Commands Missing org-agenda-overriding-header: Four of five custom commands lacked `(org-agenda-overriding-header "")`. Fixed by adding it to all commands.'
-      - "[v34 Fix] Custom Commands :log/:discard Consumption Order: Added 3-line explanatory comment to prevent future reordering bugs."
-      - "[v34 Note] Org Super Agenda Subsection Still Has 4 Bugs: The global default groups still contain: (1) defconst instead of defvar, (2) :take (15 (:anything t)) wrong nesting, (3) :property dotted pair, (4) no fboundp guards on nerd-icons calls."
-      - "[v34 Note] Org Super Agenda Subsection Missing :transformer: The global default groups lack :transformer on context groups."
-      - "[v34 Confirmation] No Emojis Introduced: All fallback characters are standard Unicode symbols. No emoji codepoints or U+FE0F presentation selectors were used."
-      - "[v35 Note] Font Family Unification (config.org v0.16): nerd-icons-font-family changed from 'Symbols Nerd Font Mono' to 'JetBrainsMono Nerd Font'. All set-face-attribute calls changed from 'JetBrains Mono' to 'JetBrainsMono Nerd Font'. This ensures a single font family handles both code glyphs and Nerd Font icons without mid-line fallback context switches."
-      - "[v35 Note] Denote Ecosystem Scope: The full Denote ecosystem (25 packages) is documented but only 5 packages are currently configured in config.org v0.16 (denote, denote-org, denote-journal, consult-denote, citar-denote). The remaining 20 packages are PLANNED and will be implemented incrementally."
-      - "[v36 Note] Org Mode Cross-Section Cleanup Completed: All 7 tasks identified in v31/v32 (org-modern type mismatches, GTD remnants in capture/weekly-review, Emacs 31 line-spacing cons-cell) have been verified as resolved in config.org v0.16."
-      - "[v36 Note] Org Capture & Keybindings Implementation: Fully implemented in config.org but retain TODO headers. Awaiting user review to mark DONE."
-      - "[v37 Correction] denote-sections Hallucination: Excised the false assumption that `denote-sections` manipulates internal AST/heading structure. Verified upstream that it is strictly a `universal-sidecar` bridge for rendering backlinks and bibliography metadata. Created dedicated `* DONE Contextual Sidebars` main section."
-      - "[v38 Note] denote-refs Rejection: Formally rejected `denote-refs` from the Denote ecosystem. Its buffer-injection mechanics corrupt `org-modern` badges and trigger `super-save` I/O latency. Backlink UI is fully handled by `denote-sections` inside `universal-sidecar`."
-      - "[v39 Correction] denote-regexp Reclassification: Excised the false assumption that `denote-regexp` is an interactive search UI. Verified upstream that it is a headless API for generating regexes with boolean keyword logic. Reassigned from `Consult Denote` to `Denote Org` (later moved to dedicated `Denote Regexp` subsection) to power dynamic blocks and act as a strict prerequisite for `denote-explore`."
-      - "[v40 Note] Denote Load-Order Physics Confirmation: Confirmed zero load-order issues among Denote sibling extensions (`silo`, `sequence`, `org`, `journal`, `regexp`). They are mathematically independent leaf nodes depending only on the `denote` core. Elpaca's `Package-Requires` interception guarantees dependency resolution regardless of textual order."
-      - "[v41 Note] denote-search Rejection: Formally rejected `denote-search` from the Denote ecosystem. Its functionality was absorbed into Denote 4.0.0 core as `denote-grep`. Interactive search is fully handled by `consult-denote-grep`."
-      - "[v42 Note] denote-menu Keybinding Hallucination: The global keybindings block maps `SPC n m m` to `denote-menu-list-notes`, which is a void-function hallucination. The correct upstream command is `list-denotes`. Must be patched during implementation."
-      - "[v43 Note] Denote Keybinding Hallucination Excision: Audited and excised multiple void-function hallucinations (`list-notes`, `denote-merge-notes`, `denote-solo-mode`, `denote-review`, `denote-explore-statistics`, etc.) from the global `SPC n` leader routing. Replaced with verified upstream interactive commands."
-      - "[v44 Note] Atomic Implementation Matrix Enforcement: Prevented subsection mapping bleed by strictly isolating Order 16 (denote-explore) from Order 17 (denote-wordcloud) despite sharing the `Denote Explore` config.org subsection. Enforced NO Scope Creep protocol."
-      - "[v45 Note] Undo-Fu Internal API Fragility: Replaced `make-backup-file-name-1` with `secure-hash` to prevent silent breakage across Emacs major versions when routing session files exceeding OS 255-character limits."
-      - "[v45 Note] Org-Auto-Tangle Race Condition: Moving auto-save/tangle to Editor Behavior and setting `org-auto-tangle-async nil` permanently resolves the `early EOF` git clone failures caused by Codeberg rate-limiting concurrent background Emacs processes spawned during Elpaca queue resolution."
-      - "[v45 Note] Consult-Denote Preview Gap: Excised `:defer t` from `consult-denote`. Because it relies on `advice-add` to upgrade native Denote prompts, deferring it causes native prompts to lack Consult previews if invoked before a search command."
-      - "[v45 Note] Org-Transclusion Denote Bridge: `org-transclusion` does not natively parse `denote:` URIs. Implemented `ar/denote-org-transclusion-add` to intercept the AST, resolve the ID via `denote-get-path-by-id`, and reconstruct a `file:` link."
-      - "[v45 Note] Denote Wordcloud Dead Code: Excised `denote-wordcloud-ignore`. The package parses Denote keywords via `denote-infer-keywords-from-files`, meaning standard NLP stop-words are mathematically impossible to encounter."
-      - "[v46 Note] Jupyter/Python Paradigm Shift Deferred: Reverted `python` to standard `ob-python` in the Babel Lazy-Loading Engine and structure templates. `emacs-jupyter` requires synchronous kernel initialization that conflicts with the lazy-loader's execution-triggered physics. Deferred until an explicit Jupyter setup block is authored."
-      - "[v46 Note] Weekly Review Excision Pending: User intended to excise Weekly Review in favor of native tools, but the subsection remains in config.org v0.21. Pending manual deletion."
-      - "[v46 Note] Org Super Agenda Physics Verification: Confirmed `:take (15 (:anything t))` is the mathematically required upstream nested-list syntax for `cl-defun` destructuring in global defaults. Confirmed `nerd-icons:demand t` negates the need for `fboundp` guards."
-      - "[v46 Note] Org Capture & Popper Collision: The `*Capture*` and `CAPTURE-` regexes must be manually excised from `popper-reference-buffers` in v0.22 to prevent redisplay race conditions with the new bottom-drawer routing."
-      - "[v46 Note] Denote 4.x Signature Parity: Injected 5th `%s` placeholder (`#+signature: %s`) into `my/ensure-denote-silo` front-matter template to guarantee `denote-sequence` hierarchy rendering inside isolated silos."
-      - "[v46 Note] Hide Modeline Hook Duplication: `org-agenda-finalize-hook` is currently registered in both `Org Agenda` and `Hide Modeline` subsections in v0.21. Must be excised from `Hide Modeline` to obey Domain-Driven Hook Encapsulation."
-      - "[v47 Note] Emacs 31 Tree-sitter Native Auto-Install: Excised Emacs 30 manual `major-mode-remap-alist` and `treesit-install-language-grammar` advice dead code. Emacs 31 natively handles auto-installation via `treesit-auto-install-grammar` and mode routing via `treesit-enabled-modes`."
-      - "[v47 Note] Babel Lazy-Loading Engine: Implemented Doom Emacs parity triad of `nadvice.el` advices (`org-babel-exp-src-block`, `org-src--get-lang-mode`, `org-babel-confirm-evaluate`) to eliminate the synchronous `org-babel-do-load-languages` startup tax. Deferred `emacs-jupyter` due to ZeroMQ kernel initialization physics."
-      - "[v47 Note] Transient Template System O(1) Guard: Replaced the catastrophic O(N) `looking-back` regex trap with an O(1) `skip-chars-backward` spatial guard. Refactored inline lambdas to named interactive commands via `defalias` to prevent Transient lambda bloat."
-      - "[v47 Note] Hideshow Emacs 31 Indicators: Integrated native `hs-show-indicators`, `hs-indicator-type`, and `hs-display-lines-hidden`. Excised the obsolete `hs-special-modes-alist` fallback and custom `ar/hs-overlay-line-count` dead code."
-      - "[v48 Note] eglot-confirm-server-edits has a known type-error bug (#80549) when customized via M-x customize in Emacs 31.0.50. Setting via setq/:custom is safe."
-      - "[v48 Note] The Eglot manual index lists 'eglot-call-type-hierarchy' for call hierarchy, but upstream source code (Jan 2026) defines 'eglot-show-call-hierarchy'. Using the source-code name. If renamed upstream, update keybindings."
-      - "[v48 Note] eglot-code-action-indicator is a defvar (not defcustom) defaulting to nil. Setting to a string like 💡 enables the visual lightbulb. May cause rendering glitches in TTY; fall back to ⚡ or * if needed."
-      - "[v48 Note] eglot--apply-workspace-edit takes (WEDIT ORIGIN) — 2 args in Emacs 31. NOT (SERVER WEDIT &optional ORIGIN). Verified against upstream eglot.el source (Jan 2026 sync)."
-      - "[v48 Note] eglot-path-to-uri is the correct public function. eglot--path-to-uri is obsolete since Eglot 1.16. Similarly eglot-uri-to-path replaces eglot--uri-to-path."
-      - "[v48 Note] eglot-semantic-tokens-mode and eglot-inlay-hints-mode are NOT active by default. There is NO global-eglot-inlay-hints-mode or global-eglot-semantic-tokens-mode. They must be activated via eglot-managed-mode-hook."
-      - "[v48 Note] Inlay hint face names are eglot-type-hint-face and eglot-parameter-hint-face, NOT eglot-inlay-hint-type-face and eglot-inlay-hint-parameter-face."
-      - "[v48 Note] eglot-code-action-indications accepts 'nearby, 'margin, 'eldoc-hint. NOT 'mode-line. Verified against upstream source and Eglot manual §4.1."
-      - "[v48 Note] Language-specific eglot-server-programs and eglot-workspace-configuration entries migrated from Eglot subsection to respective Languages subsections per user directive."
-      - "[v49 Note] ide-features.md Divergence: The `ide-features.md` file recommends `eldoc-box` for GUI childframe hover tooltips. We explicitly excised `eldoc-box` in favor of a local fork `lisp/eldoc-childframe.el` to implement a Flymake Firewall and eliminate the upstream 0.5s Evil motion inhibition trap. The `ide-features.md` file is NOT updated to reflect this architectural pivot per user directive."
+    title: "Version History, Edge Cases & Overall Progress"
+    description: >
+      Single unified changelog (architectural_decisions) spanning document versions v15–v49,
+      annotated with the corresponding config.org release where one exists (folding in the
+      previously separate v016_changes…v022_changes lists). Detailed bug fixes, API corrections,
+      and hallucination catches sit in edge_cases_and_deferred_issues underneath the version that
+      produced them, so nothing here repeats the changelog prose.
     architectural_decisions:
-      v15: "IDE Stack Consolidation (Committed to `lsp-mode`). Workspace Management Selection: Selected `bufferlo`."
-      v18: "Package Management Migration: Officially transitioned to Elpaca v0.12. Deprecated `:pin` and `:vc`."
-      v19: "Keybinding Architecture Hardening: Formalized Doom Emacs Leader Paradigm via `general.el`."
-      v22: "State Synchronization & Config Audit: Aligned project state checkpoint with config.org v0.11."
-      v25: "THE GREAT IDE PIVOT: Permanently rejected the `lsp-mode` / `flycheck` / `dap-mode` ecosystem. Mandated the strict `eglot`-only, native-first Emacs 31 IDE stack."
-      v26: "IDE STACK CORRECTION & HEADERLINE CLARIFICATION: Reversed the erroneous ban on `eldoc-box` and `flyover`. Explicitly codified that `breadcrumb` is the exclusive headerline provider."
-      v27: "CITATION MANDATE & ORG-ELDOC TEARDOWN: Enforced strict inline citations for all analytical prompts."
-      v28: "ORG MODE & SECOND BRAIN FINALIZATION: Mandated Domain-Driven Denote Silos and flat todo.org + org-super-agenda paradigm."
-      v29: "STRICT FINALIZATION & SCAFFOLDING ISOLATION: Hardened the finalization protocol."
-      v30: "DYNAMIC DIRECTORY STRUCTURE FINALIZATION: Established isolated source blocks for directory scaffolding."
-      v31: "TASK STATES & ORG-MODERN SYNERGY: Confirmed org-modern badge engine consumes face variables as color input."
-      v32: "DOCUMENTATION HIERARCHY & ORG SUBSECTION FINALIZATION: Codified the formal Documentation Hierarchy & Writing Standards."
-      v33: "ORG-SUPER-AGENDA ENHANCEMENT ARCHITECTURE: Codified 14-category enhancement plan. Native outline folding via TAB (no origami). :take with keep-order. :auto-parent provisional. :log caveat resolved via consumption order. :children restricted to daily views. O(1) :transformer constraint. Multiple View Profiles placed in org-agenda-custom-commands. Effort/property grouping in dedicated custom commands."
-      v34: "ORG AGENDA CUSTOM COMMANDS REWRITE: Executed the full rewrite fixing 5 bugs (2 critical, 2 moderate, 1 minor). Implemented v33 Categories 2, 3, 4, 5, 7, 8, 11, 12 in the Custom Commands subsection. Changed defconst to defvar with fboundp guards. Fixed :take nesting and :property dotted pair syntax. Added org-agenda-overriding-header to all commands. Added :transformer to context groups. Added :children performance guard comment. Added :log/:discard consumption order comment. Confirmed zero emoji usage. Inventoried 4 remaining bugs in the Org Super Agenda subsection's global default groups for future rewrite."
-      v35: "DENOTE ECOSYSTEM PACKAGE ORDERING & CONFIG v0.16 SYNC: Incorporated the full 25-package Denote ecosystem ordering with dependency graph, implementation order, and config.org subsection mapping. Synced project state with config.org v0.16 font family unification (JetBrainsMono Nerd Font). Added Denote Ecosystem Load-Order Rule and Font Family Consistency Rule to architectural constraints. Documented that only 5 of 25 Denote packages are currently configured."
-      v36: "ORG MODE & SECOND BRAIN SUBSECTION FINALIZATION (PARTIAL): Marked Org Agenda Custom Commands, Org Habit, Denote Core, Denote Silo, Denote Org, Denote Journal, and Denote Journal Capture as DONE. Verified implementation of Org Capture, Weekly Review, Consult Denote, Citar Denote, and Keybindings (headers remain TODO pending user review). Completed all v31/v32 Org Mode Cross-Section Cleanup tasks (org-modern type fixes, GTD remnant excision, line-spacing cons-cell). Marked Org-Super-Agenda Categories 1, 6, 9, 10, 13, and 14 as IMPLEMENTED in the global default subsection."
-      v37: "CONTEXTUAL SIDEBARS & DENOTE-SECTIONS HALLUCINATION FIX: Excised the false assumption that `denote-sections` manipulates internal AST/heading structure. Verified upstream that it is strictly a `universal-sidecar` bridge for rendering backlinks and bibliography metadata. Created dedicated `* DONE Contextual Sidebars` main section between Development Tools and Highlight TODOs. Updated Denote Ecosystem implementation order and config.org subsection mapping to reflect the new architectural placement."
-      v38: "CONTEXTUAL SIDEBARS FINALIZATION & DENOTE-REFS REJECTION: Synced with config.org v0.17. Marked Contextual Sidebars (Universal Sidecar, Denote Sections, Denote Citar Sections) as DONE. Formally rejected `denote-refs` from the Denote ecosystem due to fragile buffer-injection mechanics, write-region-annotate-functions hooks, and org-modern AST desyncs. Superseded by native denote-backlinks and universal-sidecar."
-      v39: "DENOTE-REGEXP RECLASSIFICATION & PLACEMENT: Excised the false assumption that `denote-regexp` is an interactive search tool. Verified upstream that it is a headless utility library for generating file-name regexes with boolean keyword logic. Reassigned its architectural placement to a dedicated `Denote Regexp` subsection to act as a strict prerequisite for `denote-explore` and downstream analytics."
-      v40: "DENOTE REGEXP FINALIZATION & LOAD-ORDER PHYSICS: Synced with config.org v0.18. Marked `Denote Regexp` as DONE. Confirmed zero load-order issues among Denote sibling extensions due to Elpaca's native `Package-Requires` resolution and `use-package:after` physics. Updated implementation matrix to reflect 11 configured packages, 1 rejected package, and 13 planned packages."
-      v41: "DENOTE-SEARCH REJECTION & ECOSYSTEM CLEANUP: Formally rejected `denote-search` from the Denote ecosystem. Verified upstream that its functionality was absorbed into Denote 4.0.0 core as `denote-grep`. Interactive search is fully handled by `consult-denote-grep`. Updated implementation matrix to reflect 11 configured packages, 2 rejected packages, and 12 planned packages."
-      v42: "DENOTE-MENU UPSTREAM AUDIT & KEYBINDING HALLUCINATION FIX: Verified `denote-menu` (by Mohamed Suliman) provides a tabulated-list interface for viewing/filtering Denote files and exporting marked files to Dired. Discovered and documented a void-function hallucination in the global keybindings block (`denote-menu-list-notes` must be corrected to `list-denotes`)."
-      v43: "DENOTE MANAGEMENT FINALIZATION & HALLUCINATION EXCISION: Implemented denote-menu, denote-merge, denote-solo, and denote-review. Excised void-function hallucinations from global leader routing. Verified upstream APIs and load-order physics."
-      v44: "DENOTE EXPLORE FINALIZATION & ATOMIC EXECUTION: Implemented denote-explore (Order 16) with strict dependency on denote-regexp. Enforced atomic execution boundaries to prevent scope creep into denote-wordcloud (Order 17) despite shared subsection mapping."
-      v45: "v0.20 SYNC, TRANSCLUSION BRIDGE, & ECOSYSTEM REJECTIONS: Synced with config.org v0.20. Hardened Undo-Fu (secure-hash routing, atomic blocks). Relocated Auto-Save/Tangle to Editor Behavior and disabled async tangling to fix Elpaca race conditions. Implemented Org-Transclusion with a custom Denote URI bridge. Hardened Consult-Denote load-order (excised :defer t to prevent Preview Gap). Implemented Denote Wordcloud. Formally rejected denote-zettel-interface, denote-project-notes, denote-agenda, denote-publish, and network transclusion extensions due to architectural redundancy and local-first paradigm violations."
-      v46: "ORG CAPTURE, BABEL LAZY-LOADING, & ORG SUPER AGENDA FINALIZATION: Executed full rewrites. Implemented Doom Emacs parity Babel Lazy-Loading Engine with triad of advices. Fixed Org Super Agenda global defaults. Excised Weekly Review. Migrated `org-agenda-finalize-hook` for modeline concealment to `Org Agenda` subsection for strict Domain-Driven encapsulation."
-      v47: "v0.22 SYNC, EMACS 31 TREE-SITTER, BABEL LAZY-LOADING, & FOLDING FINALIZATION: Synced with config.org v0.22. Finalized Tree-sitter (Emacs 31 native auto-installation), Org Structure Templates (Babel Lazy-Loading Engine), Transient Template System (O(1) spatial guard, named commands), Hideshow (Emacs 31 native indicators, hs-cycle integration), Custom Folding Functions, Link Hint, Re-Builder, and Org Super Agenda (O(1) transformers, :take physics verified)."
+      v15: "IDE Stack Consolidation (committed to lsp-mode — later reversed, see v25). Workspace Management: selected bufferlo."
+      v18: "Package Management Migration: officially transitioned to Elpaca v0.12; deprecated :pin and :vc."
+      v19: "Keybinding Architecture Hardening: formalized the Doom Emacs leader paradigm via general.el."
+      v22: "State Synchronization & Config Audit: aligned checkpoint with config.org v0.11."
+      v25: "THE GREAT IDE PIVOT: permanently rejected lsp-mode/flycheck/dap-mode; mandated the strict eglot-only, native-first Emacs 31 IDE stack."
+      v26: "IDE Stack Correction & Headerline Clarification: reversed the erroneous ban on eldoc-box and flyover; codified breadcrumb as exclusive headerline provider."
+      v27: "Citation Mandate & org-eldoc Teardown: enforced strict inline citations for analytical prompts."
+      v28: "Org Mode & Second Brain Finalization: mandated Domain-Driven Denote Silos + flat todo.org/org-super-agenda paradigm."
+      v29: "Strict Finalization & Scaffolding Isolation: hardened the finalization protocol."
+      v30: "Dynamic Directory Structure Finalization: isolated source blocks for directory scaffolding."
+      v31: "Task States & org-modern Synergy: confirmed the badge engine consumes face variables as color input (see org_modern_face_integration)."
+      v32: "Documentation Hierarchy & Org Subsection Finalization: codified Section 2 in full."
+      v33: "org-super-agenda Enhancement Architecture: codified the 14-category plan (see org_super_agenda table)."
+      v34: "org-agenda Custom Commands Rewrite: fixed 5 bugs (2 critical, 2 moderate, 1 minor) implementing categories 2,3,4,5,7,8,11,12 in Custom Commands; inventoried 4 remaining bugs in the Global Defaults groups (resolved v46, see edge_cases)."
+      v35: "Denote Ecosystem Package Ordering & config.org v0.16 sync: documented the full 25-package roster/dependency graph (only 5 configured at the time); font family unified to JetBrainsMono Nerd Font."
+      v36: "Org Mode & Second Brain Finalization (partial): marked Org Agenda Custom Commands, Org Habit, and the first Denote core subsections DONE; completed all v31/v32 cross-section cleanup; marked org-super-agenda categories 1,6,9,10,13,14 IMPLEMENTED in Global Defaults."
+      v37: "Contextual Sidebars & denote-sections Hallucination Fix: corrected the false assumption that denote-sections manipulates AST/heading structure (it's a universal-sidecar bridge); created the dedicated Contextual Sidebars main section."
+      v38: "Contextual Sidebars Finalization & denote-refs Rejection: synced config.org v0.17; formally rejected denote-refs."
+      v39: "denote-regexp Reclassification: corrected the false assumption that it's an interactive search tool — it's a headless regex-generation utility, positioned as a prerequisite for denote-explore."
+      v40: "Denote Regexp Finalization & Load-Order Physics: synced config.org v0.18; confirmed zero load-order issues among Denote sibling extensions via Elpaca's Package-Requires resolution."
+      v41: "denote-search Rejection: absorbed into Denote 4.0.0 core as denote-grep; consult-denote-grep handles interactive search."
+      v42: "denote-menu Upstream Audit: verified its tabulated-list role; found and documented the denote-menu-list-notes → list-denotes keybinding hallucination."
+      v43: "Denote Management Finalization: implemented denote-menu/-merge/-solo/-review; excised void-function hallucinations from global leader routing."
+      v44: "Denote Explore Finalization: implemented denote-explore (order 16) with strict dependency on denote-regexp; enforced an atomic boundary vs. denote-wordcloud (order 17)."
+      v45: "config.org v0.20 sync, Transclusion Bridge, Ecosystem Rejections: hardened Undo-Fu (secure-hash routing); relocated Auto-Save/Tangle to Editor Behavior and disabled async tangling; implemented Org-Transclusion's Denote URI bridge; hardened consult-denote load order; implemented denote-wordcloud; formally rejected denote-zettel-interface, denote-project-notes, denote-agenda, denote-publish, and network transclusion extensions."
+      v46: "Org Capture, Babel Lazy-Loading, & org-super-agenda Finalization: implemented the Babel Lazy-Loading Engine (nadvice.el triad); fixed the 4 remaining org-super-agenda Global Defaults bugs; excised Weekly Review; migrated org-agenda-finalize-hook to the org-agenda subsection for Domain-Driven encapsulation."
+      v47: "config.org v0.22 sync, Emacs 31 Tree-sitter, Babel Lazy-Loading, & Folding Finalization: finalized Tree-sitter (native auto-installation), Org Structure Templates, Transient Template System (O(1) spatial guard, named commands), Hideshow (native indicators, hs-cycle), Custom Folding Functions, Link Hint, Re-Builder, and org-super-agenda (O(1) transformers, :take physics verified)."
       v48: >
-        DEVELOPMENT TOOLS DOCUMENTATION OVERRIDE, EGLOT FINALIZATION, LANGUAGES EGLOT MIGRATION,
-        & KEYBINDS SCOPING: Enacted documentation override for Development Tools section (detailed
-        inline comments, brief headers). Finalized Eglot subsection with exhaustive inline
-        documentation and corrected API signatures (eglot--apply-workspace-edit 2-arg, eglot-path-to-uri
-        public function, eglot-code-action-indications valid values). Migrated all language-specific
-        eglot-server-programs and eglot-workspace-configuration entries from Eglot subsection to
-        respective Languages subsections (Python, TypeScript/JavaScript, Rust, Go, C/C++, Bash, Nix,
-        JSON, YAML, LaTeX). Scoped Keybinds subsection to Development Tools commands only.
-        Integrated three Project State Addition blocks (architectural decisions, negative constraints,
-        edge cases). Added Development Tools documentation override rule, Language-Specific Eglot
-        Placement Rule, and Keybinds Subsection Scoping Rule to architectural constraints.
+        Development Tools Documentation Override, Eglot Finalization, Languages Eglot Migration, &
+        Keybinds Scoping: enacted a documentation override for Development Tools (detailed inline
+        comments, brief headers — later excised in v49); finalized Eglot with exhaustive inline
+        docs and corrected API signatures; migrated all language-specific eglot-server-programs and
+        eglot-workspace-configuration entries to their Languages subsections (Python, TS/JS, Rust,
+        Go, C/C++, Bash, Nix, JSON, YAML, LaTeX); scoped Keybinds to Development Tools commands only.
       v49: >
-        ELDOC-CHILDFRAME FORK & ELDOC-BOX EXCISION: Replaced upstream `eldoc-box` with a custom local
-        fork `lisp/eldoc-childframe.el`. The fork implements a Flymake Firewall (origin-based routing
-        to prevent diagnostic bleed), Evil motion spatial debouncing (eliminating the upstream 0.5s
-        inhibition trap that punishes normal state navigation), and strict TTY degradation guards.
-        This supersedes the `eldoc-box` recommendation in `ide-features.md` to guarantee zero-latency
-        cursor tracking and strict separation of concerns between documentation and diagnostics.
-        Excised the v48 Development Tools documentation override, restoring the standard Section 2
-        documentation hierarchy universally across all main sections.
+        Eldoc-Childframe Fork & eldoc-box Excision: replaced upstream eldoc-box with the local fork
+        lisp/eldoc-childframe.el (Flymake Firewall, Evil-motion spatial debouncing eliminating the
+        upstream 0.5s inhibition trap, strict TTY degradation guards), superseding the ide-features.md
+        recommendation. Excised the v48 Development Tools documentation override, restoring the
+        standard Section 2 hierarchy universally.
+    edge_cases_and_deferred_issues:
+      - "Dirvish multi-frame flicker: patched via define-advice on dirvish-pre-redisplay-h."
+      - "Emacs 31 unreleased APIs (e.g. grep-edit-mode) must be wrapped in defensive runtime guards."
+      - "[v11] MPS incremental GC (igc) confirmed deferred out of Emacs 31 entirely."
+      - "no-littering API typo fixed: hallucinated no-littering-expand-var-directory-name → no-littering-expand-var-file-name."
+      - "treesit block parenthesis mismatch (extra closing paren in treesit--build-grammar advice) fixed; treesit-fold ellipsis natively inherits truncate-string-ellipsis."
+      - "[v16] Evil Easymotion API hallucination: evilem-create crashes — replaced with native evil-define-motion wrappers."
+      - "Re-Builder reb-copy hallucination: custom ar/re-builder-copy-interactive wrapper required to strip quotes. Grep grep-apply-setting physics: replaced fragile setq template injection."
+      - "[v26] Reversed the eldoc-box/flyover ban; clarified eglot has no headerline (breadcrumb is exclusive)."
+      - "[v28] org-modern type mismatches fixed: org-modern-star needs 'replace + org-modern-replace-stars; org-modern-checkbox needs an alist not t; org-modern-block-name needs 2-string lists; hallucinated org-modern-statistics excised. compose-region bullet replacement excised from ar/org-font-setup to prevent redisplay fights with org-modern-list."
+      - "[v31] Cross-Section INBOX inconsistency: Org Capture templates and org-super-agenda still referenced 'INBOX'/'gtd/inbox.org' as remnants of the excised org-gtd paradigm."
+      - "[v32] Better Font Faces global pollution: set-face-attribute (global) replaced with face-remap-add-relative (buffer-local) for org-level heading zoom."
+      - "[v33] :log caveat resolved via order-0 placement before :time-grid (first-match-wins); :children perf caveat resolved by daily/weekly-only restriction; :auto-parent flagged provisional; :take ordering caveat mitigated by keep-order t."
+      - '[v34 fixes] :take nesting bug — `:take (15 (:anything t))` (a list-of-a-list, invalid plist) corrected to `:take (15 :anything t)`. :property dotted-pair bug — `("ENERGY" . "high")` corrected to list syntax `("ENERGY" "high")`. defconst→defvar with fboundp guards + Unicode fallbacks, fixing a reload warning caused by eager `nerd-icons-faicon` calls in all five group definitions. Missing org-agenda-overriding-header added to 4 of 5 custom commands. :log/:discard consumption-order comment added. Confirmed no emoji codepoints introduced anywhere.'
+      - "[v34] Global Defaults groups still carried all 4 of the above bugs plus a missing :transformer — resolved in v46 (see v46 changelog entry)."
+      - "[v35] Font unification: nerd-icons-font-family and all set-face-attribute calls moved from 'Symbols Nerd Font Mono'/'JetBrains Mono' to 'JetBrainsMono Nerd Font' to avoid mid-line font-fallback switches."
+      - "[v36] Org Capture & Keybindings fully implemented but headers retain TODO pending user review."
+      - "[v40] Confirmed Denote sibling extensions (silo/sequence/org/journal/regexp) are mathematically independent leaf nodes of core denote — zero load-order issues regardless of textual order."
+      - "[v43] Excised void-function hallucinations (list-notes, denote-merge-notes, denote-solo-mode, denote-review, denote-explore-statistics, etc.) from the global SPC n leader routing."
+      - "[v45] Undo-Fu: replaced make-backup-file-name-1 with secure-hash to avoid silent breakage across Emacs versions when routing paths over the OS 255-char limit. org-auto-tangle-async nil permanently resolves 'early EOF' git-clone failures from Codeberg rate-limiting concurrent Elpaca processes. Org-Transclusion's Denote bridge (ar/denote-org-transclusion-add) intercepts the AST and resolves IDs via denote-get-path-by-id."
+      - "[v46] Jupyter/Python paradigm shift deferred: reverted to standard ob-python in the Babel Lazy-Loading Engine — emacs-jupyter's synchronous kernel init conflicts with the lazy loader's execution-triggered physics. Weekly Review excision was intended but the subsection still awaited manual deletion in config.org v0.21 at that point. Org Capture's *Capture*/CAPTURE- regexes must be manually excised from popper-reference-buffers to prevent redisplay races. Denote 4.x signature parity: injected the 5th `%s` placeholder (`#+signature: %s`) into my/ensure-denote-silo's front matter for denote-sequence hierarchy rendering inside isolated silos."
+      - "[v48] eglot-confirm-server-edits has a known type-error bug (#80549) when customized via M-x customize in Emacs 31.0.50 — setting via setq/:custom is safe. The Eglot manual lists eglot-call-type-hierarchy but upstream source (Jan 2026) defines eglot-show-call-hierarchy — using the source-code name. eglot-code-action-indicator is a defvar (not defcustom), default nil; a string like 💡 enables the lightbulb but may glitch in TTY (fall back to ⚡ or *). Inlay-hint face names are eglot-type-hint-face / eglot-parameter-hint-face, not the '-inlay-hint-' variants."
+      - "[v49] ide-features.md divergence: it still recommends eldoc-box for GUI childframe tooltips; the project explicitly uses the local fork lisp/eldoc-childframe.el instead (Flymake Firewall, Evil debounce). ide-features.md is intentionally NOT updated, per user directive."
     overall_progress:
       finalized:
-        - "Core Emacs (13 subsections)"
-        - "Visual Chrome & UI Overlays (Group 1)"
-        - "Interactive Buffers & Redisplay Physics (Group 2)"
-        - "AST Parsing & Structural Typing (Group 3)"
-        - "Code Folding & Region Concealment (Group 4 - Hideshow, Custom Folding Functions, Treesit-Fold, Vimish Fold)"
-        - "Spatial Alignment & Whitespace Hygiene (Group 5)"
-        - "Frame Chrome & Status Indicators (Group 6)"
-        - "Spatial Traversal & Inline Mutations (Group 7 - Link Hint, Avy, Evil Easymotion, Evil Snipe, Ace Window)"
-        - "Vim Emulation (12 subsections)"
-        - "General Keybindings (Centralized leader routing)"
-        - "Workflow Management (Dired, Dirvish, Treemacs)"
-        - "IDE Architecture Blueprint (eglot + eldoc-childframe + flyover + breadcrumb stack defined)"
-        - "Org Mode & Second Brain Architecture Blueprint (Denote Silos + Flat Todo paradigm defined)"
-        - "Dynamic Directory Structure (Org Mode subsection — DONE)"
-        - "Task States & Contexts (Org Mode subsection — DONE)"
-        - "Better Font Faces (Org Mode subsection — DONE)"
-        - "Org Agenda Custom Commands (Org Mode subsection — DONE)"
-        - "Org Habit (Org Mode subsection — DONE)"
-        - "Org Super Agenda (Global defaults rewrite, O(1) transformers, :take physics verified — DONE)"
-        - "Org Capture (Bottom-drawer UI, Denote journal routing — DONE)"
-        - "Org Structure Templates (Babel Lazy-Loading Engine, org-tempo integration — DONE)"
-        - "Transient Template System (O(1) spatial guard, named commands — DONE)"
-        - "Denote Core (Org Mode subsection — DONE)"
-        - "Denote Silo (Org Mode subsection — DONE)"
-        - "Denote Sequence (Org Mode subsection — DONE)"
-        - "Denote Org (Org Mode subsection — DONE)"
-        - "Denote Journal (Org Mode subsection — DONE)"
-        - "Denote Journal Capture (Org Mode subsection — DONE)"
-        - "Denote Regexp (Org Mode subsection — DONE)"
-        - "Contextual Sidebars (Universal Sidecar, Denote Sections, Denote Citar Sections — DONE)"
-        - "Denote Management (Menu, Merge, Solo, Review)"
-        - "Denote Explore (Analytics, Janitor, Network Graphs)"
-        - "Denote Wordcloud (Frequency visualization)"
-        - "Org Transclusion (Custom Denote URI bridge implemented)"
-        - "Consult Denote (Load-order hardened, Preview Gap prevented)"
-        - "Undo Fu & Undo Fu Session (Secure-hash routing, linear paradigm alignment)"
-        - "Auto Save & Auto Tangle (Relocated to Editor Behavior, async disabled)"
-        - "Tree-sitter (Emacs 31 native auto-installation and mode routing — DONE)"
-        - "Hideshow & Custom Folding Functions (Emacs 31 native indicators, hs-cycle integration — DONE)"
-        - "Link Hint (Avy-backed spatial navigation, Embark fallback — DONE)"
-        - "Re-Builder (Transient menu patched, Evil insert state — DONE)"
-        - "Org-Super-Agenda Enhancement Architecture (14 categories planned — v33, 14 categories implemented across Custom Commands & Global Defaults — v36/v46)"
-        - "Denote Ecosystem Package Ordering (25 packages documented — v35, updated v45)"
-        - "Font Family Unification (config.org v0.16 — JetBrainsMono Nerd Font)"
-        - "Org Mode Cross-Section Cleanup (v31/v32 Identified — COMPLETED v36)"
-        - "Eglot Core Configuration (v48 — exhaustive inline docs, corrected API signatures, language settings migrated)"
-        - "Languages Eglot Server Programs (v48 — Python, TS/JS, Rust, Go, C/C++, Bash, Nix, JSON, YAML, LaTeX)"
-        - "Development Tools Keybinds (v48 — scoped to Development Tools commands only)"
-        - "Eldoc Childframe (Local fork finalized with Flymake Firewall, Evil spatial debounce, and TTY guards — DONE)"
+        - "Core Emacs (13 subsections); Vim Emulation (12 subsections); General Keybindings (centralized leader routing)."
+        - "Editor Behaviour Groups 1–7 (see editor_behaviour_paradigm.groups above)."
+        - "Workflow Management: Dired, Dirvish, Treemacs."
+        - "IDE Architecture Blueprint defined (eglot + eldoc-childframe + flyover + breadcrumb)."
+        - "Org Mode & Second Brain: architecture blueprint, Dynamic Directory Structure, Task States & Contexts, Better Font Faces, Org Agenda Custom Commands, Org Habit, Org Super Agenda (see org_super_agenda table)."
+        - "Org Capture: Doom Emacs parity bottom-drawer UI routing via display-buffer-alist, with Denote journal routing."
+        - "Org Structure Templates: Babel Lazy-Loading Engine (nadvice.el triad: org-babel-exp-src-block, org-src--get-lang-mode, org-babel-confirm-evaluate — eliminates the synchronous org-babel-do-load-languages startup tax) plus org-tempo integration."
+        - "Transient Template System: named interactive commands via defalias (prevents lambda bloat) and an O(1) skip-chars-backward spatial guard replacing a catastrophic O(N) looking-back regex trap."
+        - "Denote Ecosystem: 18 of 25 numbered packages CONFIGURED, plus Org Transclusion's Denote bridge and Consult Denote (see denote_ecosystem table for the full breakdown)."
+        - "Undo Fu & Undo Fu Session (secure-hash routing, linear paradigm); Auto Save & Auto Tangle (relocated to Editor Behavior, async disabled)."
+        - "Tree-sitter: Emacs 31 native auto-installation (treesit-auto-install-grammar) and mode routing (treesit-enabled-modes); excised the Emacs-30-era major-mode-remap-alist and treesit-install-language-grammar advice dead code."
+        - "Hideshow & Custom Folding Functions: integrated native hs-show-indicators, hs-indicator-type, hs-display-lines-hidden, and hs-cycle; excised the obsolete hs-special-modes-alist fallback and ar/hs-overlay-line-count dead code."
+        - "Link Hint (Avy-backed spatial navigation with embark-dwim fallback); Re-Builder (Transient patched, Evil insert state)."
+        - "Font Family Unification (JetBrainsMono Nerd Font, config.org v0.16); Org Mode Cross-Section Cleanup (v31/v32 items, completed v36)."
+        - "Development Tools: Eglot Core Configuration, Languages Eglot Server Programs (Python/TS/JS/Rust/Go/C-C++/Bash/Nix/JSON/YAML/LaTeX), Keybinds (scoped), Eldoc Childframe (local fork finalized)."
       in_progress:
-        - "Window Management (Winner, Popper pending)"
-        - "Workflow Management (Buffer Management, Project Management, Workspaces pending)"
-        - "Org Mode & Second Brain (Org Eldoc custom library written but header retains TODO pending user integration, Citar Denote, Keybindings implemented but headers retain TODO pending user review)"
-        - "Denote Ecosystem (9 of 25 packages pending implementation, 6 rejected, 10 configured)"
-        - "Development Tools (apheleia, dape, Flymake, Direnv subsections pending)"
+        - "Window Management (Winner, Popper pending)."
+        - "Workflow Management (Buffer Management, Project Management, Workspaces pending)."
+        - "Org Mode & Second Brain: ar-org-eldoc.el custom library written but header retains TODO; Citar Denote and Keybindings implemented but headers retain TODO pending user review."
+        - "Denote Ecosystem: 6 packages pending or planned (see denote_ecosystem table)."
+        - "Development Tools: apheleia, dape, Flymake, Direnv subsections pending."
       untouched:
-        - "Lexical Validation & Comparative Workflows (Group 8 - Jinx, Helpful, Ediff, Woman pending)"
-        - "Version Control"
-        - "Completion Framework (Needs rewrite to align with eglot/cape/corfu pipeline)"
-        - "Highlight TODOs, Snippet Engine, LaTeX, Languages (non-eglot parts), XML Viewer, Study"
+        - "Lexical Validation & Comparative Workflows (Group 8 — Jinx, Helpful, Ediff, Woman)."
+        - "Version Control."
+        - "Completion Framework (needs a rewrite to align with the eglot/cape/corfu pipeline)."
+        - "Highlight TODOs, Snippet Engine, LaTeX, Languages (non-eglot parts), XML Viewer, Study."
+
   - id: 6
-    title: "Work Checklists & Global Questions"
+    title: "Remaining Work Checklists & Global Questions"
+    description: >
+      Only genuinely open items are listed here. Checklist groups that were fully "done" and
+      simply restated the Denote Ecosystem table, the org-super-agenda category table, or the
+      finalized editor-behaviour groups (Spatial Traversal Group 7, Code Folding Group 4, the
+      "Denote Ecosystem Implementation" group, the "org-super-agenda Subsection Rewrite" bug
+      group, and the "org-super-agenda Enhancement" category group) have been removed — their
+      facts already live in Section 3/5 above and nothing has been lost.
     remaining_work_checklists:
-      - group: "Denote Ecosystem Implementation (v45 — 9 Pending Packages, 6 Rejected)"
+      - group: "Org Mode & Second Brain (v28 rewrite required)"
         tasks:
           - {
-              status: "done",
-              description: "denote-silo: Multi-silo isolation via .dir-locals.el. GNU ELPA official. Add to Denote Silo subsection.",
+              status: "pending",
+              description: "Author custom, optimized ar-org-eldoc.el local library.",
             }
+      - group: "Lexical Validation & Comparative Workflows (Group 8)"
+        tasks:
           - {
-              status: "done",
-              description: "denote-sequence: Sequential note numbering. Add to Denote Sequence subsection.",
-            }
-          - {
-              status: "done",
-              description: "denote-regexp: Headless regex utility for boolean keyword logic. Add to Denote Regexp subsection.",
-            }
-          - {
-              status: "done",
-              description: "denote-sections: Universal Sidecar backlinks. Add to Contextual Sidebars subsection.",
-            }
-          - {
-              status: "done",
-              description: "denote-citar-sections: Universal Sidecar bibliography. Add to Contextual Sidebars subsection.",
-            }
-          - {
-              status: "done",
-              description: "universal-sidecar: Core sidecar engine. Add to Contextual Sidebars subsection.",
-            }
-          - {
-              status: "rejected",
-              description: "denote-refs: Rejected due to ghost-text buffer injection and I/O latency.",
-            }
-          - {
-              status: "rejected",
-              description: "denote-search: Rejected as obsolete. Functionality absorbed into Denote 4.0.0 core as `denote-grep`.",
-            }
-          - {
-              status: "done",
-              description: "denote-menu: Tabulated-list interface for viewing/filtering and Dired export. Add to Denote Management subsection.",
-            }
-          - {
-              status: "done",
-              description: "denote-merge: Merge multiple notes. Add to Denote Management subsection.",
-            }
-          - {
-              status: "done",
-              description: "denote-solo: Single-note focus mode. Add to Denote Management subsection.",
-            }
-          - {
-              status: "done",
-              description: "denote-review: Spaced-repetition review scheduling. Add to Denote Management subsection.",
-            }
-          - {
-              status: "done",
-              description: "denote-explore: Analytics (random walks, statistics, orphans). Peter Prevos. Add to Denote Explore subsection.",
-            }
-          - {
-              status: "done",
-              description: "denote-wordcloud: Keyword frequency visualization. Add to Denote Wordcloud subsection.",
-            }
-          - {
-              status: "rejected",
-              description: "denote-zettel-interface: Rejected. Redundant with denote-sequence and denote-menu.",
-            }
-          - {
-              status: "rejected",
-              description: "denote-project-notes: Rejected. Redundant with Domain-Driven Silos and project.el.",
-            }
-          - {
-              status: "rejected",
-              description: "denote-agenda: Rejected. Violates Knowledge/Task separation and resurrects dynamic context swapping.",
-            }
-          - {
-              status: "rejected",
-              description: "denote-publish: Rejected. Redundant with native ox-hugo/ox-publish.",
+              status: "pending",
+              description: "Jinx: migrate exclusions from dict.txt to an inline, case-insensitive Elisp list.",
             }
           - {
               status: "pending",
-              description: "denote-markdown: Markdown file-type support. Add to Denote Org subsection. (Deferred until external SSG sync required).",
-            }
-          - {
-              status: "done",
-              description: "org-transclusion + denote: Transclude Denote content into Org. Custom bridge implemented.",
-            }
-          - {
-              status: "done",
-              description: "consult-denote: Vertico-powered search/grep scoped to active silo. Load-order hardened.",
+              description: "Helpful: integrate with the main development tools sections.",
             }
           - {
               status: "pending",
-              description: "citar-denote: Bibliography → literature note pipeline.",
-            }
-      - group: "Org Super Agenda Subsection Rewrite (v34 — 4 Known Bugs + Missing Features)"
-        tasks:
-          - {
-              status: "done",
-              description: "BUG 1: Change defconst to defvar with fboundp guards for all nerd-icons calls in global default groups. (Resolved via :demand t verification in v46).",
+              description: "Ediff: finalize transient menu and vim-style navigation bindings.",
             }
           - {
-              status: "done",
-              description: "BUG 2: Fix :take (15 (:anything t)) to :take (15 :anything t) in the Other Tasks group. (Resolved: Upstream physics require nested list in global defaults, verified in v46).",
-            }
-          - {
-              status: "done",
-              description: "BUG 3: Verify if global defaults reference :property with dotted pair syntax. (Verified N/A in global defaults).",
-            }
-          - {
-              status: "done",
-              description: "BUG 4: Add fboundp guards with Unicode symbol fallbacks for all nerd-icons calls. (Resolved: :demand t negates need for guards, verified in v46).",
-            }
-          - {
-              status: "done",
-              description: "FEATURE: Add :transformer to context groups (@Computer, @Home, @Errands, @Phone, @Deep Work). (Implemented O(1) string-remove-prefix in v46).",
-            }
-          - {
-              status: "done",
-              description: "FEATURE: Add :log/:discard consumption order comment. (Implemented in v34, verified in v46).",
-            }
-      - group: "Org-Super-Agenda Enhancement (v33 — Remaining Categories)"
-        tasks:
-          - {
-              status: "done",
-              description: "Category 1: Implement ar/org-super-agenda-toggle-group (native overlay folding) + TAB binding.",
-            }
-          - {
-              status: "done",
-              description: "Category 2: :take limits implemented in Custom Commands.",
-            }
-          - {
-              status: "done",
-              description: "Category 3: :auto-parent implemented in Custom Commands. PROVISIONAL.",
-            }
-          - {
-              status: "done",
-              description: "Category 4: Effort-Based custom command implemented.",
-            }
-          - {
-              status: "done",
-              description: "Category 5: :log closed at order 0 before :time-grid.",
-            }
-          - {
-              status: "done",
-              description: "Category 6: Bind TAB, RET, q in org-super-agenda-header-map.",
-            }
-          - {
-              status: "done",
-              description: "Category 7: Multiple View Profiles implemented (SPC a d/w/e/A/p).",
-            }
-          - {
-              status: "done",
-              description: "Category 8: :transformer on context groups implemented in Custom Commands.",
-            }
-          - {
-              status: "done",
-              description: "Category 9: Set org-super-agenda-header-prefix to '▸ '.",
-            }
-          - {
-              status: "done",
-              description: "Category 10: Set org-super-agenda-final-group-separator.",
-            }
-          - {
-              status: "done",
-              description: "Category 11: :children todo at order 14 in Daily + Project Status views.",
-            }
-          - {
-              status: "done",
-              description: "Category 12: ENERGY property grouping in Effort-Based custom command.",
-            }
-          - {
-              status: "done",
-              description: "Category 13: Set org-super-agenda-show-message to nil.",
-            }
-          - {
-              status: "done",
-              description: "Category 14: Set org-super-agenda-date-format to '%A, %B %d'.",
-            }
-      - group: "Spatial Traversal & Inline Mutations (Group 7)"
-        tasks:
-          - {
-              status: "done",
-              description: "Link Hint: Route Avy-backed semantic link mutations with Embark fallback.",
-            }
-      - group: "Code Folding & Region Concealment (Group 4)"
-        tasks:
-          - {
-              status: "done",
-              description: "Hideshow: Integrate Emacs 31 native indicators and hs-cycle.",
-            }
-          - {
-              status: "done",
-              description: "Custom Folding Functions: Unified dispatcher routing to Tree-sitter, Outline, Hideshow, or Vimish Fold.",
+              status: "pending",
+              description: "Woman: extract system manpath directories for native Arch Linux manual integration.",
             }
       - group: "Window Management"
         tasks:
           - {
               status: "pending",
-              description: "Winner: Configure undo/redo window states.",
+              description: "Winner: configure undo/redo window states.",
             }
           - {
               status: "pending",
-              description: "Popper: Configure popup management and echo dispatch.",
+              description: "Popper: configure popup management and echo dispatch.",
             }
       - group: "Workflow Management"
         tasks:
           - {
               status: "pending",
-              description: "Buffer Management: Finalize iBuffer, Nerd Icons iBuffer, iBuffer VC, Projection iBuffer, Buffer Terminator.",
+              description: "Buffer Management: finalize iBuffer, Nerd Icons iBuffer, iBuffer VC, Projection iBuffer, Buffer Terminator.",
             }
           - {
               status: "pending",
-              description: "Project Management: Implement `projection` package and excise projectile glue code.",
+              description: "Project Management: implement `projection`; excise projectile glue code.",
             }
           - {
               status: "pending",
-              description: "Workspaces: Implement `bufferlo` package and wire consult-buffer sources.",
+              description: "Workspaces: implement `bufferlo`; wire consult-buffer sources.",
             }
           - {
               status: "pending",
-              description: "POST-FINALIZATION: Revisit org-super-agenda Category 3 (:auto-parent).",
+              description: "Post-finalization: revisit org-super-agenda category 3 (:auto-parent) once the above is done.",
             }
-      - group: "Development Tools & Completion Framework (v26 Rewrite Required)"
+      - group: "Development Tools & Completion Framework (v26 rewrite required)"
         tasks:
           - {
               status: "pending",
-              description: "Rewrite Completion Framework: Strictly implement `eglot` -> `cape` -> `corfu` -> `orderless` pipeline.",
-            }
-          - {
-              status: "done",
-              description: "Eglot subsection: Finalized with exhaustive inline documentation, corrected API signatures, language settings migrated to Languages.",
-            }
-          - {
-              status: "done",
-              description: "Languages eglot migration: All eglot-server-programs and workspace configs moved to respective Languages subsections.",
-            }
-          - {
-              status: "done",
-              description: "Keybinds subsection: Scoped to Development Tools commands only.",
-            }
-          - {
-              status: "done",
-              description: "Eldoc Childframe subsection: Finalized using custom local fork `lisp/eldoc-childframe.el` with Flymake Firewall and Evil spatial debounce.",
+              description: "Rewrite Completion Framework: strictly implement eglot → cape → corfu → orderless.",
             }
           - {
               status: "pending",
-              description: "apheleia, dape, Flymake, Direnv subsections: Pending implementation.",
-            }
-      - group: "Org Mode & Second Brain (v28 Rewrite Required)"
-        tasks:
-          - {
-              status: "done",
-              description: "Excise `my/project-org-contexts` dynamic state swapping and `org-gtd` package.",
-            }
-          - {
-              status: "done",
-              description: "Implement Domain-Driven Denote Silos isolated via `.dir-locals.el`.",
-            }
-          - {
-              status: "done",
-              description: "Implement flat `~/org/agenda/todo.org` with `org-super-agenda` context tagging.",
-            }
-          - {
-              status: "done",
-              description: "Rewrite `org-modern` configuration to fix type mismatches.",
-            }
-          - {
-              status: "pending",
-              description: "Author custom, optimized `ar-org-eldoc.el` local library.",
-            }
-          - {
-              status: "done",
-              description: "Excise Weekly Review static text generation (Replaced by native tools in v46).",
-            }
-      - group: "Lexical Validation & Comparative Workflows (Group 8)"
-        tasks:
-          - {
-              status: "done",
-              description: "Re-Builder: Patch Transient menu parenthesis mismatch and configure for immediate Evil insert state.",
-            }
-          - {
-              status: "pending",
-              description: "Jinx: Migrate exclusions from `dict.txt` to an inline, case-insensitive Elisp list.",
-            }
-          - {
-              status: "pending",
-              description: "Helpful: Integrate with the main development tools sections.",
-            }
-          - {
-              status: "pending",
-              description: "Ediff: Finalize transient menu and vim-style navigation bindings.",
-            }
-          - {
-              status: "pending",
-              description: "Woman: Extract system manpath directories for native Arch Linux manual integration.",
+              description: "apheleia, dape, Flymake, Direnv subsections: pending implementation.",
             }
       - group: "Global Remaining Work"
         tasks:
@@ -1279,72 +785,72 @@ sections:
             }
           - {
               status: "pending",
-              description: "customize org-agenda-finalize to customize org-agenda buffer.",
+              description: "Customize org-agenda-finalize to customize the org-agenda buffer.",
             }
           - { status: "pending", description: "Implement the email setup." }
           - {
               status: "pending",
-              description: "Add epithet and math-delimiters package from https://github.com/oantolin.",
+              description: "Add epithet and math-delimiters packages from https://github.com/oantolin.",
             }
           - {
               status: "pending",
-              description: "Orderless only matches letters next to each other; I dont want that.",
+              description: "Orderless only matches letters next to each other; want non-adjacent matching too.",
             }
           - { status: "pending", description: "Add keybindings for embark." }
           - { status: "pending", description: "Add lsp-ltex-plus." }
           - {
               status: "pending",
-              description: "`Important`: Write a test org-mode file to practice all the writing practices in org buffers.",
+              description: "`Important`: write a test org-mode file to practice all writing practices in org buffers.",
             }
           - {
               status: "pending",
-              description: "I also need interactive custom functions for .dir-locals.el.",
+              description: "Need interactive custom functions for .dir-locals.el.",
             }
           - {
               status: "pending",
-              description: "`Important`: Determine all the related packages that are integrated together in the whole emacs config.",
+              description: "`Important`: determine all related packages integrated together across the whole Emacs config.",
             }
           - { status: "pending", description: "Add flyover package." }
           - {
               status: "pending",
-              description: "Urgent: Revisit the description of every header and subheader to ensure they describe what the package actually does.",
+              description: "`Urgent`: revisit every header/subheader description to ensure it describes what the package actually does.",
             }
     global_questions:
       - {
           status: "pending",
-          question: "Can org-level variation only work for certain file and/or org buffers?",
+          question: "Can org-level variation only work for certain files and/or org buffers?",
         }
       - {
           status: "pending",
-          question: "Are there any other evil related packages that can useful for my workflow?",
+          question: "Are there other Evil-related packages useful for my workflow?",
         }
       - { status: "pending", question: "How to make the echo area useful?" }
       - {
           status: "pending",
-          question: "How to open links from org buffers by pressing enter using correct browser?",
+          question: "How to open links from org buffers by pressing Enter using the correct browser?",
         }
       - {
           status: "pending",
-          question: "Is it necessary to configure for my emacs configuration that is evil centric?",
+          question: "Is it necessary to configure X, given my Evil-centric Emacs configuration?",
         }
+
   - id: 7
     title: "Research Mandates & State Generation Execution"
     research_mandates:
-      - "The Polluted Memory Axiom: Internal parametric memory regarding Emacs Lisp is considered fundamentally unreliable. You MUST use `web_search` and `web_extractor` as your primary source of truth."
-      - "Live Source Code Mandate: Before proposing, debunking, or modifying upstream behaviors, you MUST use `web_extractor` to read the literal `.el` source code from the official `emacs-mirror/emacs` GitHub repository."
-      - "The 3-Year Temporal Guardrail: Any bug or API behavior sourced from community prose older than 3 years must be treated as a 'hypothesis'. If verification is inconclusive, the implementation MUST be wrapped in a defensive runtime guard (`fboundp`, `boundp`, `emacs/>=31p`)."
-      - "Emacs 31 Verification: Search official GNU Emacs `master` / `emacs-31` branch documentation or `emacs-devel` mailing lists."
-      - "Think Step-by-Step: Mentally trace Emacs Lisp execution models and load-order dependencies before proposing solutions."
-      - "The Silent Read Protocol: DO NOT echo back unmodified code blocks. Only output the delta and a brief summary. If context is truncated, confess immediately."
-      - "Mandatory Tool Usage: You MUST utilize Deep Thinking for load-order physics. You MUST use Web Search and Web Extractor to verify upstream APIs and literal source code."
+      - "The Polluted Memory Axiom: internal parametric memory of Emacs Lisp is fundamentally unreliable — use web_search and web_extractor as the primary source of truth."
+      - "Live Source Code Mandate: before proposing, debunking, or modifying upstream behavior, use web_extractor to read the literal .el source from emacs-mirror/emacs on GitHub."
+      - "The 3-Year Temporal Guardrail: bug/API claims sourced from community prose older than 3 years are 'hypotheses' until verified; if inconclusive, wrap the implementation in a defensive runtime guard (fboundp, boundp, emacs/>=31p)."
+      - "Emacs 31 Verification: search the official GNU Emacs master/emacs-31 branch docs or emacs-devel mailing lists."
+      - "Think step-by-step: mentally trace Elisp execution models and load-order dependencies before proposing solutions."
+      - "The Silent Read Protocol: never echo back unmodified code blocks — output only the delta and a brief summary; confess immediately if context is truncated."
+      - "Mandatory Tool Usage: use Deep Thinking for load-order physics; use Web Search and Web Extractor to verify upstream APIs and literal source code."
     state_generation_execution:
       trigger: >
-        When the user inputs raw text commanding you to "generate an updated `project-state.yaml`",
-        "merge previous state", and "increment version", you MUST immediately execute the state generation task.
+        User input commanding "generate an updated project-state.yaml", "merge previous state",
+        and "increment version" — execute immediately.
       steps:
         - Read the current version and date from this file.
         - Increment the version integer by 1 and update the date string to the current actual date.
-        - Scan `config.org.txt` for new `DONE` keywords and update the Finalized/Pending lists.
+        - Scan config.org.txt for new DONE keywords and update the finalized/pending lists.
         - "Document new architectural decisions, add rejected patterns to Negative Constraints, and log deferred bugs in Edge Cases."
-        - "Output the complete, updated unified YAML file inside a single Markdown `yaml` code block."
-
+        - "Output the complete, updated unified YAML file inside a single Markdown yaml code block."
