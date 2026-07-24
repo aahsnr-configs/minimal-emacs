@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.23
+#+VERSION: 0.24
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -6859,109 +6859,6 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
 
 
 
-* TODO Markdown
-Configures a high-perf Markdown IDE via =gfm-mode= for native GFM syntax (intra-word underscores, strikethroughs, task lists). Toolchain:
-- =marksman= (=lsp-mode=): Structural diagnostics (links/headings) + completions.
-- =markdownlint-cli2= (=flycheck=): Stylistic linting (line length, heading increments).
-- =prettierd= (=apheleia=): Async format-on-save.
-
-** Core Configuration & Appear Mode
-Maps Markdown to =gfm-mode= with native rendering. Defines and hooks the O(1) Appear engine into =gfm-mode=.
-#+begin_src emacs-lisp
-(use-package markdown-mode
-  :defer t
-  ;; FORCE GFM: Map all standard markdown extensions exclusively to gfm-mode.
-  :mode (("README\\.md\\'" . gfm-mode)
-         ("\\.md\\'" . gfm-mode)
-         ("\\.markdown\\'" . gfm-mode))
-  :init
-  ;; Core Rendering & Behavior
-  (setq markdown-italic-underscore t
-        markdown-asymmetric-header t
-        markdown-fontify-code-blocks-natively t
-        markdown-gfm-uppercase-checkbox t
-        markdown-enable-math nil
-        markdown-hide-urls t
-        markdown-hide-markup t)
-
-  ;; List & Indentation
-  (setq markdown-list-indent-width 2)
-
-  ;; Performance: Disable expensive whole-line and block fontifications
-  (setq markdown-fontify-whole-heading-line nil
-        markdown-fontify-quote-and-verse-blocks nil)
-
-  :hook ((gfm-mode . lsp-deferred)
-         (gfm-mode . visual-line-mode)
-         (gfm-mode . ar/markdown-appear-mode))
-
-  :config
-  (defvar-local ar/md-appear--last-bounds nil
-    "Cached (start . end) of the currently revealed markdown element.")
-
-  (defun ar/md-appear--post-command ()
-    "O(1) Markdown Appear engine. Bypasses regex parsing entirely."
-    ;; 1. THE SPATIAL GUARD (O(1) Integer Math)
-    (if (and ar/md-appear--last-bounds
-             (>= (point) (car ar/md-appear--last-bounds))
-             (<= (point) (cdr ar/md-appear--last-bounds)))
-        nil ; Do nothing, stay inside the revealed zone.
-
-      ;; 2. CURSOR MOVED: Handle leaving the old element.
-      (when ar/md-appear--last-bounds
-        (font-lock-flush (car ar/md-appear--last-bounds)
-                         (cdr ar/md-appear--last-bounds))
-        (setq ar/md-appear--last-bounds nil))
-
-      ;; 3. PROPERTY INTERROGATION (O(1) C-Level Lookup)
-      (let ((inv (get-text-property (point) 'invisible))
-            (disp (get-text-property (point) 'display))
-            (comp (get-text-property (point) 'composition)))
-
-        (when (or inv disp comp)
-          ;; 4. C-LEVEL BOUNDARY SCANNING
-          (let* ((prop (cond (inv 'invisible) (disp 'display) (t 'composition)))
-                 (start (previous-single-char-property-change (point) prop))
-                 (end   (next-single-char-property-change (point) prop)))
-
-            (remove-text-properties start end '(invisible nil display nil composition nil))
-            (setq ar/md-appear--last-bounds (cons start end)))))))
-
-  (define-minor-mode ar/markdown-appear-mode
-    "O(1) dynamic markup revealing for Markdown/GFM modes."
-    :init-value nil
-    :lighter " MD-Appear"
-    (if ar/markdown-appear-mode
-        (add-hook 'post-command-hook #'ar/md-appear--post-command nil t)
-      (remove-hook 'post-command-hook #'ar/md-appear--post-command t)
-      (when ar/md-appear--last-bounds
-        (font-lock-flush (car ar/md-appear--last-bounds)
-                         (cdr ar/md-appear--last-bounds))
-        (setq ar/md-appear--last-bounds nil))
-      (font-lock-flush (point-min) (point-max))))
-
-  ;; ==========================================
-  ;; IMENU & NAVIGATION
-  ;; ==========================================
-  (setq markdown-imenu-generic-expression
-        '(("^\\(.*\\)[ \t]*\n=+$" 1)
-          ("^\\(.*\\)[ \t]*\n-+$" 1)
-          ("^\\(#+ .*\\)" 1))))
-#+end_src
-
-** Markdown TOC
-Auto-generates and syncs heading-derived TOC.
-#+begin_src emacs-lisp
-(use-package markdown-toc
-  :defer t
-  :after markdown-mode
-  :hook (gfm-mode . markdown-toc-mode)
-  :config
-  (setq markdown-toc-header-toc-title "\n## Table of Contents"
-        markdown-toc-user-toc-structure-manipulation-fn 'cdr))
-#+end_src
-
-
 
 * TODO Development Tools
 
@@ -6970,11 +6867,12 @@ Connects Emacs to external language servers for smart code navigation, error che
 #+begin_src emacs-lisp
 (use-package eglot
   :ensure nil
-  :hook ((prog-mode . eglot-ensure)
-         (markdown-mode . eglot-ensure)
-         (LaTeX-mode . eglot-ensure))
+  :hook (prog-mode . eglot-ensure)
   :custom
   (eglot-autoshutdown t)
+  ;; Native Emacs 31 Tree-sitter renderer (zero-latency). Use 'gfm-view-mode for external regex-based nested code parity.
+  (eglot-documentation-renderer 'markdown-ts-view-mode)
+  ;;(eglot-documentation-renderer 'gfm-view-mode)
   (eglot-ignored-server-capabilities '(:documentFormattingProvider
                                        :documentOnTypeFormattingProvider
                                        :colorProvider
@@ -7071,7 +6969,7 @@ Connects Emacs to external language servers for smart code navigation, error che
                  (let ((identifier (plist-get (aref result 0) :identifier)))
                    (kill-new identifier)
                    (message "Copied moniker: %s" identifier))
-               (message "No moniker found to copy."))))))))
+               (message "No moniker found to copy.")))))))))
 #+end_src
 
 
@@ -7168,33 +7066,47 @@ Native on-the-fly syntax checking and diagnostic aggregation with inline overlay
 #+end_src
 
 
-** TODO Xref
+** DONE Xref
+Navigates to definitions, references, and symbols across the project.
 #+begin_src emacs-lisp
+(use-package xref
+  :ensure nil
+  :custom
+  ;; Route regex search backend to ripgrep.
+  (xref-search-program 'ripgrep)
+  ;; Display project-relative file paths in the tabulated list.
+  (xref-file-name-display 'project-relative)
+  :config
+  ;; Force Evil Normal state in the Emacs 31 editable xref buffer.
+  (when (fboundp 'evil-set-initial-state)
+    (evil-set-initial-state 'xref-edit-mode 'normal)))
+#+end_src
 
+#+begin_src emacs-lisp
+(use-package nerd-icons-xref
+  :demand t
+  :config
+  ;; Activate global mode to register the icon injection hook.
+  (nerd-icons-xref-mode 1))
 #+end_src
 
 
-** TODO Nerd Icons Xref
+** DONE Consult Eglot
+Searches for workspace symbols and integrates with Embark actions.
 #+begin_src emacs-lisp
-
+(use-package consult-eglot
+  :defer t
+  :after (consult eglot)
+  :commands (consult-eglot-symbols))
 #+end_src
 
-
-** TODO Xref Rst
 #+begin_src emacs-lisp
-
-#+end_src
-
-
-** TODO xref-union
-#+begin_src emacs-lisp
-
-#+end_src
-
-
-** TODO Consult-eglot
-#+begin_src emacs-lisp
-
+(use-package consult-eglot-embark
+  :after (consult-eglot embark)
+  :demand t
+  :config
+  ;; Activate the Embark action overrides for workspace symbol candidates.
+  (consult-eglot-embark-mode 1))
 #+end_src
 
 
@@ -7341,7 +7253,6 @@ Consolidated keybindings for Development Tools packages and commands only.
  "c g i" '(eglot-find-implementation :wk "Implementation")
  "c m" '(ar/eglot-moniker-at-point :wk "Inspect moniker")
  "c M" '(ar/eglot-copy-moniker :wk "Copy moniker")
- "c S" '(consult-eglot-symbols :wk "Document symbols (outline)")
  "c H" '(eglot-inlay-hints-mode :wk "Toggle inlay hints")
  "c T" '(eglot-semantic-tokens-mode :wk "Toggle semantic tokens"))
 
@@ -7349,7 +7260,7 @@ Consolidated keybindings for Development Tools packages and commands only.
  "f R" '(ar/eglot-rename-file :wk "Rename file (LSP aware)"))
 
 (ar/global-leader
- "s w" '(consult-eglot-symbols :wk "Workspace symbols (use C-u)"))
+ "s w" '(consult-eglot-symbols :wk "Workspace symbols"))
 
 (ar/global-leader
  "x"   '(:ignore t :wk "execute/debug")
@@ -8403,6 +8314,109 @@ TODO: =Determine the difference between this preview package and preview-auto fr
 #+end_src
 
 
+
+
+* TODO Markdown
+Configures a high-perf Markdown IDE via =gfm-mode= for native GFM syntax (intra-word underscores, strikethroughs, task lists). Toolchain:
+- =marksman= (=lsp-mode=): Structural diagnostics (links/headings) + completions.
+- =markdownlint-cli2= (=flycheck=): Stylistic linting (line length, heading increments).
+- =prettierd= (=apheleia=): Async format-on-save.
+
+** Core Configuration & Appear Mode
+Maps Markdown to =gfm-mode= with native rendering. Defines and hooks the O(1) Appear engine into =gfm-mode=.
+#+begin_src emacs-lisp
+(use-package markdown-mode
+  :defer t
+  ;; FORCE GFM: Map all standard markdown extensions exclusively to gfm-mode.
+  :mode (("README\\.md\\'" . gfm-mode)
+         ("\\.md\\'" . gfm-mode)
+         ("\\.markdown\\'" . gfm-mode))
+  :init
+  ;; Core Rendering & Behavior
+  (setq markdown-italic-underscore t
+        markdown-asymmetric-header t
+        markdown-fontify-code-blocks-natively t
+        markdown-gfm-uppercase-checkbox t
+        markdown-enable-math nil
+        markdown-hide-urls t
+        markdown-hide-markup t)
+
+  ;; List & Indentation
+  (setq markdown-list-indent-width 2)
+
+  ;; Performance: Disable expensive whole-line and block fontifications
+  (setq markdown-fontify-whole-heading-line nil
+        markdown-fontify-quote-and-verse-blocks nil)
+
+  :hook ((gfm-mode . lsp-deferred)
+         (gfm-mode . visual-line-mode)
+         (gfm-mode . ar/markdown-appear-mode))
+
+  :config
+  (defvar-local ar/md-appear--last-bounds nil
+    "Cached (start . end) of the currently revealed markdown element.")
+
+  (defun ar/md-appear--post-command ()
+    "O(1) Markdown Appear engine. Bypasses regex parsing entirely."
+    ;; 1. THE SPATIAL GUARD (O(1) Integer Math)
+    (if (and ar/md-appear--last-bounds
+             (>= (point) (car ar/md-appear--last-bounds))
+             (<= (point) (cdr ar/md-appear--last-bounds)))
+        nil ; Do nothing, stay inside the revealed zone.
+
+      ;; 2. CURSOR MOVED: Handle leaving the old element.
+      (when ar/md-appear--last-bounds
+        (font-lock-flush (car ar/md-appear--last-bounds)
+                         (cdr ar/md-appear--last-bounds))
+        (setq ar/md-appear--last-bounds nil))
+
+      ;; 3. PROPERTY INTERROGATION (O(1) C-Level Lookup)
+      (let ((inv (get-text-property (point) 'invisible))
+            (disp (get-text-property (point) 'display))
+            (comp (get-text-property (point) 'composition)))
+
+        (when (or inv disp comp)
+          ;; 4. C-LEVEL BOUNDARY SCANNING
+          (let* ((prop (cond (inv 'invisible) (disp 'display) (t 'composition)))
+                 (start (previous-single-char-property-change (point) prop))
+                 (end   (next-single-char-property-change (point) prop)))
+
+            (remove-text-properties start end '(invisible nil display nil composition nil))
+            (setq ar/md-appear--last-bounds (cons start end)))))))
+
+  (define-minor-mode ar/markdown-appear-mode
+    "O(1) dynamic markup revealing for Markdown/GFM modes."
+    :init-value nil
+    :lighter " MD-Appear"
+    (if ar/markdown-appear-mode
+        (add-hook 'post-command-hook #'ar/md-appear--post-command nil t)
+      (remove-hook 'post-command-hook #'ar/md-appear--post-command t)
+      (when ar/md-appear--last-bounds
+        (font-lock-flush (car ar/md-appear--last-bounds)
+                         (cdr ar/md-appear--last-bounds))
+        (setq ar/md-appear--last-bounds nil))
+      (font-lock-flush (point-min) (point-max))))
+
+  ;; ==========================================
+  ;; IMENU & NAVIGATION
+  ;; ==========================================
+  (setq markdown-imenu-generic-expression
+        '(("^\\(.*\\)[ \t]*\n=+$" 1)
+          ("^\\(.*\\)[ \t]*\n-+$" 1)
+          ("^\\(#+ .*\\)" 1))))
+#+end_src
+
+** Markdown TOC
+Auto-generates and syncs heading-derived TOC.
+#+begin_src emacs-lisp
+(use-package markdown-toc
+  :defer t
+  :after markdown-mode
+  :hook (gfm-mode . markdown-toc-mode)
+  :config
+  (setq markdown-toc-header-toc-title "\n## Table of Contents"
+        markdown-toc-user-toc-structure-manipulation-fn 'cdr))
+#+end_src
 
 
 * TODO Languages
