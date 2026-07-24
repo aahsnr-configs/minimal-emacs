@@ -4281,7 +4281,7 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
 
 * TODO Completion Framework
 
-** TODO Orderless
+** DONE Orderless
 Provides flexible, multi-component fuzzy matching for minibuffer and in-buffer completions.
 #+begin_src emacs-lisp
 (use-package orderless
@@ -4295,8 +4295,7 @@ Provides flexible, multi-component fuzzy matching for minibuffer and in-buffer c
   ;; Strict global matching styles, omitting flex and initialism for performance.
   (orderless-matching-styles '(orderless-regexp orderless-literal))
   :config
-  ;; Consolidates all category routing into a single alist to prevent
-  ;; Elpaca async load-order overwrites from fragmented =add-to-list= calls.
+  ;; Unified category routing alist for files and LSP payloads.
   (setq completion-category-overrides
         `((file (styles basic partial-completion orderless))
           (eglot (styles ,@completion-styles))
