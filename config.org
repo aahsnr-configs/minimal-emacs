@@ -4549,6 +4549,7 @@ Injects Org-mode specific targets and actions into the Embark framework.
   :after (embark org))
 #+end_src
 
+
 ** TODO Corfu
 Renders in-buffer completion candidates in a minimal, unobtrusive popup.
 #+begin_src emacs-lisp
@@ -4562,7 +4563,7 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
   (corfu-quit-no-match 'separator)
   (corfu-count 16)
   (corfu-max-width 120)
-  ;; Preselects the prompt to prevent accidental LSP candidate commits.
+  ;; Preselects the prompt to prevent accidental candidate commits.
   (corfu-preselect 'prompt)
   (corfu-on-exact-match nil)
   ;; Delays auto-completion to prevent GC stutter with Orderless.
@@ -4589,9 +4590,11 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
   :config
   ;; Activates the global Corfu engine post-load.
   (global-corfu-mode 1)
-  ;; Routes Orderless completion styles to lsp-capf.
+  ;; Routes Orderless styles to Eglot's in-buffer and minibuffer categories.
   (add-to-list 'completion-category-overrides
-               `(lsp-capf (styles ,@completion-styles)))
+               `(eglot (styles ,@completion-styles)))
+  (add-to-list 'completion-category-overrides
+               `(eglot-capf (styles ,@completion-styles)))
   ;; Closes the popup on insert state exit or buffer save.
   (add-hook 'evil-insert-state-exit-hook #'corfu-quit)
   (add-hook 'before-save-hook #'corfu-quit))
@@ -4649,6 +4652,7 @@ Appends visual glyphs to in-buffer completion candidates.
   (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
 #+end_src
 
+
 ** TODO Cape
 Wraps and merges completion-at-point functions for global and local pipelines.
 #+begin_src emacs-lisp
@@ -4673,10 +4677,12 @@ Wraps and merges completion-at-point functions for global and local pipelines.
             (lambda () (add-hook 'completion-at-point-functions #'cape-file nil t)))
   (add-hook 'bash-ts-mode-hook
             (lambda () (add-hook 'completion-at-point-functions #'cape-file nil t)))
-  ;; Shields LSP and Comint from quit signals and enables non-exclusive merging.
-  (with-eval-after-load 'lsp-mode
-    (advice-add #'lsp-completion-at-point :around #'cape-wrap-noninterruptible)
-    (advice-add #'lsp-completion-at-point :around #'cape-wrap-nonexclusive))
+  ;; Shields Eglot from quit signals, busts cache for Orderless, and enables merging.
+  (with-eval-after-load 'eglot
+    (advice-add #'eglot-completion-at-point :around #'cape-wrap-buster)
+    (advice-add #'eglot-completion-at-point :around #'cape-wrap-noninterruptible)
+    (advice-add #'eglot-completion-at-point :around #'cape-wrap-nonexclusive))
+  ;; Applies non-exclusive merging to Comint and Pcomplete.
   (advice-add #'comint-completion-at-point :around #'cape-wrap-nonexclusive)
   (advice-add #'pcomplete-completions-at-point :around #'cape-wrap-nonexclusive))
 #+end_src
