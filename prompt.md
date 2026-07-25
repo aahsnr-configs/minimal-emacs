@@ -6,9 +6,9 @@
 
 - Now lets review and audit the Dabbrev subsection. Audit and review this subsection thoroughly in great detail. Then find any errors and issues. Also determine if the optimal settings are being used. Search the web and think longer for these task and make sure you have the latest information till July 23, 2026. Explain everything in great detail for me to review.
 
-- Find and fix any further errors and issues in your latest rewrite of Helpful subsection. Search the web and think longer for this task and explain everything back to me.
+- Find and fix any errors and issues in your latest rewrite of Helpful subsection. Search the web and think longer for this task and explain everything back to me.
 
-- Now lets work on the subsection. Search the web, think for longer and write a new configuration for expreg and treesit-expreg from scratch. First determine if these packages are needed together and if they work together. But do not write any config for this subsection yet. Present me a plan on how you want to approach in writing this configuration. Explain everything in great detail for me to review.
+- Now lets work on the subsection Evil MC subsection. Search the web, think for longer and write a new configuration for expreg and treesit-expreg from scratch. First determine if these packages are needed together and if they work together. But do not write any config for this subsection yet. Present me a plan on how you want to approach in writing this configuration. Explain everything in great detail for me to review.
 
 - Okay then you have the signal to rewrite the Session Management subsection. Follow the protocols and instructions from system-prompt-protocols.md file and make sure the documentation is very concise as well.
 

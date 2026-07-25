@@ -867,6 +867,7 @@ Manages global and local leader keybindings for accessing editor commands.
   "<escape>" #'abort-recursive-edit)
 #+end_src
 
+
 * TODO Editor Behavior
 ** DONE Auto Save
 Saves buffer contents directly to disk on idle, focus loss, and window/buffer switches.
@@ -6546,10 +6547,10 @@ If REGION-TEXT is provided, wrap it inside the block."
 ** TODO Org Eldoc
 High-performance, O(1) contextual router for Org mode echo-area metadata. Excises heavy AST parsing and breadcrumb generation, delegating structural context to `breadcrumb.el` and focusing strictly on src-block headers, in-block language delegation, link targets, and property drawers.
 #+begin_src emacs-lisp
-;; ;; Ensure the local library is loaded and hooked into Org mode.
-;; (with-eval-after-load 'org
-;;   (require 'ar-org-eldoc)
-;;   (add-hook 'org-mode-hook #'ar/org-eldoc-load))
+;; Ensure the local library is loaded and hooked into Org mode.
+(with-eval-after-load 'org
+  (require 'ar-org-eldoc)
+  (add-hook 'org-mode-hook #'ar/org-eldoc-load))
 #+end_src
 
 ** TODO Keybindings
