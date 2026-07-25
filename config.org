@@ -86,6 +86,9 @@ Initializes =elpaca=, an asynchronous package manager replacing =package.el=. Di
 ;; Block init reading until elpaca-use-package advice is applied.
 (elpaca-wait)
 
+;; Force Elpaca to use SSH to bypass Codeberg HTTPS rate limits
+(setq elpaca-recipe-defaults '(:protocol ssh))
+
 ;; Use Package Configuration
 (setq use-package-verbose nil
       use-package-always-ensure t
@@ -978,9 +981,7 @@ Foundational glyph substitution and icon API. Eagerly loaded to prevent void-fun
 (use-package nerd-icons
   :demand t
   :custom
-  ;; Enforces the dedicated Nerd Font symbol family for consistent glyph rendering.
-  (nerd-icons-font-family "JetBrainsMono Nerd Font")
-  ;; Enables colorized glyphs; upstream fallbacks handle terminal degradation.
+  (nerd-icons-font-family "Symbols Nerd Font Mono")
   (nerd-icons-color-icons t))
 #+end_src
 
@@ -989,10 +990,10 @@ Configures global typography, baseline monospaced faces, fontset fallback regist
 #+begin_src emacs-lisp
 (defun ar/setup-fonts ()
   "Apply global typography, baseline faces, and fontset fallbacks to the current frame."
-  (set-face-attribute 'default nil :font "JetBrainsMono Nerd Font" :height 123 :weight 'medium)
-  (set-face-attribute 'fixed-pitch nil :font "JetBrainsMono Nerd Font" :height 123 :weight 'medium)
+  (set-face-attribute 'default nil :font "JetBrains Mono" :height 125 :weight 'medium)
+  (set-face-attribute 'fixed-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
   ;; Maps variable-pitch to monospaced to preserve Org-mode table alignment.
-  (set-face-attribute 'variable-pitch nil :font "JetBrainsMono Nerd Font" :height 123 :weight 'medium)
+  (set-face-attribute 'variable-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
   ;; Pre-register Noto Sans for Unicode blocks used by org-modern-replace-stars.
    (set-fontset-font t '(#x25A0 . #x25FF) "Noto Sans")  ; Geometric Shapes (◉ ○ ◇ ▷)
   (set-fontset-font t '(#x2600 . #x26FF) "Noto Sans")  ; Miscellaneous Symbols
@@ -1006,8 +1007,9 @@ Configures global typography, baseline monospaced faces, fontset fallback regist
 (add-hook 'server-after-make-frame-hook #'ar/setup-fonts)
 
 ;; Vertically centers org-modern badges (TODO, tags, priorities) against text baseline.
-(setq-default line-spacing '(2 . 2))
-
+;;(setq-default line-spacing '(1 . 1))
+;;(setq-default line-spacing 0.02)
+;; (setq-default line-spacing '(0.02 . 0.02))
 ;; Maximizes syntax highlighting decoration across all programming buffers.
 (setq font-lock-maximum-decoration t)
 #+end_src
@@ -1473,7 +1475,6 @@ Delegates hardware input to =ultra-scroll= and keyboard interpolation to =good-s
   (advice-add #'scroll-down :around #'ar/good-scroll--scroll-down-around))
 #+end_src
 
-
 ** DONE Tree-sitter
 Downloads language parsers that power code coloring and structural navigation.
 #+begin_src emacs-lisp
@@ -1886,14 +1887,13 @@ Provides O(1) AST-aware visual selection expansion via the native =treesit= engi
  "C-M--" #'expreg-contract)
 #+end_src
 
-
 ** DONE Global Ellipsis
 #+begin_src emacs-lisp
 ;; inherited by `treesit-fold', `outline', and `hideshow'.
 (setq truncate-string-ellipsis " ↴ ")
 
-(with-eval-after-load 'org
-  (setq org-ellipsis " ↴ "))
+;; (with-eval-after-load 'org
+;;   (setq org-ellipsis " ↴ "))
 #+end_src
 
 ** DONE Custom Folding Functions
@@ -2167,7 +2167,6 @@ AST-aware vertical guides synchronizing depth colorization with rainbow-delimite
     (add-to-list 'magit-blame-disable-modes 'indent-bars-mode)))
 #+end_src
 
-
 ** DONE Move Text
 Provides O(1) line and region dragging. Automatically re-indents displaced lines to preserve structural integrity in whitespace-sensitive languages.
 #+begin_src emacs-lisp
@@ -2424,8 +2423,6 @@ Native Emacs 29+ face-remapping engine for global typography scaling. Prevents P
 
 
 
-
-
 ** DONE Avy
 Provides an O(1) radix-tree jumping engine for long-distance spatial navigation. Configured with the =at-full= overlay style, home-row routing, proximity sorting, and on-demand multi-window expansion.
 #+begin_src emacs-lisp
@@ -2663,7 +2660,6 @@ Displays the current match index and total match count in the mode-line during i
   (global-anzu-mode 1))
 #+end_src
 
-
 ** DONE Evil Anzu
 Advises Evil's search motions to trigger Anzu's modeline match tracking.
 #+begin_src emacs-lisp
@@ -2708,8 +2704,6 @@ Provides multiple cursor editing in Evil mode by wrapping the iedit lexical engi
   "M-D" #'evil-multiedit-match-all)
 #+end_src
 
-
-
 ** DONE Grep
 Finds text across files and allows direct editing of the search results to update the original files.
 #+begin_src emacs-lisp
@@ -2747,8 +2741,6 @@ Finds text across files and allows direct editing of the search results to updat
     "ZZ" #'grep-edit-save
     "ZQ" #'grep-edit-abort))
 #+end_src
-
-
 
 ** DONE Re-builder
 Constructs, tests, and highlights regular expressions against live buffer text.
@@ -4924,7 +4916,7 @@ Configures Org's core behavior, display, source editing, and performance setting
   (org-element-use-cache t)
   (org-element-cache-persistent nil)
   ;; LaTeX: native AST-aware highlighting for academic writing.
-  (org-highlight-latex-and-related 'native)
+  (org-highlight-latex-and-related '(latex script entities))
   ;; Startup
   (org-startup-folded 'overview)
   (org-startup-with-inline-images nil)
@@ -4994,33 +4986,33 @@ Prettifies Org buffers with badges, pills, and typographic substitutions.
   ;; Checkboxes: map Org's three valid states to Unicode glyphs.
   (org-modern-checkbox '((?X . "☑") (?- . "◧") (?\s . "☐")))
   ;; TODO/Tag/Priority badges consume faces from Task States & Contexts.
-  (org-modern-todo t)
-  (org-modern-todo-faces t)
+  ;; (org-modern-todo t)
+  ;; (org-modern-todo-faces t)
   (org-modern-tag t)
   (org-modern-priority t)
-  ;; Badge geometry: 1px border, 1-space inner padding.
-  (org-modern-label-border 1)
-  (org-modern-inner-spacing 1)
+  ;; TODO Determine what each of these following two options do
+  ;; (org-modern-label-border 1)
+  ;; (org-modern-inner-spacing 1)
   ;; Keywords and rules.
   (org-modern-keyword t)
   (org-modern-horizontal-rule t)
   ;; Blocks: hide #+begin_/#+end_ prefix, show only replacement glyphs.
   (org-modern-block-keyword t)
-  (org-modern-block-fringe nil)
+  ;; (org-modern-block-fringe nil)
   (org-modern-block-name
-   '(("src"        ("»" "«"))
-     ("example"    ("¶" "¶"))
-     ("quote"      ("❝" "❞"))
-     ("verse"      ("❝" "❞"))
-     ("center"     ("≡" "≡"))
-     ("comment"    ("⊘" "⊘"))
-     ("export"     ("⇥" "⇤"))
-     ("latex"      ("∫" "∫"))
-     ("theorem"    ("∴" "∎"))
-     ("proof"      ("∵" "∎"))
-     ("definition" ("≝" "≝"))
-     ("warning"    ("⚠" "⚠"))
-     ("note"       ("✎" "✎"))))
+   '(("src"        "»" "«")
+     ("example"    "¶" "¶")
+     ("quote"      "❝" "❞")
+     ("verse"      "❝" "❞")
+     ("center"     "≡" "≡")
+     ("comment"    "⊘" "⊘")
+     ("export"     "⇥" "⇤")
+     ("latex"      "∫" "∫")
+     ("theorem"    "∴" "∎")
+     ("proof"      "∵" "∎")
+     ("definition" "≝" "≝")
+     ("warning"    "⚠" "⚠")
+     ("note"       "✎" "✎")))
   ;; Lists: map ASCII bullet characters to Unicode glyphs.
   (org-modern-list '((43 . "▸") (45 . "–") (42 . "•")))
   ;; Tables: nil horizontal multiplier prevents fractional redisplay stutter.
@@ -5062,14 +5054,13 @@ Wires Org mode, agenda, and capture buffers with display, typography, and behavi
 
 (with-eval-after-load 'org
   (add-hook 'org-mode-hook #'visual-line-mode)
-  (add-hook 'org-mode-hook #'ar/org-font-setup)
+  ;; (add-hook 'org-mode-hook #'ar/org-font-setup)
   (add-hook 'org-mode-hook #'ar/org-setup-yas-parents)
   (add-hook 'org-mode-hook #'ar/org-disable-indent-mode)
   (add-hook 'org-agenda-mode-hook #'ar/org-agenda-setup)
   (add-hook 'org-capture-mode-hook #'ar/org-capture-setup)
   (add-hook 'org-babel-after-execute-hook #'org-display-inline-images))
 #+end_src
-
 
 ** DONE Task States & Contexts
 Defines the lifecycle of actionable items and groups them by physical or digital environments.
@@ -5357,7 +5348,8 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
       (:discard (:todo ("DONE" "CANCEL")))
       (:name ,(concat (nerd-icons-octicon "nf-oct-alert" :v-adjust 0.02)
                       " Overdue")
-       :take (10 :deadline past :scheduled past)
+       (:take (10 (:deadline past :scheduled past)))
+
        :face font-lock-warning-face
        :order 1)
       (:name ,(concat (nerd-icons-octicon "nf-oct-inbox" :v-adjust 0.02)
@@ -5416,7 +5408,8 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
        :order 11)
       (:name ,(concat (nerd-icons-faicon "nf-fa-clock" :v-adjust 0.02)
                       " Due Soon")
-       :take (7 :deadline (before "+7d"))
+       (:take (7 (:deadline (before "+7d"))))
+
        :order 12)
       ;; :children restricted to daily/weekly agenda views only.
       ;; NEVER use in org-todo-list or org-tags-view (O(n×depth) recursive scan).
@@ -5431,7 +5424,7 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
       (:name ,(concat (nerd-icons-octicon "nf-oct-kebab_horizontal"
                                           :v-adjust 0.02)
                       " Other Tasks")
-	     :take (15 :anything t)
+	     (:take (15 (:anything t)))
 	     :order 99))
     "Groups for the Daily Dashboard command.")
 
@@ -5551,6 +5544,7 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
                      (org-agenda-span 'day)
                      (org-agenda-start-day "0d")
                      (org-super-agenda-groups ,ar/org-sa-project-groups))))))))
+
 #+end_src
 
 
@@ -6548,47 +6542,47 @@ If REGION-TEXT is provided, wrap it inside the block."
 High-performance, O(1) contextual router for Org mode echo-area metadata. Excises heavy AST parsing and breadcrumb generation, delegating structural context to `breadcrumb.el` and focusing strictly on src-block headers, in-block language delegation, link targets, and property drawers.
 #+begin_src emacs-lisp
 ;; Ensure the local library is loaded and hooked into Org mode.
-(with-eval-after-load 'org
-  (require 'ar-org-eldoc)
-  (add-hook 'org-mode-hook #'ar/org-eldoc-load))
+;; (with-eval-after-load 'org
+;;   (require 'ar-org-eldoc)
+;;   (add-hook 'org-mode-hook #'ar/org-eldoc-load))
 #+end_src
 
 ** TODO Keybindings
 Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motions, and the complete 25-package Denote ecosystem matrix.
 #+begin_src emacs-lisp
-(use-package evil-org
-  :defer t
-  :after (evil org)
-  :hook (org-mode . evil-org-mode)
-  :config
-  ;; Activate navigation, insert, textobjects, additional, calendar, todo, and heading themes.
-  (evil-org-set-key-theme '(navigation insert textobjects additional calendar todo heading))
-  ;; Context-aware RET: toggles TODO states, checkboxes, follows links, or opens folds.
-  (defun ar/org-return-dwim (&optional arg)
-    "Doom Emacs parity: Context-aware RET in Org normal/motion states."
-    (interactive "P")
-    (cond
-     ((and (org-at-heading-p) (org-get-todo-state))
-      (org-todo arg))
-     ((org-at-item-checkbox-p)
-      (org-toggle-checkbox arg))
-     ((org-in-regexp org-link-any-re 1)
-      (org-open-at-point arg))
-     ((and (org-at-heading-p) (org-invisible-p))
-      (org-fold-show-entry))
-     (t (org-ctrl-c-ctrl-c arg))))
-  ;; Bind RET in normal and motion states to the DWIM handler.
-  (evil-define-key '(normal motion) evil-org-mode-map
-    (kbd "RET") #'ar/org-return-dwim))
+;; (use-package evil-org
+;;   :defer t
+;;   :after (evil org)
+;;   :hook (org-mode . evil-org-mode)
+;;   :config
+;;   ;; Activate navigation, insert, textobjects, additional, calendar, todo, and heading themes.
+;;   (evil-org-set-key-theme '(navigation insert textobjects additional calendar todo heading))
+;;   ;; Context-aware RET: toggles TODO states, checkboxes, follows links, or opens folds.
+;;   (defun ar/org-return-dwim (&optional arg)
+;;     "Doom Emacs parity: Context-aware RET in Org normal/motion states."
+;;     (interactive "P")
+;;     (cond
+;;      ((and (org-at-heading-p) (org-get-todo-state))
+;;       (org-todo arg))
+;;      ((org-at-item-checkbox-p)
+;;       (org-toggle-checkbox arg))
+;;      ((org-in-regexp org-link-any-re 1)
+;;       (org-open-at-point arg))
+;;      ((and (org-at-heading-p) (org-invisible-p))
+;;       (org-fold-show-entry))
+;;      (t (org-ctrl-c-ctrl-c arg))))
+;;   ;; Bind RET in normal and motion states to the DWIM handler.
+;;   (evil-define-key '(normal motion) evil-org-mode-map
+;;     (kbd "RET") #'ar/org-return-dwim))
 
-(use-package evil-org-agenda
-  :ensure nil
-  :defer t
-  :after evil-org
-  :hook (org-agenda-mode . evil-org-agenda-mode)
-  :config
-  ;; Inject Vim motions for agenda manipulation, item reordering, and date jumping.
-  (evil-org-agenda-set-keys))
+;; (use-package evil-org-agenda
+;;   :ensure nil
+;;   :defer t
+;;   :after evil-org
+;;   :hook (org-agenda-mode . evil-org-agenda-mode)
+;;   :config
+;;   ;; Inject Vim motions for agenda manipulation, item reordering, and date jumping.
+;;   (evil-org-agenda-set-keys))
 
 (defun ar/org-babel-remove-result-one-or-many (&optional arg)
   "Remove babel results. With ARG, remove all results in buffer."
@@ -6727,28 +6721,28 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
 (ar/local-leader
   :keymaps 'org-mode-map
 
-  ;; Single-Key
-  "#" '(org-update-statistics-cookies :wk "Update cookies")
-  "'" '(org-edit-special :wk "Edit babel block")
-  "*" '(org-ctrl-c-star :wk "Heading from list")
-  "-" '(org-ctrl-c-minus :wk "Cycle list bullet")
-  "," '(org-switchb :wk "Switch org buffer")
-  "." '(consult-org-heading :wk "Fuzzy jump heading")
-  "/" '(consult-org-agenda :wk "Fuzzy jump agenda")
-  "@" '(org-cite-insert :wk "Insert citation")
-  "A" '(org-archive-subtree-default :wk "Archive subtree")
-  "C" '(org-capture :wk "Local capture")
-  "e" '(org-export-dispatch :wk "Export dispatch")
-  "f" '(org-footnote-action :wk "Footnote action")
-  "h" '(org-toggle-heading :wk "Toggle heading")
-  "I" '(org-id-get-create :wk "Create ID")
-  "k" '(ar/org-babel-remove-result-one-or-many :wk "Remove babel result")
-  "K" '(org-babel-remove-result :wk "Remove block result")
-  "n" '(org-store-link :wk "Store link")
-  "o" '(org-set-property :wk "Set property")
-  "q" '(org-set-tags-command :wk "Set tags")
-  "t" '(org-todo :wk "Cycle TODO")
-  "x" '(org-toggle-checkbox :wk "Toggle checkbox")
+  ;; ;; Single-Key
+  ;; "#" '(org-update-statistics-cookies :wk "Update cookies")
+  ;; "'" '(org-edit-special :wk "Edit babel block")
+  ;; "*" '(org-ctrl-c-star :wk "Heading from list")
+  ;; "-" '(org-ctrl-c-minus :wk "Cycle list bullet")
+  ;; "," '(org-switchb :wk "Switch org buffer")
+  ;; "." '(consult-org-heading :wk "Fuzzy jump heading")
+  ;; "/" '(consult-org-agenda :wk "Fuzzy jump agenda")
+  ;; "@" '(org-cite-insert :wk "Insert citation")
+  ;; "A" '(org-archive-subtree-default :wk "Archive subtree")
+  ;; "C" '(org-capture :wk "Local capture")
+  ;; "e" '(org-export-dispatch :wk "Export dispatch")
+  ;; "f" '(org-footnote-action :wk "Footnote action")
+  ;; "h" '(org-toggle-heading :wk "Toggle heading")
+  ;; "I" '(org-id-get-create :wk "Create ID")
+  ;; "k" '(ar/org-babel-remove-result-one-or-many :wk "Remove babel result")
+  ;; "K" '(org-babel-remove-result :wk "Remove block result")
+  ;; "n" '(org-store-link :wk "Store link")
+  ;; "o" '(org-set-property :wk "Set property")
+  ;; "q" '(org-set-tags-command :wk "Set tags")
+  ;; "t" '(org-todo :wk "Cycle TODO")
+  ;; "x" '(org-toggle-checkbox :wk "Toggle checkbox")
 
   ;; Prefix Routes
   "a" '(:ignore t :wk "attachments")
@@ -6902,10 +6896,6 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
   "M-j" #'org-agenda-drag-line-forward
   "gd"  #'org-agenda-goto-date)
 #+end_src
-
-
-
-
 
 
 * TODO Development Tools
@@ -7080,9 +7070,9 @@ Native on-the-fly syntax checking and diagnostic aggregation with inline overlay
   ;;                                     (warning "▲" flymake-warning-fringe)
   ;;                                     (note "■" flymake-note-fringe)))
   :custom-face
-  (flymake-error ((t (:underline (:style line :color "#f7768e" :position t)))))
-  (flymake-warning ((t (:underline (:style line :color "#e0af68" :position t)))))
-  (flymake-note ((t (:underline (:style line :color "#7aa2f7" :position t)))))
+  (flymake-error ((t (:underline (:style line :color "#f7768e" :position bottom)))))
+  (flymake-warning ((t (:underline (:style line :color "#e0af68" :position bottom)))))
+  (flymake-note ((t (:underline (:style line :color "#7aa2f7" :position bottom)))))
   (flymake-error-fringe ((t (:foreground "#f7768e"))))
   (flymake-warning-fringe ((t (:foreground "#e0af68"))))
   (flymake-note-fringe ((t (:foreground "#7aa2f7"))))
