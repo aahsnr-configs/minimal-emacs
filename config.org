@@ -3271,7 +3271,6 @@ Extracts system =manpath= directories to guarantee native Emacs =woman= can loca
 
 
 * TODO Workflow Management
-
 ** DONE Dired
 Provides a visual directory editor and file manager for navigating the filesystem, copying, moving, and deleting files.
 #+begin_src emacs-lisp
@@ -3295,12 +3294,10 @@ Provides a visual directory editor and file manager for navigating the filesyste
   :config
   (setq dired-listing-switches "-ahl -v --group-directories-first")
   (put 'dired-find-alternate-file 'disabled nil)
-
   (defun ar/dired--no-revert-in-virtual-buffers-p (&rest _)
     "Return nil if the current buffer is a virtual Dired buffer."
     (not (eq revert-buffer-function #'dired-virtual-revert)))
   (advice-add #'dired-buffer-stale-p :before-while #'ar/dired--no-revert-in-virtual-buffers-p)
-
   (defun ar/dired-strip-unsupported-ls-flags ()
     "Strip GNU-specific ls flags over TRAMP to prevent blank screens on minimal remote containers."
     (when (file-remote-p default-directory)
@@ -3311,7 +3308,6 @@ Provides a visual directory editor and file manager for navigating the filesyste
         (setq switches (replace-regexp-in-string "  +" " " (string-trim switches)))
         (setq-local dired-actual-switches switches))))
   (add-hook 'dired-before-readin-hook #'ar/dired-strip-unsupported-ls-flags)
-
   (setq dired-guess-shell-alist-user
         '(("\\.pdf\\'" "xdg-open" "evince" "zathura")
           ("\\.\\(?:jpe?g\\|png\\|gif\\|svg\\|webp\\)\\'" "xdg-open" "imv")
@@ -3402,21 +3398,18 @@ Transforms the native directory editor into a modern, visual file manager with l
       (when (eq (frame-selected-window) window)
         (funcall fn window)))
     (advice-add #'dirvish-pre-redisplay-h :around #'ar/dirvish--debounce-redisplay))
-  ;; TODO: modify this to work with bufferlo/projection
-  ;; DOOM HACK: Clean up Dirvish before switching workspaces/projects.
-  ;; If Dirvish is open in a dedicated side-window and you switch workspaces,
-  ;; Emacs will throw an error trying to delete the dedicated window.
-  ;; (add-hook 'persp-before-switch-functions
-  ;;           (lambda (&rest _)
-  ;;             (when-let* ((dv (cl-loop for w in (window-list)
-  ;;                                      if (window-dedicated-p w)
-  ;;                                      if (with-current-buffer (window-buffer w) (dirvish-curr))
-  ;;                                      return it)))
-  ;;               (let (dirvish-reuse-session)
-  ;;                 (with-selected-window (dv-root-window dv)
-  ;;                   (dirvish-quit))))))
-  )
-
+  ;; Clean up Dirvish before switching workspaces via bufferlo.
+  ;; Prevents delete-window errors on dedicated side-windows during tab switches.
+  (with-eval-after-load 'bufferlo
+    (add-hook 'bufferlo-before-switch-hook
+              (lambda (&rest _)
+                (when-let* ((dv (cl-loop for w in (window-list)
+                                         if (window-dedicated-p w)
+                                         if (with-current-buffer (window-buffer w) (dirvish-curr))
+                                         return it)))
+                  (let (dirvish-reuse-session)
+                    (with-selected-window (dv-root-window dv)
+                      (dirvish-quit))))))))
 ;; CUSTOM DIRVISH TRANSIENT DASHBOARD
 ;; ------------------------------------------------------------------
 ;; Replaces the default `dirvish-dispatch` with a unified, Doom-inspired
@@ -3429,7 +3422,6 @@ Transforms the native directory editor into a modern, visual file manager with l
          (nerd-icons-mdicon "nf-md-folder" :face 'transient-heading :v-adjust 0.02)
        "")
      (propertize " Dirvish Dashboard" 'face 'transient-heading)))
-
   (transient-define-prefix ar/dirvish-transient ()
     "Dirvish Dashboard"
     [:description ar/dirvish-title
@@ -3456,63 +3448,63 @@ Transforms the native directory editor into a modern, visual file manager with l
       ("<escape>" "" transient-quit-one :format " ")]]))
 
 (general-define-key
-  :states 'normal
-  :keymaps 'dirvish-mode-map
-  "?"   #'ar/dirvish-transient
-  "q"   #'dirvish-quit
-  "b"   #'dirvish-quick-access
-  "p"   #'dirvish-yank
-  "F"   #'dirvish-layout-toggle
-  "z"   #'dirvish-history-jump
-  "gh"  #'dirvish-subtree-up
-  "gl"  #'dirvish-subtree-toggle
-  "h"   #'dired-up-directory
-  "l"   #'dired-find-file
-  "TAB" #'dirvish-subtree-toggle)
+ :states 'normal
+ :keymaps 'dirvish-mode-map
+ "?"   #'ar/dirvish-transient
+ "q"   #'dirvish-quit
+ "b"   #'dirvish-quick-access
+ "p"   #'dirvish-yank
+ "F"   #'dirvish-layout-toggle
+ "z"   #'dirvish-history-jump
+ "gh"  #'dirvish-subtree-up
+ "gl"  #'dirvish-subtree-toggle
+ "h"   #'dired-up-directory
+ "l"   #'dired-find-file
+ "TAB" #'dirvish-subtree-toggle)
 
 (general-define-key
-  :states '(normal visual)
-  :keymaps 'dirvish-mode-map
-  "f"   #'dirvish-file-info-menu
-  "S"   #'dirvish-quicksort
-  "M-b" #'dirvish-history-go-backward
-  "M-f" #'dirvish-history-go-forward
-  "M-n" #'dirvish-narrow
-  "M-m" #'dirvish-mark-menu
-  "M-s" #'dirvish-setup-menu
-  "M-e" #'dirvish-emerge-menu)
+ :states '(normal visual)
+ :keymaps 'dirvish-mode-map
+ "f"   #'dirvish-file-info-menu
+ "S"   #'dirvish-quicksort
+ "M-b" #'dirvish-history-go-backward
+ "M-f" #'dirvish-history-go-forward
+ "M-n" #'dirvish-narrow
+ "M-m" #'dirvish-mark-menu
+ "M-s" #'dirvish-setup-menu
+ "M-e" #'dirvish-emerge-menu)
 
 (general-define-key
-  :states 'motion
-  :keymaps 'dirvish-mode-map
-  "[h"  #'dirvish-history-go-backward
-  "]h"  #'dirvish-history-go-forward
-  "[e"  #'dirvish-emerge-next-group
-  "]e"  #'dirvish-emerge-previous-group)
+ :states 'motion
+ :keymaps 'dirvish-mode-map
+ "[h"  #'dirvish-history-go-backward
+ "]h"  #'dirvish-history-go-forward
+ "[e"  #'dirvish-emerge-next-group
+ "]e"  #'dirvish-emerge-previous-group)
 
 (general-define-key
-  :states '(normal visual motion)
-  :keymaps 'dirvish-mode-map
-  "<left>"  #'dired-up-directory
-  "<right>" #'dired-find-file)
+ :states '(normal visual motion)
+ :keymaps 'dirvish-mode-map
+ "<left>"  #'dired-up-directory
+ "<right>" #'dired-find-file)
 
 (general-define-key
-  :states 'normal
-  :keymaps 'dirvish-mode-map
-  :prefix "y"
-  "l"   #'dirvish-copy-file-true-path
-  "n"   #'dirvish-copy-file-name
-  "p"   #'dirvish-copy-file-path
-  "r"   #'dirvish-copy-remote-path
-  "y"   #'dired-do-copy)
+ :states 'normal
+ :keymaps 'dirvish-mode-map
+ :prefix "y"
+ "l"   #'dirvish-copy-file-true-path
+ "n"   #'dirvish-copy-file-name
+ "p"   #'dirvish-copy-file-path
+ "r"   #'dirvish-copy-remote-path
+ "y"   #'dired-do-copy)
 
 (general-define-key
-  :states 'normal
-  :keymaps 'dirvish-mode-map
-  :prefix "s"
-  "s"   #'dirvish-symlink
-  "S"   #'dirvish-relative-symlink
-  "h"   #'dirvish-hardlink)
+ :states 'normal
+ :keymaps 'dirvish-mode-map
+ :prefix "s"
+ "s"   #'dirvish-symlink
+ "S"   #'dirvish-relative-symlink
+ "h"   #'dirvish-hardlink)
 #+end_src
 
 ** DONE Dired Extensions
@@ -3576,7 +3568,6 @@ Renders visual file and folder glyphs in standard directory listings.
   :hook (dired-mode . nerd-icons-dired-mode))
 #+end_src
 
-
 ** DONE Treemacs
 Provides a persistent file and project explorer sidebar for navigating directory trees and workspaces.
 #+begin_src emacs-lisp
@@ -3608,6 +3599,7 @@ Provides a persistent file and project explorer sidebar for navigating directory
   ;; Directories to collapse/ignore during cleanup to prevent UI lag.
   (treemacs-litter-directories '("/node_modules"
                                  "/.venv"
+                                 "/.direnv"
                                  "/.cask"
                                  "/__pycache__"))
   ;; Route session persistence to the no-littering var directory.
@@ -3656,22 +3648,22 @@ Provides a persistent file and project explorer sidebar for navigating directory
   :after (treemacs evil))
 
 (general-define-key
-  :states 'treemacs
-  :keymaps 'evil-treemacs-state-map
-  "RET"      #'treemacs-RET-action
-  "[return]" #'treemacs-RET-action
-  "TAB"      #'treemacs-TAB-action
-  "[tab]"    #'treemacs-TAB-action
-  "o v"      #'treemacs-visit-node-horizontal-split
-  "o s"      #'treemacs-visit-node-vertical-split
-  "q"        #'treemacs-quit)
+ :states 'treemacs
+ :keymaps 'evil-treemacs-state-map
+ "RET"      #'treemacs-RET-action
+ "[return]" #'treemacs-RET-action
+ "TAB"      #'treemacs-TAB-action
+ "[tab]"    #'treemacs-TAB-action
+ "o v"      #'treemacs-visit-node-horizontal-split
+ "o s"      #'treemacs-visit-node-vertical-split
+ "q"        #'treemacs-quit)
 #+end_src
-
 
 ** TODO Buffer Management
 Provides a centralized dashboard and automated cleanup engine for viewing, filtering, and managing all open buffers across projects and workspaces.
+
 *** TODO iBuffer
-=ibuffer= provides a highly customizable dashboard for viewing, filtering, and managing open buffers with project and workspace awareness.
+Displays all open buffers in a filterable, sortable dashboard with project and workspace awareness.
 #+begin_src emacs-lisp
 (use-package ibuffer
   :ensure nil
@@ -3687,9 +3679,7 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
   :config
   ;; Suppress rendering of zero-match filter groups in the tabulated list grid.
   (setq ibuffer-show-empty-filter-groups nil)
-
   ;; Regex alist evaluated by `ibuffer-filter-buffer-by-name` to cull ephemeral noise.
-  ;; Append new regex strings to this list to cull specific buffers (e.g., "^\\*my-custom-log\\*$").
   (setq ibuffer-never-show-predicates '("^\\*Completions\\*$"
                                         "^\\*Messages\\*$"
                                         "^\\*Async-native-compile-log\\*$"
@@ -3697,9 +3687,8 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
                                         "^\\*Warnings\\*$"
                                         "^\\*tramp/.*\\*$"
                                         "^\\*eldoc\\*$"))
-
-  ;; Redefine tabulated list column widths to prevent aggressive name truncation and optimize spatial distribution.
-  ;; Splices in `vc-status` if `ibuffer-vc` is available, and includes the Emacs 28+ `locked` mark indicator.
+  ;; Redefine tabulated list column widths to prevent aggressive name truncation.
+  ;; Splices in `vc-status` if `ibuffer-vc` is available, and includes the Emacs 28+ `locked` mark.
   (setq ibuffer-formats
         `((mark modified read-only locked " "
                 (name 40 40 :left :elide)
@@ -3715,10 +3704,8 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
                 (name 16 -1)
                 " "
                 filename)))
-
-  ;; Minimize column padding to reclaim horizontal screen real estate in the tabulated list.
+  ;; Minimize column padding to reclaim horizontal screen real estate.
   (setq ibuffer-default-shrink-to-minimum-size t)
-
   ;; Map buffer states to semantic font-lock faces for Tokyo Night syntax parity.
   (setq ibuffer-fontification-alist
         `((10 buffer-read-only font-lock-constant-face)
@@ -3726,9 +3713,7 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
           (20 (string-prefix-p "*" (buffer-name)) shadow)
           (25 (derived-mode-p 'dired-mode) font-lock-function-name-face)
           (30 auto-save-mode font-lock-warning-face)))
-
   ;; Anti-Popper Guard: Force Ibuffer to reuse the current window or spawn a standard window.
-  ;; Strictly bypasses side-window drawers, dedicated popups, and popup managers.
   (add-to-list 'display-buffer-alist
                '("\\*Ibuffer\\*"
                  (display-buffer-reuse-window display-buffer-same-window)
@@ -3736,7 +3721,7 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
 #+end_src
 
 *** TODO Nerd Icons iBuffer
-=nerd-icons-ibuffer= renders visual file and mode glyphs inside the buffer dashboard for quick visual identification.
+Renders visual file and mode glyphs inside the buffer dashboard for quick visual identification.
 #+begin_src emacs-lisp
 (use-package nerd-icons-ibuffer
   :defer t
@@ -3744,18 +3729,19 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
 #+end_src
 
 *** TODO iBuffer VC
-=ibuffer-vc= injects version control status indicators directly into the buffer dashboard columns without overriding project groupings.
+Injects version control status indicators directly into the buffer dashboard columns.
 #+begin_src emacs-lisp
 (use-package ibuffer-vc :defer t)
 #+end_src
 
 *** TODO Projection iBuffer
-=projection-ibuffer= automatically groups all open buffers by their active project roots while respecting workspace boundaries.
+Groups all open buffers by their active project roots while respecting workspace boundaries.
 #+begin_src emacs-lisp
-;; projection-ibuffer is bundled inside the `projection` package.
+;; projection-ibuffer is bundled inside the `projection` monorepo.
 ;; It dynamically generates ibuffer filter groups based on project.el roots.
 (use-package projection-ibuffer
   :ensure nil
+  :after projection
   :commands
   ibuffer-projection-set-filter-groups
   ibuffer-projection-unset-filter-groups
@@ -3771,7 +3757,7 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
                 (ibuffer-do-sort-by-alphabetic))
               (ibuffer-update nil t)))
   :config
-  ;; Inject `cl-letf` shadow over `buffer-list` to intersect filter groups with `bufferlo` workspace boundaries.
+  ;; Intersect filter groups with `bufferlo` workspace boundaries when active.
   (with-eval-after-load 'bufferlo
     (define-advice projection-ibuffer--filter-groups (:around (fn) bufferlo-intersection)
       (if (bound-and-true-p bufferlo-mode)
@@ -3782,7 +3768,7 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
 #+end_src
 
 *** TODO Buffer Terminator
-=buffer-terminator= automatically cleans up inactive, buried buffers to prevent memory bloat during long daemon sessions.
+Automatically cleans up inactive, buried buffers to prevent memory bloat during long daemon sessions.
 #+begin_src emacs-lisp
 (use-package buffer-terminator
   :custom
@@ -3793,13 +3779,19 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
   ;; Check for inactive buffers every 10 minutes.
   (buffer-terminator-interval (* 10 60))
   :config
+  ;; Protect workspace-local buffers from termination when bufferlo is active.
+  (with-eval-after-load 'bufferlo
+    (add-to-list 'buffer-terminator-exceptions
+                 (lambda (buf)
+                   (and (bound-and-true-p bufferlo-mode)
+                        (memq buf (bufferlo-buffer-list))))))
   ;; Elpaca natively intercepts `:config` for external packages, wrapping it in an async callback.
-  ;; Omitting `:defer t` guarantees the background timer initializes safely post-build without blocking startup.
+  ;; Omitting `:defer t` guarantees the background timer initializes safely post-build.
   (buffer-terminator-mode 1))
 #+end_src
 
 *** TODO General Keybindings
-=general.el= routes centralized leader keybindings for buffer operations.
+Routes centralized leader keybindings for buffer operations.
 #+begin_src emacs-lisp
 (ar/global-leader
   "b"   '(:ignore t :wk "buffer")
@@ -3816,12 +3808,11 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
   "b z" '(bury-buffer :wk "Bury buffer"))
 #+end_src
 
-
 ** TODO Project Management
-Provides a unified workspace engine for navigating, compiling, and managing code repositories. Replaces legacy external project managers with Emacs' native C-level project detection, augmented by an abstraction layer that exposes transient build menus and multi-target compilation.
+Provides a unified workspace engine for navigating, compiling, and managing code repositories using native project detection augmented with transient build menus.
 
 *** TODO Project.el
-=project= serves as the foundational, built-in workspace detector. It identifies repository boundaries, manages ignore patterns for massive monorepos, and routes project-scoped searches natively into the completion framework.
+Identifies repository boundaries, manages ignore patterns, and routes project-scoped searches into the completion framework.
 #+begin_src emacs-lisp
 (use-package project
   :ensure nil
@@ -3852,7 +3843,6 @@ Provides a unified workspace engine for navigating, compiling, and managing code
   ;; Display the entire transient menu immediately upon invoking the prefix.
   (project-switch-use-entire-map t)
   ;; Enrich the native project dispatch menu with Doom-like actions.
-  ;; Defined entirely in :custom to prevent `add-to-list` duplication on reloads.
   (project-switch-commands '((project-find-file "Find file")
                              (project-find-regexp "Find regexp")
                              (project-dired "Dired")
@@ -3864,8 +3854,17 @@ Provides a unified workspace engine for navigating, compiling, and managing code
                              (ghostel-project "Ghostel")
                              (ghostel-project-list-buffers "Ghostel buffers")))
   :config
-  ;; Wire native project.el into consult. Extracts root directory string safely,
-  ;; bypassing the `project-current` instance object to prevent type mismatches.
+  ;; Emacs 31: VC-aware backend caching to prevent stale roots after branch switches.
+  (when (boundp 'project-vc-cache-timeout)
+    (setq project-vc-cache-timeout '((nil . 5))))
+  ;; Emacs 31: Longer cache for non-essential contexts (modeline, which-key).
+  (when (boundp 'project-vc-non-essential-cache-timeout)
+    (setq project-vc-non-essential-cache-timeout '((nil . 30))))
+  ;; Emacs 31: Add worktree-aware buffer matching to the switch menu.
+  (when (fboundp 'project-find-matching-buffer)
+    (add-to-list 'project-switch-commands
+                 '(project-find-matching-buffer "Matching buffer") t))
+  ;; Wire native project.el into consult. Extracts root directory string safely.
   (with-eval-after-load 'consult
     (setq consult-project-function
           (lambda (may-prompt)
@@ -3876,40 +3875,64 @@ Provides a unified workspace engine for navigating, compiling, and managing code
     (setq consult-dir-project-list-function #'project-known-project-roots)))
 #+end_src
 
+
 *** TODO Custom Utilities
-=Custom Utilities= provide O(1) wrapper functions for rapid configuration navigation and frictionless workspace teardown, mirroring Doom Emacs muscle memory.
+Provides wrapper functions for rapid configuration navigation, frictionless workspace teardown, and cross-project file access.
 #+begin_src emacs-lisp
 (defun ar/find-file-in-emacs-config ()
-  "Instantly search the private Emacs configuration directory via `consult-find`.
-Mirrors Doom Emacs `SPC f p` behavior for rapid config navigation."
+  "Instantly search the private Emacs configuration directory via `consult-find`."
   (interactive)
   (let ((default-directory user-emacs-directory))
     (call-interactively #'consult-find)))
 
 (defun ar/project-kill-buffers ()
-  "Kill project buffers without confirmation, mirroring Doom Emacs behavior.
-Bypasses the interactive `yes-or-no-p` prompt natively via the NO-CONFIRM argument."
+  "Kill project buffers without confirmation, mirroring Doom Emacs behavior."
   (interactive)
   (project-kill-buffers t))
+
+(defun ar/find-file-in-other-project ()
+  "Find a file in a different project without switching the current context."
+  (interactive)
+  (let* ((other-root (completing-read
+                      "Project: "
+                      (project-known-project-roots)
+                      nil t))
+         (default-directory other-root))
+    (call-interactively #'project-find-file)))
+
+(defun ar/project-recentf ()
+  "Show recently opened files scoped to the current project."
+  (interactive)
+  (if-let ((proj (project-current)))
+      (let* ((root (project-root proj))
+             (files (seq-filter
+                     (lambda (f) (string-prefix-p root f))
+                     recentf-list)))
+        (if files
+            (find-file (completing-read "Recent in project: " files nil t))
+          (message "No recent files in this project.")))
+    (user-error "Not inside a project")))
 #+end_src
 
 *** TODO Projection
-=projection= extends the native workspace detector with Projectile-like abstractions. It injects project-specific buffer hooks, exposes transient menus for build systems, and enables intelligent file jumping across diverse language ecosystems.
+Extends the native workspace detector with project-type-aware build menus, intelligent file jumping, and multi-target compilation.
 #+begin_src emacs-lisp
 (use-package projection
+  :ensure (projection :host github :repo "mohkale/projection" :files ("*.el"))
   :defer t
   :after project
   :commands
-  (projection-find-other-file
-   projection-commands-build-project
-   projection-commands-test-project
-   projection-commands-run-project
-   projection-commands-configure-project)
+  projection-find-other-file
+  projection-commands-build-project
+  projection-commands-test-project
+  projection-commands-run-project
+  projection-commands-configure-project
+  projection-commands-package-project
+  projection-commands-install-project
   :hook
   (compilation-mode . projection-customize-compilation-mode)
   :init
-  ;; Mark projection build/test/run commands as safe for .dir-locals.el
-  ;; to prevent Emacs from throwing "unsafe variable" security prompts.
+  ;; Mark projection commands as safe for .dir-locals.el to prevent security prompts.
   (put 'projection-commands-configure-project 'safe-local-variable #'stringp)
   (put 'projection-commands-build-project 'safe-local-variable #'stringp)
   (put 'projection-commands-test-project 'safe-local-variable #'stringp)
@@ -3926,20 +3949,20 @@ Bypasses the interactive `yes-or-no-p` prompt natively via the NO-CONFIRM argume
 #+end_src
 
 *** TODO Projection Multi
-=projection-multi= integrates multi-target compilation into the workspace engine. It automatically extracts available build, test, and run targets from Makefiles, CMake, and language-specific toolchains, presenting them in a unified selection menu.
+Extracts available build, test, and run targets from Makefiles, CMake, and language-specific toolchains into a unified selection menu.
 #+begin_src emacs-lisp
 (use-package projection-multi
-  :defer t
+  :ensure nil
   :after projection
   :commands
-  (projection-multi-compile))
+  projection-multi-compile)
 #+end_src
 
 *** TODO Projection Multi Embark
-=projection-multi-embark= bridges the multi-target compilation engine with Embark actions. It allows interactive selection and immediate reassignment of compilation targets directly from the minibuffer candidate list.
+Bridges the multi-target compilation engine with Embark actions for instant target reassignment from the minibuffer.
 #+begin_src emacs-lisp
 (use-package projection-multi-embark
-  :defer t
+  :ensure nil
   :after (projection-multi embark)
   :config
   ;; Add the projection set-command bindings to the embark command map.
@@ -3947,13 +3970,14 @@ Bypasses the interactive `yes-or-no-p` prompt natively via the NO-CONFIRM argume
 #+end_src
 
 *** TODO General Keybindings
-=general.el= routes centralized leader keybindings for project operations, mirroring Doom Emacs mnemonics for spatial navigation, buffer switching, and workspace-scoped searches.
+Routes centralized leader keybindings for project operations, mirroring Doom Emacs mnemonics.
 #+begin_src emacs-lisp
 (ar/global-leader
   "f p" '(ar/find-file-in-emacs-config :wk "Find in config")
   "p"   '(:ignore t :wk "project")
   "p p" '(project-switch-project :wk "Switch project")
   "p f" '(project-find-file :wk "Find file")
+  "p F" '(ar/find-file-in-other-project :wk "Find in other project")
   "p b" '(consult-project-buffer :wk "Project buffers")
   "p s" '(consult-ripgrep :wk "Search project")
   "p d" '(project-dired :wk "Dired root")
@@ -3968,19 +3992,14 @@ Bypasses the interactive `yes-or-no-p` prompt natively via the NO-CONFIRM argume
   "p u" '(projection-commands-run-project :wk "Run project")
   "p g" '(projection-commands-configure-project :wk "Configure")
   "p i" '(project-forget-zombie-projects :wk "Invalidate cache")
-  "p a" '(project-remember-project :wk "Add known project"))
+  "p a" '(project-remember-project :wk "Add known project")
+  "p R" '(ar/project-recentf :wk "Recent files in project"))
 #+end_src
 
-
-
-
-
-
-
 ** TODO Workspaces
-Provides mathematically strict buffer isolation per workflow context. Replaces legacy workspace managers with a headless native tab-bar engine augmented by an isolation layer that intercepts buffer creation and persists complex layouts across daemon restarts.
+Provides strict buffer isolation per workflow context using a headless native tab-bar engine augmented by an interception layer that persists layouts across daemon restarts.
 *** Tab Bar
-=tab-bar= serves as the foundational, built-in workspace container. It is configured headlessly to provide structural boundaries without rendering visual UI chrome, while spawning isolated scratch buffers for every new workspace.
+Serves as the foundational workspace container, configured headlessly to provide structural boundaries without rendering visual UI chrome.
 #+begin_src emacs-lisp
 (use-package tab-bar
   :ensure nil
@@ -3997,9 +4016,8 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
   ;; Ensure new frames also receive an isolated local scratch buffer.
   (add-hook 'after-make-frame-functions #'bufferlo-switch-to-local-scratch-buffer))
 #+end_src
-
 *** Bufferlo
-=bufferlo= extends the native tab container with strict buffer isolation, workspace-aware minibuffer interception, and lightweight bookmark persistence.
+Extends the native tab container with strict buffer isolation, workspace-aware minibuffer interception, and lightweight bookmark persistence.
 #+begin_src emacs-lisp
 (use-package bufferlo
   :after tab-bar
@@ -4016,11 +4034,14 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
   (bufferlo-exclude-buffer-filters '(".*"))
   (bufferlo-include-buffer-filters '("^\\*scratch\\*$"
                                      "^\\*Messages\\*$"))
-  ;; Hide ephemeral noise and space-prefixed internal buffers from the local list.
+  ;; Hide ephemeral noise, internal buffers, and side-window chrome from the local list.
   (bufferlo-hidden-buffers '("^\\*Completions\\*$"
                              "^\\*Flymake log\\*$"
                              "^\\*tramp/.*\\*$"
                              "^\\*eldoc\\*$"
+                             "^\\*eldoc-childframe\\*$"
+                             "^\\*Dirvish\\*$"
+                             "^\\*Treemacs\\*$"
                              "^ "))
   ;; Doom Parity: Protect unsaved code from accidental data loss, but aggressively kill ephemeral buffers.
   (bufferlo-kill-modified-buffers-policy 'retain-modified-kill-without-file-name)
@@ -4038,11 +4059,17 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
   (bufferlo-anywhere-mode 1)
   ;; Triad Integration: Wire bufferlo into consult-buffer to solve the "buffer soup" problem.
   (with-eval-after-load 'consult
-    (setq consult-buffer-list-function #'bufferlo-local-buffers)))
-#+end_src
+    (setq consult-buffer-list-function #'bufferlo-local-buffers))
 
+  ;; Protect Dirvish and Treemacs side-windows from workspace isolation.
+  (with-eval-after-load 'dirvish
+    (add-to-list 'bufferlo-exclude-buffer-filters "^\\*Dirvish\\*$"))
+  (with-eval-after-load 'treemacs
+    (add-to-list 'bufferlo-exclude-buffer-filters "^\\*Treemacs\\*$"))
+  )
+#+end_src
 *** Custom Workspace Utilities
-=Custom Workspace Utilities= provide O(1) wrappers for Doom Emacs perspective muscle memory, bridging the gap between `persp-mode` semantics and `bufferlo`'s tab-bar physics.
+Provides wrapper functions for Doom Emacs perspective muscle memory, bridging persp-mode semantics to bufferlo's tab-bar physics.
 #+begin_src emacs-lisp
 (defun ar/workspace-set-buffer (buffer)
   "Switch to BUFFER and remove it from all other workspaces."
@@ -4058,7 +4085,6 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
                   (delq buf (alist-get 'buffer-list tab)))
             (setf (alist-get 'buried-buffer-list tab)
                   (delq buf (alist-get 'buried-buffer-list tab)))))))))
-
 (defun ar/workspace-kill-other-buffers ()
   "Kill all local buffers in the current workspace except the current one."
   (interactive)
@@ -4069,14 +4095,12 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
         (when (kill-buffer buf)
           (cl-incf killed))))
     (message "Killed %d local buffer(s)" killed)))
-
 (defun ar/workspace-project-switch ()
   "Switch project and isolate workspace to the new project."
   (interactive)
   (call-interactively #'project-switch-project)
   (when (project-current)
     (bufferlo-isolate-project)))
-
 (defun ar/workspace-project-kill ()
   "Kill project buffers and close the current workspace."
   (interactive)
@@ -4087,18 +4111,18 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
 #+end_src
 
 *** General Keybindings
-=general.el= routes centralized leader keybindings for workspace operations, mirroring legacy `persp-mode` mnemonics mapped strictly to `bufferlo` and `tab-bar` APIs.
+Routes centralized leader keybindings for workspace operations, mirroring legacy persp-mode mnemonics mapped to bufferlo and tab-bar APIs.
 #+begin_src emacs-lisp
 (ar/global-leader
   "TAB"     '(:ignore t :wk "workspace")
   "TAB TAB" '(tab-switcher :wk "Switch/create workspace")
   "TAB n"   '(tab-next :wk "Next workspace")
+  "TAB N"   '(tab-new :wk "New workspace")
   "TAB p"   '(tab-previous :wk "Previous workspace")
   "TAB `"   '(tab-bar-switch-to-recent-tab :wk "Last workspace")
   "TAB r"   '(tab-bar-rename-tab :wk "Rename workspace")
   "TAB k"   '(bufferlo-tab-close-kill-buffers :wk "Kill workspace")
   "TAB K"   '(tab-bar-close-other-tabs :wk "Kill other workspaces")
-
   "TAB b"   '(bufferlo-switch-to-buffer :wk "Switch to buffer (local)")
   "TAB B"   '(switch-to-buffer :wk "Switch buffer (global)")
   "TAB a"   '(bufferlo-find-buffer-switch :wk "Add/Import buffer")
@@ -4106,18 +4130,16 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
   "TAB x"   '(bufferlo-remove :wk "Remove buffer from workspace")
   "TAB X"   '(ar/workspace-kill-other-buffers :wk "Kill other local buffers")
   "TAB m"   '(bufferlo-ibuffer :wk "IBuffer (workspace-filtered)")
-
   "TAB s"   '(:ignore t :wk "state")
   "TAB s s" '(bufferlo-bookmark-tab-save-current :wk "Save workspace state")
   "TAB s l" '(bufferlo-bookmark-tab-load-current :wk "Load/restore workspace state")
-
   "TAB P"   '(:ignore t :wk "project")
   "TAB P s" '(ar/workspace-project-switch :wk "Switch project + isolate")
   "TAB P p" '(bufferlo-isolate-project :wk "Isolate workspace to project")
   "TAB P k" '(ar/workspace-project-kill :wk "Kill project + workspace")
-
   "TAB l"   '(bufferlo-list-buffers :wk "List all local buffers"))
 #+end_src
+
 
 
 * TODO Version Control
