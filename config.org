@@ -851,7 +851,6 @@ Manages global and local leader keybindings for accessing editor commands.
   "X"   '(org-capture :wk "Org capture"))
 
 ;; Binds <escape> across all minibuffer keymaps to abort recursive edits.
-;; Unquoted `ar/minibuffer-escape-maps` prevents a wrong-type-argument error at call-site.
 (general-define-key
   :states '(normal insert emacs motion)
   :keymaps ar/minibuffer-escape-maps
@@ -1115,20 +1114,16 @@ Reopens the current buffer with elevated privileges via TRAMP's native sudo meth
 (use-package sudo-edit :defer t)
 #+end_src
 
-** TODO Ghostel
+** DONE Ghostel
 Terminal emulation powered by =libghostty-vt=, rendering as a persistent 30% bottom drawer with strict Evil integration and automatic TRAMP support.
 #+begin_src emacs-lisp
 (use-package ghostel
+  :ensure (:host github :repo "dakra/ghostel")
   :defer t
-  :commands (ghostel ghostel-project)
-  :bind (:map ghostel-semi-char-mode-map
-         ;; Map M-p/M-n to terminal history navigation.
-         ("M-p" . (lambda () (interactive) (ghostel-send-key "p" "ctrl")))
-         ("M-n" . (lambda () (interactive) (ghostel-send-key "n" "ctrl")))
-         ("M-<backspace>" . ghostel-backward-kill-word))
+  :commands (ghostel
+             ghostel-project)
   :config
-  (require 'seq)
-  ;; Route buffers to a dedicated 30% bottom side-window.
+  ;; Route all ghostel-derived buffers to a dedicated 30% bottom side-window.
   (add-to-list 'display-buffer-alist
                '((derived-mode . ghostel-mode)
                  (display-buffer-in-side-window)
@@ -1137,14 +1132,12 @@ Terminal emulation powered by =libghostty-vt=, rendering as a persistent 30% bot
                  (window-parameters (no-delete-other-windows . t))))
   ;; Whitelist Magit for OSC 52;e shell evaluation.
   (add-to-list 'ghostel-eval-cmds '("magit-status-setup-buffer" magit-status-setup-buffer))
-  ;; TODO: Integrate natively with  workflow management section
-  (add-to-list 'project-switch-commands '(ghostel-project "Ghostel") t)
-  (add-to-list 'project-switch-commands '(ghostel-project-list-buffers "Ghostel buffers") t)
   ;; Synchronize C-k kill-ring behavior with terminal line deletion.
+  ;; Uses `kill-ring-save' to sync killed text to the system clipboard via PGTK/Wayland.
   (defun ar/ghostel-send-C-k-and-kill ()
     "Send `C-k' to ghostel and save to kill-ring."
     (interactive)
-    (copy-region-as-kill (point) (line-end-position))
+    (kill-ring-save (point) (line-end-position))
     (ghostel-send-key "k" "ctrl"))
   (define-key ghostel-semi-char-mode-map (kbd "C-k") #'ar/ghostel-send-C-k-and-kill)
   ;; Strip DIRENV_ variables to enforce local .envrc evaluation.
@@ -1154,19 +1147,19 @@ Terminal emulation powered by =libghostty-vt=, rendering as a persistent 30% bot
                     (seq-remove (lambda (env) (string-prefix-p "DIRENV_" env))
                                 process-environment))))
   ;; Enable automatic TRAMP shell integration via temporary SCP transfers.
-  (setq ghostel-tramp-shell-integration t)
-  ;; TODO: Configure OS-level Zsh aliases for ghostel_cmd IDE synergy.
-  ;; TODO: Configure OS-level Tmux for xterm-ghostty true-color passthrough.
-  )
+  (setq ghostel-tramp-shell-integration t))
 
 ;; State-aware toggle for the persistent bottom terminal drawer.
+;; Respects bufferlo workspace boundaries when active.
 (defun ar/ghostel-toggle ()
   "Toggle the Ghostel terminal drawer at the bottom of the frame."
   (interactive)
-  ;; TODO: Restrict buffer querying to persp-mode/projectile boundaries.
-  (let* ((buf (seq-find (lambda (b)
+  (let* ((bufs (if (bound-and-true-p bufferlo-mode)
+                   (bufferlo-buffer-list)
+                 (buffer-list)))
+         (buf (seq-find (lambda (b)
                           (with-current-buffer b (derived-mode-p 'ghostel-mode)))
-                        (buffer-list)))
+                        bufs))
          (win (and buf (get-buffer-window buf))))
     (cond
      ((and win (eq win (selected-window))) (delete-window win))
@@ -1176,6 +1169,7 @@ Terminal emulation powered by =libghostty-vt=, rendering as a persistent 30% bot
 
 ;; Synchronizes the terminal cursor with Emacs point during Evil state transitions.
 (use-package evil-ghostel
+  :ensure nil
   :after (ghostel evil)
   :hook (ghostel-mode . evil-ghostel-mode))
 
@@ -1189,13 +1183,15 @@ Terminal emulation powered by =libghostty-vt=, rendering as a persistent 30% bot
 (use-package ghostel-compile
   :ensure nil
   :after ghostel
-  :hook (elpaca-after-init . ghostel-compile-global-mode))
+  :config
+  (ghostel-compile-global-mode 1))
 
 ;; Upgrades Comint and REPL output with libghostty-vt ANSI and OSC parsing fidelity.
 (use-package ghostel-comint
   :ensure nil
   :after ghostel
-  :hook (elpaca-after-init . ghostel-comint-global-mode))
+  :config
+  (ghostel-comint-global-mode 1))
 #+end_src
 
 ** DONE Eshell
@@ -3270,7 +3266,7 @@ Extracts system =manpath= directories to guarantee native Emacs =woman= can loca
 #+end_src
 
 
-* TODO Workflow Management
+* DONE Workflow Management
 ** DONE Dired
 Provides a visual directory editor and file manager for navigating the filesystem, copying, moving, and deleting files.
 #+begin_src emacs-lisp
@@ -3659,10 +3655,10 @@ Provides a persistent file and project explorer sidebar for navigating directory
  "q"        #'treemacs-quit)
 #+end_src
 
-** TODO Buffer Management
+** DONE Buffer Management
 Provides a centralized dashboard and automated cleanup engine for viewing, filtering, and managing all open buffers across projects and workspaces.
 
-*** TODO iBuffer
+*** DONE iBuffer
 Displays all open buffers in a filterable, sortable dashboard with project and workspace awareness.
 #+begin_src emacs-lisp
 (use-package ibuffer
@@ -3720,7 +3716,7 @@ Displays all open buffers in a filterable, sortable dashboard with project and w
                  (reusable-frames . visible))))
 #+end_src
 
-*** TODO Nerd Icons iBuffer
+*** DONE Nerd Icons iBuffer
 Renders visual file and mode glyphs inside the buffer dashboard for quick visual identification.
 #+begin_src emacs-lisp
 (use-package nerd-icons-ibuffer
@@ -3728,13 +3724,13 @@ Renders visual file and mode glyphs inside the buffer dashboard for quick visual
   :hook (ibuffer-mode . nerd-icons-ibuffer-mode))
 #+end_src
 
-*** TODO iBuffer VC
+*** DONE iBuffer VC
 Injects version control status indicators directly into the buffer dashboard columns.
 #+begin_src emacs-lisp
 (use-package ibuffer-vc :defer t)
 #+end_src
 
-*** TODO Projection iBuffer
+*** DONE Projection iBuffer
 Groups all open buffers by their active project roots while respecting workspace boundaries.
 #+begin_src emacs-lisp
 ;; projection-ibuffer is bundled inside the `projection` monorepo.
@@ -3767,7 +3763,7 @@ Groups all open buffers by their active project roots while respecting workspace
         (funcall fn)))))
 #+end_src
 
-*** TODO Buffer Terminator
+*** DONE Buffer Terminator
 Automatically cleans up inactive, buried buffers to prevent memory bloat during long daemon sessions.
 #+begin_src emacs-lisp
 (use-package buffer-terminator
@@ -3790,7 +3786,7 @@ Automatically cleans up inactive, buried buffers to prevent memory bloat during 
   (buffer-terminator-mode 1))
 #+end_src
 
-*** TODO General Keybindings
+*** DONE General Keybindings
 Routes centralized leader keybindings for buffer operations.
 #+begin_src emacs-lisp
 (ar/global-leader
@@ -3808,10 +3804,10 @@ Routes centralized leader keybindings for buffer operations.
   "b z" '(bury-buffer :wk "Bury buffer"))
 #+end_src
 
-** TODO Project Management
+** DONE Project Management
 Provides a unified workspace engine for navigating, compiling, and managing code repositories using native project detection augmented with transient build menus.
 
-*** TODO Project.el
+*** DONE Project.el
 Identifies repository boundaries, manages ignore patterns, and routes project-scoped searches into the completion framework.
 #+begin_src emacs-lisp
 (use-package project
@@ -3860,6 +3856,13 @@ Identifies repository boundaries, manages ignore patterns, and routes project-sc
   ;; Emacs 31: Longer cache for non-essential contexts (modeline, which-key).
   (when (boundp 'project-vc-non-essential-cache-timeout)
     (setq project-vc-non-essential-cache-timeout '((nil . 30))))
+  ;; Emacs 31: Automatically prune inaccessible projects from the known list.
+  (when (boundp 'project-prune-zombie-projects)
+    (setq project-prune-zombie-projects
+          '((project-prompt-project-dir . file-directory-p))))
+  ;; Emacs 31: Skip transient/ephemeral directories from project memory.
+  (when (boundp 'project-list-exclude)
+    (setq project-list-exclude '("/tmp/" "/dev/shm/")))
   ;; Emacs 31: Add worktree-aware buffer matching to the switch menu.
   (when (fboundp 'project-find-matching-buffer)
     (add-to-list 'project-switch-commands
@@ -3875,8 +3878,7 @@ Identifies repository boundaries, manages ignore patterns, and routes project-sc
     (setq consult-dir-project-list-function #'project-known-project-roots)))
 #+end_src
 
-
-*** TODO Custom Utilities
+*** DONE Custom Utilities
 Provides wrapper functions for rapid configuration navigation, frictionless workspace teardown, and cross-project file access.
 #+begin_src emacs-lisp
 (defun ar/find-file-in-emacs-config ()
@@ -3914,7 +3916,7 @@ Provides wrapper functions for rapid configuration navigation, frictionless work
     (user-error "Not inside a project")))
 #+end_src
 
-*** TODO Projection
+*** DONE Projection
 Extends the native workspace detector with project-type-aware build menus, intelligent file jumping, and multi-target compilation.
 #+begin_src emacs-lisp
 (use-package projection
@@ -3948,28 +3950,30 @@ Extends the native workspace detector with project-type-aware build menus, intel
   (global-projection-hook-mode 1))
 #+end_src
 
-*** TODO Projection Multi
+*** DONE Projection Multi
 Extracts available build, test, and run targets from Makefiles, CMake, and language-specific toolchains into a unified selection menu.
 #+begin_src emacs-lisp
 (use-package projection-multi
   :ensure nil
+  :defer t
   :after projection
   :commands
   projection-multi-compile)
 #+end_src
 
-*** TODO Projection Multi Embark
+*** DONE Projection Multi Embark
 Bridges the multi-target compilation engine with Embark actions for instant target reassignment from the minibuffer.
 #+begin_src emacs-lisp
 (use-package projection-multi-embark
   :ensure nil
+  :defer t
   :after (projection-multi embark)
   :config
   ;; Add the projection set-command bindings to the embark command map.
   (projection-multi-embark-setup-command-map))
 #+end_src
 
-*** TODO General Keybindings
+*** DONE General Keybindings
 Routes centralized leader keybindings for project operations, mirroring Doom Emacs mnemonics.
 #+begin_src emacs-lisp
 (ar/global-leader
@@ -3996,9 +4000,9 @@ Routes centralized leader keybindings for project operations, mirroring Doom Ema
   "p R" '(ar/project-recentf :wk "Recent files in project"))
 #+end_src
 
-** TODO Workspaces
+** DONE Workspaces
 Provides strict buffer isolation per workflow context using a headless native tab-bar engine augmented by an interception layer that persists layouts across daemon restarts.
-*** Tab Bar
+*** DONE Tab Bar
 Serves as the foundational workspace container, configured headlessly to provide structural boundaries without rendering visual UI chrome.
 #+begin_src emacs-lisp
 (use-package tab-bar
@@ -4016,7 +4020,7 @@ Serves as the foundational workspace container, configured headlessly to provide
   ;; Ensure new frames also receive an isolated local scratch buffer.
   (add-hook 'after-make-frame-functions #'bufferlo-switch-to-local-scratch-buffer))
 #+end_src
-*** Bufferlo
+*** DONE Bufferlo
 Extends the native tab container with strict buffer isolation, workspace-aware minibuffer interception, and lightweight bookmark persistence.
 #+begin_src emacs-lisp
 (use-package bufferlo
@@ -4068,7 +4072,7 @@ Extends the native tab container with strict buffer isolation, workspace-aware m
     (add-to-list 'bufferlo-exclude-buffer-filters "^\\*Treemacs\\*$"))
   )
 #+end_src
-*** Custom Workspace Utilities
+*** DONE Custom Workspace Utilities
 Provides wrapper functions for Doom Emacs perspective muscle memory, bridging persp-mode semantics to bufferlo's tab-bar physics.
 #+begin_src emacs-lisp
 (defun ar/workspace-set-buffer (buffer)
@@ -4110,7 +4114,7 @@ Provides wrapper functions for Doom Emacs perspective muscle memory, bridging pe
   (bufferlo-tab-close-kill-buffers))
 #+end_src
 
-*** General Keybindings
+*** DONE General Keybindings
 Routes centralized leader keybindings for workspace operations, mirroring legacy persp-mode mnemonics mapped to bufferlo and tab-bar APIs.
 #+begin_src emacs-lisp
 (ar/global-leader
@@ -6621,48 +6625,49 @@ Displays lightweight context-aware metadata for Org elements in the echo area.
   :hook (org-mode . org-eldoc-load))
 #+end_src
 
-** TODO Evil Integration
+** TODO Evil Org
+Vim-modal integration for Org buffers with context-aware RET and table/list continuation.
 #+begin_src emacs-lisp
+(use-package evil-org
+  :defer t
+  :after (evil org)
+  :hook (org-mode . evil-org-mode)
+  :custom
+  ;; o/O continue table rows and list items in normal state.
+  (evil-org-special-o/O '(table-row item))
+  :config
+  (evil-org-set-key-theme '(navigation insert textobjects additional calendar todo heading))
+  ;; Context-aware RET: TODO toggle, checkbox, link follow, fold reveal, else C-c C-c.
+  (defun ar/org-return-dwim (&optional arg)
+    "Context-aware RET in Org normal/motion states."
+    (interactive "P")
+    (cond
+     ((and (org-at-heading-p) (org-get-todo-state))
+      (org-todo arg))
+     ((org-at-item-checkbox-p)
+      (org-toggle-checkbox arg))
+     ((org-in-regexp org-link-any-re 1)
+      (org-open-at-point arg))
+     ((and (org-at-heading-p) (org-invisible-p))
+      (org-fold-show-entry))
+     (t (org-ctrl-c-ctrl-c arg)))))
+#+end_src
 
+** TODO Evil Org Agenda
+Vim motions and operator bindings for org-agenda buffers.
+#+begin_src emacs-lisp
+(use-package evil-org-agenda
+  :ensure nil
+  :defer t
+  :after evil-org
+  :hook (org-agenda-mode . evil-org-agenda-mode)
+  :config
+  (evil-org-agenda-set-keys))
 #+end_src
 
 ** TODO Keybindings
 Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motions, and the complete 25-package Denote ecosystem matrix.
 #+begin_src emacs-lisp
-;; (use-package evil-org
-;;   :defer t
-;;   :after (evil org)
-;;   :hook (org-mode . evil-org-mode)
-;;   :config
-;;   ;; Activate navigation, insert, textobjects, additional, calendar, todo, and heading themes.
-;;   (evil-org-set-key-theme '(navigation insert textobjects additional calendar todo heading))
-;;   ;; Context-aware RET: toggles TODO states, checkboxes, follows links, or opens folds.
-;;   (defun ar/org-return-dwim (&optional arg)
-;;     "Doom Emacs parity: Context-aware RET in Org normal/motion states."
-;;     (interactive "P")
-;;     (cond
-;;      ((and (org-at-heading-p) (org-get-todo-state))
-;;       (org-todo arg))
-;;      ((org-at-item-checkbox-p)
-;;       (org-toggle-checkbox arg))
-;;      ((org-in-regexp org-link-any-re 1)
-;;       (org-open-at-point arg))
-;;      ((and (org-at-heading-p) (org-invisible-p))
-;;       (org-fold-show-entry))
-;;      (t (org-ctrl-c-ctrl-c arg))))
-;;   ;; Bind RET in normal and motion states to the DWIM handler.
-;;   (evil-define-key '(normal motion) evil-org-mode-map
-;;     (kbd "RET") #'ar/org-return-dwim))
-
-;; (use-package evil-org-agenda
-;;   :ensure nil
-;;   :defer t
-;;   :after evil-org
-;;   :hook (org-agenda-mode . evil-org-agenda-mode)
-;;   :config
-;;   ;; Inject Vim motions for agenda manipulation, item reordering, and date jumping.
-;;   (evil-org-agenda-set-keys))
-
 (defun ar/org-babel-remove-result-one-or-many (&optional arg)
   "Remove babel results. With ARG, remove all results in buffer."
   (interactive "P")
@@ -6800,29 +6805,6 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
 (ar/local-leader
   :keymaps 'org-mode-map
 
-  ;; ;; Single-Key
-  ;; "#" '(org-update-statistics-cookies :wk "Update cookies")
-  ;; "'" '(org-edit-special :wk "Edit babel block")
-  ;; "*" '(org-ctrl-c-star :wk "Heading from list")
-  ;; "-" '(org-ctrl-c-minus :wk "Cycle list bullet")
-  ;; "," '(org-switchb :wk "Switch org buffer")
-  ;; "." '(consult-org-heading :wk "Fuzzy jump heading")
-  ;; "/" '(consult-org-agenda :wk "Fuzzy jump agenda")
-  ;; "@" '(org-cite-insert :wk "Insert citation")
-  ;; "A" '(org-archive-subtree-default :wk "Archive subtree")
-  ;; "C" '(org-capture :wk "Local capture")
-  ;; "e" '(org-export-dispatch :wk "Export dispatch")
-  ;; "f" '(org-footnote-action :wk "Footnote action")
-  ;; "h" '(org-toggle-heading :wk "Toggle heading")
-  ;; "I" '(org-id-get-create :wk "Create ID")
-  ;; "k" '(ar/org-babel-remove-result-one-or-many :wk "Remove babel result")
-  ;; "K" '(org-babel-remove-result :wk "Remove block result")
-  ;; "n" '(org-store-link :wk "Store link")
-  ;; "o" '(org-set-property :wk "Set property")
-  ;; "q" '(org-set-tags-command :wk "Set tags")
-  ;; "t" '(org-todo :wk "Cycle TODO")
-  ;; "x" '(org-toggle-checkbox :wk "Toggle checkbox")
-
   ;; Prefix Routes
   "a" '(:ignore t :wk "attachments")
   "a a" '(org-attach :wk "Attach file")
@@ -6952,20 +6934,24 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
   "]c" #'org-babel-next-src-block
   "[c" #'org-babel-previous-src-block)
 
-
-;; Subtree Manipulation
+;; Evil Org: context-aware RET and clock operators
 (general-define-key
-  :states '(normal visual)
-  :keymaps 'org-mode-map
-  "M-h" #'org-metaleft
-  "M-l" #'org-metaright
-  "M-k" #'org-metaup
-  "M-j" #'org-metadown
-  "M-H" #'org-shiftmetaleft
-  "M-L" #'org-shiftmetaright
-  "M-K" #'org-shiftmetaup
-  "M-J" #'org-shiftmetadown)
+ :states '(normal motion)
+ :keymaps 'evil-org-mode-map
+ "RET" #'ar/org-return-dwim)
 
+(general-define-key
+ :states 'normal
+ :keymaps 'evil-org-mode-map
+ "gci" #'org-clock-in
+ "gco" #'org-clock-out
+ "gcO" #'org-clock-in-last
+ "gcq" #'org-clock-cancel
+ "gcx" #'org-clock-goto
+ "gcX" (lambda () (interactive) (org-clock-goto t))
+ "gcd" #'org-clock-display
+ "gcD" #'org-clock-remove-overlays
+ "gcS" #'org-clock-report)
 
 ;; Agenda Item Manipulation
 (general-define-key
@@ -7089,7 +7075,6 @@ Connects Emacs to external language servers for smart code navigation, error che
                (message "No moniker found to copy.")))))))))
 #+end_src
 
-
 ** DONE Eldoc
 Configures the core documentation engine with strict 2-line echo area limits and Emacs 31 help-at-point integration.
 #+begin_src emacs-lisp
@@ -7190,7 +7175,6 @@ Native on-the-fly syntax checking and diagnostic aggregation with inline overlay
   (consult-flymake t))
 #+end_src
 
-
 ** DONE Xref
 Navigates to definitions, references, and symbols across the project.
 #+begin_src emacs-lisp
@@ -7215,7 +7199,6 @@ Navigates to definitions, references, and symbols across the project.
   (nerd-icons-xref-mode 1))
 #+end_src
 
-
 ** DONE Consult Eglot
 Searches for workspace symbols and integrates with Embark actions.
 #+begin_src emacs-lisp
@@ -7233,7 +7216,6 @@ Searches for workspace symbols and integrates with Embark actions.
   ;; Activate the Embark action overrides for workspace symbol candidates.
   (consult-eglot-embark-mode 1))
 #+end_src
-
 
 ** DONE Peek
 Renders inline definition and reference panels below the cursor using native overlays.
@@ -7259,7 +7241,6 @@ Renders inline definition and reference panels below the cursor using native ove
   (global-peek-mode 1))
 #+end_src
 
-
 ** DONE Apheleia
 Automatically formats code using external tools when saving files.
 #+begin_src emacs-lisp
@@ -7271,7 +7252,6 @@ Automatically formats code using external tools when saving files.
   (apheleia-remote-algorithm 'cancel)
   (apheleia-hide-log-buffers t))
 #+end_src
-
 
 ** DONE Auto Rename Tag
 Zero-latency local renaming of paired HTML, XML, and JSX tags.
@@ -7287,7 +7267,6 @@ Zero-latency local renaming of paired HTML, XML, and JSX tags.
          (mhtml-mode . auto-rename-tag-mode)
          (rjsx-mode . auto-rename-tag-mode)))
 #+end_src
-
 
 ** DONE Evil MC
 Enables multiple cursors for simultaneous editing across arbitrary and rectangular selections.
@@ -7319,12 +7298,10 @@ Enables multiple cursors for simultaneous editing across arbitrary and rectangul
           evil-mc-custom-known-commands)))
 #+end_src
 
-
 ** TODO Minimap
 #+begin_src emacs-lisp
 
 #+end_src
-
 
 ** TODO Topsy
 #+begin_src emacs-lisp
@@ -7332,18 +7309,16 @@ Enables multiple cursors for simultaneous editing across arbitrary and rectangul
 #+end_src
 
 
-
 ** TODO Debug Adapter Protocol
 #+begin_src emacs-lisp
 
 #+end_src
 
-
 ** TODO Direnv
    #+begin_src emacs-lisp
-
+(use-package envrc
+  :hook (elpaca-after-init . envrc-global-mode))
 #+end_src
-
 
 ** TODO Transient Menu
 Provides a centralized dashboard for code actions, navigation, diagnostics, folding, and documentation lookup.
@@ -7397,7 +7372,6 @@ Provides a centralized dashboard for code actions, navigation, diagnostics, fold
       ("M" "Man Page" woman)
       ("<escape>" "" transient-quit-one :format " ")]]))
 #+end_src
-
 
 ** TODO Keybinds
 Consolidated keybindings for Development Tools packages and commands only.
