@@ -7195,15 +7195,32 @@ Renders inline definition and reference panels below the cursor using native ove
 #+end_src
 
 
-** TODO Apheleia
+** DONE Apheleia
+Automatically formats code using external tools when saving files.
 #+begin_src emacs-lisp
-
+(use-package apheleia
+  :hook (prog-mode . apheleia-mode)
+  :commands (apheleia-format-buffer)
+  :custom
+  ;; Prevents main-thread hangs over TRAMP.
+  (apheleia-remote-algorithm 'cancel)
+  (apheleia-hide-log-buffers t))
 #+end_src
 
 
 ** TODO Auto Rename Tag
+Zero-latency local renaming of paired HTML, XML, and JSX tags.
 #+begin_src emacs-lisp
-
+(use-package auto-rename-tag
+  :custom
+  ;; Prevent tag renaming loops during bulk editing with iedit, evil-multiedit, or evil-mc.
+  (auto-rename-tag-disabled-minor-modes '(iedit-mode evil-multiedit-mode evil-mc-mode))
+  :hook ((html-ts-mode . auto-rename-tag-mode)
+         (tsx-ts-mode . auto-rename-tag-mode)
+         (web-mode . auto-rename-tag-mode)
+         (nxml-mode . auto-rename-tag-mode)
+         (mhtml-mode . auto-rename-tag-mode)
+         (rjsx-mode . auto-rename-tag-mode)))
 #+end_src
 
 
