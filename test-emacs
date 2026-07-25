@@ -1,0 +1,3 @@
+#!/bin/bash
+rm -rf var/ etc/ init.el
+emacs --batch --eval "(require 'org)" --eval '(org-babel-tangle-file "~/emacs-configs/testing-emacs/test.org")' && emacs --debug-init --init-directory ~/emacs-configs/testing-emacs
