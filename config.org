@@ -833,19 +833,20 @@ Intercepts Evil's =o= and =O= operators to continue comment lines natively. Util
 
 
 * DONE General
-Centralized keybinding router establishing global and local leader prefixes for modal state routing. Synchronously loaded to guarantee macro availability prior to downstream deferred package evaluations.
+Manages global and local leader keybindings for accessing editor commands.
 #+begin_src emacs-lisp
 (use-package general
   :ensure (:wait t)
   :demand t
   :after evil
   :config
-  ;; Establishes the global leader prefix (SPC) for cross-buffer and universal commands.
+  ;; Creates the global leader prefix (SPC).
   (general-create-definer ar/global-leader
     :states '(normal insert visual emacs)
     :prefix "SPC"
     :global-prefix "C-SPC")
-  ;; Establishes the local leader prefix (SPC m) for major-mode-specific commands.
+
+  ;; Creates the local leader prefix (SPC m).
   (general-create-definer ar/local-leader
     :states '(normal insert visual emacs)
     :prefix "SPC m"
@@ -858,27 +859,13 @@ Centralized keybinding router establishing global and local leader prefixes for 
   "!"   '(shell-command :wk "Shell cmd")
   "X"   '(org-capture :wk "Org capture"))
 
-;; ──────────────────────────────────────────────────────────────
-;; BELT-AND-SUSPENDERS: Bind <escape> in ALL Evil states via
-;; general.el across every minibuffer keymap. If a rogue downstream
-;; hook re-enables evil-local-mode in the minibuffer, Evil's
-;; per-state auxiliary keymaps would be consulted. This binding
-;; ensures <escape> still fires abort-recursive-edit regardless of
-;; which Evil state is active.
-;;
-;; CRITICAL: `:keymaps ar/minibuffer-escape-maps` is UNQUOTED.
-;; A quoted symbol ('ar/minibuffer-escape-maps) would pass the
-;; symbol to general.el, which resolves it to the LIST, then tries
-;; to use that list as a single keymap → wrong-type-argument error.
-;; Unquoted, the variable evaluates to the list at call-site and
-;; general.el correctly iterates each symbol individually.
-;; ──────────────────────────────────────────────────────────────
+;; Binds <escape> across all minibuffer keymaps to abort recursive edits.
+;; Unquoted `ar/minibuffer-escape-maps` prevents a wrong-type-argument error at call-site.
 (general-define-key
- :states '(normal insert emacs motion)
- :keymaps ar/minibuffer-escape-maps
- "<escape>" #'abort-recursive-edit)
+  :states '(normal insert emacs motion)
+  :keymaps ar/minibuffer-escape-maps
+  "<escape>" #'abort-recursive-edit)
 #+end_src
-
 
 * TODO Editor Behavior
 ** DONE Auto Save
@@ -7208,7 +7195,7 @@ Automatically formats code using external tools when saving files.
 #+end_src
 
 
-** TODO Auto Rename Tag
+** DONE Auto Rename Tag
 Zero-latency local renaming of paired HTML, XML, and JSX tags.
 #+begin_src emacs-lisp
 (use-package auto-rename-tag
@@ -7224,9 +7211,34 @@ Zero-latency local renaming of paired HTML, XML, and JSX tags.
 #+end_src
 
 
-** TODO Evil MC
+** DONE Evil MC
+Enables multiple cursors for simultaneous editing across arbitrary and rectangular selections.
 #+begin_src emacs-lisp
-
+(use-package evil-mc
+  :defer t
+  :after evil
+  :commands (evil-mc-make-cursor-here
+             evil-mc-make-all-cursors
+             evil-mc-undo-all-cursors
+             evil-mc-pause-cursors
+             evil-mc-resume-cursors
+             evil-mc-make-cursor-in-visual-selection-beg
+             evil-mc-make-cursor-in-visual-selection-end
+             evil-mc-make-cursor-move-next-line
+             evil-mc-make-cursor-move-prev-line)
+  :custom-face
+  ;; Tokyo Night synergy: Distinct background for fake cursors.
+  (evil-mc-cursor-default-face ((t (:background "#bb9af7" :foreground "#1a1b26" :weight bold))))
+  (evil-mc-region-face ((t (:inherit region))))
+  :config
+  ;; Activate the global minor mode to intercept Evil's command loop.
+  (global-evil-mc-mode 1)
+  ;; Whitelist insert-mode DEL to ensure it repeats across all fake cursors.
+  ;; We use `evil-mc-custom-known-commands' and push properly structured
+  ;; cons cells to avoid corrupting the upstream alist structure.
+  (dolist (cmd '(delete-backward-char backward-delete-char-untabify))
+    (push `(,cmd . ((:default . evil-mc-execute-default-call-with-count)))
+          evil-mc-custom-known-commands)))
 #+end_src
 
 
@@ -7338,10 +7350,12 @@ Consolidated keybindings for Development Tools packages and commands only.
  "c A" '(xref-find-apropos :wk "Apropos")
  "c h" '(eglot-show-call-hierarchy :wk "Call hierarchy")
  "c t" '(eglot-show-type-hierarchy :wk "Type hierarchy")
+
  "c p" '(:ignore t :wk "peek")
  "c p d" '(peek-xref-definition :wk "Peek definition")
  "c p r" '(peek-xref-references :wk "Peek references")
  "c p h" '(peek-overlay-dwim :wk "Hide peek")
+
  "c g" '(:ignore t :wk "goto")
  "c g d" '(xref-find-definitions :wk "Definition")
  "c g D" '(eglot-find-declaration :wk "Declaration")
@@ -7351,6 +7365,22 @@ Consolidated keybindings for Development Tools packages and commands only.
  "c M" '(ar/eglot-copy-moniker :wk "Copy moniker")
  "c H" '(eglot-inlay-hints-mode :wk "Toggle inlay hints")
  "c T" '(eglot-semantic-tokens-mode :wk "Toggle semantic tokens"))
+
+;; Multi-Cursor (evil-mc)
+(ar/global-leader
+  "c v"   '(:ignore t :wk "multi-cursor")
+  "c v v" '(evil-mc-make-cursor-here :wk "Make cursor here")
+  "c v a" '(evil-mc-make-all-cursors :wk "Make all cursors")
+  "c v q" '(evil-mc-undo-all-cursors :wk "Undo all cursors")
+  "c v p" '(evil-mc-pause-cursors :wk "Pause cursors")
+  "c v r" '(evil-mc-resume-cursors :wk "Resume cursors")
+  "c v I" '(evil-mc-make-cursor-in-visual-selection-beg :wk "Cursors in selection (beg)")
+  "c v A" '(evil-mc-make-cursor-in-visual-selection-end :wk "Cursors in selection (end)"))
+
+(general-define-key
+  :states 'visual
+  "C-S-<down>" #'evil-mc-make-cursor-move-next-line
+  "C-S-<up>"   #'evil-mc-make-cursor-move-prev-line)
 
 (ar/global-leader
  "f R" '(ar/eglot-rename-file :wk "Rename file (LSP aware)"))
@@ -7504,8 +7534,7 @@ Injects bibliography abstracts and formatted references into the universal sidec
       (add-to-list 'consult-preview-allowed-hooks 'global-hl-todo-mode))))
 #+end_src
 
-** TODO flycheck-todo
-TODO: Uncomment when setting up flycheck
+** TODO flymake todo
 #+begin_src emacs-lisp
 ;; (use-package flycheck-hl-todo
 ;;   :defer 5 ; Need to be initialized after the rest of checkers
