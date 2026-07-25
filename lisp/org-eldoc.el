@@ -1,4 +1,4 @@
-;;; ar-org-eldoc.el --- High-performance Org ElDoc integration -*- lexical-binding: t; -*-
+;;; org-eldoc.el --- High-performance Org ElDoc integration -*- lexical-binding: t; -*-
 
 ;;; Commentary:
 ;; Custom, optimized ElDoc router for Org mode. Excises heavy AST parsing
@@ -13,30 +13,28 @@
 (require 'eldoc)
 (require 'org-element)
 
-(defvar ar/org-eldoc-local-functions-cache (make-hash-table :size 40 :test 'equal)
+(defvar org-eldoc-local-functions-cache (make-hash-table :size 40 :test 'equal)
   "Cache of major-mode's `eldoc-documentation-functions' for Babel blocks.")
 
-(defun ar/org-eldoc--get-mode-local-documentation (lang)
+(defun org-eldoc--get-mode-local-documentation (lang)
   "Retrieve and cache the ElDoc documentation function for LANG."
-  (let ((cached-func (gethash lang ar/org-eldoc-local-functions-cache 'empty))
+  (let ((cached-func (gethash lang org-eldoc-local-functions-cache 'empty))
         (mode-func (org-src-get-lang-mode lang)))
     (if (eq 'empty cached-func)
         (when (fboundp mode-func)
           (with-temp-buffer
             (funcall mode-func)
-            (let ((doc-func (if (boundp 'eldoc-documentation-functions)
-                                (let ((doc-funs eldoc-documentation-functions))
-                                  (lambda (callback)
-                                    (let ((eldoc-documentation-functions doc-funs))
-                                      (run-hook-with-args-until-success
-                                       'eldoc-documentation-functions callback))))
-                              (and (boundp 'eldoc-documentation-function)
-                                   (symbol-value 'eldoc-documentation-function)))))
-              (puthash lang doc-func ar/org-eldoc-local-functions-cache)
+            (let ((doc-func (when (boundp 'eldoc-documentation-functions)
+                              (let ((doc-funs eldoc-documentation-functions))
+                                (lambda (callback)
+                                  (let ((eldoc-documentation-functions doc-funs))
+                                    (run-hook-with-args-until-success
+                                     'eldoc-documentation-functions callback)))))))
+              (puthash lang doc-func org-eldoc-local-functions-cache)
               doc-func)))
       cached-func)))
 
-(defun ar/org-eldoc--src-header ()
+(defun org-eldoc--src-header ()
   "Return language and header arguments when on a src block boundary."
   (let ((case-fold-search t) info lang hdr-args)
     (save-excursion
@@ -57,7 +55,7 @@
                                  " "))))
                    hdr-args " ")))))))
 
-(defun ar/org-eldoc--src-lang ()
+(defun org-eldoc--src-lang ()
   "Return the language of the current src block if point is inside the body."
   (let ((element (save-match-data (org-element-at-point))))
     (and (eq (org-element-type element) 'src-block)
@@ -70,7 +68,7 @@
               (line-end-position)))
          (org-element-property :language element))))
 
-(defun ar/org-eldoc--link-target ()
+(defun org-eldoc--link-target ()
   "Return the resolved target description when point is on an Org link."
   (let ((context (ignore-errors (org-element-context))))
     (when (and context (eq (org-element-type context) 'link))
@@ -90,7 +88,7 @@
           (propertize (format "Fuzzy: %s" (or raw path "")) 'face 'font-lock-string-face))
          (t (propertize (or raw path "") 'face 'font-lock-string-face)))))))
 
-(defun ar/org-eldoc--property-drawer ()
+(defun org-eldoc--property-drawer ()
   "Return the key-value pair when point is inside a property drawer."
   (let ((context (ignore-errors (org-element-context))))
     (when (and context (memq (org-element-type context) '(node-property)))
@@ -99,20 +97,21 @@
         (propertize (format "%s: %s" key (or value "")) 'face 'org-list-dt)))))
 
 ;;;###autoload
-(defun ar/org-eldoc-documentation-function (callback &rest _args)
+(defun org-eldoc-documentation-function (callback &rest _args)
   "High-performance ElDoc router for Org mode.
 Delegates to CALLBACK according to the Emacs 28+ async protocol."
   ;; Massive file guard to prevent main-thread freezing.
-  (unless (too-long-file-p)
+  ;; Guarded by `fboundp` to ensure clean byte-compilation in isolation.
+  (unless (and (fboundp 'too-long-file-p) (too-long-file-p))
     (or
      ;; 1. Property Drawers (O(1) context check)
-     (ar/org-eldoc--property-drawer)
+     (org-eldoc--property-drawer)
      ;; 2. Link Targets (O(1) context check)
-     (ar/org-eldoc--link-target)
+     (org-eldoc--link-target)
      ;; 3. Src Block Boundaries
-     (ar/org-eldoc--src-header)
+     (org-eldoc--src-header)
      ;; 4. Inside Src Block (Language Delegation)
-     (let ((lang (ar/org-eldoc--src-lang)))
+     (let ((lang (org-eldoc--src-lang)))
        (when lang
          (cond
           ((string= lang "org") nil) ; Prevent inf-loop
@@ -123,7 +122,7 @@ Delegates to CALLBACK according to the Emacs 28+ async protocol."
                     '(elisp-eldoc-var-docstring elisp-eldoc-funcall)))
                (run-hook-with-args-until-success 'eldoc-documentation-functions callback))))
           (t
-           (let ((doc-fun (ar/org-eldoc--get-mode-local-documentation lang)))
+           (let ((doc-fun (org-eldoc--get-mode-local-documentation lang)))
              (when (functionp doc-fun)
                ;; Crash guard: prevent foreign backend errors from silencing ElDoc.
                (condition-case nil
@@ -133,11 +132,11 @@ Delegates to CALLBACK according to the Emacs 28+ async protocol."
                  (error nil)))))))))))
 
 ;;;###autoload
-(defun ar/org-eldoc-load ()
-  "Register `ar/org-eldoc-documentation-function' in the buffer."
+(defun org-eldoc-load ()
+  "Register `org-eldoc-documentation-function' in the buffer."
   (when (boundp 'eldoc-documentation-functions)
     (add-hook 'eldoc-documentation-functions
-              #'ar/org-eldoc-documentation-function nil t)))
+              #'org-eldoc-documentation-function nil t)))
 
-(provide 'ar-org-eldoc)
-;;; ar-org-eldoc.el ends here
+(provide 'org-eldoc)
+;;; org-eldoc.el ends here

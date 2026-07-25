@@ -14,7 +14,7 @@
 
 - Now audit and review the subsection: Org Capture. Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from project_operationals.yaml file. Look at upstream documentations and source codes for org-capture. Also look at the upstream code and documentation for doom emacs in https://github.com/doomemacs/modules and https://github.com/doomemacs/core . Then determine how doom emacs handles org-capture. Keep in mind this Org Capture subsection has to integrate with the entirety of Org Mode and Second Brain main sectio, Then explain everything to me in detail and present me how you plan to deal with this configuration.I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 20 2026.
 
-- Now audit and review the subsection: Transient Template System. Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from project_operationals.yaml file. Look at upstream documentations and source codes for transient. Then explain everything to me in detail and present me how you plan to deal with this configuration.I need to review everything. Search the web and think longer for this task and make sure you have the latest information till July 20 2026.
+- Now audit and review the subsection: Breadcrumb. Find and fix any errors and issues. Optimize this configuration. Follow the protocols and instructions from project_operationals.yaml file. Look at upstream documentations and source codes for breadcrumb. Then explain everything to me in detail. Search the web and think longer for this task and make sure you have the latest information till July 23 2026.
 
 - Are you sure there are no more errors and issues in this iteration of Undo Fu subsection? And are you sure there are not any more extra configurations you need to add by search the web? Answer and explain everything to me in great detail.Search the web and think longer for this task and make sure the information you get is latest till July 2026.
 
@@ -29,6 +29,8 @@
 - Ingest the attached files, acknowledge that you ingest and state their version numbers. You don't have to know what task is next though.
 
 - Now ingest the attached ide-features.md file and the source code file for flymake attached as a txt file. Acknowledge that you understand everything.
+
+- There appears to be errors in Org Super Agenda and Org Agenda Custom Commands because of (cl-defun org-super-agenda--group-dispatch-take (items (n group)) ...)
 
 ## Python script to build and install emacs from source
 
