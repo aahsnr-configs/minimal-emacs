@@ -1,17 +1,15 @@
 ;;; eldoc-childframe.el --- Optimized childframe documentation viewer -*- lexical-binding: t; -*-
-
 ;; Author: Ahsanur Rahman (Forked from eldoc-box by Yuan Fu)
-;; Version: 1.0.0
+;; Version: 1.1.0
 ;; Package-Requires: ((emacs "28.1"))
-
 ;;; Commentary:
 ;; A modernized, stripped-down fork of `eldoc-box` optimized for Emacs 31.
 ;; Features:
-;; - Flymake Firewall: Filters out diagnostic payloads from `eldoc-display-functions`.
-;; - TTY Degradation: Gracefully aborts on non-graphical frames lacking TTY childframes.
-;; - Evil Motion Fix: Replaces the 0.5s inhibition trap with spatial debouncing.
+;; - Intelligent Display Routing: ≤2 lines → echo area, >2 lines → childframe.
+;; - Flymake Firewall: Filters out diagnostic payloads from childframe display.
+;; - TTY Degradation: Gracefully falls back to echo area on non-graphical frames.
+;; - Evil Motion Fix: Spatial debouncing replaces the 0.5s inhibition trap.
 ;; - Corfu Collision Avoidance: Shifts the childframe to avoid overlapping popups.
-
 ;;; Code:
 
 (require 'cl-lib)
@@ -22,18 +20,21 @@
   :prefix "eldoc-childframe-"
   :group 'eldoc)
 
-(defface eldoc-childframe-border '((((background dark)) . (:background "#292e42"))
-                                   (((background light)) . (:background "#292e42")))
+(defface eldoc-childframe-border
+  '((((background dark)) . (:background "#292e42"))
+    (((background light)) . (:background "#292e42")))
   "The border color used in childframe.")
 
-(defface eldoc-childframe-body '((t (:background "#24283b" :foreground "#c0caf5")))
+(defface eldoc-childframe-body
+  '((t (:background "#24283b" :foreground "#c0caf5")))
   "Body face used in documentation childframe.")
 
-(defface eldoc-childframe-markdown-separator '((t (:inherit shadow :strike-through t :height 0.4 :extend t)))
+(defface eldoc-childframe-markdown-separator
+  '((t (:inherit shadow :strike-through t :height 0.4 :extend t)))
   "Face for the separator line in Markdown.")
 
 (defcustom eldoc-childframe-only-multi-line t
-  "If non-nil, only use childframe when there are more than one line."
+  "If non-nil, only use childframe when there are more than 2 lines."
   :type 'boolean)
 
 (defcustom eldoc-childframe-clear-with-C-g t
@@ -95,13 +96,16 @@ Its value should be a list: (left right top)"
 (defvar eldoc-childframe-frame-hook nil
   "Hook run after doc frame is setup but just before it is made visible.")
 
-(defvar eldoc-childframe-buffer-hook '(eldoc-childframe--prettify-markdown-separator
-                                       eldoc-childframe--replace-en-space
-                                       eldoc-childframe--remove-linked-images
-                                       eldoc-childframe--remove-noise-chars
-                                       eldoc-childframe--fontify-html
-                                       eldoc-childframe--condense-large-newline-gaps)
+(defvar eldoc-childframe-buffer-hook
+  '(eldoc-childframe--prettify-markdown-separator
+    eldoc-childframe--replace-en-space
+    eldoc-childframe--remove-linked-images
+    eldoc-childframe--remove-noise-chars
+    eldoc-childframe--fontify-html
+    eldoc-childframe--condense-large-newline-gaps)
   "Hook run after buffer for doc is setup.")
+
+;;; Frame Management
 
 (defun eldoc-childframe--frame-visible-p ()
   "Return t when the childframe is visible."
@@ -164,13 +168,17 @@ Its value should be a list: (left right top)"
                       (no-other-window . t)
                       (no-delete-other-windows . t))))
       (setq frame (window-frame window)))
-    (set-face-attribute 'fringe frame :background 'unspecified :inherit 'eldoc-childframe-body)
+    (set-face-attribute 'fringe frame
+                        :background 'unspecified
+                        :inherit 'eldoc-childframe-body)
     (set-window-dedicated-p window t)
     (redirect-frame-focus frame (frame-parent frame))
-    (set-face-attribute 'internal-border frame :inherit 'eldoc-childframe-border)
+    (set-face-attribute 'internal-border frame
+                        :inherit 'eldoc-childframe-border)
     (when (facep 'child-frame-border)
       (set-face-background 'child-frame-border
-                           (face-attribute 'eldoc-childframe-border :background nil t)
+                           (face-attribute 'eldoc-childframe-border
+                                           :background nil t)
                            frame))
     (eldoc-childframe--update-geometry frame window)
     (set-window-margins window nil nil)
@@ -184,7 +192,10 @@ Its value should be a list: (left right top)"
 (defun eldoc-childframe--update-geometry (frame window)
   "Update the size and the position of childframe."
   (let* ((parent-frame (frame-parent frame))
-         (size (window-text-pixel-size window nil nil eldoc-childframe-max-pixel-width eldoc-childframe-max-pixel-height t))
+         (size (window-text-pixel-size
+                window nil nil
+                eldoc-childframe-max-pixel-width
+                eldoc-childframe-max-pixel-height t))
          (width (+ (car size) (frame-char-width frame)))
          (height (cdr size))
          (width (min width (- (frame-pixel-width parent-frame) 32)))
@@ -197,15 +208,20 @@ Its value should be a list: (left right top)"
 (defun eldoc-childframe--calc-position (width height)
   "Calculate (X . Y) position for childframe of WIDTH and HEIGHT."
   (let* ((point-pos (pos-visible-in-window-p (point) nil t))
-         (x (+ (car point-pos) (nth 0 (window-edges nil nil nil t)) (frame-char-width)))
-         (y (+ (cadr point-pos) (nth 1 (window-edges nil nil nil t)) (frame-char-height)))
+         (x (+ (car point-pos)
+               (nth 0 (window-edges nil nil nil t))
+               (frame-char-width)))
+         (y (+ (cadr point-pos)
+               (nth 1 (window-edges nil nil nil t))
+               (frame-char-height)))
          (parent-w (frame-pixel-width))
          (parent-h (frame-pixel-height)))
     ;; Corfu collision avoidance
     (when (and (boundp 'corfu--frame)
                (frame-live-p corfu--frame)
                (frame-visible-p corfu--frame))
-      (setq x (+ (car (frame-position corfu--frame)) (frame-pixel-width corfu--frame))))
+      (setq x (+ (car (frame-position corfu--frame))
+                 (frame-pixel-width corfu--frame))))
     ;; Boundary clamping
     (when (> (+ x width) parent-w)
       (setq x (max 0 (- parent-w width 16))))
@@ -229,16 +245,19 @@ Its value should be a list: (left right top)"
       (setq eldoc-childframe--last-point (point))
       (make-frame-visible frame))))
 
-;;; Flymake Firewall & Eldoc Integration
+;;; Flymake Firewall
 
 (defun eldoc-childframe--filter-flymake (docs)
-  "Filter out Flymake diagnostic payloads from DOCS."
+  "Filter out Flymake diagnostic payloads from DOCS.
+Inspects the :origin plist key added by ElDoc to each doc item."
   (cl-remove-if (lambda (doc)
                   (eq (plist-get (cdr doc) :origin) 'flymake-eldoc-function))
                 docs))
 
+;;; Intelligent Display Routing
+
 (defun eldoc-childframe--compose-doc (doc)
-  "Compose a DOC passed from eldoc."
+  "Compose a single DOC item into a display string."
   (let ((thing (plist-get (cdr doc) :thing))
         (face (plist-get (cdr doc) :face)))
     (concat (if thing
@@ -246,30 +265,37 @@ Its value should be a list: (left right top)"
               "")
             (car doc))))
 
-(defun eldoc-childframe--count-newlines (str)
-  "Count visible newlines in STR."
-  (cl-loop for idx = 0 then (1+ idx)
-           while (< idx (length str))
-           count (and (eq (aref str idx) ?\n)
-                      (not (memq 'invisible (text-properties-at idx str))))))
+(defun eldoc-childframe--route-display (docs interactive)
+  "Route DOCS to echo area (≤2 lines) or childframe (>2 lines).
+This function is the sole display router in `eldoc-display-functions'.
+It internally delegates to `eldoc-display-in-echo-area' for short docs
+and renders long docs in the childframe.
 
-(defun eldoc-childframe--display-function (docs interactive)
-  "Display DOCS in childframe.
-For DOCS and INTERACTIVE see `eldoc-display-functions'."
-  ;; TTY Guard: Abort if not graphical and lacking TTY childframe support
-  (unless (or (display-graphic-p) (featurep 'tty-child-frames))
-    (cl-return-from eldoc-childframe--display-function))
-
-  (let* ((filtered-docs (eldoc-childframe--filter-flymake docs))
-         (doc (string-trim (string-join
-                            (mapcar #'eldoc-childframe--compose-doc filtered-docs)
-                            "\n\n"))))
-    (when (and (not (string-empty-p doc))
-               (or (not eldoc-childframe-only-multi-line)
-                   (> (eldoc-childframe--count-newlines doc) 0)))
-      (eldoc-childframe--display doc)
-      ;; If we displayed in childframe, prevent echo area display
-      t)))
+NOTE: `eldoc-display-functions' is run via `run-hook-with-args' (NOT
+until-success), so all members always execute. This function handles
+both display paths internally to avoid double-rendering."
+  (let* ((filtered (eldoc-childframe--filter-flymake docs))
+         (composed (string-join (mapcar #'eldoc-childframe--compose-doc
+                                        filtered)
+                                "\n"))
+         (line-count (if (string-empty-p composed)
+                         0
+                       (1+ (cl-count ?\n composed)))))
+    (cond
+     ;; Nothing to display: clear echo area.
+     ((zerop line-count)
+      (eldoc--message nil))
+     ;; ≤2 lines: delegate to the native echo area renderer.
+     ((<= line-count 2)
+      (eldoc-display-in-echo-area filtered interactive))
+     ;; >2 lines: render in childframe (with TTY guard).
+     (t
+      (if (or (display-graphic-p) (featurep 'tty-child-frames))
+          (let ((doc (string-trim composed)))
+            (unless (string-empty-p doc)
+              (eldoc-childframe--display doc)))
+        ;; TTY fallback: truncate to echo area.
+        (eldoc-display-in-echo-area filtered interactive))))))
 
 ;;; Evil Motion Fix (Spatial Debounce)
 
@@ -280,7 +306,7 @@ For DOCS and INTERACTIVE see `eldoc-display-functions'."
         (eldoc-childframe--update-geometry
          eldoc-childframe--frame
          (frame-selected-window eldoc-childframe--frame)))
-    ;; Point moved: hide frame instantly without 0.5s penalty
+    ;; Point moved: hide frame instantly without 0.5s penalty.
     (eldoc-childframe-quit-frame)))
 
 ;;; Help at Point & Glance
@@ -305,8 +331,9 @@ For DOCS and INTERACTIVE see `eldoc-display-functions'."
   (add-hook 'post-command-hook #'eldoc-childframe--glance-cleanup))
 
 (defun eldoc-childframe--glance-cleanup ()
-  "Hide childframe and remove self from `post-command-hook`."
-  (unless (memq this-command '(eldoc-childframe-glance eldoc-childframe-help-at-point))
+  "Hide childframe and remove self from `post-command-hook'."
+  (unless (memq this-command
+                '(eldoc-childframe-glance eldoc-childframe-help-at-point))
     (eldoc-childframe-quit-frame)
     (remove-hook 'post-command-hook #'eldoc-childframe--glance-cleanup)))
 
@@ -341,15 +368,15 @@ For DOCS and INTERACTIVE see `eldoc-display-functions'."
             (rx (>= 2 (or "\n"
                           (seq bol "```" (* (syntax word)) "\n")
                           (seq (+ "<br>") "\n")
-                          (seq bol (+ (or " " "\t" " ")) "\n"))))
+                          (seq bol (+ (or " " "\t" "　")) "\n"))))
             nil t)
       (if (or (eq (match-beginning 0) (point-min))
               (eq (match-end 0) (point-max)))
           (replace-match "")
         (replace-match "\n")
         (add-text-properties (1- (point)) (point)
-                             '( font-lock-face (:height 0.4)
-                                face (:height 0.4)))))))
+                             '(font-lock-face (:height 0.4)
+                               face (:height 0.4)))))))
 
 (defun eldoc-childframe--remove-linked-images ()
   "Remove embedded image links from documentation."
@@ -379,24 +406,17 @@ For DOCS and INTERACTIVE see `eldoc-display-functions'."
                 (group "</h" digit ">")
                 eol)
             nil t)
-      (add-text-properties (match-beginning 2)
-                           (match-end 2)
-                           '( face (:weight bold)
-                              font-lock-face (:weight bold)))
-      (put-text-property (match-beginning 1) (match-end 1)
-                         'invisible t)
-      (put-text-property (match-beginning 3) (match-end 3)
-                         'invisible t))
+      (add-text-properties (match-beginning 2) (match-end 2)
+                           '(face (:weight bold)
+                             font-lock-face (:weight bold)))
+      (put-text-property (match-beginning 1) (match-end 1) 'invisible t)
+      (put-text-property (match-beginning 3) (match-end 3) 'invisible t))
     (goto-char (point-min))
     (while (re-search-forward
-            (rx (group "<p>")
-                (group (*? anychar))
-                (group "</p>"))
+            (rx (group "<p>") (group (*? anychar)) (group "</p>"))
             nil t)
-      (put-text-property (match-beginning 1) (match-end 1)
-                         'invisible t)
-      (put-text-property (match-beginning 3) (match-end 3)
-                         'invisible t))
+      (put-text-property (match-beginning 1) (match-end 1) 'invisible t)
+      (put-text-property (match-beginning 3) (match-end 3) 'invisible t))
     (goto-char (point-min))
     (while (re-search-forward (rx (or "&lt;" "&gt;" "&nbsp;")) nil t)
       (put-text-property (match-beginning 0) (match-end 0)
@@ -412,26 +432,37 @@ For DOCS and INTERACTIVE see `eldoc-display-functions'."
   "The original value of `eldoc-display-functions'.")
 
 (defun eldoc-childframe--enable ()
-  "Enable eldoc-childframe hover."
+  "Enable eldoc-childframe with intelligent routing.
+Replaces `eldoc-display-in-echo-area' with the router function."
   (setq-local eldoc-childframe--old-eldoc-functions eldoc-display-functions)
   (setq-local eldoc-display-functions
-              (cons #'eldoc-childframe--display-function
-                    (remq 'eldoc-display-in-echo-area eldoc-display-functions)))
-  (remove-hook 'pre-command-hook #'eldoc-pre-command-refresh-echo-area t)
-  (add-hook 'post-command-hook #'eldoc-childframe--follow-cursor nil t)
+              (cons #'eldoc-childframe--route-display
+                    (remq 'eldoc-display-in-echo-area
+                          eldoc-display-functions)))
+  (remove-hook 'pre-command-hook
+               #'eldoc-pre-command-refresh-echo-area t)
+  (add-hook 'post-command-hook
+            #'eldoc-childframe--follow-cursor nil t)
   (when eldoc-childframe-clear-with-C-g
-    (advice-add #'keyboard-quit :before #'eldoc-childframe--quit-frame-not-in-childframe)))
+    (advice-add #'keyboard-quit :before
+                #'eldoc-childframe--quit-frame-not-in-childframe)))
 
 (defun eldoc-childframe--disable ()
-  "Disable eldoc-childframe hover."
+  "Disable eldoc-childframe and restore original display functions."
   (setq-local eldoc-display-functions
-              (remq #'eldoc-childframe--display-function eldoc-display-functions))
-  (when (memq 'eldoc-display-in-echo-area eldoc-childframe--old-eldoc-functions)
+              (remq #'eldoc-childframe--route-display
+                    eldoc-display-functions))
+  (when (memq 'eldoc-display-in-echo-area
+              eldoc-childframe--old-eldoc-functions)
     (setq-local eldoc-display-functions
-                (cons 'eldoc-display-in-echo-area eldoc-display-functions)))
-  (add-hook 'pre-command-hook #'eldoc-pre-command-refresh-echo-area nil t)
-  (remove-hook 'post-command-hook #'eldoc-childframe--follow-cursor t)
-  (advice-remove #'keyboard-quit #'eldoc-childframe--quit-frame-not-in-childframe)
+                (cons 'eldoc-display-in-echo-area
+                      eldoc-display-functions)))
+  (add-hook 'pre-command-hook
+            #'eldoc-pre-command-refresh-echo-area nil t)
+  (remove-hook 'post-command-hook
+               #'eldoc-childframe--follow-cursor t)
+  (advice-remove #'keyboard-quit
+                 #'eldoc-childframe--quit-frame-not-in-childframe)
   (when eldoc-childframe--frame
     (delete-frame eldoc-childframe--frame)
     (setq eldoc-childframe--frame nil)))

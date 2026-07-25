@@ -978,10 +978,10 @@ Configures global typography, baseline monospaced faces, fontset fallback regist
 #+begin_src emacs-lisp
 (defun ar/setup-fonts ()
   "Apply global typography, baseline faces, and fontset fallbacks to the current frame."
-  (set-face-attribute 'default nil :font "JetBrains Mono" :height 123 :weight 'medium)
-  (set-face-attribute 'fixed-pitch nil :font "JetBrains Mono" :height 123 :weight 'medium)
+  (set-face-attribute 'default nil :font "JetBrains Mono" :height 125 :weight 'medium)
+  (set-face-attribute 'fixed-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
   ;; Maps variable-pitch to monospaced to preserve Org-mode table alignment.
-  (set-face-attribute 'variable-pitch nil :font "JetBrains Mono" :height 123 :weight 'medium)
+  (set-face-attribute 'variable-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
   ;; Pre-register Noto Sans for Unicode blocks used by org-modern-replace-stars.
    (set-fontset-font t '(#x25A0 . #x25FF) "Noto Sans")  ; Geometric Shapes (◉ ○ ◇ ▷)
   (set-fontset-font t '(#x2600 . #x26FF) "Noto Sans")  ; Miscellaneous Symbols
@@ -997,7 +997,7 @@ Configures global typography, baseline monospaced faces, fontset fallback regist
 ;; Vertically centers org-modern badges (TODO, tags, priorities) against text baseline.
 ;;(setq-default line-spacing '(1 . 1))
 ;;(setq-default line-spacing 0.02)
-;; (setq-default line-spacing '(0.02 . 0.02))
+(setq-default line-spacing '(0.02 . 0.02))
 ;; Maximizes syntax highlighting decoration across all programming buffers.
 (setq font-lock-maximum-decoration t)
 #+end_src
@@ -2369,21 +2369,104 @@ Native redisplay concealment for terminal, agenda, and UI buffers. Replaces unma
   (add-hook (intern (format "%s-hook" mode)) #'ar/enable-hide-modeline))
 #+end_src
 
+** DONE Echo Area Intelligence
+Provides debounced, glanceable context flashes for git branches, Denote silos, org-clock transitions, and Evil state changes.
+#+begin_src emacs-lisp
+;; --- Evil State Flash ---
+(defun ar/echo-evil-state-flash ()
+  "Flash the current Evil state in the echo area."
+  (let ((msg (pcase evil-state
+               ('insert  "-- INSERT --")
+               ('visual  "-- VISUAL --")
+               ('replace "-- REPLACE --")
+               (_        nil))))
+    (when msg
+      (let ((message-log-max nil))
+        (message "%s" (propertize msg 'face 'font-lock-warning-face))))))
+(add-hook 'evil-state-change-hook #'ar/echo-evil-state-flash)
+
+;; --- Org Clock Pulse ---
+(defun ar/echo-clock-in-pulse ()
+  "Flash clock-in notification."
+  (when org-clock-current-task
+    (let ((message-log-max nil))
+      (message "%s %s"
+               (propertize "⏱ Clocked in:" 'face 'org-special-keyword)
+               (propertize org-clock-current-task 'face 'bold)))))
+(defun ar/echo-clock-out-pulse ()
+  "Flash clock-out notification."
+  (let ((message-log-max nil))
+    (message "%s" (propertize "⏱ Clocked out" 'face 'shadow))))
+(with-eval-after-load 'org-clock
+  (add-hook 'org-clock-in-hook #'ar/echo-clock-in-pulse)
+  (add-hook 'org-clock-out-hook #'ar/echo-clock-out-pulse))
+
+;; --- Git Branch Context (debounced) ---
+(defvar ar/echo-git-timer nil
+  "Idle timer for debounced git branch echo.")
+(defun ar/echo-git-branch ()
+  "Show git branch on buffer switch."
+  (when (and buffer-file-name
+             (not (file-remote-p default-directory))
+             (fboundp 'vc-git-root)
+             (vc-git-root default-directory))
+    (let ((branch (or (and (fboundp 'magit-get-current-branch)
+                           (magit-get-current-branch))
+                      (ignore-errors
+                        (vc-git--symbolic-ref default-directory)))))
+      (when branch
+        (let ((message-log-max nil))
+          (message "%s %s"
+                   (propertize "⎇" 'face 'font-lock-type-face)
+                   (propertize branch 'face 'bold)))))))
+(defun ar/echo-git-branch-debounced ()
+  "Schedule git branch echo after 0.3s idle."
+  (when ar/echo-git-timer (cancel-timer ar/echo-git-timer))
+  (setq ar/echo-git-timer
+        (run-with-idle-timer 0.3 nil #'ar/echo-git-branch)))
+(add-hook 'buffer-list-update-hook #'ar/echo-git-branch-debounced)
+
+;; --- Denote Silo Indicator (debounced) ---
+(defun ar/echo-denote-silo ()
+  "Show which Denote silo the current Org file belongs to."
+  (when (and (derived-mode-p 'org-mode)
+             buffer-file-name
+             (fboundp 'denote-directory))
+    (let* ((silo (denote-directory))
+           (name (file-name-nondirectory
+                  (directory-file-name silo))))
+      (when (and silo (not (string-empty-p name)))
+        (let ((message-log-max nil))
+          (message "%s %s"
+                   (propertize "📁" 'face 'font-lock-type-face)
+                   (propertize name 'face 'bold)))))))
+(defun ar/echo-denote-silo-debounced ()
+  "Schedule Denote silo echo after 0.3s idle."
+  (when (derived-mode-p 'org-mode)
+    (run-with-idle-timer 0.3 nil #'ar/echo-denote-silo)))
+(add-hook 'buffer-list-update-hook #'ar/echo-denote-silo-debounced)
+
+;; --- Macro Recording Indicator ---
+(defun ar/echo-macro-recording ()
+  "Show recording indicator in echo area."
+  (when defining-kbd-macro
+    (let ((message-log-max nil))
+      (message "%s"
+               (propertize "● REC" 'face 'font-lock-warning-face)))))
+(add-hook 'post-command-hook #'ar/echo-macro-recording)
+#+end_src
+
 ** DONE Breadcrumb
-Displays the current project path and document heading in the header line.
+Provides cached project and structural path rendering for the echo area.
 #+begin_src emacs-lisp
 (use-package breadcrumb
   :defer t
   :custom
-  ;; Allocate 30% of the window width to the project path.
   (breadcrumb-project-max-length 0.3)
-  ;; Allocate 40% of the window width to the imenu structural path.
   (breadcrumb-imenu-max-length 0.4)
-  ;; Clean, readable separators avoiding heavy nerd-icons font-fallback in header-line.
   (breadcrumb-project-crumb-separator " / ")
   (breadcrumb-imenu-crumb-separator " > ")
   :custom-face
-  ;; Tokyo Night synergy: Recessive project path, high-contrast structural leaf.
   (breadcrumb-face ((t (:inherit shadow))))
   (breadcrumb-project-crumbs-face ((t (:inherit shadow))))
   (breadcrumb-project-base-face ((t (:inherit shadow :weight bold))))
@@ -2391,10 +2474,39 @@ Displays the current project path and document heading in the header line.
   (breadcrumb-imenu-crumbs-face ((t (:inherit shadow))))
   (breadcrumb-imenu-leaf-face ((t (:inherit font-lock-function-name-face :weight bold))))
   :config
-  ;; Set idle timer via raw setq to satisfy defvar physics and prevent byte-compiler warnings.
+  ;; Idle timer for imenu cache refresh (defvar, not defcustom).
   (setq breadcrumb-idle-time 2.0)
-  ;; Activate the globalized minor mode, safely injecting into header-line-format.
-  (breadcrumb-mode 1))
+  ;; NO breadcrumb-mode or breadcrumb-local-mode activation.
+  ;; Used purely as a library by org-eldoc and prog-eldoc bridge.
+  )
+#+end_src
+
+** DONE Prog Eldoc Breadcrumb
+Renders the cached project and imenu structural path in the echo area for programming buffers.
+#+begin_src emacs-lisp
+(defun prog-eldoc--breadcrumb (_callback &rest _args)
+  "Compose project path and imenu crumbs for the echo area.
+Calls breadcrumb's standalone functions (no minor mode needed).
+Returns a single-line string: =project/path │ Class > Method=."
+  (when (fboundp 'breadcrumb-imenu-crumbs)
+    (let ((proj (and (fboundp 'breadcrumb-project-crumbs)
+                     (breadcrumb-project-crumbs)))
+          (imenu (breadcrumb-imenu-crumbs)))
+      (when (or proj imenu)
+        (concat
+         (when proj
+           (concat proj (propertize " │ " 'face 'shadow)))
+         (or imenu
+             (propertize "Top Level" 'face 'shadow)))))))
+
+(defun prog-eldoc--breadcrumb-load ()
+  "Register the breadcrumb bridge in the current buffer."
+  (when (boundp 'eldoc-documentation-functions)
+    (add-hook 'eldoc-documentation-functions
+              #'prog-eldoc--breadcrumb 90 t)))
+
+(add-hook 'prog-mode-hook #'prog-eldoc--breadcrumb-load)
+(add-hook 'emacs-lisp-mode-hook #'prog-eldoc--breadcrumb-load)
 #+end_src
 
 ** DONE Text Scaling
@@ -3166,46 +3278,29 @@ Provides a visual directory editor and file manager for navigating the filesyste
 (use-package dired
   :ensure nil
   :defer t
-  :hook ((dired-mode . hl-line-mode))
+  :hook (dired-mode . hl-line-mode)
   :custom
-  ;; Suppress recursive operation prompts while maintaining baseline safety.
   (dired-recursive-copies 'always)
   (dired-recursive-deletes 'top)
-  ;; DWIM target: suggest the other window's directory for copy/move operations.
   (dired-dwim-target t)
-  ;; Prevent buffer bloat by killing old Dired buffers of the same directory.
   (dired-kill-when-opening-new-dired-buffer t)
-  ;; Git Integration: Use `git mv` when renaming files in VC repositories.
   (dired-vc-rename-file t)
-  ;; Prompt to create missing parent directories when copying/moving.
   (dired-create-destination-dirs 'ask)
-  ;; Kill associated buffers when files are deleted via Dired.
   (dired-clean-up-buffers-too t)
-  ;; Restrict C-s (isearch) to file names only when point is on a file.
   (dired-isearch-filenames 'dwim)
-  ;; Emacs 29+: Enable drag-and-drop of files to external applications.
   (dired-mouse-drag-files t)
-  ;; Defensive auto-revert: Revert local dirs, but strictly ignore TRAMP to prevent I/O hangs.
   (dired-auto-revert-buffer (lambda (dir)
                               (and (not (file-remote-p dir))
                                    (dired-buffer-stale-p))))
   :config
-  ;; Arch Linux natively ships GNU coreutils. Establish baseline ls switches.
   (setq dired-listing-switches "-ahl -v --group-directories-first")
-
-  ;; Enable `dired-find-alternate-file' to kill the current Dired buffer
-  ;; when drilling down into files/directories, preventing buffer bloat.
   (put 'dired-find-alternate-file 'disabled nil)
 
-  ;; Prevent auto-revert in virtual Dired buffers (e.g., find-dired, locate).
-  ;; Reverting these buffers destroys the search results and throws errors.
   (defun ar/dired--no-revert-in-virtual-buffers-p (&rest _)
     "Return nil if the current buffer is a virtual Dired buffer."
     (not (eq revert-buffer-function #'dired-virtual-revert)))
   (advice-add #'dired-buffer-stale-p :before-while #'ar/dired--no-revert-in-virtual-buffers-p)
 
-  ;; Surgically strip GNU-specific flags before `dired-readin` parses the directory.
-  ;; Prevents blank screens over TRAMP when connecting to minimal containers (e.g., Alpine/BusyBox) or BSD servers.
   (defun ar/dired-strip-unsupported-ls-flags ()
     "Strip GNU-specific ls flags over TRAMP to prevent blank screens on minimal remote containers."
     (when (file-remote-p default-directory)
@@ -3217,22 +3312,12 @@ Provides a visual directory editor and file manager for navigating the filesyste
         (setq-local dired-actual-switches switches))))
   (add-hook 'dired-before-readin-hook #'ar/dired-strip-unsupported-ls-flags)
 
-  ;; Arch Linux / PGTK: Map common media and document extensions to xdg-open.
   (setq dired-guess-shell-alist-user
         '(("\\.pdf\\'" "xdg-open" "evince" "zathura")
           ("\\.\\(?:jpe?g\\|png\\|gif\\|svg\\|webp\\)\\'" "xdg-open" "imv")
           ("\\.\\(?:mp4\\|mkv\\|webm\\|mov\\)\\'" "xdg-open" "mpv")
           ("\\.\\(?:mp3\\|flac\\|wav\\|ogg\\)\\'" "xdg-open"))))
 #+end_src
-
-
-
-
-
-
-
-
-
 
 ** DONE Dirvish
 Transforms the native directory editor into a modern, visual file manager with live previews, sidebars, and integrated version control overlays.
@@ -3265,7 +3350,6 @@ Transforms the native directory editor into a modern, visual file manager with l
   (dirvish-attributes '(vc-state subtree-state nerd-icons collapse git-msg file-time file-size))
   ;; Isolated, stripped-down attributes for the narrow 30% sidebar to prevent visual clutter.
   (dirvish-side-attributes '(vc-state nerd-icons collapse file-size))
-  ;; Doom-like UI: Span headers globally across all panes and hide the mode-line bar.
   (dirvish-use-header-line 'global)
   (dirvish-use-mode-line t)
   (dirvish-mode-line-bar-image-width 0)
@@ -3371,32 +3455,6 @@ Transforms the native directory editor into a modern, visual file manager with l
       ("q" "Quit Dirvish" dirvish-quit)
       ("<escape>" "" transient-quit-one :format " ")]]))
 
-;; ==========================================
-;; GENERAL KEYBINDINGS (Dired & Dirvish)
-;; ==========================================
-(ar/global-leader
-  "d"   '(:ignore t :wk "dired")
-  "d d" '(dired-jump :wk "Open dired here")          ; Jump to current file's directory
-  "d D" '(dired :wk "Open dired...")                 ; Open specific directory via prompt
-  "d s" '(dirvish-side :wk "Dirvish sidebar")        ; Toggle persistent 30% left sidebar
-  "d f" '(dirvish-dwim :wk "Dirvish fullscreen")     ; Open fullscreen or split intelligently
-  "d h" '(dirvish-show-history :wk "History")        ; Jump to recently visited directories
-  "d a" '(dirvish-quick-access :wk "Quick access")   ; Summon bookmark menu for pinned dirs
-  "d j" '(dirvish-fd-jump :wk "Jump fd")             ; Async search and jump to any directory
-  "d n" '(dirvish-narrow :wk "Narrow/Filter")        ; Live filter current directory
-  "d e" '(dirvish-emerge-menu :wk "Emerge groups")   ; Transient menu for grouping files
-  "d l" '(dirvish-layout-toggle :wk "Toggle layout") ; Cycle through preview layouts
-  "d y" '(dirvish-yank-menu :wk "Yank/Paste")        ; Async copy/paste menu
-  "d v" '(dirvish-vc-menu :wk "VC operations")       ; Git operations menu
-  "d S" '(dirvish-quicksort :wk "Sort by...")        ; On-the-fly ls switch changes
-  "d i" '(dirvish-file-info-menu :wk "File info")    ; File stats and permissions
-  "d r" '(dirvish-rsync :wk "Rsync")                 ; Async rsync for TRAMP/remote
-  "d c" '(dired-create-directory :wk "Create dir")   ; Quickly create a new folder
-  "d g" '(revert-buffer :wk "Refresh")               ; Manually refresh directory listing
-  "d u" '(dired-up-directory :wk "Up directory")     ; Navigate to parent directory
-  "d w" '(dirvish-setup-menu :wk "Setup menu")       ; Transient menu to toggle attributes
-  "d ?" '(ar/dirvish-transient :wk "Dashboard"))     ; Summon unified Dirvish dashboard
-
 (general-define-key
   :states 'normal
   :keymaps 'dirvish-mode-map
@@ -3456,9 +3514,6 @@ Transforms the native directory editor into a modern, visual file manager with l
   "S"   #'dirvish-relative-symlink
   "h"   #'dirvish-hardlink)
 #+end_src
-
-
-
 
 ** DONE Dired Extensions
 *** DONE Dired X
@@ -4065,10 +4120,6 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
 #+end_src
 
 
-
-
-
-
 * TODO Version Control
 ** TODO Magit: The Git Porcelain
 #+begin_src emacs-lisp
@@ -4286,6 +4337,31 @@ Provides mathematically strict buffer isolation per workflow context. Replaces l
       ("R" "Refresh" magit-refresh :transient t)
       ("?" "Dispatch" magit-dispatch)
       ("<escape>" "" transient-quit-one :format " ")]]))
+#+end_src
+
+** DONE General Keybindings
+#+begin_src emacs-lisp
+;; Git operations (SPC g)
+(ar/global-leader
+  "g" '(:ignore t :wk "git")
+  "g s" '(magit-status :wk "Status")
+  "g c" '(magit-commit :wk "Commit")
+  "g C" '(magit-commit-amend :wk "Commit amend")
+  "g p" '(magit-push-current-to-pushremote :wk "Push")
+  "g P" '(magit-pull-from-upstream :wk "Pull")
+  "g b" '(magit-branch :wk "Branches")
+  "g l" '(magit-log-buffer-file :wk "Log current file")
+  "g L" '(magit-log-current :wk "Log current branch")
+  "g f" '(magit-fetch :wk "Fetch")
+  "g h" '(ar/toggles-vc-menu :wk "VC transient menu")
+  "g m" '(magit-merge :wk "Merge")
+  "g r" '(magit-rebase :wk "Rebase")
+  "g t" '(git-timemachine-toggle :wk "Timemachine")
+  "g n" '(diff-hl-next-hunk :wk "Next hunk")
+  "g N" '(diff-hl-previous-hunk :wk "Previous hunk")
+  "g S" '(diff-hl-stage-current-hunk :wk "Stage hunk")
+  "g R" '(diff-hl-revert-hunk :wk "Revert hunk")
+  "g H" '(diff-hl-show-hunk :wk "Preview hunk"))
 #+end_src
 
 
@@ -4894,7 +4970,6 @@ Configures Org's core behavior, display, source editing, and performance setting
   :preface
   ;; Prevent eager loading of legacy modules. Only org-habit is required.
   (defvar org-modules '(org-habit))
-  ;; Enable alphabetical list formats (a), A), a.) before parser init.
   (defvar org-list-allow-alphabetical t)
   :init
   ;; Route Org cache directories into no-littering var tree.
@@ -4921,18 +4996,12 @@ Configures Org's core behavior, display, source editing, and performance setting
   ;; Performance
   (org-element-use-cache t)
   (org-element-cache-persistent nil)
-  ;; LaTeX: native AST-aware highlighting for academic writing.
   (org-highlight-latex-and-related '(latex script entities))
   ;; Startup
   (org-startup-folded 'overview)
   (org-startup-with-inline-images nil)
   (org-startup-with-latex-preview nil)
-  (org-cycle-separator-lines 2)
-  :config
-  ;; Vim-inspired emphasis toggle. Extends the z display prefix.
-  ;; Only active in normal/motion states; never fires during insert-state typing.
-  (evil-define-key '(normal motion) org-mode-map
-    "ze" #'org-toggle-pretty-entities))
+  (org-cycle-separator-lines 2))
 #+end_src
 
 ** DONE Better Font Faces
@@ -6506,13 +6575,19 @@ If REGION-TEXT is provided, wrap it inside the block."
       ("<" "insert <"     self-insert-command)]]))
 #+end_src
 
-** TODO Org Src Buffer Naming
+** DONE Org Src Buffer Naming
+Simplifies the names of temporary source code editing buffers to reduce visual clutter.
 #+begin_src emacs-lisp
-(defun ar/org-src-simplify-buffer-name (base-buffer-name lang)
-  "Return a static buffer name for Org source edit buffers."
-  "src code")
+(defun ar/org-src-simplify-buffer-name (_org-buffer-name lang)
+  "Simplify Org source edit buffer names to `*Src LANG*`.
+Strips the verbose parent file name to reduce mode-line clutter."
+  (if (and (boundp 'org-src--source-type)
+           (eq org-src--source-type 'example))
+      "*Org Example*"
+    (format "*Src %s*" (or lang "text"))))
 
-(advice-add 'org-src--construct-edit-buffer-name :override #'ar/org-src-simplify-buffer-name)
+(with-eval-after-load 'org-src
+  (advice-add #'org-src--construct-edit-buffer-name :override #'ar/org-src-simplify-buffer-name))
 #+end_src
 
 ** DONE Org Eldoc
@@ -6522,6 +6597,11 @@ Displays lightweight context-aware metadata for Org elements in the echo area.
   :ensure nil
   :defer t
   :hook (org-mode . org-eldoc-load))
+#+end_src
+
+** TODO Evil Integration
+#+begin_src emacs-lisp
+
 #+end_src
 
 ** TODO Keybindings
@@ -6989,45 +7069,53 @@ Connects Emacs to external language servers for smart code navigation, error che
 
 
 ** DONE Eldoc
-Displays function signatures, variable documentation, and contextual help in the echo area or a dedicated buffer.
+Configures the core documentation engine with strict 2-line echo area limits and Emacs 31 help-at-point integration.
 #+begin_src emacs-lisp
 (use-package eldoc
   :ensure nil
   :custom
-  (eldoc-help-at-pt t)
+  ;; Strict 2-line maximum in the echo area.
+  (eldoc-echo-area-use-multiline-p 2)
+  ;; Prefer the dedicated doc buffer for long docs over echo area truncation.
   (eldoc-echo-area-prefer-doc-buffer 'maybe)
-  (eldoc-echo-area-use-multiline-p t)
+  ;; Idle delay before triggering documentation lookup.
   (eldoc-idle-delay 0.1)
   :config
   (global-eldoc-mode 1)
-  ;; Overrides Eglot's blocking composition with eager rendering.
+  ;; Emacs 31: show keybinding hints for buttons/links via ElDoc.
+  ;; MUST use setopt to trigger the :set function that adds the hook.
+  (setopt eldoc-help-at-pt t)
+  ;; Emacs 31: cap elisp docstring length for echo area readability.
+  (when (boundp 'elisp-eldoc-docstring-length-limit)
+    (setq elisp-eldoc-docstring-length-limit 1000))
+  ;; Eglot buffers: use eager composition for async LSP hover payloads.
   (add-hook 'eglot-managed-mode-hook
             (lambda ()
               (when (eglot-managed-p)
-                (setq-local eldoc-documentation-strategy #'eldoc-documentation-compose-eagerly)))))
+                (setq-local eldoc-documentation-strategy
+                            #'eldoc-documentation-compose-eagerly)))))
 #+end_src
 
-
 ** DONE Eldoc Childframe
-Displays documentation in a floating popup window anchored to the cursor, strictly isolated from diagnostic overlays.
+Routes complex documentation to a floating popup and keeps the echo area concise.
 #+begin_src emacs-lisp
 (use-package eldoc-childframe
   :ensure nil
   :hook (prog-mode . eldoc-childframe-hover-at-point-mode)
   :custom
-  ;; Only spawn the popup for multi-line payloads to prevent UI flicker.
+  ;; Only spawn the popup for multi-line payloads (>2 lines).
   (eldoc-childframe-only-multi-line t)
   ;; Clear the popup instantly when the cursor moves off the symbol.
   (eldoc-childframe-clear-with-C-g t)
-  ;; Expand maximum dimensions for massive Rust/C++ generic type signatures.
+  ;; Expand maximum dimensions for massive type signatures.
   (eldoc-childframe-max-pixel-width 900)
   (eldoc-childframe-max-pixel-height 800)
   :custom-face
   (eldoc-childframe-border ((t (:background "#292e42"))))
   (eldoc-childframe-body ((t (:background "#24283b" :foreground "#c0caf5"))))
-  (eldoc-childframe-markdown-separator ((t (:inherit shadow :strike-through t :height 0.4)))))
+  (eldoc-childframe-markdown-separator
+   ((t (:inherit shadow :strike-through t :height 0.4)))))
 #+end_src
-
 
 ** DONE Flymake
 Native on-the-fly syntax checking and diagnostic aggregation with inline overlay rendering.
@@ -7305,8 +7393,6 @@ Consolidated keybindings for Development Tools packages and commands only.
  "c E" '(consult-flymake-project :wk "Search errors (project)")
  "c B" '(flymake-show-buffer-diagnostics :wk "Buffer diagnostics")
  "c P" '(flymake-show-project-diagnostics :wk "Project diagnostics panel")
- "c n" '(flymake-goto-next-error :wk "Next error")
- "c p" '(flymake-goto-prev-error :wk "Prev error")
  "c !" '(flymake-start :wk "Force recheck")
  "c o" '(flymake-collection-change-checker :wk "Change checker")
  "c D" '(xref-find-references :wk "Find all references")
@@ -7633,10 +7719,10 @@ Injects bibliography abstracts and formatted references into the universal sidec
 
   (add-hook 'after-save-hook #'ar/yas-reload-snippets-on-save))
 
-;; (use-package yasnippet-snippets
-;;   :after yasnippet
-;;   :config
-;;   (yas-reload-all))
+(use-package yasnippet-snippets
+  :after yasnippet
+  :config
+  (yas-reload-all))
 
 (use-package consult-yasnippet
   :after (consult yasnippet)
@@ -9703,36 +9789,11 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
 
 
 * TODO AI/LLM
-* TODO Built-in Packages to Upgrade
-#+begin_src emacs-lisp
-;; (use-package eglot)
-;; (use-package eldoc)
-;; (use-package external-completion)
-;; (use-package eldoc)
-;; (use-package flymake)
-;; (use-package jsonrpc)
-;; (use-package project)
-;; (use-package seq)
-;; (use-package xref)
-#+end_src
+* TODO Misc Keybindings
 
-* TODO General Keybindings
-#+begin_src emacs-lisp
-;; Debug operations (SPC x) - "execute/run"
-(ar/global-leader
-  "x" '(:ignore t :wk "execute/debug")
-  "x x" '(ar/toggles-dape :wk "Debug menu")
-  "x d" '(dape :wk "Start debugging")
-  "x b" '(dape-breakpoint-toggle :wk "Toggle breakpoint")
-  "x n" '(dape-next :wk "Next")
-  "x s" '(dape-step-in :wk "Step in")
-  "x o" '(dape-step-out :wk "Step out")
-  "x c" '(dape-continue :wk "Continue")
-  "x q" '(dape-quit :wk "Quit debugger")
-  "x k" '(dape-kill :wk "Kill debugger")
-  "x r" '(dape-restart :wk "Restart")
-  "x w" '(dape-watch-dwim :wk "Watch"))
+** File Operations
 
+#+begin_src emacs-lisp
 ;; File operations (SPC f)
 (ar/global-leader
   "f" '(:ignore t :wk "file")
@@ -9744,26 +9805,14 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
   "f E" '(sudo-edit :wk "Sudo edit")
   "f l" '(reload-init-file :wk "Reload config")
   "f e" '(:ignore t :wk "emacs")
-  "f e d" '((lambda () (interactive) (find-file user-emacs-directory)) :wk "Open emacs.d")
+  "f e d" '((lambda () (interactive) (find-file user-emacs-directory)) :wk "Open ~/.config/emacs")
   "f e i" '((lambda () (interactive) (find-file user-init-file)) :wk "Open init.el")
   "f d" '(consult-dir :wk "Change directory")
   "f j" '(consult-dir-jump-file :wk "Jump to file in dir"))
+#+end_src
 
-;; Diff/Ediff operations (SPC v) - "view/compare"
-(ar/global-leader
-  "v" '(:ignore t :wk "view/diff")
-  "v v" '(ar/ediff-transient :wk "Ediff menu")
-  "v d" '(ediff :wk "Ediff")
-  "v f" '(ediff-files :wk "Ediff files")
-  "v b" '(ediff-buffers :wk "Ediff buffers")
-  "v c" '(ediff-current-file :wk "Ediff current file")
-  "v r" '(ediff-revision :wk "Ediff revision")
-  "v 3" '(ediff3 :wk "Ediff3")
-  "v m" '(ediff-merge :wk "Merge")
-  "v M" '(ediff-merge-with-ancestor :wk "Merge with ancestor")
-  "v p" '(ediff-patch-file :wk "Patch file")
-  "v P" '(ediff-patch-buffer :wk "Patch buffer"))
 
+#+begin_src emacs-lisp
 
 ;; Search operations (SPC s)
 (ar/global-leader
@@ -9786,29 +9835,15 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
   "s T" '(hl-todo-rg-project :wk "Todo in project"))
 
 
-;; Toggle operations (SPC t)
-(ar/global-leader
-  "t" '(:ignore t :wk "toggle")
-  "t l" '(display-line-numbers-mode :wk "Line numbers")
-  "t w" '(whitespace-mode :wk "Whitespace")
-  "t f" '(toggle-frame-fullscreen :wk "Fullscreen")
-  "t m" '(markdown-toggle-markup-hiding :wk "Markdown markup")
-  "t v" '(visual-line-mode :wk "Visual line mode")
-  "t r" '(rainbow-mode :wk "Rainbow mode")
-  "t h" '(global-hl-line-mode :wk "Highlight line")
-  "t s" '(global-prettify-symbols-mode :wk "Prettify symbols")
-  "t p" '(show-paren-mode :wk "Show paren")
-  "t t" '(ar/toggles-transient :wk "Toggles menu"))
-
-;; Open operations (SPC o)
-(ar/global-leader
- "o" '(:ignore t :wk "open")
- "o t" '(ar/ghostel-toggle :wk "toggle ghostel")
- "o T" '(ghostel-project :wk "Ghostel project")
- "o s" '(shell :wk "Shell")
- "o d" '(dired :wk "Dired")
- "o D" '((lambda () (interactive) (switch-to-buffer "*dashboard*")) :wk "Dashboard")
- "o P" '(popper-toggle :wk "Toggle popup"))
+;; ;; Open operations (SPC o)
+;; (ar/global-leader
+;;  "o" '(:ignore t :wk "open")
+;;  "o t" '(ar/ghostel-toggle :wk "toggle ghostel")
+;;  "o T" '(ghostel-project :wk "Ghostel project")
+;;  "o s" '(shell :wk "Shell")
+;;  "o d" '(dired :wk "Dired")
+;;  "o D" '((lambda () (interactive) (switch-to-buffer "*dashboard*")) :wk "Dashboard")
+;;  "o P" '(popper-toggle :wk "Toggle popup"))
 
 ;; Help operations (SPC h)
 (ar/global-leader
@@ -9829,44 +9864,6 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
   "h r" '(:ignore t :wk "reload")
   "h r r" '(reload-init-file :wk "Reload config"))
 
-(general-define-key
- :states 'motion
-  "] e" 'ar/flymake-next-error
-  "[ e" 'ar/flymake-prev-error)
-
-(ar/global-leader
-  "c" '(:ignore t :wk "code")
-  "c ." '(ar/toggles-devtools :wk "Dev dashboard")
-  "c e" '(consult-flymake :wk "Search errors")
-  "c B" '(flymake-show-buffer-diagnostics :wk "Buffer diagnostics")
-  "c n" '(ar/flymake-next-error :wk "Next error")
-  "c p" '(ar/flymake-prev-error :wk "Prev error")
-  "c f" '(apheleia-format-buffer :wk "Format buffer")
-  "c r" '(eglot-rename :wk "Rename")
-  "c s" '(ar/ast-refactor-transient :wk "Structure")
-  "c a" '(eglot-code-actions :wk "Code action"))
-
-;; Git operations (SPC g)
-(ar/global-leader
-  "g" '(:ignore t :wk "git")
-  "g s" '(magit-status :wk "Status")
-  "g c" '(magit-commit :wk "Commit")
-  "g C" '(magit-commit-amend :wk "Commit amend")
-  "g p" '(magit-push-current-to-pushremote :wk "Push")
-  "g P" '(magit-pull-from-upstream :wk "Pull")
-  "g b" '(magit-branch :wk "Branches")
-  "g l" '(magit-log-buffer-file :wk "Log current file")
-  "g L" '(magit-log-current :wk "Log current branch")
-  "g f" '(magit-fetch :wk "Fetch")
-  "g h" '(ar/toggles-vc-menu :wk "VC transient menu")
-  "g m" '(magit-merge :wk "Merge")
-  "g r" '(magit-rebase :wk "Rebase")
-  "g t" '(git-timemachine-toggle :wk "Timemachine")
-  "g n" '(diff-hl-next-hunk :wk "Next hunk")
-  "g N" '(diff-hl-previous-hunk :wk "Previous hunk")
-  "g S" '(diff-hl-stage-current-hunk :wk "Stage hunk")
-  "g R" '(diff-hl-revert-hunk :wk "Revert hunk")
-  "g H" '(diff-hl-show-hunk :wk "Preview hunk"))
 
 (ar/global-leader
   "j" '(:ignore t :wk "jinx (spellcheck)")
@@ -9916,16 +9913,8 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
   "@ v" '(kmacro-view-macro :wk "View macro")
   "@ d" '(kmacro-delete-ring-head :wk "Delete"))
 
-;; Kill ring (SPC k)
-(ar/global-leader
-  "k" '(browse-kill-ring :wk "Kill ring"))
-
 (ar/global-leader
   "a" '(embark-act :wk "Actions"))
-
-;; Treemacs (SPC 0)
-(ar/global-leader
-  "0" '(treemacs-select-window :wk "Select treemacs"))
 
 (general-define-key
  :states 'motion
@@ -9992,46 +9981,6 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
  "b" 'pdf-view-set-slice-from-bounding-box
  "r" 'pdf-view-reset-slice
  "q" 'quit-window)
-
-(ar/local-leader
-  :keymaps 'plantuml-mode-map
-  "c" '(:ignore t :wk "compile/preview")
-  "c c" '(plantuml-preview :wk "Preview (C-c C-c)")
-  "c b" '(plantuml-preview-buffer :wk "Preview buffer")
-  "c r" '(plantuml-preview :wk "Preview region/buffer")
-  "s" '(:ignore t :wk "settings")
-  "s m" '(plantuml-set-exec-mode :wk "Set execution mode")
-  "s o" '(ar/plantuml-set-output-type :wk "Set output type")
-  "s v" '(ar/plantuml-validate-installation :wk "Validate installation")
-  "i" '(:ignore t :wk "install")
-  "i j" '(ar/plantuml-install-jar :wk "Install/Download JAR")
-  "i b" '(ar/plantuml-insert-org-block :wk "Insert org block")
-  "=" '(plantuml-indent-buffer :wk "Indent buffer")
-  "TAB" '(plantuml-complete-symbol :wk "Complete symbol"))
-
-;; eshell keybindings
-(general-define-key
- :keymaps 'eshell-mode-map
- :states '(insert normal)
- "C-r" #'consult-history
- "M-r" #'consult-history)
-
-(general-define-key
- :keymaps 'eshell-mode-map
- :states 'insert
- "C-d" #'eshell-delchar-or-maybe-eof
- "C-a" #'eshell-bol
- "C-e" #'end-of-line
- "C-u" #'eshell-kill-input)
-
-(general-define-key
- :keymaps 'eshell-mode-map
- :states 'normal
- "C-d" #'eshell-life-is-too-much
- "C-l" (lambda () (interactive) (eshell/clear-scrollback) (eshell-emit-prompt))
- "RET" (lambda () (interactive) (goto-char (point-max)))
- "[[" #'eshell-previous-prompt
- "]]" #'eshell-next-prompt)
 #+end_src
 
 * TODO Remaining Work
