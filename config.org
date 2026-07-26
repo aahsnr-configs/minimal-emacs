@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.26
+#+VERSION: 0.27
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -352,6 +352,18 @@ Quality-of-life settings, safety guards, and core minor modes. Disables unused V
 #+end_src
 
 
+** DONE Repeat Mode
+Enables native sticky-key repetition for debugging and spatial commands while suppressing echo area noise.
+#+begin_src emacs-lisp
+(use-package repeat
+  :ensure nil
+  :custom
+  ;; Suppresses echo area hints to prevent collisions with Eldoc and Which-Key.
+  (repeat-echo-function #'ignore)
+  :config
+  ;; Activates the native sticky-key engine globally.
+  (repeat-mode 1))
+#+end_src
 
 ** DONE Garbage Collector
 Manages garbage collection via =gcmh= idle timers. Elevates the GC threshold during active input and triggers background collection during idle periods. Disables =gcmh= on experimental MPS Incremental GC (=igc=) builds and utilizes =after-focus-change-function= for focus-out memory reclamation.
@@ -858,7 +870,7 @@ Manages global and local leader keybindings for accessing editor commands.
 #+end_src
 
 
-* TODO Editor Behavior
+* DONE Editor Behavior
 ** DONE Auto Save
 Saves buffer contents directly to disk on idle, focus loss, and window/buffer switches.
 #+begin_src emacs-lisp
@@ -6625,7 +6637,7 @@ Displays lightweight context-aware metadata for Org elements in the echo area.
   :hook (org-mode . org-eldoc-load))
 #+end_src
 
-** TODO Evil Org
+** DONE Evil Org
 Vim-modal integration for Org buffers with context-aware RET and table/list continuation.
 #+begin_src emacs-lisp
 (use-package evil-org
@@ -6653,7 +6665,7 @@ Vim-modal integration for Org buffers with context-aware RET and table/list cont
      (t (org-ctrl-c-ctrl-c arg)))))
 #+end_src
 
-** TODO Evil Org Agenda
+** DONE Evil Org Agenda
 Vim motions and operator bindings for org-agenda buffers.
 #+begin_src emacs-lisp
 (use-package evil-org-agenda
@@ -7309,10 +7321,136 @@ Enables multiple cursors for simultaneous editing across arbitrary and rectangul
 #+end_src
 
 
-** TODO Debug Adapter Protocol
+** TODO Dape
+Provides native debugging with inline variable hints, persistent breakpoints, and remote debugging support.
 #+begin_src emacs-lisp
+(use-package dape
+  :defer t
+  :commands (dape
+             dape-quit
+             dape-restart
+             dape-next
+             dape-step-in
+             dape-step-out
+             dape-continue
+             dape-pause
+             dape-breakpoint-toggle
+             dape-breakpoint-remove-all
+             dape-breakpoint-log
+             dape-breakpoint-expression
+             dape-breakpoint-hits
+             dape-breakpoint-condition
+             dape-breakpoint-disable
+             dape-evaluate-expression
+             dape-watch-dwim
+             dape-info
+             dape-repl
+             dape-memory
+             dape-disassemble
+             dape-select-thread
+             dape-select-stack
+             dape-until
+             dape-restart-frame)
+  :custom
+  ;; Unbind the default C-x C-a prefix; we use general.el leader bindings.
+  (dape-key-prefix nil)
+  ;; IDE-style side panels (matches Treemacs-left, info-right paradigm).
+  (dape-buffer-window-arrangement 'right)
+  ;; Full VS Code-like multi-panel layout on session start.
+  (dape-many-windows t)
+  ;; Keep info buffers chrome-free (matches ar/hide-modeline-mode aesthetic).
+  (dape-info-hide-mode-line t)
+  ;; Wire cwd to native project.el (NOT projectile).
+  ;; Emacs 31: `when-let` is obsolete; strictly use `when-let*`.
+  (dape-cwd-function (lambda ()
+                       (or (when-let* ((proj (project-current)))
+                             (project-root proj))
+                           default-directory)))
+  ;; Auto-expand variable trees: 1 level for locals (buffer 0), 0 for globals.
+  (dape-variable-auto-expand-alist '((0 . 1)))
+  ;; Tabular alignment in the scopes buffer.
+  (dape-info-variable-table-aligned t)
+  ;; Line-level stepping granularity.
+  (dape-stepping-granularity 'line)
+  ;; Adapter response timeout in seconds.
+  (dape-timeout 5)
+  ;; Configuration hints in minibuffer.
+  (dape-minibuffer-hint t)
+  ;; Echo runInTerminal output to REPL.
+  (dape-repl-echo-shell-output t)
+  ;; Dash-form config parsing.
+  (dape-history-use-dash-form t)
+  ;; Route breakpoint persistence to no-littering var directory.
+  (dape-default-breakpoints-file (no-littering-expand-var-file-name "dape/breakpoints.eld"))
+  :config
+  ;; Breakpoint persistence: save on quit, load on startup.
+  (add-hook 'kill-emacs-hook #'dape-breakpoint-save)
+  (add-hook 'elpaca-after-init-hook #'dape-breakpoint-load)
 
+  ;; Enable mouse-based breakpoint manipulation (click fringe to toggle).
+  (dape-breakpoint-global-mode 1)
+
+  ;; Visual pulse on stop, guarded against massive buffers.
+  (add-hook 'dape-display-source-hook
+            (lambda ()
+              (unless (too-long-file-p)
+                (pulse-momentary-highlight-one-line))))
+
+  ;; Save buffers before debug session (useful for interpreted languages).
+  (add-hook 'dape-start-hook (lambda () (save-some-buffers t t)))
+
+  ;; Kill compile buffer on success.
+  (add-hook 'dape-compile-hook #'kill-buffer)
+
+  ;; Hide modeline in REPL buffer.
+  (add-hook 'dape-repl-mode-hook #'ar/enable-hide-modeline)
+
+  ;; Transient Dashboard (Replacing dap-hydra)
+  (with-eval-after-load 'transient
+    (defun ar/dape-title ()
+      (concat
+       (if (fboundp 'nerd-icons-codicon)
+           (nerd-icons-codicon "nf-cod-debug" :face 'transient-heading :v-adjust 0.02)
+         "")
+       (propertize " Debug" 'face 'transient-heading)))
+
+    (transient-define-prefix ar/toggles-dape ()
+      "Debugger"
+      [:description ar/dape-title
+       ["Session"
+        ("S" "start" dape :transient t)
+        ("q" "quit" dape-quit)
+        ("k" "kill" dape-kill)
+        ("r" "restart" dape-restart :transient t)
+        ("R" "restart frame" dape-restart-frame :transient t)]
+       ["Navigation"
+        ("n" "next" dape-next :transient t)
+        ("s" "step in" dape-step-in :transient t)
+        ("o" "step out" dape-step-out :transient t)
+        ("c" "continue" dape-continue :transient t)
+        ("p" "pause" dape-pause :transient t)
+        ("u" "until" dape-until :transient t)]
+       ["Breakpoints"
+        ("b" "toggle" dape-breakpoint-toggle :transient t)
+        ("B" "clear all" dape-breakpoint-remove-all :transient t)
+        ("l" "log" dape-breakpoint-log :transient t)
+        ("h" "hits" dape-breakpoint-hits :transient t)
+        ("C" "condition" dape-breakpoint-condition :transient t)
+        ("D" "disable" dape-breakpoint-disable :transient t)]
+       ["Evaluation"
+        ("e" "eval" dape-evaluate-expression :transient t)
+        ("w" "watch" dape-watch-dwim :transient t)]
+       ["Info Panels"
+        ("i" "info" dape-info :transient t)
+        ("t" "threads" dape-select-thread :transient t)
+        ("F" "stack" dape-select-stack :transient t)
+        ("m" "repl" dape-repl :transient t)
+        ("M" "memory" dape-memory :transient t)
+        ("A" "disasm" dape-disassemble :transient t)]
+       ["Exit"
+        ("<escape>" "" transient-quit-one :format " ")]])))
 #+end_src
+
 
 ** TODO Direnv
    #+begin_src emacs-lisp
@@ -7434,18 +7572,33 @@ Consolidated keybindings for Development Tools packages and commands only.
  "s w" '(consult-eglot-symbols :wk "Workspace symbols"))
 
 (ar/global-leader
- "x"   '(:ignore t :wk "execute/debug")
- "x x" '(ar/toggles-dape :wk "Debug menu")
- "x d" '(dape :wk "Start debugging")
- "x b" '(dape-breakpoint-toggle :wk "Toggle breakpoint")
- "x n" '(dape-next :wk "Next")
- "x s" '(dape-step-in :wk "Step in")
- "x o" '(dape-step-out :wk "Step out")
- "x c" '(dape-continue :wk "Continue")
- "x q" '(dape-quit :wk "Quit debugger")
- "x k" '(dape-kill :wk "Kill debugger")
- "x r" '(dape-restart :wk "Restart")
- "x w" '(dape-watch-dwim :wk "Watch"))
+ "d"   '(:ignore t :wk "debug")
+ "d d" '(ar/toggles-dape :wk "Debug menu")
+ "d S" '(dape :wk "Start debugging")
+ "d b" '(dape-breakpoint-toggle :wk "Toggle breakpoint")
+ "d n" '(dape-next :wk "Next")
+ "d s" '(dape-step-in :wk "Step in")
+ "d o" '(dape-step-out :wk "Step out")
+ "d c" '(dape-continue :wk "Continue")
+ "d q" '(dape-quit :wk "Quit debugger")
+ "d k" '(dape-kill :wk "Kill debugger")
+ "d r" '(dape-restart :wk "Restart")
+ "d w" '(dape-watch-dwim :wk "Watch")
+ "d p" '(dape-pause :wk "Pause")
+ "d u" '(dape-until :wk "Run until point")
+ "d R" '(dape-restart-frame :wk "Restart frame")
+ "d e" '(dape-evaluate-expression :wk "Evaluate expression")
+ "d B" '(dape-breakpoint-remove-all :wk "Clear all breakpoints")
+ "d l" '(dape-breakpoint-log :wk "Log breakpoint")
+ "d h" '(dape-breakpoint-hits :wk "Hit condition")
+ "d C" '(dape-breakpoint-condition :wk "Condition")
+ "d D" '(dape-breakpoint-disable :wk "Disable breakpoint")
+ "d I" '(dape-info :wk "Toggle info panels")
+ "d T" '(dape-select-thread :wk "Select thread")
+ "d F" '(dape-select-stack :wk "Select stack frame")
+ "d m" '(dape-repl :wk "REPL")
+ "d M" '(dape-memory :wk "Memory editor")
+ "d A" '(dape-disassemble :wk "Disassemble"))
 
 (general-define-key
  :states 'motion
@@ -7468,7 +7621,6 @@ Consolidated keybindings for Development Tools packages and commands only.
 
 * DONE Contextual Sidebars
 Persistent side windows displaying dynamic metadata, backlinks, and bibliography context for the active buffer.
-
 ** DONE Universal Sidecar
 Provides a per-frame sidebar buffer that dynamically renders contextual metadata sections for the focused window.
 #+begin_src emacs-lisp
@@ -7497,7 +7649,6 @@ Provides a per-frame sidebar buffer that dynamically renders contextual metadata
   (universal-sidecar-insinuate))
 #+end_src
 
-
 ** DONE Denote Sections
 Injects Denote backlinks into the universal sidecar, mimicking the org-roam buffer UI without a SQLite database.
 #+begin_src emacs-lisp
@@ -7508,7 +7659,6 @@ Injects Denote backlinks into the universal sidecar, mimicking the org-roam buff
   ;; Append the backlinks section to preserve rendering order.
   (add-to-list 'universal-sidecar-sections 'denote-sections-backlinks-section t))
 #+end_src
-
 
 ** DONE Denote Citar Sections
 Injects bibliography abstracts and formatted references into the universal sidecar for literature notes.
@@ -9549,7 +9699,7 @@ Routes ephemeral buffers to dedicated bottom drawers or echo-area popups, strict
   :custom
   (popper-group-function #'popper-group-by-directory)
   (popper-echo-dispatch-actions t)
-  :hook (after-init . popper-echo-mode)
+  :hook (elpaca-after-init . popper-echo-mode)
   :init
   (setq popper-mode-line ""
         popper-reference-buffers
@@ -9986,12 +10136,11 @@ This section just contains checkboxes with stuff that still needs to be done for
 - [ ] add a doom emacs style keybinding with SPC as leader in general.el for =org-babel-remove-result-one-or-many=
 - [ ] Illustrate a workflow using iedit and evil-multiedit
 
-- [ ] customize org-agenda-finalize to customize org-agenda buffer
 - [ ] Setup automatic pair generation for '**', '==', etc and make sure the cursor in insert mode is placed in the middle
 - [ ] Determine if compile-angel is needed for elpaca?
 - [ ] Determine if elpaca byte-compiles and native-compiles all packages. And is it okay to leave these settings to elpaca's default.
-- [ ] Pressing enter on a header should move a task from TODO to DONE like doom emacs does
-- [ ] Add flyover package
+- [X] Pressing enter on a header should move a task from TODO to DONE like doom emacs does
+- [X] Add flyover package
 - [ ] implement the email setup
 - [X] move customs.el to var
 - [ ] add more padding to emacs buffer
@@ -10031,14 +10180,7 @@ This section raises questions if some features, capabilities, etc can be achieve
 
 - [ ] Can org-level variation can only work for certain file and/or org buffers?
 - [ ] Are there any other evil related packages that can useful for my workflow?
-- [ ] Is there a way to execute nerd-icons-install-fonts during intial emacs setup using elpaca?
 - [ ] How do I get history evil commands in the echo area like doom emacs?
-- [ ] How can I make the echo area useful? Do this at the very end of the configuration
-- [ ] How to open links from org buffers by pressing enter and using the correct browser?
-- [ ] Is it necessary to configure for my emacs configuration that is evil centric?
-- [ ] Is there a chance that anzu and evil-anzu might collide with my lsp-mode configuration?
 - [X] Is it safe to use :demand t in solaire-mode?
 - [ ] If choose to go over eglot ecosystem, do I strictly need eldoc-box to have lsp-ui-doc like features? eldoc-box provides both diagnostics and documentation, but it is extremely slow. However, I can you corfu-popupinfo for documentation at point and flyover for diagnostics at point
 
-* TODO Errors
-- [X] Symbol's value as variable is void: solaire-mode--set-explicitly. Paste solaire-mode source code for to confirm everything is correct
