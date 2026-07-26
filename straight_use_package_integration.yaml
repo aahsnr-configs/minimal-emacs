@@ -1,0 +1,476 @@
+document:
+  title: "straight.el Package Manager & `use-package` Integration: Architecture, Synchronous Physics, and Load-Order Execution (v1)"
+  description: >
+    This document provides a canonical, unified breakdown of the straight.el package manager
+    (radian-software/straight.el, bootstrap-version 7) and its integration with the `use-package`
+    macro (v2.4.5+, bundled with Emacs 30.2). It details straight.el's synchronous, git-based
+    installation model, its `use-package` keyword integration (`:straight`), and chronological
+    load-order dependencies. This is a direct architectural counterpart to a companion document
+    covering Elpaca; wherever the two package managers diverge, that divergence is called out
+    explicitly, because it is the single most common source of migration bugs.
+    All definitions are derived from the official straight.el README/manual
+    (radian-software/straight.el), the official GNU Emacs `use-package` User Manual, the upstream
+    `use-package` source (jwiegley/use-package), and straight.el's own source comments,
+    cross-checked against Emacs 30.2 core. Verified current as of July 2026.
+  sections:
+    - id: 1
+      title: Core Philosophy
+      points:
+        - >
+          straight.el is a synchronous, git-based elisp package manager that replaces `package.el`
+          entirely. It has no support whatsoever for `package.el` by design: packages are cloned
+          as git (or other VCS) repositories rather than downloaded as archive tarballs, and
+          package state is defined entirely by the init-file plus an optional version lockfile,
+          with no other persistent data.
+        - >
+          `use-package` is not a package manager. Its primary purpose is to organize package
+          configuration declaratively, eliminate repetitive boilerplate, and enable lazy-loading
+          (autoloading) to keep Emacs startup times low. This is unchanged from any other backend.
+        - >
+          CRITICAL DIVERGENCE FROM ASYNC PACKAGE MANAGERS (e.g. Elpaca): straight.el does its
+          registration, cloning, and building work synchronously, in-line, at the exact moment
+          `straight-use-package` (or the `:straight` use-package keyword) is evaluated during
+          init-file reading. There is no post-init async queue, no `after-init-hook` processing
+          step, and no equivalent of `elpaca-wait`. Standard synchronous, top-to-bottom load-order
+          assumptions largely DO apply: by the time control returns from one `use-package` form,
+          that package's repository has been cloned/checked-out and (if needed) built. The one
+          remaining subtlety is that `use-package`'s OWN keyword-ordering pipeline still creates a
+          gap between "package installed" and "package required," described in Section 2.
+      files:
+        - path: "~/.emacs.d/early-init.el"
+          note: >
+            `package-enable-at-startup` MUST be `nil` here, before `package.el` gets a chance to
+            run, exactly as with any other non-`package.el` manager.
+    - id: 2
+      title: The Synchronous Execution Timeline
+      description: >
+        Because straight.el has no async queue, this "timeline" is really a single linear pass
+        through the init file, interrupted only by `use-package`'s own internal keyword-processing
+        order (`use-package-keywords`) at each individual `use-package` form. Keyword order in
+        your source does not determine evaluation order within one form; the internal
+        `use-package-keywords` list does.
+      phases:
+        - name: "Phase 0: Bootstrap (Synchronous, unconditionally so)"
+          items:
+            - event: "early-init.el"
+              description: >
+                `package-enable-at-startup` set to `nil` to prevent `package.el` interference.
+            - event: "The Bootstrap Snippet"
+              description: >
+                Checks for `straight/repos/straight.el/bootstrap.el`; if absent, downloads
+                `install.el` from the `develop` branch of `radian-software/straight.el` and
+                evaluates it in a child Emacs process to clone/build straight.el itself (honoring
+                any version pinned in a lockfile). Current canonical snippet uses
+                `bootstrap-version 7` and resolves the install directory via
+                `(or (bound-and-true-p straight-base-dir) user-emacs-directory)`. This has always
+                been synchronous in every package manager, straight.el included.
+        - name: "Phase 1: Per-Package Registration, Clone, and Build (Inline, during init read)"
+          description: >
+            This entire phase happens once per `straight-use-package` call (or per `:straight`
+            keyword), fully before that call returns control to the next form in your init file.
+          items:
+            - event: "Recipe Resolution"
+              description: >
+                If only a package name was given, straight.el looks up a recipe from its
+                configured recipe repositories (MELPA, GNU ELPA mirror, Emacsmirror, in that
+                priority by default). If an explicit recipe plist/list was given, that is used
+                and merged with any resolved defaults.
+            - event: "Registration"
+              description: >
+                The recipe is recorded in straight.el's internal caches. This is the first action
+                straight-use-package takes, before any cloning or building.
+            - event: "Clone (if needed)"
+              description: >
+                If the local repository is not already present under `straight/repos/`, it is
+                cloned and the commit/branch/tag specified by the recipe (or, if present, by the
+                version lockfile) is checked out. Note: straight.el does NOT perform git fetch
+                operations on every startup for already-cloned packages — this is a deliberate
+                performance decision. Existing repos are left alone unless you explicitly pull.
+            - event: "Modification Check & Build (if needed)"
+              description: >
+                straight.el decides whether to rebuild a package based on
+                `straight-check-for-modifications`. The default (on non-Windows systems with
+                `find` available) is `find-when-checking`, which uses the `find` command at
+                startup to detect file changes since the last build, restricted to subdirectories
+                of the repos directory. Alternatives: `check-on-save` (a `before-save-hook`,
+                default on Windows), `watch-files` (a persistent filesystem watcher requiring
+                python3 + watchexec), or `nil` (rebuild only on recipe/Emacs-version metadata
+                changes, or via `M-x straight-rebuild-package`/`straight-rebuild-all`).
+            - event: "Autoload Activation (NOT full `require`)"
+              description: >
+                Once built, straight.el activates the package's autoloads. This makes autoloaded
+                commands/functions callable, but it does NOT `require` the package's features.
+                `defcustom`, `defvar`, and `defun` forms inside the package's main file are NOT
+                yet evaluated. This is the load-bearing fact for Section 5's case study, and it is
+                functionally identical in spirit to Elpaca's own "installing activates autoloads
+                but does not require features" behavior — the two managers agree here even though
+                one is sync and the other is async.
+        - name: "Phase 2: use-package's Own Keyword Pipeline (per form)"
+          description: >
+            Independent of straight.el, `use-package-core.el` defines a fixed evaluation order via
+            the `use-package-keywords` defcustom. Its BASE order (before any package-manager
+            integration adds keywords) is: `:disabled :load-path :requires :defines :functions
+            :preface :if :when :unless :no-require :catch :after :custom :custom-face :bind
+            :bind* :bind-keymap :bind-keymap* :interpreter :mode :magic :magic-fallback :hook
+            :commands :autoload :init :defer :demand :load :config`. Note `:load` sits directly
+            before `:config`, near the very end — this is where the actual `(require 'foo)` (or
+            equivalent) happens for non-deferred packages, and it is what creates the gap between
+            "straight has cloned/built/autoloaded the package" and "the package's real symbols
+            exist."
+          items:
+            - event: ":disabled Check"
+              description: >
+                Checked by the macro itself via `(unless (memq :disabled args) ...)`, entirely
+                outside and prior to the `use-package-keywords` pipeline. `(use-package foo
+                :disabled nil)` is still disabled; only the keyword's presence matters. Identical
+                under every backend.
+            - event: ":straight (straight.el's integration point)"
+              description: >
+                Once both straight.el and `use-package` are loaded, straight.el registers a
+                `:straight` handler with `use-package-keywords`. `:straight t` triggers
+                `straight-use-package` for that form; `:straight (recipe...)` supplies a custom
+                recipe (backquote forms are accepted, so parts of the recipe can be computed
+                dynamically). `:straight t` is unnecessary if `straight-use-package-by-default` is
+                non-nil — this is straight.el's own equivalent of "always ensure," and it is
+                DISTINCT from use-package's `use-package-always-ensure`, which is package.el-
+                specific and should not be used with straight.el. straight.el's own source
+                explicitly documents that setting `:straight` disables any competing `:ensure`-
+                driven install for the same form, but notes this "only works when `:ensure` is
+                processed before `:straight`" — i.e., the two keywords are positioned so `:ensure`
+                (if present at all) is evaluated first. In current, official, documented usage you
+                should simply not write `:ensure` under straight.el at all; the migration guidance
+                is to remove `:ensure` and `use-package-always-ensure` outright, not to rely on
+                any legacy interop between them.
+            - event: ":preface"
+              description: >
+                Evaluated before conditionals (after `:disabled` and after the package-manager
+                keyword). Runs at both byte-compile time and load time; must stay side-effect-free.
+            - event: ":if / :when / :unless"
+              description: >
+                Gates whether the *rest* of the declaration loads, by wrapping the remainder in
+                `(when PRED ...)`. Same mechanism regardless of backend.
+            - event: ":custom / :custom-face"
+              description: >
+                Expands to `customize-set-variable` calls. Because these sit well before `:init`
+                and `:load`/`:config` in the base keyword order, they still run before the package
+                is actually required — same behavior as under any other backend.
+            - event: "Autoload Triggers (:hook, :bind, :mode, :commands)"
+              description: >
+                Register autoloads/deferred triggers in Emacs; they do not force the package to
+                load immediately. This layer is entirely a `use-package` feature, orthogonal to
+                which package manager is installing the package underneath.
+            - event: ":init"
+              description: >
+                Evaluated before `:load`/`:config`, i.e. before the real `(require 'foo)` happens.
+                WARNING: because straight.el has already cloned/built/autoload-activated the
+                package by this point (Phase 1), it is tempting to assume the package is "ready."
+                It is not — its `defcustom`/`defvar`/`defun` forms have not been evaluated yet.
+                Referencing package-specific variables here still typically raises a
+                `void-variable` error, exactly as under async managers, just for a different
+                underlying reason (use-package's own deferred `:load` position, not an async
+                queue).
+            - event: ":load / (implicit require)"
+              description: >
+                This is where `use-package` actually loads the package for non-deferred
+                declarations (or where deferred declarations get their autoload-triggered load
+                later). This is the true "boundary" in straight.el's world — not a post-init
+                hook, but a fixed, near-final position in `use-package-keywords`.
+            - event: ":config"
+              description: >
+                Evaluated after the package has fully loaded (i.e., after the `:load` step, or
+                after a deferred autoload trigger fires and pulls the package in). This is the
+                bulletproof phase for modifying a package's internal `defcustom` lists, altering
+                keymaps, advising functions, and activating global minor modes — identical
+                guidance to any other backend, and for the same underlying reason.
+    - id: 3
+      title: Anatomy of a straight.el Recipe
+      keywords:
+        - name: ":type"
+          description: >
+            VC backend for the local repository. Defaults to the value of `straight-default-vc`
+            (normally `git`), so `:type git` is usually omittable.
+        - name: ":host / :repo"
+          description: 'Repository source (e.g., `:host github :repo "user/repo"`).'
+        - name: ":branch"
+          description: "Git branch to track/check out."
+        - name: ":nonrecursive / :depth"
+          description: "Controls submodule recursion and clone depth for performance tuning."
+        - name: ":files"
+          description: >
+            Directives for which files to symlink from the local repo into the build directory,
+            using a MELPA-recipe-style DSL. No dedicated `:defaults`-vs-`:main` split the way
+            Elpaca frames it; straight.el's own default-files heuristics and the `:files` DSL
+            together determine what gets linked and what the package's entry point is.
+        - name: ":local-repo"
+          description: >
+            The name of the local repository directory under `straight/repos/`. Lets multiple
+            recipes share one clone, or lets you rename the on-disk directory independent of the
+            package name.
+        - name: ":fork"
+          description: >
+            Declares a personal fork alongside the upstream recipe (e.g.
+            `:fork (:host github :repo "your-name/el-patch")`, or bare `:fork t` when the fork
+            lives at the same host/name pattern via `straight-host-usernames`). straight.el
+            deliberately does NOT touch git remotes on every startup for performance reasons; use
+            the interactive normalize/merge workflows to reconcile fork remotes after changing a
+            recipe.
+        - name: ":build"
+          description: >
+            Controls which build steps run for this package (e.g. compiling, native-compiling,
+            generating autoloads, building info manuals). Can be `nil` to skip building entirely,
+            `t` for the default set, or a list to include/exclude specific steps.
+        - name: ":pre-build / :post-build"
+          description: >
+            Arbitrary forms/commands to run immediately before or after the standard build steps —
+            useful for packages needing an extra compile step (e.g. running `make`) that
+            straight.el doesn't know about natively.
+      note: >
+        There is no direct straight.el analogue to Elpaca's `:wait` recipe keyword, because there
+        is nothing to wait FOR — `straight-use-package` already blocks the current form until that
+        package's clone/build is complete before evaluation continues to the next form.
+    - id: 4
+      title: Detailed `use-package` Keyword Breakdown (straight.el-specific)
+      keywords:
+        - name: ":straight"
+          subtitle: Registration, Clone, Build, and Autoload Activation (Synchronous)
+          details:
+            - label: Mechanism
+              text: >
+                straight.el registers a `:straight` handler with `use-package-keywords` once both
+                packages are loaded. `:straight t` calls `straight-use-package` for the declared
+                package name; a recipe form customizes the source.
+            - label: Global default
+              text: >
+                Set `straight-use-package-by-default` to a non-nil value to make every
+                `use-package` form implicitly behave as though `:straight t` were given, without
+                writing it out. Do not use `use-package-always-ensure` for this — that variable
+                is specific to `package.el` and is explicitly documented as something you should
+                remove when migrating to straight.el, not repurpose.
+        - name: ":init"
+          subtitle: Pre-Load Execution (The "Unconditional" Trap — still present)
+          details:
+            - label: Purpose
+              text: >
+                Sets up state the package's own load sequence might read, or defines hooks/
+                variables that must exist before the package initializes.
+            - label: Constraint
+              text: >
+                Even though straight.el has already cloned/built/autoload-activated the package
+                by the time `:init` runs, the package's actual functions and variables (from its
+                `defcustom`/`defvar`/`defun` forms) generally don't exist yet, because the real
+                `(require ...)` happens later, at `use-package`'s own `:load` position.
+                Referencing them in `:init` typically still raises a `void-function` or
+                `void-variable` error.
+        - name: ":config"
+          subtitle: Post-Load Execution (The Safe Zone — still present)
+          details:
+            - label: Purpose
+              text: >
+                The safe place to call the package's functions, modify its keymaps, advise its
+                internals, and activate its global minor modes.
+            - label: Best Practice
+              text: >
+                Keep `:init` forms minimal and put as much as possible into `:config`, exactly as
+                under any other backend — the reasoning is `use-package`'s own keyword order, not
+                anything specific to being sync or async.
+    - id: 5
+      title: "Case Study: The `evil-snipe` `defcustom` List Modification"
+      problem:
+        description: >
+          In an `evil-snipe` configuration, a list of UI modes must be appended to
+          `evil-snipe-disabled-modes` to prevent the package from hijacking native keybindings
+          in read-only or UI-heavy buffers.
+      analysis:
+        - approach: "Why `:init` Fails (even though straight.el is synchronous)"
+          explanation: >
+            This is the point most migrators get wrong: they assume that because straight.el is
+            synchronous, "the package is already there" by `:init` time, so `:init` should be
+            safe. It is not, and the reason has nothing to do with straight.el's synchrony — it's
+            `use-package`'s own internal keyword order:
+          steps:
+            - >
+              By the time `:init` runs, straight.el HAS already cloned, built, and
+              autoload-activated `evil-snipe` (Phase 1 is fully synchronous and already complete).
+            - >
+              But `use-package`'s `:load` step — the point at which `(require 'evil-snipe)`
+              actually happens and `evil-snipe.el`'s top-level `defcustom` forms actually run —
+              sits near the END of `use-package-keywords`, right before `:config`, i.e. AFTER
+              `:init`.
+            - "So at `:init` time, `evil-snipe-disabled-modes` is still unbound."
+            - "Calling `add-to-list` on an unbound symbol signals a `void-variable` error, aborting the `:init` block, just as it would under any backend."
+            - >
+              Pre-declaring the variable via `defvar` in `:preface` trades this for a subtler
+              issue: since `defvar` never overwrites an already-bound variable, your custom list
+              locks in permanently before `evil-snipe.el`'s own `defcustom` can establish its
+              upstream default.
+        - approach: "Why `:config` is Bulletproof"
+          explanation: >
+            Placing the `dolist` at the very beginning of `:config` guarantees this sequence,
+            regardless of package manager:
+          steps:
+            - "`use-package`'s `:load` step runs first: `(require 'evil-snipe)` evaluates, and its `defcustom` registers the upstream default list."
+            - "Your modification runs: the `dolist` executes, safely appending your custom modes to the already-populated upstream list."
+            - "The mode activates: `(evil-snipe-mode 1)` executes only after your modification."
+    - id: 6
+      title: Obsolete / Superseded / Inapplicable Paradigms Under straight.el
+      points:
+        - keyword: ":ensure / use-package-always-ensure"
+          claim: "These `package.el`-oriented keywords/variables are the historical default."
+          correction: >
+            Under straight.el the officially documented and supported mechanism is the `:straight`
+            keyword and the `straight-use-package-by-default` variable, not `:ensure` /
+            `use-package-always-ensure`. straight.el's own migration guidance explicitly says to
+            REMOVE `:ensure` and `use-package-always-ensure` references when switching from
+            package.el. Some older third-party documentation states that straight.el can override
+            `use-package-ensure-function` so a bare `:ensure t` is also routed through straight —
+            and straight.el's own source does contain logic to disable a competing `:ensure`
+            install when `:straight` is also present on the same form — but this is not the
+            documented interface to rely on, and mixing `package.el`'s `:ensure` with straight.el
+            in the same configuration is explicitly cautioned against in the community (risk of a
+            package being installed/loaded twice, once via each manager).
+        - keyword: ":pin"
+          claim: "`:pin` still means something useful under straight.el, e.g. archive pinning."
+          correction: >
+            Meaningless in practice. `:pin` (added to `use-package-keywords` by
+            `use-package-ensure.el` for `package.el` archive-pinning) has nothing to pin, because
+            straight-managed packages are never installed from a `package.el` archive in the first
+            place. Version pinning under straight.el is done at the recipe level (`:branch`, or
+            checking out a specific commit) or globally via the version lockfile
+            (`straight-freeze-versions` / `straight-thaw-versions`). Unlike Elpaca, straight.el
+            does not repurpose the `:pin` keyword/recipe-slot for a different meaning of its own;
+            it simply has no dedicated keyword for "exclude this package from bulk updates" — the
+            practical workaround is to update packages individually with `straight-pull-package`
+            instead of running `straight-pull-all`.
+        - keyword: ":vc"
+          claim: "The `:vc` keyword is superseded by straight.el's recipe system and is effectively ignored."
+          correction: >
+            Inaccurate, and for the same reason as under Elpaca: straight.el's use-package
+            integration only adds/overrides handling for its own `:straight` keyword. It does not
+            touch the separate handler that Emacs 30's built-in `package-vc.el` registers for the
+            `:vc` keyword. If `:vc` is used alongside straight.el, it is NOT silently ignored — it
+            still invokes `package-vc.el`'s own synchronous, non-straight install path, which can
+            produce the same kind of confusing double-management described in the Elpaca
+            companion document. Guidance is identical: don't mix `:vc` with straight.el; use the
+            recipe system (`:straight (recipe...)`) instead.
+        - keyword: "package-quickstart"
+          claim: "package-quickstart is obsolete."
+          correction: >
+            Category error, same as under Elpaca. `package-quickstart` is a `package.el` feature
+            and remains fully valid in vanilla Emacs configurations that still use `package.el`.
+            It is simply INAPPLICABLE under straight.el, because straight.el users set
+            `package-enable-at-startup nil` and never invoke `package.el`'s activation path that
+            `package-quickstart` accelerates.
+        - keyword: "straight.el is 'just Elpaca but synchronous'"
+          claim: "The two managers are interchangeable drop-ins for each other, modulo sync/async."
+          correction: >
+            Overstated. Beyond the sync/async split, they differ in: default recipe-repository
+            priority order and format (MELPA/GNU-ELPA-mirror/Emacsmirror vs. Elpaca's own recipe
+            resolution); the total absence of `package.el` support in straight.el by design
+            (Elpaca is more permissive about coexistence in practice, though not recommended
+            either); the lockfile/profile model (`straight-freeze-versions` writing
+            `straight/versions/<profile>.el`, with support for multiple named profiles via
+            `straight-profiles`); and the modification-detection/rebuild model
+            (`straight-check-for-modifications`, with no real Elpaca equivalent since Elpaca's
+            async build queue works differently). Treat this document and its Elpaca companion as
+            two distinct references, not one document with a find-and-replace applied.
+    - id: 7
+      title: "Ecosystem Tooling: Keeping straight.el Packages Up To Date (including topgrade)"
+      description: >
+        This section exists because it is a very common practical question and a very common
+        source of surprise: general-purpose "upgrade everything" tools do not understand
+        straight.el's per-package git checkouts by default.
+      points:
+        - topic: "Interactive, in-Emacs update workflow (canonical)"
+          detail: >
+            `M-x straight-pull-package` (single package) or `M-x straight-pull-all` (every
+            registered package) fetches and merges upstream changes into each package's local
+            repository. Follow with `M-x straight-freeze-versions` to rewrite the lockfile at
+            `straight/versions/<profile>.el` (default profile: `default.el`) so the new commits
+            become reproducible across machines. `M-x straight-thaw-versions` reverts local
+            checkouts back to whatever the lockfile currently says, and
+            `M-x straight-normalize-package`/`straight-normalize-all` restores a package's
+            repository to a clean working state (main branch checked out, remotes correct) if it
+            has drifted.
+        - topic: "Command-line / batch equivalent"
+          detail: >
+            The same operations can be run headlessly by loading your real init file (so every
+            `straight-use-package`/`:straight` form actually registers) and then calling the same
+            functions, e.g.:
+            `emacs --batch -l ~/.emacs.d/early-init.el -l ~/.emacs.d/init.el --eval "(progn (straight-pull-all) (straight-freeze-versions))"`.
+            This is the building block for any external automation, including topgrade.
+        - topic: "topgrade: no native straight.el step exists"
+          detail: >
+            As of the current topgrade-rs releases (v17.x, the actively maintained fork of the
+            original, now-archived r-darwish/topgrade), topgrade has no dedicated straight.el
+            update step. Its built-in "Emacs" step is oriented around `package.el` and does not
+            know about `straight/repos/`. A GitHub feature request for straight.el support was
+            filed against the original project in 2019 and was never implemented before that
+            repository was archived; no equivalent step has appeared in the maintained fork's
+            config schema since.
+        - topic: "topgrade: the Doom Emacs exception"
+          detail: >
+            topgrade DOES have a dedicated `[doom]` config section (e.g. an `aot` option for
+            ahead-of-time native compilation) and explicitly detects Doom Emacs to run
+            `doom upgrade` instead of its generic Emacs step. Because Doom is itself built on
+            straight.el internally, this means straight.el-based configs that go through Doom are
+            already well handled by topgrade. topgrade's git-repo-pulling logic also explicitly
+            checks `Emacs::is_doom()` and skips pulling Doom-managed repositories itself, to avoid
+            fighting with Doom's own upgrade pipeline. If your straight.el setup is vanilla (not
+            Doom), none of this applies to you, and you need one of the two options below.
+        - topic: "Recommended: a topgrade custom command"
+          detail: >
+            Add a custom step to `topgrade.toml` (current schema: `[commands]`, or
+            `[pre_commands]`/`[post_commands]` if you want it to run before/after everything else)
+            that loads your init file in batch mode and calls `straight-pull-all` followed by
+            `straight-freeze-versions`, then disable topgrade's own package.el-oriented Emacs step
+            so it doesn't run redundantly:
+          example_config: |
+            [commands]
+            "Emacs packages (straight.el)" = "emacs --batch -l ~/.emacs.d/early-init.el -l ~/.emacs.d/init.el --eval \"(progn (straight-pull-all) (straight-freeze-versions))\""
+
+            [misc]
+            disable = ["emacs"]
+        - topic: "Not recommended as primary method: pointing topgrade's [git] repos glob at straight/repos/*"
+          detail: >
+            topgrade's `[git]` section does support a `repos` list with glob patterns (e.g.
+            `repos = ["~/.emacs.d/straight/repos/*"]`), which would make topgrade's generic
+            git-pull step walk into every package checkout and run a plain `git pull`. This is
+            tempting but risky: straight.el frequently leaves package repositories in a detached
+            HEAD state, checked out at whatever commit the recipe or lockfile specifies, rather
+            than tracking a local branch. A blind `git pull` against a detached HEAD has no
+            upstream branch to pull from and will typically fail outright rather than silently do
+            nothing — and in cases where it does succeed, it can leave the repo in a state
+            straight.el considers "dirty" or diverged from its recipe on the next Emacs startup,
+            forcing a manual `git` fixup or `M-x straight-normalize-package`. The batch `emacs
+            --batch ... --eval "(straight-pull-all)"` approach above is preferred because
+            straight.el itself resolves the correct target ref per package (recipe branch, fork
+            remote, lockfile pin) rather than treating every repo identically.
+    - id: 8
+      title: Verification Notes
+      points:
+        - "Primary Source: Official GNU Emacs `use-package` User Manual (v2.4.5, bundled with Emacs 30.2)."
+        - "Primary Source: `jwiegley/use-package` upstream, `use-package-core.el` (base `use-package-keywords` order) and `use-package-ensure.el` (confirms `:ensure`/`:pin` are `package.el`-specific and that straight.el is the one third-party manager historically documented as overriding `use-package-ensure-function`)."
+        - "Primary Source: `radian-software/straight.el` README/manual (current `main` branch; org previously known as `raxod502`), including the Getting Started bootstrap snippet (`bootstrap-version 7`), the use-package integration section, the recipe format section, and the `straight-check-for-modifications` documentation."
+        - >
+          The `:straight`-disables-competing-`:ensure` behavior, and its explicit precondition
+          that `:ensure` be processed before `:straight`, was confirmed directly against a source
+          comment in `straight.el`'s own use-package integration code. The exact relative position
+          of `:straight` within the full, integration-augmented `use-package-keywords` list (as
+          opposed to the base list, which IS fully confirmed from upstream `use-package-core.el`)
+          was not independently verified byte-for-byte against a specific `use-package-keywords`
+          snapshot at time of writing; treat the "evaluated very early, alongside/after `:ensure`"
+          characterization as directionally correct but not pinned to an exact index.
+        - >
+          topgrade findings confirmed against: the archived `r-darwish/topgrade` issue tracker
+          (issue requesting straight.el support, opened 2019, never resolved before archival);
+          the current `topgrade-rs/topgrade` README and `config.example.toml` (confirming the
+          `[git]` repos-glob mechanism, the `[commands]`/`[pre_commands]`/`[post_commands]`
+          mechanism, the `[doom]` config section, and the absence of any `[straight]`-equivalent
+          section); and third-party documentation (DeepWiki analysis of `src/steps/git.rs`)
+          describing topgrade's explicit `Emacs::is_doom()` check used to avoid double-managing
+          Doom's straight-based repositories.
+        - >
+          Emacs 31 Context: Emacs 31 entered its feature-freeze/branch-cut phase near June 2026.
+          Public release previews confirm no structural changes to `use-package`'s keyword ordering
+          or macro expansion logic since the 30.2 baseline, so none of the above is expected to
+          shift with Emacs 31.
