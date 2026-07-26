@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.27
+#+VERSION: 0.28
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -3985,6 +3985,16 @@ Bridges the multi-target compilation engine with Embark actions for instant targ
   (projection-multi-embark-setup-command-map))
 #+end_src
 
+*** DONE Projection Dape
+Bridges the native project engine with the debug adapter protocol for interactive, project-aware debug target selection.
+#+begin_src emacs-lisp
+(use-package projection-dape
+  :ensure nil
+  :defer t
+  :after (projection dape)
+  :commands (projection-dape))
+#+end_src
+
 *** DONE General Keybindings
 Routes centralized leader keybindings for project operations, mirroring Doom Emacs mnemonics.
 #+begin_src emacs-lisp
@@ -3997,6 +4007,7 @@ Routes centralized leader keybindings for project operations, mirroring Doom Ema
   "p b" '(consult-project-buffer :wk "Project buffers")
   "p s" '(consult-ripgrep :wk "Search project")
   "p d" '(project-dired :wk "Dired root")
+  "p D" '(projection-dape :wk "Debug project")
   "p e" '(project-eshell :wk "Eshell")
   "p S" '(project-shell :wk "Shell")
   "p k" '(ar/project-kill-buffers :wk "Kill buffers")
@@ -4058,6 +4069,7 @@ Extends the native tab container with strict buffer isolation, workspace-aware m
                              "^\\*eldoc-childframe\\*$"
                              "^\\*Dirvish\\*$"
                              "^\\*Treemacs\\*$"
+                             "^\\*dape-info.*\\*$"
                              "^ "))
   ;; Doom Parity: Protect unsaved code from accidental data loss, but aggressively kill ephemeral buffers.
   (bufferlo-kill-modified-buffers-policy 'retain-modified-kill-without-file-name)
@@ -6677,6 +6689,13 @@ Vim motions and operator bindings for org-agenda buffers.
   (evil-org-agenda-set-keys))
 #+end_src
 
+** DONE Org Block Wrap
+#+begin_src emacs-lisp
+(use-package org-block-wrap
+  :ensure (:host gitlab :repo "vegasharmon/org-block-wrap")
+  :hook (org-mode . org-block-wrap-mode))
+#+end_src
+
 ** TODO Keybindings
 Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motions, and the complete 25-package Denote ecosystem matrix.
 #+begin_src emacs-lisp
@@ -7321,7 +7340,7 @@ Enables multiple cursors for simultaneous editing across arbitrary and rectangul
 #+end_src
 
 
-** TODO Dape
+** DONE Dape
 Provides native debugging with inline variable hints, persistent breakpoints, and remote debugging support.
 #+begin_src emacs-lisp
 (use-package dape
@@ -7339,8 +7358,6 @@ Provides native debugging with inline variable hints, persistent breakpoints, an
              dape-breakpoint-log
              dape-breakpoint-expression
              dape-breakpoint-hits
-             dape-breakpoint-condition
-             dape-breakpoint-disable
              dape-evaluate-expression
              dape-watch-dwim
              dape-info
@@ -7373,13 +7390,13 @@ Provides native debugging with inline variable hints, persistent breakpoints, an
   ;; Line-level stepping granularity.
   (dape-stepping-granularity 'line)
   ;; Adapter response timeout in seconds.
-  (dape-timeout 5)
+  (dape-request-timeout 5)
   ;; Configuration hints in minibuffer.
   (dape-minibuffer-hint t)
   ;; Echo runInTerminal output to REPL.
   (dape-repl-echo-shell-output t)
   ;; Dash-form config parsing.
-  (dape-history-use-dash-form t)
+  (dape-history-add 'shell-like)
   ;; Route breakpoint persistence to no-littering var directory.
   (dape-default-breakpoints-file (no-littering-expand-var-file-name "dape/breakpoints.eld"))
   ;; Render inlay hints for 10 lines surrounding the stopped stack frame.
@@ -7442,18 +7459,6 @@ Provides native debugging with inline variable hints, persistent breakpoints, an
                  (window-height . 0.25)
                  (window-parameters (no-delete-other-windows . t))))
 
-  ;; Evil State Management
-  (evil-set-initial-state 'dape-repl-mode 'insert)
-  (dolist (mode '(dape-memory-mode
-                  dape-info-scope-mode
-                  dape-info-watch-mode
-                  dape-info-stack-mode
-                  dape-info-modules-mode
-                  dape-info-sources-mode
-                  dape-info-breakpoints-mode
-                  dape-info-threads-mode))
-    (evil-set-initial-state mode 'normal))
-
   ;; Transient Dashboard (Replacing dap-hydra)
   (with-eval-after-load 'transient
     (defun ar/dape-title ()
@@ -7466,38 +7471,38 @@ Provides native debugging with inline variable hints, persistent breakpoints, an
     (transient-define-prefix ar/toggles-dape ()
       "Debugger"
       [:description ar/dape-title
-       ["Session"
-        ("S" "start" dape :transient t)
-        ("q" "quit" dape-quit)
-        ("k" "kill" dape-kill)
-        ("r" "restart" dape-restart :transient t)
-        ("R" "restart frame" dape-restart-frame :transient t)]
-       ["Navigation"
-        ("n" "next" dape-next :transient t)
-        ("s" "step in" dape-step-in :transient t)
-        ("o" "step out" dape-step-out :transient t)
-        ("c" "continue" dape-continue :transient t)
-        ("p" "pause" dape-pause :transient t)
-        ("u" "until" dape-until :transient t)]
-       ["Breakpoints"
-        ("b" "toggle" dape-breakpoint-toggle :transient t)
-        ("B" "clear all" dape-breakpoint-remove-all :transient t)
-        ("l" "log" dape-breakpoint-log :transient t)
-        ("h" "hits" dape-breakpoint-hits :transient t)
-        ("C" "condition" dape-breakpoint-condition :transient t)
-        ("D" "disable" dape-breakpoint-disable :transient t)]
-       ["Evaluation"
-        ("e" "eval" dape-evaluate-expression :transient t)
-        ("w" "watch" dape-watch-dwim :transient t)]
-       ["Info Panels"
-        ("i" "info" dape-info :transient t)
-        ("t" "threads" dape-select-thread :transient t)
-        ("F" "stack" dape-select-stack :transient t)
-        ("m" "repl" dape-repl :transient t)
-        ("M" "memory" dape-memory :transient t)
-        ("A" "disasm" dape-disassemble :transient t)]
-       ["Exit"
-        ("<escape>" "" transient-quit-one :format " ")]])))
+		    ["Session"
+		     ("S" "start" dape :transient t)
+		     ("P" "project" projection-dape :transient t)
+		     ("q" "quit" dape-quit)
+		     ("k" "kill" dape-kill)
+		     ("r" "restart" dape-restart :transient t)
+		     ("R" "restart frame" dape-restart-frame :transient t)]
+		    ["Navigation"
+		     ("n" "next" dape-next :transient t)
+		     ("s" "step in" dape-step-in :transient t)
+		     ("o" "step out" dape-step-out :transient t)
+		     ("c" "continue" dape-continue :transient t)
+		     ("p" "pause" dape-pause :transient t)
+		     ("u" "until" dape-until :transient t)]
+		    ["Breakpoints"
+		     ("b" "toggle" dape-breakpoint-toggle :transient t)
+		     ("B" "clear all" dape-breakpoint-remove-all :transient t)
+		     ("l" "log" dape-breakpoint-log :transient t)
+		     ("h" "hits" dape-breakpoint-hits :transient t)
+		     ("C" "condition" dape-breakpoint-expression :transient t)]
+		    ["Evaluation"
+		     ("e" "eval" dape-evaluate-expression :transient t)
+		     ("w" "watch" dape-watch-dwim :transient t)]
+		    ["Info Panels"
+		     ("i" "info" dape-info :transient t)
+		     ("t" "threads" dape-select-thread :transient t)
+		     ("F" "stack" dape-select-stack :transient t)
+		     ("m" "repl" dape-repl :transient t)
+		     ("M" "memory" dape-memory :transient t)
+		     ("A" "disasm" dape-disassemble :transient t)]
+		    ["Exit"
+		     ("<escape>" "" transient-quit-one :format " ")]])))
 #+end_src
 
 
@@ -7610,9 +7615,9 @@ Consolidated keybindings for Development Tools packages and commands only.
   "c v A" '(evil-mc-make-cursor-in-visual-selection-end :wk "Cursors in selection (end)"))
 
 (general-define-key
-  :states 'visual
-  "C-S-<down>" #'evil-mc-make-cursor-move-next-line
-  "C-S-<up>"   #'evil-mc-make-cursor-move-prev-line)
+ :states 'visual
+ "C-S-<down>" #'evil-mc-make-cursor-move-next-line
+ "C-S-<up>"   #'evil-mc-make-cursor-move-prev-line)
 
 (ar/global-leader
  "f R" '(ar/eglot-rename-file :wk "Rename file (LSP aware)"))
@@ -7624,6 +7629,7 @@ Consolidated keybindings for Development Tools packages and commands only.
  "d"   '(:ignore t :wk "debug")
  "d d" '(ar/toggles-dape :wk "Debug menu")
  "d S" '(dape :wk "Start debugging")
+ "d P" '(projection-dape :wk "Debug project")
  "d b" '(dape-breakpoint-toggle :wk "Toggle breakpoint")
  "d n" '(dape-next :wk "Next")
  "d s" '(dape-step-in :wk "Step in")
@@ -7640,8 +7646,7 @@ Consolidated keybindings for Development Tools packages and commands only.
  "d B" '(dape-breakpoint-remove-all :wk "Clear all breakpoints")
  "d l" '(dape-breakpoint-log :wk "Log breakpoint")
  "d h" '(dape-breakpoint-hits :wk "Hit condition")
- "d C" '(dape-breakpoint-condition :wk "Condition")
- "d D" '(dape-breakpoint-disable :wk "Disable breakpoint")
+ "d C" '(dape-breakpoint-expression :wk "Condition/Expression")
  "d I" '(dape-info :wk "Toggle info panels")
  "d T" '(dape-select-thread :wk "Select thread")
  "d F" '(dape-select-stack :wk "Select stack frame")
