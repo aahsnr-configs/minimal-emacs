@@ -7434,10 +7434,25 @@ Provides native debugging with inline variable hints, persistent breakpoints, an
                  (side . right)
                  (window-width . 0.35)
                  (window-parameters (no-delete-other-windows . t))))
+  ;; Route standard compilation buffers (spawned by dape-compile-function) to bottom drawer.
+  (add-to-list 'display-buffer-alist
+               '("\\*compilation\\*"
+                 (display-buffer-in-side-window)
+                 (side . bottom)
+                 (window-height . 0.25)
+                 (window-parameters (no-delete-other-windows . t))))
 
   ;; Evil State Management
-  (evil-set-initial-state 'dape-memory-mode 'normal)
   (evil-set-initial-state 'dape-repl-mode 'insert)
+  (dolist (mode '(dape-memory-mode
+                  dape-info-scope-mode
+                  dape-info-watch-mode
+                  dape-info-stack-mode
+                  dape-info-modules-mode
+                  dape-info-sources-mode
+                  dape-info-breakpoints-mode
+                  dape-info-threads-mode))
+    (evil-set-initial-state mode 'normal))
 
   ;; Transient Dashboard (Replacing dap-hydra)
   (with-eval-after-load 'transient
@@ -7484,7 +7499,6 @@ Provides native debugging with inline variable hints, persistent breakpoints, an
        ["Exit"
         ("<escape>" "" transient-quit-one :format " ")]])))
 #+end_src
-
 
 
 ** TODO Direnv
