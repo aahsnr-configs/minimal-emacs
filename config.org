@@ -3788,11 +3788,11 @@ Automatically cleans up inactive, buried buffers to prevent memory bloat during 
   (buffer-terminator-interval (* 10 60))
   :config
   ;; Protect workspace-local buffers from termination when bufferlo is active.
-  (with-eval-after-load 'bufferlo
-    (add-to-list 'buffer-terminator-exceptions
-                 (lambda (buf)
-                   (and (bound-and-true-p bufferlo-mode)
-                        (memq buf (bufferlo-buffer-list))))))
+  ;; (with-eval-after-load 'bufferlo
+  ;;   (add-to-list 'buffer-terminator-exceptions
+  ;;                (lambda (buf)
+  ;;                  (and (bound-and-true-p bufferlo-mode)
+  ;;                       (memq buf (bufferlo-buffer-list))))))
   ;; Elpaca natively intercepts `:config` for external packages, wrapping it in an async callback.
   ;; Omitting `:defer t` guarantees the background timer initializes safely post-build.
   (buffer-terminator-mode 1))
@@ -3932,7 +3932,6 @@ Provides wrapper functions for rapid configuration navigation, frictionless work
 Extends the native workspace detector with project-type-aware build menus, intelligent file jumping, and multi-target compilation.
 #+begin_src emacs-lisp
 (use-package projection
-  :ensure (projection :host github :repo "mohkale/projection" :files ("*.el"))
   :defer t
   :after project
   :commands

@@ -281,6 +281,16 @@
 
 Similar ideas like above can be extended to make the echo area more useful to core emacs libraries like eldoc, imenu, treesit, etc. There are numerous clever ways you can make the echo area extremely useful for basic information without relying on external packages like org-contrib. You need to utilize emacs's C-level optimizations, ast etc, to build org-eldoc from scratch but also utilize the intelligent design of breadcrumb. Search the web and think longer for these tasks. Re-ingest all the files you need to come up with a new plan from scratch.
 
+---
+
+Now implement pillars 5 through 7 and come up with a comprehensive and detailed plan. Then explain everything to me in detail.
+
+---
+
+---
+
+---
+
 ## Python script to build and install emacs from source
 
 - Write a python script to build and install emacs from source. It will specifically install emacs-pretest package for now until emacs 31 has been released. It must have the following features and functionalities:
