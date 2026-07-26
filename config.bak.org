@@ -351,7 +351,6 @@ Quality-of-life settings, safety guards, and core minor modes. Disables unused V
   (add-to-list 'auto-mode-alist pair))
 #+end_src
 
-
 ** DONE Repeat Mode
 Enables native sticky-key repetition for debugging and spatial commands while suppressing echo area noise.
 #+begin_src emacs-lisp
@@ -4609,10 +4608,7 @@ Supplies async search, directory navigation, and live preview commands.
   ;; Configures hidden files and .git exclusion for ripgrep and find.
   (setq consult-ripgrep-args "rg --null --line-buffered --color=never --max-columns=1000 --path-separator / --smart-case --no-heading --line-number --hidden --glob '!.git'"
         consult-find-args "find . -not -path '*/.git/*'")
-  ;; Allows hl-todo-mode during live previews.
-  (with-eval-after-load 'hl-todo
-    (add-to-list 'consult-preview-allowed-hooks 'hl-todo-mode)
-    (add-to-list 'consult-preview-allowed-hooks 'global-hl-todo-mode))
+
   ;; Configures preview debouncing per command category.
   (consult-customize
    consult-line consult-line-multi consult-imenu consult-imenu-multi
@@ -7655,9 +7651,7 @@ Consolidated keybindings for Development Tools packages and commands only.
 #+end_src
 
 ** DONE Eval Overlay
-Universal evaluation result display engine adapted from the Doom Emacs
-=tools/eval +overlay= module. Routes quickrun output through a three-tier
-display system: eros inline overlays for short results (≤2 lines), posframe childframes for medium results (3–20 lines), and a bottom popup buffer for long output (>20 lines). Primarily targets Python buffers but supports all quickrun languages. Uses =quickrun-output-only= to suppress header/footer noise at the source, and =:filter-return= advice on the quickrun sentinel to intercept output asynchronously.
+Routes code evaluation results to inline overlays, floating childframes, or bottom drawers based on output length.
 #+begin_src emacs-lisp
 (use-package eros
   :defer t
@@ -7668,7 +7662,9 @@ display system: eros inline overlays for short results (≤2 lines), posframe ch
 
 (use-package quickrun
   :defer t
-  :commands (quickrun quickrun-region quickrun-replace-region)
+  :commands (quickrun
+             quickrun-region
+             quickrun-replace-region)
   :custom
   (quickrun-focus-p nil)
   (quickrun-timeout-seconds 15))
@@ -7677,6 +7673,7 @@ display system: eros inline overlays for short results (≤2 lines), posframe ch
   :ensure nil
   :after (posframe eros quickrun)
   :custom
+  ;; Routing thresholds for inline overlays, childframes, and bottom popups.
   (eval-overlay-inline-max-lines 2)
   (eval-overlay-inline-max-width 80)
   (eval-overlay-posframe-max-lines 20)
@@ -7686,7 +7683,7 @@ display system: eros inline overlays for short results (≤2 lines), posframe ch
   :config
   (eval-overlay-mode 1))
 
-;; Eval Overlay Keybindings (SPC e)
+;; Eval operations (SPC e)
 (ar/global-leader
   "e"   '(:ignore t :wk "eval")
   "e e" '(eval-overlay-region-or-buffer :wk "Eval region/buffer")
@@ -7696,6 +7693,7 @@ display system: eros inline overlays for short results (≤2 lines), posframe ch
   "e R" '(eval-overlay-region-and-replace :wk "Eval & replace")
   "e d" '(eval-overlay-dismiss :wk "Dismiss result"))
 #+end_src
+
 
 * DONE Contextual Sidebars
 Persistent side windows displaying dynamic metadata, backlinks, and bibliography context for the active buffer.
@@ -7751,45 +7749,58 @@ Injects bibliography abstracts and formatted references into the universal sidec
 #+end_src
 
 
-* TODO Highlight TODOs
-** TODO hl-todo
+* DONE Highlight TODOs
+** DONE hl-todo
+Highlights and navigates TODO keywords across buffers with integrated flymake diagnostics.
 #+begin_src emacs-lisp
 (use-package hl-todo
   :defer t
-  :commands (hl-todo-rg-project
-             hl-todo-rgrep
-             hl-todo-next
+  :commands (hl-todo-next
              hl-todo-previous
-             hl-todo-occur)
+             hl-todo-occur
+             hl-todo-rgrep
+             ar/hl-todo-rg-project)
+  :bind (:map hl-todo-mode-map
+         ("C-c n" . hl-todo-next)
+         ("C-c p" . hl-todo-previous)
+         ("C-c i" . hl-todo-insert))
   :custom-face
-  (hl-todo ((t (:inherit default :height 0.9 :width condensed :weight bold :underline nil :inverse-video nil))))
-
-  :hook ((after-init . global-hl-todo-mode)
-         (org-mode . hl-todo-mode))
-
+  (hl-todo ((t (:inherit font-lock-keyword-face :weight bold))))
   :custom
-  (hl-todo-require-punctuation t)
-  (hl-todo-highlight-punctuation "")
-
+  (hl-todo-require-punctuation nil)
+  (hl-todo-highlight-punctuation ":!")
+  (hl-todo-keyword-faces
+   '(("TODO"       . "#e0af68")
+     ("COMMENT"    . "#e0af68")
+     ("FIXME"      . "#f7768e")
+     ("BUG"        . "#f7768e")
+     ("ISSUE"      . "#f7768e")
+     ("PROG"       . "#7aa2f7")
+     ("TRICK"      . "#ff9e64")
+     ("WORKAROUND" . "#ff9e64")
+     ("BENCHMARK"  . "#9ece6a")
+     ("REVIEW"     . "#7dcfff")
+     ("NOTE"       . "#bb9af7")
+     ("DEPRECATED" . "#73daca")
+     ("HACK"       . "#db4b4b")
+     ("DEBUG"      . "#e0af68")
+     ("STUB"       . "#e0af68")))
   :config
-  (setq hl-todo-keyword-faces
-        '(("TODO"       . "#e0af68")
-          ("COMMENT"    . "#e0af68")
-          ("FIXME"      . "#f7768e")
-          ("BUG"        . "#f7768e")
-          ("ISSUE"      . "#f7768e")
-          ("PROG"       . "#7aa2f7")
-          ("TRICK"      . "#ff9e64")
-          ("WORKAROUND" . "#ff9e64")
-          ("BENCHMARK"  . "#9ece6a")
-          ("REVIEW"     . "#7dcfff")
-          ("NOTE"       . "#bb9af7")
-          ("DEPRECATED" . "#73daca")
-          ("HACK"       . "#db4b4b")
-          ("DEBUG"      . "#e0af68")
-          ("STUB"       . "#e0af68")))
+  ;; Activate the global minor mode directly per Elpaca load-order physics.
+  (global-hl-todo-mode 1)
 
-  (defun hl-todo-rg-project ()
+  ;; Inject hl-todo diagnostics into the native flymake backend pipeline buffer-locally.
+  (add-hook 'hl-todo-mode-hook
+            (lambda () (add-hook 'flymake-diagnostic-functions #'hl-todo-flymake nil t)))
+
+  ;; Safe registration of consult preview hooks.
+  (with-eval-after-load 'consult
+    (when (boundp 'consult-preview-allowed-hooks)
+      (add-to-list 'consult-preview-allowed-hooks 'hl-todo-mode)
+      (add-to-list 'consult-preview-allowed-hooks 'global-hl-todo-mode)))
+
+  (defun ar/hl-todo-rg-project ()
+    "Search for TODO keywords across the current project using ripgrep."
     (interactive)
     (let ((regexp (concat "\\b(" (string-join (mapcar #'car hl-todo-keyword-faces) "|") ")\\b")))
       (cond
@@ -7798,114 +7809,78 @@ Injects bibliography abstracts and formatted references into the universal sidec
        ((fboundp 'hl-todo-rgrep)
         (hl-todo-rgrep))
        (t
-        (user-error "Neither consult-ripgrep nor hl-todo-rgrep is available")))))
-
-  ;; Safe registration of consult preview hooks
-  (with-eval-after-load 'consult
-    (when (boundp 'consult-preview-allowed-hooks)
-      (add-to-list 'consult-preview-allowed-hooks 'hl-todo-mode)
-      (add-to-list 'consult-preview-allowed-hooks 'global-hl-todo-mode))))
+        (user-error "Neither consult-ripgrep nor hl-todo-rgrep is available"))))))
 #+end_src
 
-** TODO flymake todo
-#+begin_src emacs-lisp
-;; (use-package flycheck-hl-todo
-;;   :defer 5 ; Need to be initialized after the rest of checkers
-;;   :vc (:url "https://github.com/alvarogonzalezsotillo/flycheck-hl-todo")
-;;   :config
-;;   (flycheck-hl-todo-setup))
-#+end_src
-
-** TODO consult-todo
+** DONE consult-todo
+Upgrades hl-todo navigation with minibuffer narrowing, live previews, and project-scoped async searching.
 #+begin_src emacs-lisp
 (use-package consult-todo
   :defer t
-  :commands (consult-todo consult-todo-project consult-todo-all)
   :after (consult hl-todo)
-
   :custom
-  ;; Other missing keywords go under 'other' category
+  ;; Map narrowing characters to the 15 custom hl-todo keywords.
+  (consult-todo-narrow '((?t . "TODO")
+                         (?c . "COMMENT")
+                         (?f . "FIXME")
+                         (?b . "BUG")
+                         (?i . "ISSUE")
+                         (?p . "PROG")
+                         (?r . "TRICK")
+                         (?w . "WORKAROUND")
+                         (?B . "BENCHMARK")
+                         (?R . "REVIEW")
+                         (?n . "NOTE")
+                         (?d . "DEPRECATED")
+                         (?h . "HACK")
+                         (?D . "DEBUG")
+                         (?s . "STUB")))
+  ;; Route uncategorized keywords under the 'o' character.
   (consult-todo-other '(?o . "OTHER"))
-
-  ;; Only search keywords in comments (recommended for code files)
-  (consult-todo-only-comment t)
-
-  ;; Cache threshold for large projects (in seconds)
+  ;; Disable comment-only restriction to include Org headings and Markdown prose.
+  (consult-todo-only-comment nil)
+  ;; Enable debounced live buffer previews for project searches.
+  (consult-todo-dir-preview-key '(:debounce 0.2 any))
+  ;; Cache threshold for large project greps in seconds.
   (consult-todo-cache-threshold 5.0))
 #+end_src
 
-** TODO magit-todos
+** DONE magit-todos
+Injects project-wide TODOs into the Magit status buffer and highlights keywords in commit logs.
 #+begin_src emacs-lisp
 (use-package magit-todos
   :defer t
   :after magit
   :hook (magit-mode . magit-todos-mode)
-
+  :custom
+  ;; Exclude build artifacts, dependencies, and minified files from scanning.
+  (magit-todos-exclude-globs '("*.map" "*.min.*" ".git/" "node_modules/" "dist/" "build/" "vendor/"))
+  ;; Restrict scanning to 1 level below repo root to prevent I/O latency in massive monorepos.
+  ;; Set to `nil` for unlimited depth.
+  (magit-todos-depth 1)
   :config
-  (add-hook 'magit-log-wash-summary-hook
-            #'hl-todo-search-and-highlight t)
-  (add-hook 'magit-revision-wash-message-hook
-            #'hl-todo-search-and-highlight t)
-
-  ;; Scanner selection - prefer ripgrep for speed
-  (setq magit-todos-scanner
-        (if (executable-find "rg")
-            'magit-todos--scan-with-rg
-          'magit-todos--scan-with-git-grep))
-
-  ;; Keywords list (should match hl-todo-keyword-faces)
-  (setq magit-todos-keywords-list
-        '("TODO" "FIXME" "BUG" "ISSUE" "PROG" "TRICK" "WORKAROUND"
-          "BENCHMARK" "REVIEW" "NOTE" "DEPRECATED" "HACK" "DEBUG" "STUB"))
-
-  ;; Keyword suffix pattern (matches hl-todo configuration)
-  (setq magit-todos-keyword-suffix ":")
-
-  ;; Exclude common non-source directories
-  (setq magit-todos-exclude-globs
-        '("*.map" "*.min.*" ".git/" "node_modules/" "dist/" "build/" "vendor/"))
-
-  ;; Group by keyword by default
-  (setq magit-todos-group-by
-        '(magit-todos-item-keyword magit-todos-item-filename))
-
-  ;; Fontify keyword headers with Tokyo Night colors
-  (setq magit-todos-fontify-keyword-headers t)
-
-  ;; Insert the TODO section after the bottom
-  (setq magit-todos-insert-after '(bottom))
-
-  ;; Depth for grouping
-  (setq magit-todos-depth 1)
-
-  ;; Auto-group items threshold
-  (setq magit-todos-auto-group-items 20)
-
-  ;; Don't update remote repositories automatically (performance)
-  (setq magit-todos-update-remote nil)
-
-  ;; Faces for TODO keywords in magit-todos (Tokyo Night colors)
-  (custom-set-faces
-   '(magit-todos-item ((t (:inherit magit-section-secondary-heading))))
-   '(hl-todo-TODO ((t (:foreground "#e0af68" :weight bold))))
-   '(hl-todo-FIXME ((t (:foreground "#f7768e" :weight bold))))
-   '(hl-todo-BUG ((t (:foreground "#f7768e" :weight bold))))
-   '(hl-todo-ISSUE ((t (:foreground "#f7768e" :weight bold))))
-   '(hl-todo-PROG ((t (:foreground "#7aa2f7" :weight bold))))
-   '(hl-todo-TRICK ((t (:foreground "#ff9e64" :weight bold))))
-   '(hl-todo-WORKAROUND ((t (:foreground "#ff9e64" :weight bold))))
-   '(hl-todo-BENCHMARK ((t (:foreground "#9ece6a" :weight bold))))
-   '(hl-todo-REVIEW ((t (:foreground "#7dcfff" :weight bold))))
-   '(hl-todo-NOTE ((t (:foreground "#bb9af7" :weight bold))))
-   '(hl-todo-DEPRECATED ((t (:foreground "#73daca" :weight bold))))
-   '(hl-todo-HACK ((t (:foreground "#db4b4b" :weight bold))))
-   '(hl-todo-DEBUG ((t (:foreground "#e0af68" :weight bold))))
-   '(hl-todo-STUB ((t (:foreground "#e0af68" :weight bold))))))
+  ;;Highlight TODO keywords in commit summaries and revision messages.
+  (add-hook 'magit-log-wash-summary-hook #'hl-todo-search-and-highlight t)
+  (add-hook 'magit-revision-wash-message-hook #'hl-todo-search-and-highlight t))
 #+end_src
 
-#+RESULTS:
-| magit-todos-mode | forge-set-buffer-repository | doom-disable-line-numbers-h | +modeline-hide-in-non-status-buffer-h | gptel-magit-install | forge-bug-reference-setup |
+** DONE Keybindings
+Routes global search commands and local navigation for the TODO ecosystem.
+#+begin_src emacs-lisp
+;; Global leader (SPC s) for buffer and project TODO searches.
+(ar/global-leader
+  "s t" '(hl-todo-occur :wk "Todo list (buffer)")
+  "s T" '(ar/hl-todo-rg-project :wk "Todo in project (rg)")
+  "s C" '(consult-todo :wk "Todo list (consult)")
+  "s P" '(consult-todo-project :wk "Todo in project (consult)"))
 
+;; Local leader (SPC m) for hl-todo navigation in programming and text buffers.
+(ar/local-leader
+  :keymaps 'hl-todo-mode-map
+  "n" '(hl-todo-next :wk "Next todo")
+  "p" '(hl-todo-previous :wk "Previous todo")
+  "i" '(hl-todo-insert :wk "Insert todo"))
+#+end_src
 
 
 * TODO Snippet Engine
@@ -8140,6 +8115,7 @@ Applies the Tokyo Night color palette to all Markdown structural elements for vi
    '(markdown-ts-in-code-block ((t (:background "#292e42" :extend t))))
    '(markdown-ts-in-table ((t (:background "#292e42" :extend t))))))
 #+end_src
+
 ** DONE Modal Editing
 Sets up Evil navigation, Unimpaired bracket motions, and view-mode keymaps for Vim-style Markdown editing.
 #+begin_src emacs-lisp
@@ -8164,6 +8140,7 @@ Sets up Evil navigation, Unimpaired bracket motions, and view-mode keymaps for V
   (evil-define-key 'normal markdown-ts-view-mode-map
     "q" #'quit-window))
 #+end_src
+
 ** DONE Language Server
 Connects the Marksman language server for completion, diagnostics, rename, and cross-reference navigation in Markdown buffers.
 #+begin_src emacs-lisp
@@ -9926,9 +9903,7 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
   "s m" '(consult-mark :wk "Mark ring")
   "s e" '(consult-isearch-history :wk "Search history")
   "s r" '(vertico-repeat :wk "Repeat last search")
-  "s y" '(consult-yasnippet :wk "Yasnippet")
-  "s t" '(hl-todo-occur :wk "Todo list")
-  "s T" '(hl-todo-rg-project :wk "Todo in project"))
+  "s y" '(consult-yasnippet :wk "Yasnippet"))
 
 
 ;; ;; Open operations (SPC o)

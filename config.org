@@ -351,7 +351,6 @@ Quality-of-life settings, safety guards, and core minor modes. Disables unused V
   (add-to-list 'auto-mode-alist pair))
 #+end_src
 
-
 ** DONE Repeat Mode
 Enables native sticky-key repetition for debugging and spatial commands while suppressing echo area noise.
 #+begin_src emacs-lisp
@@ -8229,627 +8228,9 @@ Routes all Markdown editing, viewing, table, and structure commands through the 
 #+end_src
 
 
-* TODO LaTeX Writing Environment
-** TODO Utility Functions
-#+begin_src emacs-lisp
-(defun ar/latex-indent-item-fn ()
-  "Indent LaTeX itemize/enumerate/description environments."
-  (save-match-data
-    (let* ((re-beg "\\\\begin{")
-           (re-end "\\\\end{")
-           (re-env "\\(?:itemize\\|enumerate\\|description\\)")
-           (indent (save-excursion
-                     (when (looking-at (concat re-beg re-env "}"))
-                       (end-of-line))
-                     (LaTeX-find-matching-begin)
-                     (+ LaTeX-item-indent (current-column))))
-           (contin LaTeX-indent-level))
-      (cond ((looking-at (concat re-beg re-env "}"))
-             (or (save-excursion
-                   (beginning-of-line)
-                   (ignore-errors
-                     (LaTeX-find-matching-begin)
-                     (+ (current-column)
-                        LaTeX-item-indent
-                        LaTeX-indent-level
-                        (if (looking-at (concat re-beg re-env "}"))
-                            contin 0))))
-                 indent))
-            ((looking-at (concat re-end re-env "}"))
-             (save-excursion
-               (beginning-of-line)
-               (ignore-errors
-                 (LaTeX-find-matching-begin)
-                 (current-column))))
-            ((looking-at "\\\\item")
-             (+ LaTeX-indent-level indent))
-            (t (+ contin LaTeX-indent-level indent))))))
-
-(defun ar/latex-fold-last-macro (&rest _)
-  "Auto-fold the last LaTeX macro before point."
-  (when (and (derived-mode-p 'LaTeX-mode)
-             (bound-and-true-p TeX-fold-mode)
-             (fboundp 'TeX-fold-region))
-    (save-excursion
-      (let ((start (search-backward "\\" (line-beginning-position) t)))
-        (when start
-          (TeX-fold-region start (1+ (point))))))))
-
-(defun ar/latex-compile ()
-  "Compile current LaTeX buffer."
-  (interactive)
-  (cond
-   ((fboundp 'TeX-command-run-all)
-    (TeX-command-run-all nil))
-   ((fboundp 'TeX-command-master)
-    (TeX-command-master))
-   (t
-    (user-error "No LaTeX compilation command available"))))
-
-(defun ar/latex-find-master-file ()
-  "Find and visit master file."
-  (interactive)
-  (if-let ((master (and (fboundp 'TeX-master-file)
-                        (TeX-master-file))))
-      (find-file master)
-    (user-error "No master file found")))
-
-(defun ar/latex-view-output ()
-  "View compiled output."
-  (interactive)
-  (if (fboundp 'TeX-view)
-      (TeX-view)
-    (user-error "TeX-view function not available")))
-
-(defun ar/latex-fold-toggle ()
-  "Toggle folding of current element."
-  (interactive)
-  (if (not (bound-and-true-p TeX-fold-mode))
-      (user-error "TeX-fold-mode is not active")
-    (if (and (fboundp 'TeX-fold-item)
-             (fboundp 'TeX-fold-clearout-item))
-        (if (TeX-fold-item 'deep)
-            (message "Folded")
-          (TeX-fold-clearout-item)
-          (message "Unfolded"))
-      (user-error "TeX-fold functions not available"))))
-
-(defun ar/latex-fold-all ()
-  "Fold all elements in buffer."
-  (interactive)
-  (if (not (bound-and-true-p TeX-fold-mode))
-      (user-error "TeX-fold-mode is not active. Enable it with M-x TeX-fold-mode")
-    (if (fboundp 'TeX-fold-buffer)
-        (progn
-          (TeX-fold-buffer)
-          (message "Folded all elements"))
-      (user-error "TeX-fold-buffer function not available"))))
-
-(defun ar/latex-fold-clear ()
-  "Unfold all elements in buffer."
-  (interactive)
-  (if (not (bound-and-true-p TeX-fold-mode))
-      (user-error "TeX-fold-mode is not active")
-    (if (fboundp 'TeX-fold-clearout-buffer)
-        (progn
-          (TeX-fold-clearout-buffer)
-          (message "Unfolded all elements"))
-      (user-error "TeX-fold-clearout-buffer function not available"))))
-#+end_src
-
-** TODO Project Awareness
-#+begin_src emacs-lisp
-;; TODO: Replace this whole block with projectile alternative
-;; (defun ar/get-project-bibliographies ()
-;;   "Find .bib files in the current project root recursively.
-;; Works for both LaTeX and Org documents within a project."
-;;   (when-let* ((root (projectile-project-root)))
-;;     (directory-files-recursively root "\\.bib$")))
-
-;; (defun ar/setup-project-bibliography ()
-;;   "Create a references.bib file in the project root if it doesn't exist.
-;; This bibliography file can be used with both LaTeX and Org documents."
-;;   (interactive)
-;;   (if-let* ((root (projectile-acquire-root))
-;;             (bib-file (expand-file-name "references.bib" root)))
-;;       (if (file-exists-p bib-file)
-;;           (message "Bibliography already exists: %s" bib-file)
-;;         (with-temp-file bib-file
-;;           (insert "% Bibliography for " (file-name-nondirectory (directory-file-name root)) "\n")
-;;           (insert "% Created: " (format-time-string "%Y-%m-%d") "\n")
-;;           (insert "% This file can be used with both LaTeX and Org documents\n\n"))
-;;         (message "Created project bibliography: %s" bib-file))
-;;     (message "Not currently visiting a project.")))
-
-#+end_src
-
-** TODO Adaptive Wrap
-#+begin_src emacs-lisp
-(use-package adaptive-wrap
-  :defer t
-  :hook (LaTeX-mode . adaptive-wrap-prefix-mode)
-  :init (setq-default adaptive-wrap-extra-indent 0))
-#+end_src
-
-** TODO Core AUCTeX
-TODO: =add preview-auto.el from https://github.com/ultronozm/preview-auto.el=
-#+begin_src emacs-lisp
-(use-package tex
-  :defer t
-  :ensure auctex
-  :hook ((LaTeX-mode . visual-line-mode)
-         (LaTeX-mode . TeX-source-correlate-mode)
-         (LaTeX-mode . outline-minor-mode)
-         (LaTeX-mode . eglot-ensure))
-
-  :init
-  (setq jit-lock-chunk-size 4096)
-
-  :config
-  (setq TeX-engine 'luatex
-        TeX-parse-self t
-        TeX-auto-save t
-        TeX-auto-local ".auctex-auto"
-        TeX-style-local ".auctex-style"
-
-        ;; Source Correlation
-        TeX-source-correlate-mode t
-        TeX-source-correlate-method 'synctex
-        TeX-source-correlate-start-server nil
-
-        ;; Workflow
-        TeX-save-query nil
-        TeX-process-asynchronous t
-        TeX-display-help 'expert
-        TeX-master t
-
-        ;; Math Input
-        TeX-electric-math nil
-        TeX-electric-sub-and-superscript t
-
-        ;; Folding
-
-        TeX-fold-auto-reveal t
-
-        ;; Font Lock
-        font-latex-fontify-script 'invisible
-        font-latex-fontify-sectioning 'color
-
-        TeX-brace-indent-level 2)
-
-  ;; TeX Command list
-  (add-to-list 'TeX-command-list
-               '("LuaLaTeXmk"
-                 "latexmk -pdflua -pdflualatex='lualatex -shell-escape -interaction=nonstopmode' -f -outdir=%o %S"
-                 TeX-run-TeX nil t
-                 :help "Run latexmk with LuaLaTeX") t)
-
-  (add-to-list 'TeX-command-list
-               '("LaTeXmk-Watch"
-                 "latexmk -pvc -pdflua -pdflualatex='lualatex -shell-escape -interaction=nonstopmode' -outdir=%o %S"
-                 TeX-run-TeX nil t
-                 :help "Run latexmk in continuous preview mode") t)
-
-  (setq-default TeX-command-default "LuaLaTeXmk")
-
-  ;; Clean Intermediate Files
-  (setq TeX-clean-confirm nil)
-
-  ;; Post-Compilation & Mode Associations
-  (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer)
-  (add-to-list 'auto-mode-alist '("\\.map\\'" . TeX-mode))
-
-  ;; TeX-MODE-HOOK (ispell & fill-nobreak setup)
-  (add-hook 'TeX-mode-hook
-            (lambda ()
-              (setq-local ispell-parser 'tex)
-              (visual-line-mode 1)
-              (when (fboundp 'texmathp)
-                (setq-local fill-nobreak-predicate
-                            (cons #'texmathp fill-nobreak-predicate))))))
-#+end_src
-
-** TODO Flymake Integration
-#+begin_src emacs-lisp
-(with-eval-after-load 'tex
-  (with-eval-after-load 'flymake
-    (when (boundp 'LaTeX-flymake-chktex-options)
-      (setq LaTeX-flymake-chktex-options
-            '("-n2"   ; Disable "non-breaking space (~) should be used"
-              "-n8"   ; Disable "wrong length of dash"
-              "-n13"  ; Disable "Intersentence spacing"
-              "-n21"  ; Disable "This command might not be intended"
-              ))))
-
-  ;; Delayed flymake activation to prevent sentinel errors
-  (add-hook 'LaTeX-mode-hook
-            (lambda ()
-              (run-with-idle-timer 0.5 nil
-                                   (lambda ()
-                                     (when (and (derived-mode-p 'LaTeX-mode)
-                                                (not (bound-and-true-p flymake-mode)))
-                                       (flymake-mode 1)))))))
-#+end_src
-
-** TODO TeX Site
-#+begin_src emacs-lisp
-(with-eval-after-load 'tex-site
-  (TeX-modes-set 'TeX-modes TeX-modes))
-#+end_src
-
-** TODO Misc LaTeX
-#+begin_src emacs-lisp
-(with-eval-after-load 'latex
-  (setq LaTeX-clean-intermediate-suffixes
-        '("\\.aux" "\\.bbl" "\\.blg" "\\.brf" "\\.fot"
-          "\\.glo" "\\.gls" "\\.idx" "\\.ilg" "\\.ind"
-          "\\.lof" "\\.log" "\\.lot" "\\.nav" "\\.out"
-          "\\.snm" "\\.toc" "\\.url" "\\.synctex\\.gz"
-          "\\.fdb_latexmk" "\\.fls" "\\.xdv"
-          "-blx\\.bib" "\\.run\\.xml"))
-
-  (setq LaTeX-command-style '(("" "%(latex)")))
-
-  ;; Sectioning
-  (setq LaTeX-section-hook
-        '(LaTeX-section-heading
-          LaTeX-section-title
-          LaTeX-section-toc
-          LaTeX-section-section
-          LaTeX-section-label)
-        LaTeX-fill-break-at-separators nil
-        LaTeX-indent-level 2
-        LaTeX-item-indent 0)
-
-  (dolist (env '("itemize" "enumerate" "description"))
-    (add-to-list 'LaTeX-indent-environment-list
-                 `(,env ar/latex-indent-item-fn)))
-
-  (with-eval-after-load 'eglot
-    (add-to-list 'eglot-server-programs
-                 '(LaTeX-mode . ("texlab")))
-    (defun ar/latex-eglot-setup ()
-      "Optimize eglot for LaTeX buffers."
-      (setq-local eglot-events-buffer-size 0)
-      (setq-local eglot-sync-connect nil))
-
-    (add-hook 'LaTeX-mode-hook #'ar/latex-eglot-setup)))
-#+end_src
-
-** TODO TeX Folding
-
-#+begin_src emacs-lisp
-(use-package tex-fold
-  :ensure nil
-  :after tex
-  :hook (TeX-mode . ar/latex-fold-buffer-delayed)
-  :hook (TeX-mode . TeX-fold-mode)
-  :config
-  (setq TeX-fold-auto nil
-        TeX-fold-auto-reveal t)
-
-  (defun ar/latex-fold-buffer-delayed ()
-    "Fold buffer after idle delay."
-    (run-with-idle-timer 0 nil 'TeX-fold-buffer))
-
-  ;;(add-hook 'TeX-mode-hook #'ar/latex-fold-buffer-delayed)
-
-  ;; Fold after AUCTeX macro insertions
-  (add-hook 'TeX-fold-mode-hook
-            (lambda ()
-              (advice-add 'TeX-insert-macro :after #'ar/latex-fold-last-macro)))
-
-  ;; Fold after CDLaTeX macros
-  (with-eval-after-load 'cdlatex
-    (add-hook 'TeX-fold-mode-hook
-              (lambda ()
-                (advice-add 'cdlatex-math-symbol :after #'ar/latex-fold-last-macro)
-                (advice-add 'cdlatex-math-modify :after #'ar/latex-fold-last-macro))))
-
-  ;; Fold after snippet expansion
-  (with-eval-after-load 'yasnippet
-    (defun ar/latex-fold-snippet-contents ()
-      "Fold contents of last expanded snippet."
-      (when (and (derived-mode-p 'LaTeX-mode)
-                 (bound-and-true-p TeX-fold-mode)
-                 yas-snippet-beg
-                 yas-snippet-end)
-        (TeX-fold-region yas-snippet-beg yas-snippet-end)))
-
-    (add-hook 'yas-after-exit-snippet-hook #'ar/latex-fold-snippet-contents)))
-#+end_src
-
-** TODO Evil Integration
-#+begin_src emacs-lisp
-(use-package evil-tex
-  :defer t
-  :after (tex evil)
-  :hook (LaTeX-mode . evil-tex-mode))
-#+end_src
-
-** TODO Bibliography Management
-TODO: Uncomment when Project Management is setup
-#+begin_src emacs-lisp
-;; (use-package citeproc :defer t)
-
-;; (use-package citar
-;;   :defer t
-;;   :init
-;;   (setq citar-bibliography '("~/references.bib")
-;;         citar-library-paths '("~/Zotero/storage")
-;;         citar-symbols
-;;         `((file ,(nerd-icons-mdicon "nf-md-file_document") . " ")
-;;           (note ,(nerd-icons-mdicon "nf-md-note_text") . " ")
-;;           (link ,(nerd-icons-mdicon "nf-md-link") . " ")))
-
-;;   (defun ar/citar-set-local-bibliography ()
-;;     "Set buffer-local bibliography from project."
-;;     (when-let ((bibs (ar/get-project-bibliographies)))
-;;       (setq-local citar-bibliography bibs)
-;;       (setq-local org-cite-global-bibliography bibs)))
-
-;;   (add-hook 'LaTeX-mode-hook #'ar/citar-set-local-bibliography)
-;;   (add-hook 'org-mode-hook #'ar/citar-set-local-bibliography)
-
-;;   :config
-;;   (with-eval-after-load 'oc
-;;     (setq org-cite-insert-processor 'citar
-;;           org-cite-follow-processor 'citar
-;;           org-cite-activate-processor 'citar)))
-
-;; (use-package citar-embark
-;;   :defer t
-;;   :after (citar embark)
-;;   :config
-;;   (citar-embark-mode)
-;;   (with-eval-after-load 'embark
-;;     (add-to-list 'embark-keymap-alist '(citar-reference . citar-embark-map))))
-
-;; (with-eval-after-load 'oc
-;;   (setq org-cite-global-bibliography
-;;         (ensure-list
-;;          (or (bound-and-true-p citar-bibliography)
-;;              (bound-and-true-p bibtex-completion-bibliography)))
-;;         org-cite-export-processors '((latex natbib) (t csl))
-;;         org-support-shift-select t)
-;;   (require 'oc-natbib))
-
-;; (with-eval-after-load 'org
-;;   (require 'oc-csl))
-
-;; (use-package reftex
-;;   :ensure nil
-;;   :after tex
-;;   :hook (LaTeX-mode . reftex-mode)
-;;   :custom
-;;   (reftex-plug-into-AUCTeX t)
-;;   (reftex-default-bibliography nil)
-;;   (reftex-toc-split-windows-horizontally t)
-;;   (reftex-toc-split-windows-fraction 0.2))
-
-;; (use-package citar-denote
-;;   :defer t
-;;   :after (citar denote)
-;;   :custom
-;;   (citar-denote-subdir "literature")
-;;   :config
-;;   (citar-denote-mode 1))
-#+end_src
-
-** TODO Fast LaTeX Input
-TODO: =Use doom emacs configuration=
-#+begin_src emacs-lisp
-;; (use-package cdlatex
-;;   :defer t
-;;   :hook ((LaTeX-mode . cdlatex-mode)
-;;          (org-mode . org-cdlatex-mode))
-;;   :init
-;;   ;; Change the internal prefix variable.
-;;   ;; IMPORTANT: This primarily updates CDLaTeX's internal help/prompts to show '~'.
-;;   ;; It does NOT automatically update Org-mode's keybindings.
-;;   (setq cdlatex-math-symbol-prefix ?~)
-
-;;   :config
-;;   ;; --- 1. Fix for standard LaTeX Mode ---
-;;   ;; Unbind backtick (restore normal insertion for code blocks/elisp)
-;;   (define-key cdlatex-mode-map (kbd "`") nil)
-;;   ;; Bind tilde to the math symbol menu
-;;   (define-key cdlatex-mode-map (kbd "~") #'cdlatex-math-symbol)
-
-;;   ;; --- 2. Fix for Org Mode ---
-;;   ;; Org defines its own map in 'org.el', so we must modify it after org loads.
-;;   (with-eval-after-load 'org
-;;     ;; Unbind the hardcoded backtick in Org's CDLaTeX map
-;;     (define-key org-cdlatex-mode-map (kbd "`") nil)
-
-;;     ;; Bind tilde to Org's wrapper for the math symbol function
-;;     ;; We use 'org-cdlatex-math-symbol', not the raw 'cdlatex-math-symbol'
-;;     (define-key org-cdlatex-mode-map (kbd "~") #'org-cdlatex-math-symbol))
-
-;;   ;; --- 3. Customizations ---
-;;   (setq cdlatex-math-modify-alist
-;;         '((?B "\\mathbb" nil t nil nil)
-;;           (?C "\\mathcal" nil t nil nil)
-;;           (?F "\\mathfrak" nil t nil nil)
-;;           (?S "\\mathscr" nil t nil nil)))
-
-;;   (setq cdlatex-env-alist
-;;         '(("equation*" "\\begin{equation*}\n?\n\\end{equation*}" nil)
-;;           ("align*" "\\begin{align*}\n?\n\\end{align*}" nil)))
-
-;;   ;; Prevent dollar sign from automatically entering math mode check
-;;   (setq cdlatex-use-dollar-to-ensure-math nil)
-
-;;   ;; --- 4. Disable other overlapping keys ---
-;;   (define-key cdlatex-mode-map "$" nil)
-;;   (define-key cdlatex-mode-map "(" nil)
-;;   (define-key cdlatex-mode-map "{" nil)
-;;   (define-key cdlatex-mode-map "[" nil)
-;;   (define-key cdlatex-mode-map "^" nil)
-;;   (define-key cdlatex-mode-map "_" nil)
-;;   (define-key cdlatex-mode-map (kbd "TAB") nil)
-;;   (define-key cdlatex-mode-map [(control return)] nil))
-#+end_src
-
-** TODO Preview LaTeX
-TODO: =Determine the difference between this preview package and preview-auto from https://github.com/ultronozm/preview-auto.el=
-#+begin_src emacs-lisp
-(use-package preview
-  :ensure nil
-  :hook (LaTeX-mode . LaTeX-preview-setup)
-  :custom
-  (preview-auto-cache-preamble t)
-  (preview-fast-conversion t)
-  :config
-  (setq-default preview-scale 1.4
-                preview-scale-function
-                (lambda ()
-                  (* (/ 10.0 (face-attribute 'default :height))
-                     (face-attribute 'default :height)))))
-#+end_src
-
-** TODO Org Mode Integration
-#+begin_src emacs-lisp
-(with-eval-after-load 'org
-  (add-to-list 'org-preview-latex-process-alist
-               '(luamagick
-                 :programs ("lualatex" "magick")
-                 :description "pdf > png"
-                 :message "you need to install: lualatex and imagemagick."
-                 :use-xcolor t
-                 :image-input-type "pdf"
-                 :image-output-type "png"
-                 :image-size-adjust (1.0 . 1.0)
-                 :latex-compiler ("lualatex -interaction nonstopmode -output-directory %o %f")
-                 :image-converter ("magick convert -density 600 -antialias %f -trim -resize 20%% -sharpen 0x1.0 -quality 100 %O")))
-
-  (setq org-preview-latex-default-process 'luamagick)
-
-  (setq org-format-latex-options
-        (plist-put org-format-latex-options :scale 1.0))
-  (setq org-format-latex-options
-        (plist-put org-format-latex-options :foreground "#c0caf5"))
-  (setq org-format-latex-options
-        (plist-put org-format-latex-options :background "#1a1b26"))
-
-  (setq org-preview-latex-image-directory "ltximg/")
-
-  (setq org-latex-packages-alist
-        '(("" "fontspec" t ("lualatex" "xelatex"))
-          ("" "amsmath" t)
-          ("" "mathtools" t)
-          ("" "unicode-math" t ("lualatex" "xelatex")))))
-
-(use-package org-fragtog
-  :hook (org-mode . org-fragtog-mode)
-  :config
-  (setq org-fragtog-preview-delay 0.2))
-#+end_src
-
-** TODO Org LaTeX Classes
-#+begin_src emacs-lisp
-(with-eval-after-load 'ox-latex
-  (setq org-latex-compiler "lualatex")
-  (setq org-latex-pdf-process
-        '("latexmk -f -pdf -%latex -bibtex -interaction=nonstopmode -output-directory=%o %f"))
-  (add-to-list 'org-latex-classes
-               '("cas-dc"
-                 "\\documentclass{cas-dc}
-[NO-DEFAULT-PACKAGES]
-[PACKAGES]
-[EXTRA]"
-                 ("\\section{%s}" . "\\section*{%s}")
-                 ("\\subsection{%s}" . "\\subsection*{%s}")
-                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))))
-#+end_src
-
-** TODO Completions: LSP + AUCTeX + Company Integration
-=Determine=
-#+begin_src emacs-lisp
-;; (use-package company :defer t)
-;; (use-package company-math :defer t)
-;; (use-package company-auctex :defer t)
-
-;; --- Eglot Server Program Registration ---
-(with-eval-after-load 'eglot
-  (add-to-list 'eglot-server-programs
-               '((LaTeX-mode latex-mode)
-                 . ("texlab"))))
-
-;; (defun ar/latex-setup-completion ()
-;;   "Configure LaTeX completion: Eglot + AUCTeX + company-math via Cape.
-
-;; VERIFIED: cape-company-to-capf only converts backend functions.
-;; It does NOT activate company-mode - completely safe with Corfu."
-;;   (require 'cape)
-
-;;   ;; Convert company backends to CAPFs (does NOT enable company-mode)
-;;   (setq-local completion-at-point-functions
-;;               (list
-;;                ;; PRIMARY: Merge LSP + AUCTeX + Math
-;;                (cape-capf-super
-;;                 #'eglot-completion-at-point
-;;                 #'TeX--completion-at-point
-;;                 (cape-company-to-capf #'company-math-symbols-latex)
-;;                 (cape-company-to-capf #'company-auctex-macros))
-
-;;                ;; SECONDARY: Additional backends
-;;                (cape-company-to-capf #'company-auctex-environments)
-;;                #'cape-dabbrev
-;;                #'cape-file)))
-
-;; (add-hook 'LaTeX-mode-hook #'ar/latex-setup-completion)
-#+end_src
-
-** TODO LaTeX Keybindings
-#+begin_src emacs-lisp
-;; (with-eval-after-load 'tex
-;;   ;; Utility function keybindings
-;;   (define-key LaTeX-mode-map (kbd "C-c C-a") #'ar/latex-compile)
-;;   (define-key LaTeX-mode-map (kbd "C-c C-v") #'ar/latex-view-output)
-;;   (define-key LaTeX-mode-map (kbd "C-c C-^") #'ar/latex-find-master-file)
-
-;;   ;; Folding keybindings
-;;   (define-key LaTeX-mode-map (kbd "C-c C-o C-f") #'ar/latex-fold-toggle)
-;;   (define-key LaTeX-mode-map (kbd "C-c C-o C-b") #'ar/latex-fold-all)
-;;   (define-key LaTeX-mode-map (kbd "C-c C-o C-c") #'ar/latex-fold-clear))
-
-;; ;; Which-key integration
-;; (with-eval-after-load 'which-key
-;;   (which-key-add-major-mode-key-based-replacements 'LaTeX-mode
-;;     "C-c C-o" "folding"
-;;     "C-c C-o C-f" "toggle fold"
-;;     "C-c C-o C-b" "fold all"
-;;     "C-c C-o C-c" "clear folds"
-;;     "C-c C-a" "compile"
-;;     "C-c C-v" "view output"
-;;     "C-c C-^" "find master"))
-#+end_src
-
-** TODO Formatting
-#+begin_src emacs-lisp
-(with-eval-after-load 'apheleia
-  (push '(bibtex-tidy . ("bibtex-tidy"
-                         "--curly"        ; Enforce {} instead of ""
-                         "--numeric"      ; Standardize numbers/months
-                         "--align=14"     ; Align the '=' signs nicely
-                         "--blank-lines"  ; Ensure one blank line between entries
-                         "--sort=id"      ; Sort entries alphabetically by citation key
-                         "--duplicates"   ; Remove duplicate entries
-                         "--quiet"        ; Suppress CLI output
-                         "-"))
-        apheleia-formatters)
-
-  ;; 2. Map bibtex-mode to use bibtex-tidy instead of eglot
-  (setf (alist-get 'bibtex-mode apheleia-mode-alist) '(bibtex-tidy)))
-#+end_src
-
-
-
 
 * TODO Languages
 ** TODO Nix
-TODO: =Deal with later=
 #+begin_src emacs-lisp
 (use-package nix-mode
   :defer t
@@ -8865,10 +8246,9 @@ TODO: =Deal with later=
   :defer t
   :commands nix-update-fetch)
 
-;; TODO: Replace eglot with lsp-mode
-;; (with-eval-after-load 'eglot
-;;   (add-to-list 'eglot-server-programs
-;;                '((nix-mode nix-ts-mode) . ("nixd"))))
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               '((nix-mode nix-ts-mode) . ("nixd"))))
 
 ;; TODO: Add flycheck
 (with-eval-after-load 'apheleia
@@ -9608,7 +8988,7 @@ TODO: =Replace eglot with lsp-mode=
   :defer t
   :ensure nil
   :commands (winner-undo winner-redo)
-  :hook (after-init . winner-mode)
+  :hook (elpaca-after-init . winner-mode)
   :init (setq winner-boring-buffers '("*Completions*"
                                       "*Compile-Log*"
                                       "*inferior-lisp*"
@@ -9918,54 +9298,52 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
 ;;  "o P" '(popper-toggle :wk "Toggle popup"))
 
 ;; Help operations (SPC h)
-(ar/global-leader
-  "h" '(:ignore t :wk "help")
-  "h f" '(helpful-callable :wk "Describe function")
-  "h v" '(helpful-variable :wk "Describe variable")
-  "h k" '(helpful-key :wk "Describe key")
-  "h m" '(describe-mode :wk "Describe mode")
-  "h o" '(helpful-symbol :wk "Describe symbol")
-  "h c" '(helpful-command :wk "Describe command")
-  "h C" '(ar/show-char-info :wk "Char info")
-  "h ." '(helpful-at-point :wk "Describe at point")
-  "h i" '(info :wk "Info")
-  "h I" '(consult-info :wk "Consult info")
-  "h p" '(describe-package :wk "Describe package")
-  "h a" '(apropos :wk "Apropos")
-  "h w" '(woman :wk "Woman")
-  "h r" '(:ignore t :wk "reload")
-  "h r r" '(reload-init-file :wk "Reload config"))
+;; (ar/global-leader
+;;   "h" '(:ignore t :wk "help")
+;;   "h f" '(helpful-callable :wk "Describe function")
+;;   "h v" '(helpful-variable :wk "Describe variable")
+;;   "h k" '(helpful-key :wk "Describe key")
+;;   "h m" '(describe-mode :wk "Describe mode")
+;;   "h o" '(helpful-symbol :wk "Describe symbol")
+;;   "h c" '(helpful-command :wk "Describe command")
+;;   "h C" '(ar/show-char-info :wk "Char info")
+;;   "h ." '(helpful-at-point :wk "Describe at point")
+;;   "h i" '(info :wk "Info")
+;;   "h I" '(consult-info :wk "Consult info")
+;;   "h p" '(describe-package :wk "Describe package")
+;;   "h a" '(apropos :wk "Apropos")
+;;   "h w" '(woman :wk "Woman")
+;;   "h r" '(:ignore t :wk "reload")
+;;   "h r r" '(reload-init-file :wk "Reload config"))
 
 
-(ar/global-leader
-  "j" '(:ignore t :wk "jinx (spellcheck)")
-  "j c" '(jinx-correct :wk "Correct word at point")
-  "j n" '(jinx-next-error :wk "Go to next error")
-  "j p" '(jinx-previous-error :wk "Go to previous error")
-  "j s" '(jinx-suggest :wk "Show suggestions")
-  "j a" '(jinx-add-word-to-personal-dictionary :wk "Add to dictionary")
-  "j l" '(jinx-languages :wk "Select language")
-  "j t" '(jinx-toggle-checking :wk "Toggle checking in buffer"))
+;; (ar/global-leader
+;;   "j" '(:ignore t :wk "jinx (spellcheck)")
+;;   "j c" '(jinx-correct :wk "Correct word at point")
+;;   "j n" '(jinx-next-error :wk "Go to next error")
+;;   "j p" '(jinx-previous-error :wk "Go to previous error")
+;;   "j s" '(jinx-suggest :wk "Show suggestions")
+;;   "j a" '(jinx-add-word-to-personal-dictionary :wk "Add to dictionary")
+;;   "j l" '(jinx-languages :wk "Select language")
+;;   "j t" '(jinx-toggle-checking :wk "Toggle checking in buffer"))
 
 ;; Register/Bookmark operations (SPC r)
-(ar/global-leader
-  "r" '(:ignore t :wk "register/bookmark")
-  "r r" '(consult-register :wk "Registers")
-  "r s" '(consult-register-store :wk "Store register")
-  "r l" '(consult-register-load :wk "Load register")
-  "r b" '(consult-bookmark :wk "Bookmarks")
-  "r B" '(bookmark-set :wk "Set bookmark")
-  "r d" '(bookmark-delete :wk "Delete bookmark")
-  "r m" '(bookmark-bmenu-list :wk "Bookmark menu"))
+;; (ar/global-leader
+;;   "r" '(:ignore t :wk "register/bookmark")
+;;   "r r" '(consult-register :wk "Registers")
+;;   "r s" '(consult-register-store :wk "Store register")
+;;   "r l" '(consult-register-load :wk "Load register")
+;;   "r b" '(consult-bookmark :wk "Bookmarks")
+;;   "r B" '(bookmark-set :wk "Set bookmark")
+;;   "r d" '(bookmark-delete :wk "Delete bookmark")
+;;   "r m" '(bookmark-bmenu-list :wk "Bookmark menu"))
 
 ;; Quit/Session operations (SPC q)
 (ar/global-leader
   "q" '(:ignore t :wk "quit/session")
   "q q" '(save-buffers-kill-terminal :wk "Quit Emacs")
   "q Q" '(kill-emacs :wk "Quit (no save)")
-  "q f" '(delete-frame :wk "Delete frame")
-  "q s" '(tabspaces-save-session :wk "Save session")
-  "q l" '(tabspaces-restore-session :wk "Load session"))
+  "q f" '(delete-frame :wk "Delete frame"))
 
 ;; Insert operations (SPC i)
 (ar/global-leader
@@ -9985,43 +9363,6 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
 ;;   "@ v" '(kmacro-view-macro :wk "View macro")
 ;;   "@ d" '(kmacro-delete-ring-head :wk "Delete"))
 
-(ar/global-leader
-  "a" '(embark-act :wk "Actions"))
-
-(general-define-key
- :states 'motion
- ;; Xref/LSP navigation
- "g d" 'xref-find-definitions
- "g D" 'xref-find-references
- "g i" 'lsp-find-implementation
- "g t" 'lsp-find-type-definition
- "g ," 'xref-go-back)
-
-(general-define-key
- :states 'normal
-  "o" #'ar/evil-open-below-smart
-  "O" #'ar/evil-open-above-smart)
-
-(general-define-key
- :states '(normal visual)
-  ;; Evil Numbers
-  "C-a" #'evil-numbers/inc-at-pt
-  "C-x" #'evil-numbers/dec-at-pt
-  ;; Evil Multiedit
-  "M-d" #'evil-multiedit-match-symbol-and-next
-  "M-D" #'evil-multiedit-match-all)
-
-(general-define-key
- :states 'normal
- ;; Undo-fu
- "u" 'undo-fu-only-undo
- "C-r" 'undo-fu-only-redo)
-
-(general-define-key
- ;; Popper
- "C-`" 'popper-toggle
- "C-~" 'popper-cycle
- "M-`" 'popper-toggle-type)
 
 (general-define-key
  :states 'normal
