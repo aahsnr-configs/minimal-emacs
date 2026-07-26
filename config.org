@@ -7382,6 +7382,11 @@ Provides native debugging with inline variable hints, persistent breakpoints, an
   (dape-history-use-dash-form t)
   ;; Route breakpoint persistence to no-littering var directory.
   (dape-default-breakpoints-file (no-littering-expand-var-file-name "dape/breakpoints.eld"))
+  ;; Render inlay hints for 10 lines surrounding the stopped stack frame.
+  (dape-inlay-hints 10)
+  :custom-face
+  ;; Themes inline exception overlays to Tokyo Night red.
+  (dape-exception-description-face ((t (:foreground "#f7768e" :inherit error))))
   :config
   ;; Breakpoint persistence: save on quit, load on startup.
   (add-hook 'kill-emacs-hook #'dape-breakpoint-save)
@@ -7390,9 +7395,14 @@ Provides native debugging with inline variable hints, persistent breakpoints, an
   ;; Enable mouse-based breakpoint manipulation (click fringe to toggle).
   (dape-breakpoint-global-mode 1)
 
-  ;; Visual pulse on stop, guarded against massive buffers.
+  ;; Visual pulse on stop & dynamic inlay-hints guard.
+  ;; Buffer-locally overrides `dape-inlay-hints` to prevent main-thread blocking
+  ;; when the debugger halts in massive minified JSON or log files.
   (add-hook 'dape-display-source-hook
             (lambda ()
+              (if (too-long-file-p)
+                  (setq-local dape-inlay-hints nil)
+                (setq-local dape-inlay-hints 10))
               (unless (too-long-file-p)
                 (pulse-momentary-highlight-one-line))))
 
@@ -7404,6 +7414,30 @@ Provides native debugging with inline variable hints, persistent breakpoints, an
 
   ;; Hide modeline in REPL buffer.
   (add-hook 'dape-repl-mode-hook #'ar/enable-hide-modeline)
+
+  ;; Spatial Routing (Ghostel/Eshell drawer paradigm)
+  (add-to-list 'display-buffer-alist
+               '((derived-mode . dape-repl-mode)
+                 (display-buffer-in-side-window)
+                 (side . bottom)
+                 (window-height . 0.30)
+                 (window-parameters (no-delete-other-windows . t))))
+  (add-to-list 'display-buffer-alist
+               '((derived-mode . dape-memory-mode)
+                 (display-buffer-in-side-window)
+                 (side . bottom)
+                 (window-height . 0.40)
+                 (window-parameters (no-delete-other-windows . t))))
+  (add-to-list 'display-buffer-alist
+               '("\\*dape-disassemble.*\\*"
+                 (display-buffer-in-side-window)
+                 (side . right)
+                 (window-width . 0.35)
+                 (window-parameters (no-delete-other-windows . t))))
+
+  ;; Evil State Management
+  (evil-set-initial-state 'dape-memory-mode 'normal)
+  (evil-set-initial-state 'dape-repl-mode 'insert)
 
   ;; Transient Dashboard (Replacing dap-hydra)
   (with-eval-after-load 'transient
@@ -7450,6 +7484,7 @@ Provides native debugging with inline variable hints, persistent breakpoints, an
        ["Exit"
         ("<escape>" "" transient-quit-one :format " ")]])))
 #+end_src
+
 
 
 ** TODO Direnv
