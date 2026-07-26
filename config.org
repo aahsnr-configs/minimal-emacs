@@ -7652,9 +7652,7 @@ Consolidated keybindings for Development Tools packages and commands only.
 #+end_src
 
 ** DONE Eval Overlay
-Universal evaluation result display engine adapted from the Doom Emacs
-=tools/eval +overlay= module. Routes quickrun output through a three-tier
-display system: eros inline overlays for short results (≤2 lines), posframe childframes for medium results (3–20 lines), and a bottom popup buffer for long output (>20 lines). Primarily targets Python buffers but supports all quickrun languages. Uses =quickrun-output-only= to suppress header/footer noise at the source, and =:filter-return= advice on the quickrun sentinel to intercept output asynchronously.
+Routes code evaluation results to inline overlays, floating childframes, or bottom drawers based on output length.
 #+begin_src emacs-lisp
 (use-package eros
   :defer t
@@ -7676,6 +7674,7 @@ display system: eros inline overlays for short results (≤2 lines), posframe ch
   :ensure nil
   :after (posframe eros quickrun)
   :custom
+  ;; Routing thresholds for inline overlays, childframes, and bottom popups.
   (eval-overlay-inline-max-lines 2)
   (eval-overlay-inline-max-width 80)
   (eval-overlay-posframe-max-lines 20)
@@ -7685,7 +7684,7 @@ display system: eros inline overlays for short results (≤2 lines), posframe ch
   :config
   (eval-overlay-mode 1))
 
-;; Eval Overlay Keybindings (SPC e)
+;; Eval operations (SPC e)
 (ar/global-leader
   "e"   '(:ignore t :wk "eval")
   "e e" '(eval-overlay-region-or-buffer :wk "Eval region/buffer")
