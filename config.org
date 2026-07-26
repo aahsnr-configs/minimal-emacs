@@ -6584,25 +6584,15 @@ If REGION-TEXT is provided, wrap it inside the block."
 ** DONE Org Src Buffer Naming
 Simplifies the names of temporary source code editing buffers to reduce visual clutter.
 #+begin_src emacs-lisp
-(defun ar/org-src-simplify-buffer-name (_org-buffer-name lang)
-  "Simplify Org source edit buffer names to `*Src LANG*`.
-Strips the verbose parent file name to reduce mode-line clutter."
-  (if (and (boundp 'org-src--source-type)
-           (eq org-src--source-type 'example))
-      "*Org Example*"
-    (format "*Src %s*" (or lang "text"))))
-
-(with-eval-after-load 'org-src
-  (advice-add #'org-src--construct-edit-buffer-name :override #'ar/org-src-simplify-buffer-name))
 #+end_src
 
 ** DONE Org Eldoc
 Displays lightweight context-aware metadata for Org elements in the echo area.
 #+begin_src emacs-lisp
-(use-package org-eldoc
-  :ensure nil
-  :defer t
-  :hook (org-mode . org-eldoc-load))
+;;(use-package org-eldoc
+;;  :ensure nil
+;;  :defer t
+;;  :hook (org-mode . org-eldoc-load))
 #+end_src
 
 ** DONE Evil Org
@@ -7074,24 +7064,24 @@ Connects Emacs to external language servers for smart code navigation, error che
   (when (executable-find "emacs-lsp-booster")
     (eglot-booster-mode)))
 
-(use-package org-src-context
-  :ensure nil
-  :after eglot
-  :custom
-  ;; Visual: Set to 'nil' to see the grayed-out context surrounding your block.
-  ;; Set to 't' if you prefer a focused view (narrowed to just your code).
-  (org-src-context-narrow-p t)
-  ;; Safety: Disable context injection for files larger than 500KB to prevent lag.
-  (org-src-context-max-filesize 500000)
-  :config
-  ;; Activate global minor mode directly in :config per Elpaca load-order physics.
-  (org-src-context-mode 1)
-  ;; Enable Apheleia (auto-formatting) inside the edit buffer.
-  ;; The patched org-src-context ensures a valid file path exists for this to work.
-  (with-eval-after-load 'apheleia
-    (add-hook 'org-src-mode-hook
-              (lambda ()
-                (apheleia-mode 1)))))
+;;(use-package org-src-context
+;;  :ensure nil
+;;  :after eglot
+;;  :custom
+;;  ;; Visual: Set to 'nil' to see the grayed-out context surrounding your block.
+;;  ;; Set to 't' if you prefer a focused view (narrowed to just your code).
+;;  (org-src-context-narrow-p nil)
+;;  ;; Safety: Disable context injection for files larger than 500KB to prevent lag.
+;;  (org-src-context-max-filesize 500000)
+;;  :config
+;;  ;; Activate global minor mode directly in :config per Elpaca load-order physics.
+;;  (org-src-context-mode 1)
+;;  ;; Enable Apheleia (auto-formatting) inside the edit buffer.
+;;  ;; The patched org-src-context ensures a valid file path exists for this to work.
+;;  (with-eval-after-load 'apheleia
+;;    (add-hook 'org-src-mode-hook
+;;              (lambda ()
+;;                (apheleia-mode 1)))))
 #+end_src
 
 ** DONE Eldoc
