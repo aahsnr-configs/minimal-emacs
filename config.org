@@ -6652,6 +6652,8 @@ Vim motions and operator bindings for org-agenda buffers.
   :hook (org-mode . org-block-wrap-mode))
 #+end_src
 
+
+
 ** TODO Keybindings
 Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motions, and the complete 25-package Denote ecosystem matrix.
 #+begin_src emacs-lisp
@@ -7893,8 +7895,6 @@ Routes global search commands and local navigation for the TODO ecosystem.
 (unless (file-directory-p my/snippets-directory)
   (make-directory my/snippets-directory t))
 
-(use-package yasnippet-snippets :after yasnippet)
-
 (use-package yasnippet
   :defer t
   :hook (elpaca-after-init . yas-global-mode)
@@ -8230,33 +8230,6 @@ Routes all Markdown editing, viewing, table, and structure commands through the 
 
 
 * TODO Languages
-** TODO Nix
-#+begin_src emacs-lisp
-(use-package nix-mode
-  :defer t
-  :mode "\\.nix\\'"
-  :hook (nix-mode . eglot-ensure))
-
-(use-package nix-ts-mode
-  :defer t
-  :mode "\\.nix\\'"
-  :hook (nix-ts-mode . eglot-ensure))
-
-(use-package nix-update
-  :defer t
-  :commands nix-update-fetch)
-
-(with-eval-after-load 'eglot
-  (add-to-list 'eglot-server-programs
-               '((nix-mode nix-ts-mode) . ("nixd"))))
-
-;; TODO: Add flycheck
-(with-eval-after-load 'apheleia
-  (add-to-list 'apheleia-formatters '(alejandra . ("alejandra" "-q" "-")))
-  (setf (alist-get 'nix-mode apheleia-mode-alist) '(alejandra))
-  (setf (alist-get 'nix-ts-mode apheleia-mode-alist) '(alejandra)))
-#+end_src
-
 ** TODO PlantUML
 TODO: =Deal with later=
 #+begin_src emacs-lisp
