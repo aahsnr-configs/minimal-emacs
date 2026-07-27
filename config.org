@@ -935,22 +935,15 @@ Keystroke discovery UI overlay. Renders prefix bindings in the echo area with al
 #+begin_src emacs-lisp
 (use-package which-key
   :straight (:type built-in)
-  :demand t
+  :defer t
+  :hook (after-init . which-key-mode)
   :custom
-  (which-key-idle-delay 0.7) ; Initial delay
-  (which-key-idle-secondary-delay 0.05) ; Secondary delay
-  (which-key-popup-type 'minibuffer) ; Echo area rendering
-  (which-key-separator " → ") ; Separator
-  (which-key-sort-order 'which-key-key-order-alpha) ; Alphabetical sort
-  (which-key-sort-uppercase-first nil) ; Case-insensitive sort
-  (which-key-add-column-padding 1) ; Column padding
-  (which-key-max-description-length 30) ; Truncate descriptions
-  (which-key-min-display-lines 6) ; Minimum height
-  (which-key-allow-multiple-replacements t) ; Multiple replacements
-  (which-key-show-operator-state-maps t) ; Operator-pending maps
-  :config
-  (which-key-mode 1))
+  (which-key-idle-delay 0.1)
+  (which-key-separator " → ")
+  (which-key-popup-type 'minibuffer))
 #+end_src
+
+
 
 ** DONE Prettify Symbols & Ligatures
 Delegates operator ligatures to HarfBuzz via ligature.el and reserves Elisp substitution strictly for semantic keywords.
@@ -3111,7 +3104,6 @@ Routes centralized leader keybindings for project operations, mirroring Doom Ema
 #+end_src
 
 
-
 ** DONE Buffer Management
 Provides a centralized dashboard and automated cleanup engine for viewing, filtering, and managing all open buffers across projects and workspaces.
 
@@ -3165,13 +3157,14 @@ Displays all open buffers in a filterable, sortable dashboard with project and w
           (15 (and buffer-file-name (buffer-modified-p)) warning)
           (20 (string-prefix-p "*" (buffer-name)) shadow)
           (25 (derived-mode-p 'dired-mode) font-lock-function-name-face)
-          (30 auto-save-mode font-lock-warning-face)))
+          (30 (and (boundp 'auto-save-mode) auto-save-mode) font-lock-warning-face)))
   ;; Anti-Popper Guard: Force Ibuffer to reuse the current window or spawn a standard window.
   (add-to-list 'display-buffer-alist
                '("\\*Ibuffer\\*"
                  (display-buffer-reuse-window display-buffer-same-window)
                  (reusable-frames . visible))))
 #+end_src
+
 
 *** DONE Nerd Icons iBuffer
 Renders visual file and mode glyphs inside the buffer dashboard for quick visual identification.
@@ -3261,7 +3254,6 @@ Routes centralized leader keybindings for buffer operations.
   "b z" '(bury-buffer :wk "Bury buffer"))
 #+end_src
 
-
 ** DONE Workspaces
 Provides strict buffer isolation per workflow context using a headless native tab-bar engine augmented by an interception layer that persists layouts across daemon restarts.
 
@@ -3293,6 +3285,8 @@ Extends the native tab container with strict buffer isolation, workspace-aware m
   ;; CRITICAL: Must be set before `bufferlo-mode` activates.
   ;; Forces Emacs' C-level buffer cycling (next-buffer/previous-buffer) to respect strict tab boundaries.
   (bufferlo-prefer-local-buffers 'tabs)
+  ;; Strips the "Bfl" minor-mode lighter from the modeline to prevent UI clutter.
+  (bufferlo-mode-line nil)
   ;; Daemon-safe auto-save: flushes workspace layouts every 5 minutes to prevent data loss on SIGKILL/OOM.
   (bufferlo-bookmarks-auto-save-interval 300)
   ;; Persist workspace layouts across daemon restarts via native Emacs bookmarks.
@@ -3329,13 +3323,11 @@ Extends the native tab container with strict buffer isolation, workspace-aware m
   ;; Triad Integration: Wire bufferlo into consult-buffer to solve the "buffer soup" problem.
   (with-eval-after-load 'consult
     (setq consult-buffer-list-function #'bufferlo-local-buffers))
-
   ;; Protect Dirvish and Treemacs side-windows from workspace isolation.
   (with-eval-after-load 'dirvish
     (add-to-list 'bufferlo-exclude-buffer-filters "^\\*Dirvish\\*$"))
   (with-eval-after-load 'treemacs
-    (add-to-list 'bufferlo-exclude-buffer-filters "^\\*Treemacs\\*$"))
-  )
+    (add-to-list 'bufferlo-exclude-buffer-filters "^\\*Treemacs\\*$")))
 #+end_src
 
 *** DONE Custom Workspace Utilities
@@ -5406,8 +5398,6 @@ Wires all template groups into org-capture, routes the UI to a dedicated bottom 
                 (org-save-all-org-buffers)))))
 #+end_src
 
-
-
 ** DONE Org Src Buffer Naming
 Simplifies the names of temporary source code editing buffers to reduce visual clutter.
 #+begin_src emacs-lisp
@@ -5423,7 +5413,262 @@ Strips the verbose parent file name to reduce mode-line clutter."
   (advice-add #'org-src--construct-edit-buffer-name :override #'ar/org-src-simplify-buffer-name))
 #+end_src
 
+** DONE Org Structure Templates
+Configures Org structure templates for rapid block insertion and implements a deferred loading engine for Babel language backends.
+#+begin_src emacs-lisp
+(with-eval-after-load 'org
+  ;; Structure Templates (org-tempo)
+  (require 'org-tempo)
+  (dolist (pair '(("sh" . "src shell")
+                  ("el" . "src emacs-lisp")
+                  ("py" . "src python")
+                  ("dot" . "src dot")
+                  ("plantuml" . "src plantuml")
+                  ("tex" . "src latex")
+                  ("yml" . "src yaml")
+                  ("kbd" . "src kbd")
+                  ("kdl" . "src kdl")))
+    (add-to-list 'org-structure-template-alist pair))
 
+  ;; Babel Lazy-Loading Engine
+  ;; NOTE: Jupyter/Python Paradigm Shift Deferred
+  ;; `emacs-jupyter` relies on heavy, stateful ZeroMQ kernel initialization hooks
+  ;; that expect `ob-jupyter` to be fully loaded BEFORE interacting with a block.
+  ;; The lazy-loader only triggers on execution (C-c C-c), which is mathematically
+  ;; too late for the kernel handshake. To implement `emacs-jupyter` in the future,
+  ;; explicitly `(require 'ob-jupyter)` in your Jupyter setup block, add
+  ;; `(python . jupyter)` to `ar/org-babel-mode-alist`, and map `"jpy"` to
+  ;; `"src jupyter-python"` in the structure templates above. For now, standard
+  ;; `ob-python` is utilized.
+
+  (defvar ar/org-babel-mode-alist
+    '((c . C) (cpp . C) (C++ . C) (D . C)
+      (elisp . emacs-lisp) (sh . shell) (bash . shell)
+      (matlab . octave) (rust . rustic-babel) (amm . ammonite))
+    "Alist mapping divergent block headers to their `ob-*` package names.")
+
+  (defun ar/org--babel-lazy-load (lang)
+    "Lazy load the babel package for LANG and register it."
+    (cl-check-type lang (or symbol null))
+    ;; Guard against nil languages to prevent `require` crashes during export.
+    (when lang
+      (unless (cdr (assq lang org-babel-load-languages))
+        (prog1 (or (require (intern (format "ob-%s" lang)) nil t)
+                   (require lang nil t))
+          ;; Update the registry so Org's execution engine recognizes it.
+          (add-to-list 'org-babel-load-languages (cons lang t))))))
+
+  ;; 1. EXPORT HOOK: Lazy load when exporting the document.
+  (define-advice org-babel-exp-src-block (:before (&optional element) lazy-load-export)
+    "Lazy load a babel package when a block is processed during exporting."
+    (let* ((info (org-babel-get-src-block-info nil element))
+           (lang (nth 0 info))
+           (lang (cond ((symbolp lang) lang) ((stringp lang) (intern lang))))
+           (lang (or (cdr (assq lang ar/org-babel-mode-alist)) lang)))
+      (ar/org--babel-lazy-load lang)))
+
+  ;; 2. SYNTAX HOOK: Lazy load when opening a block edit buffer (C-c ').
+  (define-advice org-src--get-lang-mode (:before (lang) lazy-load-syntax)
+    "Lazy load a babel package to ensure syntax highlighting in edit buffers."
+    (let* ((lang-str (if (stringp lang) lang (symbol-name lang)))
+           (lang-sym (intern lang-str)))
+      ;; Use `assoc-string` to correctly match string keys in `org-src-lang-modes`.
+      (unless (cdr (assoc-string lang-str org-src-lang-modes))
+        (ar/org--babel-lazy-load lang-sym))))
+
+  ;; 3. EXECUTION HOOK: Lazy load when executing the block (C-c C-c).
+  ;; Uses `:after-while` to ensure the package only loads if the user
+  ;; actually confirms execution (or if confirmation is disabled).
+  (define-advice org-babel-confirm-evaluate (:after-while (info) lazy-load-execute)
+    "Load babel libraries lazily when babel blocks are executed."
+    (let* ((lang (nth 0 info))
+           (lang (cond ((symbolp lang) lang) ((stringp lang) (intern lang))))
+           (lang (or (cdr (assq lang ar/org-babel-mode-alist)) lang)))
+      (ar/org--babel-lazy-load lang)
+      t))
+
+  ;; 4. THE OVERRIDE: Neuter the synchronous startup tax.
+  (advice-add #'org-babel-do-load-languages :override #'ignore))
+#+end_src
+
+
+** DONE Evil Org
+Vim-modal integration for Org buffers with context-aware RET and table/list continuation.
+#+begin_src emacs-lisp
+(use-package evil-org
+  :defer t
+  :after (evil org)
+  :hook (org-mode . evil-org-mode)
+  :custom
+  ;; o/O continue table rows and list items in normal state.
+  (evil-org-special-o/O '(table-row item))
+  :config
+  (evil-org-set-key-theme '(navigation insert textobjects additional calendar todo heading))
+  ;; Context-aware RET: TODO toggle, checkbox, link follow, fold reveal, else C-c C-c.
+  (defun ar/org-return-dwim (&optional arg)
+    "Context-aware RET in Org normal/motion states."
+    (interactive "P")
+    (cond
+     ((and (org-at-heading-p) (org-get-todo-state))
+      (org-todo arg))
+     ((org-at-item-checkbox-p)
+      (org-toggle-checkbox arg))
+     ((org-in-regexp org-link-any-re 1)
+      (org-open-at-point arg))
+     ((and (org-at-heading-p) (org-invisible-p))
+      (org-fold-show-entry))
+     (t (org-ctrl-c-ctrl-c arg)))))
+#+end_src
+
+** DONE Evil Org Agenda
+Vim motions and operator bindings for org-agenda buffers.
+#+begin_src emacs-lisp
+(use-package evil-org-agenda
+  :straight (:type built-in)
+  :defer t
+  :after evil-org
+  :hook (org-agenda-mode . evil-org-agenda-mode)
+  :config
+  (evil-org-agenda-set-keys))
+#+end_src
+
+** DONE Org Block Wrap
+#+begin_src emacs-lisp
+(use-package org-block-wrap
+  :straight (org-block-wrap :host gitlab :repo "vegasharmon/org-block-wrap")
+  :hook (org-mode . org-block-wrap-mode))
+#+end_src
+
+** TODO Keybindings
+Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motions, and the complete 25-package Denote ecosystem matrix.
+#+begin_src emacs-lisp
+;; (defun ar/org-babel-remove-result-one-or-many (&optional arg)
+;;   "Remove babel results. With ARG, remove all results in buffer."
+;;   (interactive "P")
+;;   (org-babel-remove-result-one-or-many arg))
+
+;; ;; Agenda Prefix (SPC o)
+;; (ar/global-leader
+;;   "o"   '(:ignore t :wk "org")
+;;   "o a" '(:ignore t :wk "agenda")
+;;   "o a a" '(org-agenda :wk "Agenda dashboard")
+;;   "o a m" '(org-tags-view :wk "Tags search")
+;;   "o a t" '(org-todo-list :wk "Global TODO list")
+;;   "o a v" '(consult-org-agenda :wk "Fuzzy heading jump")
+;;   "o a d" '((lambda () (interactive) (org-agenda nil "d")) :wk "Daily dashboard")
+;;   "o a w" '((lambda () (interactive) (org-agenda nil "w")) :wk "Weekly review")
+;;   "o a e" '((lambda () (interactive) (org-agenda nil "e")) :wk "Effort-based")
+;;   "o a A" '((lambda () (interactive) (org-agenda nil "A")) :wk "Accomplishments")
+;;   "o a p" '((lambda () (interactive) (org-agenda nil "p")) :wk "Project status")
+;;   "o c" '(org-capture :wk "Capture")
+;;   "o l" '(org-store-link :wk "Store link"))
+
+;; Notes / Denote Ecosystem (SPC n)
+(ar/global-leader
+  "n"   '(:ignore t :wk "notes")
+
+  ;; Core Denote
+  "n n" '(denote :wk "New note")
+  "n N" '(denote-subdirectory :wk "New note in subdir")
+  "n t" '(denote-type :wk "New note (choose type)")
+  "n r" '(denote-rename-file :wk "Rename file")
+  "n R" '(denote-rename-file-using-front-matter :wk "Rename from front matter")
+  "n k" '(denote-rename-file-keywords :wk "Edit keywords")
+  "n d" '(denote-dired :wk "Denote dired")
+
+  ;; Search & Discovery
+  "n f" '(consult-denote-find :wk "Find note")
+  "n s" '(consult-denote-grep :wk "Search contents")
+
+  ;; Linking & Transclusion
+  "n l" '(denote-link :wk "Insert link")
+  "n i" '(denote-link-or-create :wk "Insert link or create")
+  "n b" '(denote-backlinks :wk "Backlinks")
+  "n T" '(org-transclusion-add :wk "Transclude note")
+
+  ;; Journaling
+  "n j" '(denote-journal-new-or-existing-entry :wk "Journal (today)")
+  "n J" '(denote-journal-new-entry :wk "New journal entry")
+
+  ;; Sequence Notes / Folgezettel
+  "n q"   '(:ignore t :wk "sequence")
+  "n q n" '(denote-sequence :wk "New sequence")
+  "n q p" '(denote-sequence-new-parent :wk "New parent")
+  "n q c" '(denote-sequence-new-child-of-current :wk "New child (current)")
+  "n q b" '(denote-sequence-new-sibling-of-current :wk "New sibling (current)")
+  "n q f" '(denote-sequence-find :wk "Find relative")
+  "n q l" '(denote-sequence-link :wk "Link to sequence")
+  "n q r" '(denote-sequence-reparent :wk "Reparent file")
+  "n q v" '(denote-sequence-view-hierarchy :wk "View hierarchy")
+
+  ;; Silo Management
+  "n S"   '(:ignore t :wk "silo")
+  "n S s" '(denote-silo-select-silo-then-command :wk "Silo dispatch")
+  "n S o" '(denote-silo-open-or-create :wk "Open/create silo")
+  "n S n" '(denote-silo-create-note :wk "New note in silo")
+  "n S d" '(denote-silo-dired :wk "Silo dired")
+  "n S l" '(denote-solo-switch :wk "Switch solo context")
+
+  ;; Explore & Analytics
+  "n e"   '(:ignore t :wk "explore")
+
+  ;; Statistics
+  "n e c" '(denote-explore-count-notes :wk "Count notes")
+  "n e k" '(denote-explore-count-keywords :wk "Count keywords")
+  "n e L" '(denote-explore-list-keywords :wk "List keywords")
+  "n e f" '(denote-explore-barchart-filetypes :wk "Filetypes barchart")
+  "n e w" '(denote-explore-barchart-keywords :wk "Keywords barchart")
+  "n e t" '(denote-explore-barchart-timeline :wk "Timeline barchart")
+
+  ;; Random Walks
+  "n e r" '(denote-explore-random-note :wk "Random note")
+  "n e x" '(denote-explore-random-regex :wk "Random regex")
+  "n e l" '(denote-explore-random-link :wk "Random link")
+  "n e K" '(denote-explore-random-keyword :wk "Random keyword")
+  "n e S" '(denote-explore-random-signature :wk "Random signature")
+
+  ;; Janitor
+  "n e d" '(denote-explore-duplicate-notes :wk "Duplicate notes")
+  "n e D" '(denote-explore-duplicate-notes-dired :wk "Duplicates via  Dired")
+  "n e m" '(denote-explore-missing-links :wk "Missing links")
+  "n e z" '(denote-explore-zero-keywords :wk "Zero keywords")
+  "n e s" '(denote-explore-single-keywords :wk "Single keywords")
+  "n e R" '(denote-explore-rename-keyword :wk "Rename keyword")
+  "n e y" '(denote-explore-sync-metadata :wk "Sync metadata")
+  "n e i" '(denote-explore-isolated-files :wk "Isolated files")
+
+  ;; Network Graphs & Visualisation
+  "n e n" '(denote-explore-network :wk "Generate network")
+  "n e g" '(denote-explore-network-regenerate :wk "Regenerate network")
+  "n e G" '(denote-explore-barchart-degree :wk "Degree barchart")
+  "n e b" '(denote-explore-barchart-backlinks :wk "Backlinks barchart")
+
+  ;; Wordcloud
+  "n e W" '(denote-wordcloud :wk "Wordcloud")
+  "n e F" '(denote-wordcloud-list-by-frequency :wk "Wordcloud (frequency)")
+
+  ;; Management & Refactoring
+  "n m"   '(:ignore t :wk "manage")
+  "n m m" '(list-denotes :wk "Tabulated menu")
+  "n m f" '(denote-merge-file :wk "Merge file")
+  "n m r" '(denote-merge-region :wk "Merge region")
+  "n m q" '(denote-merge-region-org-quote :wk "Merge region (quote)")
+  "n m v" '(denote-review-display-list :wk "Review list")
+  "n m u" '(denote-review-set-date :wk "Update review date")
+
+  ;; Bibliography & Publishing
+  "n B"   '(:ignore t :wk "bibliography")
+  "n B o" '(citar-denote-open-note :wk "Open bib note")
+  "n B c" '(citar-denote-create-note :wk "Create bib note")
+  "n B i" '(citar-denote-insert-citation :wk "Insert citation")
+  "n B s" '(denote-citar-sections-create :wk "Citar section")
+  "n p" '(denote-publish :wk "Publish notes")
+
+  ;; Misc
+  "n P" '(denote-project-notes :wk "Project notes")
+  "n A" '(denote-agenda :wk "Chronological view")
+  "n w" '(ar/weekly-review :wk "Weekly review"))
+#+end_src
 
 
 * TODO Development Tools
@@ -5534,18 +5779,6 @@ Connects Emacs to external language servers for smart code navigation, error che
                (message "No moniker found to copy.")))))))))
 
 
-(use-package org-src-context
-  :straight (:type built-in)
-  :after eglot
-  :custom
-  (org-src-context-narrow-p t)
-  (org-src-context-max-filesize 500000)
-  :config
-  (org-src-context-mode 1)
-  (with-eval-after-load 'apheleia
-    (add-hook 'org-src-mode-hook
-              (lambda ()
-                (apheleia-mode 1)))))
 #+end_src
 
 ** DONE Eldoc
@@ -5576,6 +5809,25 @@ Configures the core documentation engine with strict 2-line echo area limits and
                             #'eldoc-documentation-compose-eagerly)))))
 #+end_src
 
+** DONE Eldoc Childframe
+Routes complex documentation to a floating popup and keeps the echo area concise.
+#+begin_src emacs-lisp
+(use-package eldoc-childframe
+  :straight (:type built-in)
+  :hook (prog-mode . eldoc-childframe-hover-at-point-mode)
+  :bind ("M-h" . eldoc-childframe-help-at-point)
+  :custom
+  ;; Clear the popup instantly when the cursor moves off the symbol.
+  (eldoc-childframe-clear-with-C-g t)
+  ;; Expand maximum dimensions for massive type signatures.
+  (eldoc-childframe-max-pixel-width 900)
+  (eldoc-childframe-max-pixel-height 800)
+  :custom-face
+  (eldoc-childframe-border ((t (:background "#292e42"))))
+  (eldoc-childframe-body ((t (:background "#24283b" :foreground "#c0caf5"))))
+  (eldoc-childframe-markdown-separator
+   ((t (:inherit shadow :strike-through t :height 0.4)))))
+#+end_src
 
 ** TODO Minimap
 Provides a detachable, zoomed-out minimap sidebar with native diff-hl fringe synchronization.

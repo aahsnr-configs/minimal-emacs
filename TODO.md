@@ -9,4 +9,7 @@
 - [ ] super-save gives off the following error: super-save: predicate (lambda nil (super-save-include-p buffer-file-name)) failed: (wrong-type-argument stringp magit-status-mode)
 - [ ] eglot gives the warnin: Wrong type argument: processp, nil
 - [ ] implement evil redo functionality
+- [ ] Current org-src-context breaks org source code block in org buffers
 - [ ] remove bufferlo indicator from modeline
+- [ ] SPC v is undefined
+- [ ] Invalid face reference dired directory
