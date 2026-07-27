@@ -1,15 +1,21 @@
 ;;; eldoc-childframe.el --- Optimized childframe documentation viewer -*- lexical-binding: t; -*-
+
 ;; Author: Ahsanur Rahman (Forked from eldoc-box by Yuan Fu)
-;; Version: 1.1.0
+;; Version: 1.5.0
 ;; Package-Requires: ((emacs "28.1"))
+
 ;;; Commentary:
+
 ;; A modernized, stripped-down fork of `eldoc-box` optimized for Emacs 31.
 ;; Features:
-;; - Intelligent Display Routing: ≤2 lines → echo area, >2 lines → childframe.
-;; - Flymake Firewall: Filters out diagnostic payloads from childframe display.
+;; - Keybinding-Only Activation: Childframe only spawns on demand (no hover).
+;; - Native Router: Silences native echo-area/buffer popups in prog-mode.
+;; - Flymake & Breadcrumb Firewall: Filters out diagnostic and breadcrumb payloads.
 ;; - TTY Degradation: Gracefully falls back to echo area on non-graphical frames.
 ;; - Evil Motion Fix: Spatial debouncing replaces the 0.5s inhibition trap.
 ;; - Corfu Collision Avoidance: Shifts the childframe to avoid overlapping popups.
+;; - Buffer-Change Auto-Hide: Instantly vanishes when switching buffers/windows.
+
 ;;; Code:
 
 (require 'cl-lib)
@@ -33,10 +39,6 @@
   '((t (:inherit shadow :strike-through t :height 0.4 :extend t)))
   "Face for the separator line in Markdown.")
 
-(defcustom eldoc-childframe-only-multi-line t
-  "If non-nil, only use childframe when there are more than 2 lines."
-  :type 'boolean)
-
 (defcustom eldoc-childframe-clear-with-C-g t
   "If set to non-nil, clear childframe on \\[keyboard-quit]."
   :type 'boolean)
@@ -53,8 +55,8 @@
   "Sets left, right & top offset of the doc childframe.
 Its value should be a list: (left right top)"
   :type '(list (integer :tag "Left")
-          (integer :tag "Right")
-          (integer :tag "Top")))
+               (integer :tag "Right")
+               (integer :tag "Top")))
 
 (defvar eldoc-childframe-frame-parameters
   '((left . -1)
@@ -93,11 +95,15 @@ Its value should be a list: (left right top)"
 (defvar eldoc-childframe--last-point 0
   "Last point where childframe was shown.")
 
+(defvar eldoc-childframe--last-buffer nil
+  "The buffer from which the childframe was summoned.")
+
 (defvar eldoc-childframe-frame-hook nil
   "Hook run after doc frame is setup but just before it is made visible.")
 
 (defvar eldoc-childframe-buffer-hook
-  '(eldoc-childframe--prettify-markdown-separator
+  '(eldoc-childframe--strip-breadcrumb
+    eldoc-childframe--prettify-markdown-separator
     eldoc-childframe--replace-en-space
     eldoc-childframe--remove-linked-images
     eldoc-childframe--remove-noise-chars
@@ -240,12 +246,16 @@ Its value should be a list: (left right top)"
         (goto-char (point-min))
         (buffer-face-set 'eldoc-childframe-body)
         (visual-line-mode 1)
+        ;; Hide modeline and headerline for a clean floating tooltip
+        (setq-local mode-line-format nil)
+        (setq-local header-line-format nil)
         (run-hooks 'eldoc-childframe-buffer-hook)))
     (let ((frame (eldoc-childframe--get-frame doc-buffer)))
       (setq eldoc-childframe--last-point (point))
+      (setq eldoc-childframe--last-buffer (current-buffer))
       (make-frame-visible frame))))
 
-;;; Flymake Firewall
+;;; Payload Filtering & Routing
 
 (defun eldoc-childframe--filter-flymake (docs)
   "Filter out Flymake diagnostic payloads from DOCS.
@@ -253,8 +263,6 @@ Inspects the :origin plist key added by ElDoc to each doc item."
   (cl-remove-if (lambda (doc)
                   (eq (plist-get (cdr doc) :origin) 'flymake-eldoc-function))
                 docs))
-
-;;; Intelligent Display Routing
 
 (defun eldoc-childframe--compose-doc (doc)
   "Compose a single DOC item into a display string."
@@ -266,38 +274,30 @@ Inspects the :origin plist key added by ElDoc to each doc item."
             (car doc))))
 
 (defun eldoc-childframe--route-display (docs interactive)
-  "Route DOCS to echo area (≤2 lines) or childframe (>2 lines).
-This function is the sole display router in `eldoc-display-functions'.
-It internally delegates to `eldoc-display-in-echo-area' for short docs
-and renders long docs in the childframe.
-
-NOTE: `eldoc-display-functions' is run via `run-hook-with-args' (NOT
-until-success), so all members always execute. This function handles
-both display paths internally to avoid double-rendering."
-  (let* ((filtered (eldoc-childframe--filter-flymake docs))
-         (composed (string-join (mapcar #'eldoc-childframe--compose-doc
-                                        filtered)
-                                "\n"))
-         (line-count (if (string-empty-p composed)
-                         0
-                       (1+ (cl-count ?\n composed)))))
-    (cond
-     ;; Nothing to display: clear echo area.
-     ((zerop line-count)
-      (eldoc--message nil))
-     ;; ≤2 lines: delegate to the native echo area renderer.
-     ((<= line-count 2)
-      (eldoc-display-in-echo-area filtered interactive))
-     ;; >2 lines: render in childframe (with TTY guard).
-     (t
+  "Route DOCS to childframe only when INTERACTIVE is non-nil.
+This ensures the childframe only spawns on explicit keybinding invocation,
+while completely silencing native Eldoc hover popups in prog-mode."
+  (when interactive
+    (let* ((filtered (eldoc-childframe--filter-flymake docs))
+           (composed (string-join (mapcar #'eldoc-childframe--compose-doc filtered) "\n"))
+           (doc (string-trim composed)))
       (if (or (display-graphic-p) (featurep 'tty-child-frames))
-          (let ((doc (string-trim composed)))
-            (unless (string-empty-p doc)
-              (eldoc-childframe--display doc)))
+          (eldoc-childframe--display
+           (if (string-empty-p doc) "No doc to display at this point" doc))
         ;; TTY fallback: truncate to echo area.
-        (eldoc-display-in-echo-area filtered interactive))))))
+        (eldoc-display-in-echo-area filtered interactive)))))
 
-;;; Evil Motion Fix (Spatial Debounce)
+;;; Breadcrumb Stripping
+
+(defun eldoc-childframe--strip-breadcrumb ()
+  "Remove the breadcrumb line injected by prog-eldoc--breadcrumb."
+  (save-excursion
+    (goto-char (point-min))
+    ;; Match lines containing the breadcrumb separator " │ "
+    (while (re-search-forward "^.* │ .*$" nil t)
+      (delete-region (line-beginning-position) (min (1+ (line-end-position)) (point-max))))))
+
+;;; Evil Motion Fix (Spatial Debounce) & Buffer Change Auto-Hide
 
 (defun eldoc-childframe--follow-cursor ()
   "Update or hide childframe based on cursor movement."
@@ -309,20 +309,26 @@ both display paths internally to avoid double-rendering."
     ;; Point moved: hide frame instantly without 0.5s penalty.
     (eldoc-childframe-quit-frame)))
 
+(defun eldoc-childframe--hide-on-buffer-change ()
+  "Hide childframe if the current buffer changes."
+  (when (and (eldoc-childframe--frame-visible-p)
+             eldoc-childframe--last-buffer
+             (not (eq (current-buffer) eldoc-childframe--last-buffer))
+             (not (eq (current-buffer) (get-buffer eldoc-childframe--buffer))))
+    (eldoc-childframe-quit-frame)))
+
 ;;; Help at Point & Glance
 
 (defun eldoc-childframe-help-at-point ()
   "Display documentation of the symbol at point on demand."
   (interactive)
-  (cond
-   ((eldoc-childframe--frame-visible-p)
-    (eldoc-childframe-focus-frame))
-   (t
-    (when (boundp 'eldoc--doc-buffer)
-      (let ((doc (with-current-buffer eldoc--doc-buffer (buffer-string))))
-        (eldoc-childframe--display
-         (if (equal doc "") "No doc to display at this point" doc)))
-      (setq eldoc-childframe--last-point (point))))))
+  (if (eldoc-childframe--frame-visible-p)
+      (eldoc-childframe-quit-frame)
+    ;; Trigger Eldoc's native engine with interactive=t.
+    ;; This forces `eldoc-display-functions` to run with interactive=t,
+    ;; which our router catches to spawn the childframe.
+    (eldoc-print-current-symbol-info t)
+    (setq eldoc-childframe--last-point (point))))
 
 (defun eldoc-childframe-glance ()
   "Show documentation childframe temporarily until the next command."
@@ -432,37 +438,23 @@ both display paths internally to avoid double-rendering."
   "The original value of `eldoc-display-functions'.")
 
 (defun eldoc-childframe--enable ()
-  "Enable eldoc-childframe with intelligent routing.
-Replaces `eldoc-display-in-echo-area' with the router function."
+  "Enable eldoc-childframe with strict keybinding-only routing."
   (setq-local eldoc-childframe--old-eldoc-functions eldoc-display-functions)
-  (setq-local eldoc-display-functions
-              (cons #'eldoc-childframe--route-display
-                    (remq 'eldoc-display-in-echo-area
-                          eldoc-display-functions)))
-  (remove-hook 'pre-command-hook
-               #'eldoc-pre-command-refresh-echo-area t)
-  (add-hook 'post-command-hook
-            #'eldoc-childframe--follow-cursor nil t)
+  ;; Completely replace display functions so hover does NOTHING in prog-mode.
+  (setq-local eldoc-display-functions (list #'eldoc-childframe--route-display))
+  (remove-hook 'pre-command-hook #'eldoc-pre-command-refresh-echo-area t)
+  (add-hook 'post-command-hook #'eldoc-childframe--follow-cursor nil t)
+  (add-hook 'post-command-hook #'eldoc-childframe--hide-on-buffer-change)
   (when eldoc-childframe-clear-with-C-g
-    (advice-add #'keyboard-quit :before
-                #'eldoc-childframe--quit-frame-not-in-childframe)))
+    (advice-add #'keyboard-quit :before #'eldoc-childframe--quit-frame-not-in-childframe)))
 
 (defun eldoc-childframe--disable ()
-  "Disable eldoc-childframe and restore original display functions."
-  (setq-local eldoc-display-functions
-              (remq #'eldoc-childframe--route-display
-                    eldoc-display-functions))
-  (when (memq 'eldoc-display-in-echo-area
-              eldoc-childframe--old-eldoc-functions)
-    (setq-local eldoc-display-functions
-                (cons 'eldoc-display-in-echo-area
-                      eldoc-display-functions)))
-  (add-hook 'pre-command-hook
-            #'eldoc-pre-command-refresh-echo-area nil t)
-  (remove-hook 'post-command-hook
-               #'eldoc-childframe--follow-cursor t)
-  (advice-remove #'keyboard-quit
-                 #'eldoc-childframe--quit-frame-not-in-childframe)
+  "Disable eldoc-childframe and restore original hooks."
+  (setq-local eldoc-display-functions eldoc-childframe--old-eldoc-functions)
+  (add-hook 'pre-command-hook #'eldoc-pre-command-refresh-echo-area nil t)
+  (remove-hook 'post-command-hook #'eldoc-childframe--follow-cursor t)
+  (remove-hook 'post-command-hook #'eldoc-childframe--hide-on-buffer-change)
+  (advice-remove #'keyboard-quit #'eldoc-childframe--quit-frame-not-in-childframe)
   (when eldoc-childframe--frame
     (delete-frame eldoc-childframe--frame)
     (setq eldoc-childframe--frame nil)))

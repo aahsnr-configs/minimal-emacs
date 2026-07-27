@@ -8,5 +8,5 @@
 - [ ] org transient template not working because of the following error: transient-setup: Suffix command ar/org-block-A-ASCII is not defined or autoloaded
 - [ ] super-save gives off the following error: super-save: predicate (lambda nil (super-save-include-p buffer-file-name)) failed: (wrong-type-argument stringp magit-status-mode)
 - [ ] eglot gives the warnin: Wrong type argument: processp, nil
-
-Error running timer ‘indent-bars--update-current-depth-highlight-in-buffer’: (treesit-query-error "Node type error at" 3 "[(arguments) (parameters) (argument_list) (parameter_list)] @ctx" "Debug the query with `treesit-query-validate'") [49 times]
+- [ ] implement evil redo functionality
+- [ ] remove bufferlo indicator from modeline

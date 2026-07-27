@@ -1565,8 +1565,7 @@ Provides retro-active Vim-style wrapping via =ys=, =cs=, and =ds= operators. Int
     (embrace-add-pair ?* "*" "*")
     (embrace-add-pair ?_ "_" "_")
     (embrace-add-pair ?` "`" "`"))
-  (add-hook 'markdown-mode-hook #'ar/embrace-markdown-setup)
-  (add-hook 'gfm-mode-hook #'ar/embrace-markdown-setup))
+  (add-hook 'markdown-ts-mode-hook #'ar/embrace-markdown-setup))
 #+end_src
 
 ** DONE Delete Pair
@@ -3345,10 +3344,8 @@ Transforms the native directory editor into a modern, visual file manager with l
   :config
   ;; Finalize UI setup, hooks, and secondary advice post-load.
   (dirvish-override-dired-mode)
-  ;; Enable global peek mode for minibuffer file previews (Vertico synergy)
-  (dirvish-peek-mode 1)
   ;; Enable sidebar follow mode to track the active buffer
-  (dirvish-side-follow-mode 1)
+  ;; (dirvish-side-follow-mode 1)
   ;; TRAMP Async Integration: Prevents Dirvish from freezing over synchronous SSH
   ;; connections by enabling direct async processes for remote shells.
   (connection-local-set-profile-variables
@@ -3895,13 +3892,13 @@ Extends the native workspace detector with project-type-aware build menus, intel
   :defer t
   :after project
   :commands
-  projection-find-other-file
+  (projection-find-other-file
   projection-commands-build-project
   projection-commands-test-project
   projection-commands-run-project
   projection-commands-configure-project
   projection-commands-package-project
-  projection-commands-install-project
+  projection-commands-install-project)
   :hook
   (compilation-mode . projection-customize-compilation-mode)
   :init
@@ -4055,6 +4052,7 @@ Extends the native tab container with strict buffer isolation, workspace-aware m
     (add-to-list 'bufferlo-exclude-buffer-filters "^\\*Treemacs\\*$"))
   )
 #+end_src
+
 *** DONE Custom Workspace Utilities
 Provides wrapper functions for Doom Emacs perspective muscle memory, bridging persp-mode semantics to bufferlo's tab-bar physics.
 #+begin_src emacs-lisp
