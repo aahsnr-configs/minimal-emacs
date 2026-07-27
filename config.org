@@ -5777,8 +5777,22 @@ Connects Emacs to external language servers for smart code navigation, error che
                    (kill-new identifier)
                    (message "Copied moniker: %s" identifier))
                (message "No moniker found to copy.")))))))))
+#+end_src
 
+#+begin_src emacs-lisp
+(use-package consult-eglot
+  :defer t
+  :after (consult eglot)
+  :commands (consult-eglot-symbols))
+#+end_src
 
+#+begin_src emacs-lisp
+(use-package consult-eglot-embark
+  :after (consult-eglot embark)
+  :demand t
+  :config
+  ;; Activate the Embark action overrides for workspace symbol candidates.
+  (consult-eglot-embark-mode 1))
 #+end_src
 
 ** DONE Eldoc
@@ -5829,6 +5843,22 @@ Routes complex documentation to a floating popup and keeps the echo area concise
    ((t (:inherit shadow :strike-through t :height 0.4)))))
 #+end_src
 
+** DONE Xref
+Navigates to definitions, references, and symbols across the project.
+#+begin_src emacs-lisp
+(use-package xref
+  :straight (:type built-in)
+  :custom
+  ;; Route regex search backend to ripgrep.
+  (xref-search-program 'ripgrep)
+  ;; Display project-relative file paths in the tabulated list.
+  (xref-file-name-display 'project-relative)
+  :config
+  ;; Force Evil Normal state in the Emacs 31 editable xref buffer.
+  (when (fboundp 'evil-set-initial-state)
+    (evil-set-initial-state 'xref-edit-mode 'normal)))
+#+end_src
+
 ** TODO Minimap
 Provides a detachable, zoomed-out minimap sidebar with native diff-hl fringe synchronization.
 #+begin_src emacs-lisp
@@ -5855,6 +5885,61 @@ Provides a detachable, zoomed-out minimap sidebar with native diff-hl fringe syn
     (when (fboundp 'solaire-mode)
       (solaire-mode 1)))
   (add-hook 'demap-minimap-construct-hook #'ar/demap-integrate-ecosystem))
+#+end_src
+
+** DONE Flymake
+Native on-the-fly syntax checking and diagnostic aggregation with inline overlay rendering.
+#+begin_src emacs-lisp
+;; Foundational diagnostic aggregator and LSP payload router.
+(use-package flymake
+  :straight (:type built-in)
+  :custom
+  ;; Disable native EOL to prevent spatial stacking collisions with flyover.
+  (flymake-show-diagnostics-at-end-of-line nil)
+  ;; Margin indicators for a modern IDE gutter look.
+  (flymake-indicator-type 'margins)
+  (flymake-margin-indicators-string '((error "●" flymake-error-fringe)
+                                      (warning "▲" flymake-warning-fringe)
+                                      (note "■" flymake-note-fringe)))
+  (flymake-suppress-zero-counters t)
+  (flymake-wrap-around t)
+  :config
+  ;; Force straight underlines post-theme-load to bypass custom-set-faces overrides.
+  ;; Upstream `defface` defaults to `wave` if supported; `set-face-attribute` locks in `line`.
+  (set-face-attribute 'flymake-error nil :underline '(:style line :color "#f7768e" :position bottom))
+  (set-face-attribute 'flymake-warning nil :underline '(:style line :color "#e0af68" :position bottom))
+  (set-face-attribute 'flymake-note nil :underline '(:style line :color "#7aa2f7" :position bottom))
+  ;; Fringe faces for the margin indicators.
+  (set-face-attribute 'flymake-error-fringe nil :foreground "#f7768e")
+  (set-face-attribute 'flymake-warning-fringe nil :foreground "#e0af68")
+  (set-face-attribute 'flymake-note-fringe nil :foreground "#7aa2f7")
+  (add-hook 'prog-mode-hook #'flymake-mode))
+
+;; Aesthetic inline overlay engine for diagnostic messages.
+(use-package flyover
+  :defer t
+  :after flymake
+  :hook (flymake-mode . flyover-mode)
+  :custom
+  (flyover-checkers '(flymake))
+  (flyover-levels '(error warning info))
+  ;; Only reveal the inlay overlay when the cursor is placed on the error's line.
+  (flyover-display-mode 'show-only-on-same-line)
+  ;; Synchronize inline overlay icons with Flymake's margin indicators.
+  (flyover-error-icon "●")
+  (flyover-warning-icon "▲")
+  (flyover-info-icon "■")
+  :custom-face
+  ;; Explicit backgrounds bypass flyover's internal tinting engine for exact Tokyo Night colors.
+  (flyover-error ((t (:foreground "#f7768e" :background "#292e42" :height 0.9))))
+  (flyover-warning ((t (:foreground "#e0af68" :background "#292e42" :height 0.9))))
+  (flyover-info ((t (:foreground "#7aa2f7" :background "#292e42" :height 0.9)))))
+
+;; Project-wide diagnostic search wrapper for consult-flymake.
+(defun consult-flymake-project ()
+  "Invoke consult-flymake across all project buffers."
+  (interactive)
+  (consult-flymake t))
 #+end_src
 
 * Misc Keybinds

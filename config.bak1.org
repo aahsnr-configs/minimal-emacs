@@ -7144,7 +7144,7 @@ Native on-the-fly syntax checking and diagnostic aggregation with inline overlay
 #+begin_src emacs-lisp
 ;; Foundational diagnostic aggregator and LSP payload router.
 (use-package flymake
-  :ensure nil
+  :straight (:type built-in)
   :custom
   ;; Disable native EOL to prevent spatial stacking collisions with flyover.
   (flymake-show-diagnostics-at-end-of-line nil)
@@ -7152,10 +7152,10 @@ Native on-the-fly syntax checking and diagnostic aggregation with inline overlay
   (flymake-fringe-indicator-position 'left-fringe)
   (flymake-suppress-zero-counters t)
   (flymake-wrap-around t)
-  ;; (flymake-indicator-type 'margins)
-  ;; (flymake-margin-indicators-string '((error "●" flymake-error-fringe)
-  ;;                                     (warning "▲" flymake-warning-fringe)
-  ;;                                     (note "■" flymake-note-fringe)))
+  (flymake-indicator-type 'margins)
+  (flymake-margin-indicators-string '((error "●" flymake-error-fringe)
+                                      (warning "▲" flymake-warning-fringe)
+                                      (note "■" flymake-note-fringe)))
   :custom-face
   (flymake-error ((t (:underline (:style line :color "#f7768e" :position bottom)))))
   (flymake-warning ((t (:underline (:style line :color "#e0af68" :position bottom)))))
