@@ -22,7 +22,6 @@ The =no-byte-compile: t= header directive stops Emacs from prematurely compiling
 
 ** DONE Package Management
 #+begin_src emacs-lisp
-;; Prefer newer source files over stale byte-compiled artifacts.
 (defvar bootstrap-version)
 (let ((bootstrap-file
        (expand-file-name
@@ -33,7 +32,7 @@ The =no-byte-compile: t= header directive stops Emacs from prematurely compiling
   (unless (file-exists-p bootstrap-file)
     (with-current-buffer
         (url-retrieve-synchronously
-         "https://raw.githubusercontent.com/radian-software/straight.el/develop/install.el"
+         "https://radian-software.github.io/straight.el/install.el"
          'silent 'inhibit-cookies)
       (goto-char (point-max))
       (eval-print-last-sexp)))
@@ -563,7 +562,7 @@ Provides linear undo and redo actions with persistent history across Emacs sessi
            (hash (substring (secure-hash 'sha1 file) 0 16)))
       (expand-file-name (concat hash "-" base ext) undo-fu-session-directory)))
   (setq undo-fu-session-make-file-name-function #'ar/undo-fu-session-hash-path)
-  ;; Activate global minor mode directly in :config per Elpaca load-order physics.
+    ;; Activate global minor mode directly in :config per use-package/straight.el load-order physics.
   (undo-fu-session-global-mode 1))
 #+end_src
 
@@ -1614,25 +1613,25 @@ Restricts font-lock to mixed-indentation detection. Delegates trailing spaces an
 ** DONE Ws-Butler
 Unobtrusive trailing whitespace trimming confined to modified lines to prevent Git diff pollution. Exempts prose and terminal modes where trailing spaces carry structural meaning.
 #+begin_src emacs-lisp
-(use-package ws-butler
-  :demand t
-  :config
-  ;; Exempts terminals and prose modes where trailing spaces carry structural meaning.
-  (dolist (mode '(special-mode
-                  comint-mode
-                  term-mode
-                  vterm-mode
-                  eat-mode
-                  eshell-mode
-                  ghostel-mode
-                  diff-mode
-                  magit-status-mode
-                  org-mode
-                  markdown-mode
-                  gfm-mode))
-    (add-to-list 'ws-butler-global-exempt-modes mode))
-  ;; Activates global unobtrusive trimming.
-  (ws-butler-global-mode 1))
+;;(use-package ws-butler
+;; :demand t
+;; :config
+;; ;; Exempts terminals and prose modes where trailing spaces carry structural meaning.
+;; (dolist (mode '(special-mode
+;;                 comint-mode
+;;                 term-mode
+;;                 vterm-mode
+;;                 eat-mode
+;;                 eshell-mode
+;;                 ghostel-mode
+;;                 diff-mode
+;;                 magit-status-mode
+;;                 org-mode
+;;                 markdown-mode
+;;                 gfm-mode))
+;;   (add-to-list 'ws-butler-global-exempt-modes mode))
+;; ;; Activates global unobtrusive trimming.
+;; (ws-butler-global-mode 1))
 #+end_src
 
 ** DONE Dtrt Indent
@@ -1668,7 +1667,7 @@ Heuristic indentation detection for programming buffers. Executes post-mode init
 #+end_src
 
 ** DONE Indent Bars
-AST-aware vertical guides synchronizing depth colorization with rainbow-delimiters. Restricts activation to programming buffers to prevent Org-mode structural corruption.
+AST-aware vertical guides synchronizing depth colorization with rainbow-delimiters while restricting activation to programming buffers to prevent Org-mode structural corruption.
 #+begin_src emacs-lisp
 (use-package indent-bars
   :defer t
@@ -1684,6 +1683,7 @@ AST-aware vertical guides synchronizing depth colorization with rainbow-delimite
                              'lisp-mode
                              'emacs-lisp-mode
                              'lisp-interaction-mode 'lisp-data-mode))))
+
   (defun ar/indent-bars-maybe-enable ()
     "Enable indent-bars-mode if conditions are met."
     (when (ar/indent-bars-should-enable-p)
@@ -1694,7 +1694,7 @@ AST-aware vertical guides synchronizing depth colorization with rainbow-delimite
   (indent-bars-no-descend-lists t)
   (indent-bars-no-descend-string 'all)
   ;; Encapsulates multi-line AST nodes to prevent visual fragmentation.
-  (indent-bars-treesit-wrap '((python arguments parameters)
+  (indent-bars-treesit-wrap '((python argument_list parameters)
                               (c argument_list parameter_list)
                               (cpp argument_list parameter_list)
                               (rust arguments parameters)
@@ -2565,6 +2565,7 @@ Provides a visual directory editor and file manager for navigating the filesyste
           ("\\.\\(?:mp3\\|flac\\|wav\\|ogg\\)\\'" "xdg-open"))))
 #+end_src
 
+
 ** DONE Dirvish
 Transforms the native directory editor into a modern, visual file manager with live previews, sidebars, and integrated version control overlays.
 #+begin_src emacs-lisp
@@ -2616,17 +2617,9 @@ Transforms the native directory editor into a modern, visual file manager with l
   ;; Side window configuration.
   (dirvish-side-width 30)
   (dirvish-side-display-alist '((side . left) (slot . -1)))
-  :init
-  ;; Autoload Tripwire: Wraps native Dired C-level interception functions.
-  ;; Guarantees the very first `M-x dired` invocation is caught by Dirvish
-  ;; without forcing the entire package to load synchronously at startup.
-  (advice-add #'dired--find-file :override #'dirvish--find-entry)
-  (advice-add #'dired-noselect :around #'dirvish-dired-noselect-a)
   :config
-  ;; Finalize UI setup, hooks, and secondary advice post-load.
+  ;; Finalize UI setup, hooks, and safely install Dired interception advices post-load.
   (dirvish-override-dired-mode)
-  ;; Enable sidebar follow mode to track the active buffer
-  ;; (dirvish-side-follow-mode 1)
   ;; TRAMP Async Integration: Prevents Dirvish from freezing over synchronous SSH
   ;; connections by enabling direct async processes for remote shells.
   (connection-local-set-profile-variables
@@ -2635,64 +2628,49 @@ Transforms the native directory editor into a modern, visual file manager with l
   (connection-local-set-profiles
    '(:application tramp :protocol "ssh")
    'remote-tramp-direct-async)
-  ;; DOOM HACK: Prevent multi-frame feedback loop flickering (dirvish#353).
-  ;; In Emacs 30+, opening multiple frames with Dirvish active causes a redisplay
-  ;; feedback loop. This advice ensures the hook only fires for the selected window.
+  ;; Prevent multi-frame feedback loop flickering (dirvish#353) in Emacs 30+.
   (when (fboundp 'dirvish-pre-redisplay-h)
     (defun ar/dirvish--debounce-redisplay (fn window)
       "Debounce redisplay hook to prevent multi-frame flickering."
       (when (eq (frame-selected-window) window)
         (funcall fn window)))
     (advice-add #'dirvish-pre-redisplay-h :around #'ar/dirvish--debounce-redisplay))
-  ;; Clean up Dirvish before switching workspaces via bufferlo.
-  ;; Prevents delete-window errors on dedicated side-windows during tab switches.
-  (with-eval-after-load 'bufferlo
-    (add-hook 'bufferlo-before-switch-hook
-              (lambda (&rest _)
-                (when-let* ((dv (cl-loop for w in (window-list)
-                                         if (window-dedicated-p w)
-                                         if (with-current-buffer (window-buffer w) (dirvish-curr))
-                                         return it)))
-                  (let (dirvish-reuse-session)
-                    (with-selected-window (dv-root-window dv)
-                      (dirvish-quit))))))))
-;; CUSTOM DIRVISH TRANSIENT DASHBOARD
-;; ------------------------------------------------------------------
-;; Replaces the default `dirvish-dispatch` with a unified, Doom-inspired
-;; Transient dashboard. Acts as the "Main Menu" that can also summon the
-;; native `dirvish-emerge-menu` sub-menu for visual file grouping.
-(with-eval-after-load 'transient
-  (defun ar/dirvish-title ()
-    (concat
-     (if (fboundp 'nerd-icons-mdicon)
-         (nerd-icons-mdicon "nf-md-folder" :face 'transient-heading :v-adjust 0.02)
-       "")
-     (propertize " Dirvish Dashboard" 'face 'transient-heading)))
-  (transient-define-prefix ar/dirvish-transient ()
-    "Dirvish Dashboard"
-    [:description ar/dirvish-title
-     ["Navigation"
-      ("h" "History Back" dirvish-history-go-backward :transient t)
-      ("l" "History Forward" dirvish-history-go-forward :transient t)
-      ("j" "Jump (fd)" dirvish-fd-jump)
-      ("z" "History Jump" dirvish-history-jump)
-      ("b" "Quick Access" dirvish-quick-access)]
-     ["View & Layout"
-      ("F" "Toggle Layout" dirvish-layout-toggle)
-      ("S" "Quicksort" dirvish-quicksort)
-      ("s" "Setup Menu" dirvish-setup-menu)
-      ("n" "Narrow" dirvish-narrow)
-      ("i" "File Info" dirvish-file-info-menu)
-      ("e" "Emerge Groups" dirvish-emerge-menu)]
-     ["Tools"
-      ("y" "Yank Menu" dirvish-yank-menu)
-      ("v" "VC Menu" dirvish-vc-menu)
-      ("m" "Mark Menu" dirvish-mark-menu)
-      ("r" "Rsync" dirvish-rsync)]
-     ["Exit"
-      ("q" "Quit Dirvish" dirvish-quit)
-      ("<escape>" "" transient-quit-one :format " ")]]))
+  ;; Replaces the default dispatch with a unified Transient dashboard.
+  (with-eval-after-load 'transient
+    (defun ar/dirvish-title ()
+      (concat
+       (if (fboundp 'nerd-icons-mdicon)
+           (nerd-icons-mdicon "nf-md-folder" :face 'transient-heading :v-adjust 0.02)
+         "")
+       (propertize " Dirvish Dashboard" 'face 'transient-heading)))
 
+    (transient-define-prefix ar/dirvish-transient ()
+      "Dirvish Dashboard"
+      [:description ar/dirvish-title
+       ["Navigation"
+        ("h" "History Back" dirvish-history-go-backward :transient t)
+        ("l" "History Forward" dirvish-history-go-forward :transient t)
+        ("j" "Jump (fd)" dirvish-fd-jump)
+        ("z" "History Jump" dirvish-history-jump)
+        ("b" "Quick Access" dirvish-quick-access)]
+       ["View & Layout"
+        ("F" "Toggle Layout" dirvish-layout-toggle)
+        ("S" "Quicksort" dirvish-quicksort)
+        ("s" "Setup Menu" dirvish-setup-menu)
+        ("n" "Narrow" dirvish-narrow)
+        ("i" "File Info" dirvish-file-info-menu)
+        ("e" "Emerge Groups" dirvish-emerge-menu)]
+       ["Tools"
+        ("y" "Yank Menu" dirvish-yank-menu)
+        ("v" "VC Menu" dirvish-vc-menu)
+        ("m" "Mark Menu" dirvish-mark-menu)
+        ("r" "Rsync" dirvish-rsync)]
+       ["Exit"
+        ("q" "Quit Dirvish" dirvish-quit)
+        ("<escape>" "" transient-quit-one :format " ")]])))
+#+end_src
+
+#+begin_src emacs-lisp
 (general-define-key
  :states 'normal
  :keymaps 'dirvish-mode-map
@@ -3231,7 +3209,7 @@ Automatically cleans up inactive, buried buffers to prevent memory bloat during 
   ;;                (lambda (buf)
   ;;                  (and (bound-and-true-p bufferlo-mode)
   ;;                       (memq buf (bufferlo-buffer-list))))))
-  ;; Elpaca natively intercepts `:config` for external packages, wrapping it in an async callback.
+    ;; straight.el builds packages synchronously; `:config` executes safely post-load.
   ;; Omitting `:defer t` guarantees the background timer initializes safely post-build.
   (buffer-terminator-mode 1))
 #+end_src
@@ -3458,7 +3436,7 @@ Renders completion candidates in a vertical, interactive dropdown list.
   :demand t
   :custom
   ;; Reserves exactly 10 lines of vertical space for the dropdown.
-  (vertico-count 10)
+  (vertico-count 12)
   ;; Disables dynamic resizing to prevent UI jumping.
   (vertico-resize nil)
   ;; Allows cycling from the bottom of the list back to the top.
@@ -3514,12 +3492,15 @@ Saves and replays minibuffer completion sessions.
 #+end_src
 
 ** DONE Vertico Multiform
-Configures display rules and candidate transformations per command and category.
+Customizes completion dropdown layouts and applies visual highlighting to candidates based on the active command.
 #+begin_src emacs-lisp
 (use-package vertico-multiform
   :straight (:type built-in)
   :after vertico
   :config
+  ;; Guarantees the `dired-directory` face is registered before minibuffer rendering.
+  (require 'dired)
+
   ;; Intercepts candidate formatting to apply per-category text transformations.
   (defvar ar/vertico-transform-functions nil)
   (cl-defmethod vertico--format-candidate :around
@@ -3529,7 +3510,7 @@ Configures display rules and candidate transformations per command and category.
         (setq cand (funcall fun cand))))
     (cl-call-next-method cand prefix suffix index start))
 
-  ;; Highlights directories with a trailing slash.
+  ;; Highlights directories with a trailing slash using Dired faces.
   (defun ar/vertico-highlight-directory-fn (file)
     (when (string-suffix-p "/" file)
       (setq file (copy-sequence file))
@@ -3559,6 +3540,7 @@ Configures display rules and candidate transformations per command and category.
           (consult-yasnippet grid)
           (execute-extended-command
            (ar/vertico-transform-functions . ar/vertico-highlight-enabled-mode-fn))))
+
   (setq vertico-multiform-categories
         '((file
            (ar/vertico-transform-functions . ar/vertico-highlight-directory-fn))
@@ -3566,12 +3548,6 @@ Configures display rules and candidate transformations per command and category.
 
   ;; Activates the multiform engine post-load.
   (vertico-multiform-mode 1))
-
-;; Remaps C-s to fuzzy-search minibuffer input history.
-(with-eval-after-load 'consult
-  (dolist (keymap ar/minibuffer-escape-maps)
-    (when (boundp keymap)
-      (define-key (symbol-value keymap) (kbd "C-s") #'consult-history))))
 #+end_src
 
 ** DONE Marginalia
@@ -5941,6 +5917,928 @@ Native on-the-fly syntax checking and diagnostic aggregation with inline overlay
   (interactive)
   (consult-flymake t))
 #+end_src
+
+** DONE Eval Overlay
+Routes code evaluation results to inline overlays, floating childframes, or bottom drawers based on output length.
+#+begin_src emacs-lisp
+(use-package eros
+  :defer t
+  :custom
+  (eros-eval-result-duration 'command)
+  (eros-eval-result-prefix "⇒ ")
+  (eros-overlays-use-font-lock nil))
+
+(use-package quickrun
+  :defer t
+  :commands (quickrun
+             quickrun-region
+             quickrun-replace-region)
+  :custom
+  (quickrun-focus-p nil)
+  (quickrun-timeout-seconds 15))
+
+(use-package eval-overlay
+  :straight (:type built-in)
+  :after (posframe eros quickrun)
+  :custom
+  ;; Routing thresholds for inline overlays, childframes, and bottom popups.
+  (eval-overlay-inline-max-lines 2)
+  (eval-overlay-inline-max-width 80)
+  (eval-overlay-posframe-max-lines 20)
+  (eval-overlay-posframe-auto-hide t)
+  (eval-overlay-posframe-timeout 30)
+  (eval-overlay-popup-height 0.3)
+  :config
+  (eval-overlay-mode 1))
+#+end_src
+
+** DONE Dape
+Provides native debugging with inline variable hints, persistent breakpoints, and remote debugging support.
+#+begin_src emacs-lisp
+(use-package dape
+  :defer t
+  :commands (dape
+             dape-quit
+             dape-restart
+             dape-next
+             dape-step-in
+             dape-step-out
+             dape-continue
+             dape-pause
+             dape-breakpoint-toggle
+             dape-breakpoint-remove-all
+             dape-breakpoint-log
+             dape-breakpoint-expression
+             dape-breakpoint-hits
+             dape-evaluate-expression
+             dape-watch-dwim
+             dape-info
+             dape-repl
+             dape-memory
+             dape-disassemble
+             dape-select-thread
+             dape-select-stack
+             dape-until
+             dape-restart-frame)
+  :custom
+  ;; Unbind the default C-x C-a prefix; we use general.el leader bindings.
+  (dape-key-prefix nil)
+  ;; IDE-style side panels (matches Treemacs-left, info-right paradigm).
+  (dape-buffer-window-arrangement 'right)
+  ;; Full VS Code-like multi-panel layout on session start.
+  (dape-many-windows t)
+  ;; Keep info buffers chrome-free (matches ar/hide-modeline-mode aesthetic).
+  (dape-info-hide-mode-line t)
+  ;; Wire cwd to native project.el (NOT projectile).
+  ;; Emacs 31: `when-let` is obsolete; strictly use `when-let*`.
+  (dape-cwd-function (lambda ()
+                       (or (when-let* ((proj (project-current)))
+                             (project-root proj))
+                           default-directory)))
+  ;; Auto-expand variable trees: 1 level for locals (buffer 0), 0 for globals.
+  (dape-variable-auto-expand-alist '((0 . 1)))
+  ;; Tabular alignment in the scopes buffer.
+  (dape-info-variable-table-aligned t)
+  ;; Line-level stepping granularity.
+  (dape-stepping-granularity 'line)
+  ;; Adapter response timeout in seconds.
+  (dape-request-timeout 5)
+  ;; Configuration hints in minibuffer.
+  (dape-minibuffer-hint t)
+  ;; Echo runInTerminal output to REPL.
+  (dape-repl-echo-shell-output t)
+  ;; Dash-form config parsing.
+  (dape-history-add 'shell-like)
+  ;; Route breakpoint persistence to no-littering var directory.
+  (dape-default-breakpoints-file (no-littering-expand-var-file-name "dape/breakpoints.eld"))
+  ;; Render inlay hints for 10 lines surrounding the stopped stack frame.
+  (dape-inlay-hints 10)
+  :custom-face
+  ;; Themes inline exception overlays to Tokyo Night red.
+  (dape-exception-description-face ((t (:foreground "#f7768e" :inherit error))))
+  :config
+  ;; Breakpoint persistence: save on quit, load on startup.
+  (add-hook 'kill-emacs-hook #'dape-breakpoint-save)
+  (add-hook 'after-init-hook #'dape-breakpoint-load)
+
+  ;; Enable mouse-based breakpoint manipulation (click fringe to toggle).
+  (dape-breakpoint-global-mode 1)
+
+  ;; Visual pulse on stop & dynamic inlay-hints guard.
+  ;; Buffer-locally overrides `dape-inlay-hints` to prevent main-thread blocking
+  ;; when the debugger halts in massive minified JSON or log files.
+  (add-hook 'dape-display-source-hook
+            (lambda ()
+              (if (too-long-file-p)
+                  (setq-local dape-inlay-hints nil)
+                (setq-local dape-inlay-hints 10))
+              (unless (too-long-file-p)
+                (pulse-momentary-highlight-one-line))))
+
+  ;; Save buffers before debug session (useful for interpreted languages).
+  (add-hook 'dape-start-hook (lambda () (save-some-buffers t t)))
+
+  ;; Kill compile buffer on success.
+  (add-hook 'dape-compile-hook #'kill-buffer)
+
+  ;; Hide modeline in REPL buffer.
+  (add-hook 'dape-repl-mode-hook #'ar/enable-hide-modeline)
+
+  ;; Spatial Routing (Ghostel/Eshell drawer paradigm)
+  (add-to-list 'display-buffer-alist
+               '((derived-mode . dape-repl-mode)
+                 (display-buffer-in-side-window)
+                 (side . bottom)
+                 (window-height . 0.30)
+                 (window-parameters (no-delete-other-windows . t))))
+  (add-to-list 'display-buffer-alist
+               '((derived-mode . dape-memory-mode)
+                 (display-buffer-in-side-window)
+                 (side . bottom)
+                 (window-height . 0.40)
+                 (window-parameters (no-delete-other-windows . t))))
+  (add-to-list 'display-buffer-alist
+               '("\\*dape-disassemble.*\\*"
+                 (display-buffer-in-side-window)
+                 (side . right)
+                 (window-width . 0.35)
+                 (window-parameters (no-delete-other-windows . t))))
+  ;; Route standard compilation buffers (spawned by dape-compile-function) to bottom drawer.
+  (add-to-list 'display-buffer-alist
+               '("\\*compilation\\*"
+                 (display-buffer-in-side-window)
+                 (side . bottom)
+                 (window-height . 0.25)
+                 (window-parameters (no-delete-other-windows . t))))
+
+  ;; Transient Dashboard (Replacing dap-hydra)
+  (with-eval-after-load 'transient
+    (defun ar/dape-title ()
+      (concat
+       (if (fboundp 'nerd-icons-codicon)
+           (nerd-icons-codicon "nf-cod-debug" :face 'transient-heading :v-adjust 0.02)
+         "")
+       (propertize " Debug" 'face 'transient-heading)))
+
+    (transient-define-prefix ar/toggles-dape ()
+      "Debugger"
+      [:description ar/dape-title
+		    ["Session"
+		     ("S" "start" dape :transient t)
+		     ("P" "project" projection-dape :transient t)
+		     ("q" "quit" dape-quit)
+		     ("k" "kill" dape-kill)
+		     ("r" "restart" dape-restart :transient t)
+		     ("R" "restart frame" dape-restart-frame :transient t)]
+		    ["Navigation"
+		     ("n" "next" dape-next :transient t)
+		     ("s" "step in" dape-step-in :transient t)
+		     ("o" "step out" dape-step-out :transient t)
+		     ("c" "continue" dape-continue :transient t)
+		     ("p" "pause" dape-pause :transient t)
+		     ("u" "until" dape-until :transient t)]
+		    ["Breakpoints"
+		     ("b" "toggle" dape-breakpoint-toggle :transient t)
+		     ("B" "clear all" dape-breakpoint-remove-all :transient t)
+		     ("l" "log" dape-breakpoint-log :transient t)
+		     ("h" "hits" dape-breakpoint-hits :transient t)
+		     ("C" "condition" dape-breakpoint-expression :transient t)]
+		    ["Evaluation"
+		     ("e" "eval" dape-evaluate-expression :transient t)
+		     ("w" "watch" dape-watch-dwim :transient t)]
+		    ["Info Panels"
+		     ("i" "info" dape-info :transient t)
+		     ("t" "threads" dape-select-thread :transient t)
+		     ("F" "stack" dape-select-stack :transient t)
+		     ("m" "repl" dape-repl :transient t)
+		     ("M" "memory" dape-memory :transient t)
+		     ("A" "disasm" dape-disassemble :transient t)]
+		    ["Exit"
+		     ("<escape>" "" transient-quit-one :format " ")]])))
+#+end_src
+
+** DONE Direnv
+Per-directory environment variable isolation for project-specific subprocesses and language servers.
+#+begin_src emacs-lisp
+(use-package envrc
+  :hook (after-init . envrc-global-mode))
+#+end_src
+
+** DONE Apheleia
+Automatically formats code using external tools when saving files.
+#+begin_src emacs-lisp
+(use-package apheleia
+  :hook (prog-mode . apheleia-mode)
+  :commands (apheleia-format-buffer)
+  :custom
+  ;; Prevents main-thread hangs over TRAMP.
+  (apheleia-remote-algorithm 'cancel)
+  (apheleia-hide-log-buffers t))
+#+end_src
+
+
+* DONE Contextual Sidebars
+Persistent side windows displaying dynamic metadata, backlinks, and bibliography context for the active buffer.
+
+** DONE Universal Sidecar
+Provides a per-frame sidebar buffer that dynamically renders contextual metadata sections for the focused window.
+#+begin_src emacs-lisp
+(use-package universal-sidecar
+  :defer t
+  :commands (universal-sidecar-toggle
+             universal-sidecar-insinuate
+             universal-sidecar-uninsinuate
+             universal-sidecar-refresh)
+  :custom
+  ;; Tie buffer name to the frame description.
+  (universal-sidecar-buffer-name-format "*Sidecar: %F*")
+  ;; Enable passive idle timer for content refresh.
+  (universal-sidecar-enable-timer t)
+  (universal-sidecar-refresh-time 5)
+  :config
+  ;; Route to a dedicated right-side window, isolated from Popper and `C-x o`.
+  (add-to-list 'display-buffer-alist
+               '("\\*Sidecar:.*\\*"
+                 (display-buffer-in-side-window)
+                 (side . right)
+                 (window-width . 0.25)
+                 (window-parameters (no-delete-other-windows . t)
+                                    (no-other-window . t))))
+  ;; Advise core navigation functions to trigger sidecar updates.
+  (universal-sidecar-insinuate))
+#+end_src
+
+** DONE Denote Sections
+Injects Denote backlinks into the universal sidecar, mimicking the org-roam buffer UI without a SQLite database.
+#+begin_src emacs-lisp
+(use-package denote-sections
+  :defer t
+  :after (universal-sidecar denote)
+  :config
+  ;; Append the backlinks section to preserve rendering order.
+  (add-to-list 'universal-sidecar-sections 'denote-sections-backlinks-section t))
+#+end_src
+
+** DONE Denote Citar Sections
+Injects bibliography abstracts and formatted references into the universal sidecar for literature notes.
+#+begin_src emacs-lisp
+(use-package denote-citar-sections
+  :defer t
+  :after (universal-sidecar denote citar)
+  :config
+  ;; Append bibliography sections for literature notes (abstract first, then reference).
+  (add-to-list 'universal-sidecar-sections 'denote-citar-sections-abstract-section t)
+  (add-to-list 'universal-sidecar-sections 'denote-citar-sections-reference-section t))
+#+end_src
+
+
+
+* TODO Version Control
+** TODO Magit: The Git Porcelain
+#+begin_src emacs-lisp
+(use-package magit
+  :defer t
+  :commands (magit-status
+             magit-blame
+             magit-log-buffer-file
+             magit-stage-file
+             magit-unstage-file
+             magit-stage
+             magit-unstage
+             magit-commit
+             magit-push-current-to-pushremote
+             magit-pull-from-upstream
+             magit-fetch
+             magit-run-git
+             magit-branch
+             magit-merge
+             magit-rebase
+             magit-diff-unstaged
+             magit-diff-staged
+             magit-stash
+             magit-dispatch)
+  :custom
+  ;; Display settings
+  (magit-display-buffer-function #'magit-display-buffer-fullframe-status-v1)
+  (magit-bury-buffer-function #'magit-restore-window-configuration)
+
+  ;; Performance
+  (magit-refresh-status-buffer t)
+  (magit-refresh-verbose nil)
+  (magit-git-executable "git")
+
+  ;; Behavior
+  (magit-save-repository-buffers 'dontask)
+  (magit-commit-ask-to-stage 'stage)
+  (magit-commit-show-diff t)
+  (magit-revision-show-gravatars nil)
+
+  ;; Diff settings
+  (magit-diff-refine-hunk 'all)
+  (magit-diff-paint-whitespace t)
+  (magit-diff-highlight-trailing t)
+
+  :config
+  ;; Enable gravatars if desired (requires imagemagick)
+  (when (and (display-graphic-p)
+             (image-type-available-p 'imagemagick))
+    (setq magit-revision-show-gravatars '("^Author:     " . "^Commit:     "))))
+#+end_src
+
+** TODO Forge
+#+begin_src emacs-lisp
+(use-package forge
+  :after magit
+  :defer t
+  :config
+  ;; Configure forge to use sqlite for storage
+  (setq forge-database-connector 'sqlite-builtin))
+#+end_src
+
+** TODO Diff-hl
+#+begin_src emacs-lisp
+(use-package diff-hl
+  :hook ((after-init . global-diff-hl-mode)
+         (dired-mode . diff-hl-dired-mode))
+  :hook (magit-pre-refresh . diff-hl-magit-pre-refresh)
+  :hook (magit-post-refresh . diff-hl-magit-post-refresh)
+  :init
+  ;; Doom Emacs aesthetic: Thin vertical bars instead of blocks
+  ;; We define custom bitmaps to match Doom's 'ui/vc-gutter' look
+  (define-fringe-bitmap 'my-diff-hl-bmp-insert [224] nil nil '(center repeated))
+  (define-fringe-bitmap 'my-diff-hl-bmp-modify [224] nil nil '(center repeated))
+  (define-fringe-bitmap 'my-diff-hl-bmp-delete [128 192 224 240] nil nil 'bottom)
+
+  :custom
+  (diff-hl-draw-borders nil)
+  (diff-hl-flydiff-delay 0.1) ;; Update immediately while typing
+
+  :config
+  ;; Enable real-time updates (equivalent to git-gutter+)
+  (diff-hl-flydiff-mode 1)
+
+  ;; Force the custom thin bitmaps defined in :init
+  (setq diff-hl-fringe-bmp-function
+        (lambda (type pos)
+          (cond
+           ((eq type 'delete) 'my-diff-hl-bmp-delete)
+           ((eq type 'insert) 'my-diff-hl-bmp-insert)
+           ((eq type 'change) 'my-diff-hl-bmp-modify)
+           (t 'my-diff-hl-bmp-insert))))
+
+  ;; Clean Tokyo Night colors (Foreground only, no ugly background blocks)
+  (custom-set-faces
+   '(diff-hl-insert ((t (:foreground "#9ece6a" :background unspecified))))
+   '(diff-hl-change ((t (:foreground "#e0af68" :background unspecified))))
+   '(diff-hl-delete ((t (:foreground "#f7768e" :background unspecified))))))
+#+end_src
+
+** TODO Git-Timemachine: Step Through File History
+#+begin_src emacs-lisp
+(use-package git-timemachine
+  :defer t
+  :commands (git-timemachine git-timemachine-toggle)
+
+  :init
+  ;; CRITICAL FIX: Only configure native-comp if it's actually available
+  (when (and (fboundp 'native-comp-available-p)
+             (native-comp-available-p))
+    (with-eval-after-load 'comp
+      (when (boundp 'native-comp-deferred-compilation-deny-list)
+        (add-to-list 'native-comp-deferred-compilation-deny-list "git-timemachine"))))
+
+  :custom
+  (git-timemachine-abbreviation-length 7)
+  (git-timemachine-show-minibuffer-details t)
+
+  :config
+  (defun ar/git-timemachine-setup ()
+    "Disable interfering modes when entering git-timemachine."
+    (when (bound-and-true-p diff-hl-mode)
+      (diff-hl-mode -1)
+      (setq-local ar/diff-hl-was-active t))
+
+    (when (bound-and-true-p eglot--managed-mode)
+      (eglot-managed-mode -1)
+      (setq-local ar/eglot-was-active t))
+
+    (when (bound-and-true-p flymake-mode)
+      (flymake-mode -1)
+      (setq-local ar/flymake-was-active t))
+
+    (read-only-mode 1))
+
+  (defun ar/git-timemachine-teardown ()
+    "Re-enable modes when exiting git-timemachine."
+    (when (bound-and-true-p ar/diff-hl-was-active)
+      (diff-hl-mode 1)
+      (kill-local-variable 'ar/diff-hl-was-active))
+
+    (when (bound-and-true-p ar/eglot-was-active)
+      (eglot-ensure)
+      (kill-local-variable 'ar/eglot-was-active))
+
+    (when (bound-and-true-p ar/flymake-was-active)
+      (flymake-mode 1)
+      (kill-local-variable 'ar/flymake-was-active))
+
+    ;; 4. Disable read-only
+    (read-only-mode -1))
+
+  (add-hook 'git-timemachine-mode-hook #'ar/git-timemachine-setup)
+  (add-hook 'git-timemachine-mode-exit-hook #'ar/git-timemachine-teardown))
+#+end_src
+
+
+
+* DONE Highlight TODOs
+** DONE hl-todo
+Highlights and navigates TODO keywords across buffers with integrated flymake diagnostics.
+#+begin_src emacs-lisp
+(use-package hl-todo
+  :defer t
+  :bind (:map hl-todo-mode-map
+         ("C-c n" . hl-todo-next)
+         ("C-c p" . hl-todo-previous)
+         ("C-c i" . hl-todo-insert))
+  :custom-face
+  (hl-todo ((t (:inherit font-lock-keyword-face :weight bold))))
+  :custom
+  (hl-todo-require-punctuation nil)
+  (hl-todo-highlight-punctuation ":!")
+  (hl-todo-keyword-faces
+   '(("TODO"       . "#e0af68")
+     ("COMMENT"    . "#e0af68")
+     ("FIXME"      . "#f7768e")
+     ("BUG"        . "#f7768e")
+     ("ISSUE"      . "#f7768e")
+     ("PROG"       . "#7aa2f7")
+     ("TRICK"      . "#ff9e64")
+     ("WORKAROUND" . "#ff9e64")
+     ("BENCHMARK"  . "#9ece6a")
+     ("REVIEW"     . "#7dcfff")
+     ("NOTE"       . "#bb9af7")
+     ("DEPRECATED" . "#73daca")
+     ("HACK"       . "#db4b4b")
+     ("DEBUG"      . "#e0af68")
+     ("STUB"       . "#e0af68")))
+  :config
+  (global-hl-todo-mode 1)
+
+  ;; Inject hl-todo diagnostics into the native flymake backend pipeline buffer-locally.
+  (add-hook 'hl-todo-mode-hook
+            (lambda () (add-hook 'flymake-diagnostic-functions #'hl-todo-flymake nil t)))
+
+  ;; Safe registration of consult preview hooks.
+  (with-eval-after-load 'consult
+    (when (boundp 'consult-preview-allowed-hooks)
+      (add-to-list 'consult-preview-allowed-hooks 'hl-todo-mode)
+      (add-to-list 'consult-preview-allowed-hooks 'global-hl-todo-mode)))
+
+  (defun ar/hl-todo-rg-project ()
+    "Search for TODO keywords across the current project using ripgrep."
+    (interactive)
+    (let ((regexp (concat "\\b(" (string-join (mapcar #'car hl-todo-keyword-faces) "|") ")\\b")))
+      (cond
+       ((fboundp 'consult-ripgrep)
+        (consult-ripgrep nil regexp))
+       ((fboundp 'hl-todo-rgrep)
+        (hl-todo-rgrep))
+       (t
+        (user-error "Neither consult-ripgrep nor hl-todo-rgrep is available"))))))
+#+end_src
+
+** DONE consult-todo
+Upgrades hl-todo navigation with minibuffer narrowing, live previews, and project-scoped async searching.
+#+begin_src emacs-lisp
+(use-package consult-todo
+  :defer t
+  :after (consult hl-todo)
+  :custom
+  ;; Map narrowing characters to the 15 custom hl-todo keywords.
+  (consult-todo-narrow '((?t . "TODO")
+                         (?c . "COMMENT")
+                         (?f . "FIXME")
+                         (?b . "BUG")
+                         (?i . "ISSUE")
+                         (?p . "PROG")
+                         (?r . "TRICK")
+                         (?w . "WORKAROUND")
+                         (?B . "BENCHMARK")
+                         (?R . "REVIEW")
+                         (?n . "NOTE")
+                         (?d . "DEPRECATED")
+                         (?h . "HACK")
+                         (?D . "DEBUG")
+                         (?s . "STUB")))
+  ;; Route uncategorized keywords under the 'o' character.
+  (consult-todo-other '(?o . "OTHER"))
+  ;; Disable comment-only restriction to include Org headings and Markdown prose.
+  (consult-todo-only-comment nil)
+  ;; Enable debounced live buffer previews for project searches.
+  (consult-todo-dir-preview-key '(:debounce 0.2 any))
+  ;; Cache threshold for large project greps in seconds.
+  (consult-todo-cache-threshold 5.0))
+#+end_src
+
+** DONE magit-todos
+Injects project-wide TODOs into the Magit status buffer and highlights keywords in commit logs.
+#+begin_src emacs-lisp
+(use-package magit-todos
+  :defer t
+  :after magit
+  :hook (magit-mode . magit-todos-mode)
+  :custom
+  ;; Exclude build artifacts, dependencies, and minified files from scanning.
+  (magit-todos-exclude-globs '("*.map" "*.min.*" ".git/" "node_modules/" "dist/" "build/" "vendor/"))
+  ;; Restrict scanning to 1 level below repo root to prevent I/O latency in massive monorepos.
+  ;; Set to `nil` for unlimited depth.
+  (magit-todos-depth 1)
+  :config
+  ;;Highlight TODO keywords in commit summaries and revision messages.
+  (add-hook 'magit-log-wash-summary-hook #'hl-todo-search-and-highlight t)
+  (add-hook 'magit-revision-wash-message-hook #'hl-todo-search-and-highlight t))
+#+end_src
+
+** DONE Keybindings
+Routes global search commands and local navigation for the TODO ecosystem.
+#+begin_src emacs-lisp
+;; Global leader (SPC s) for buffer and project TODO searches.
+(ar/global-leader
+  "s t" '(hl-todo-occur :wk "Todo list (buffer)")
+  "s T" '(ar/hl-todo-rg-project :wk "Todo in project (rg)")
+  "s C" '(consult-todo :wk "Todo list (consult)")
+  "s P" '(consult-todo-project :wk "Todo in project (consult)"))
+
+;; Local leader (SPC m) for hl-todo navigation in programming and text buffers.
+(ar/local-leader
+  :keymaps 'hl-todo-mode-map
+  "n" '(hl-todo-next :wk "Next todo")
+  "p" '(hl-todo-previous :wk "Previous todo")
+  "i" '(hl-todo-insert :wk "Insert todo"))
+#+end_src
+
+
+
+* DONE Markdown Mode
+Native tree-sitter Markdown editing and viewing via Emacs 31's built-in engine. Provides structure-aware coloring, hidden markup rendering, inline images, table editing, code block context, and outline folding without any external packages.
+
+** DONE Grammar Setup
+Registers the two required tree-sitter grammars so they are available before the first Markdown file is opened.
+#+begin_src emacs-lisp
+;; Register markdown grammar sources for auto-installation.
+;; The built-in markdown-ts-mode.el also registers these at load time,
+;; but early registration ensures availability for `markdown-ts-mode-install-parsers'.
+(when (treesit-available-p)
+  (dolist (source
+           '((markdown
+              "https://github.com/tree-sitter-grammars/tree-sitter-markdown"
+              :commit "413285231ce8fa8b11e7074bbe265b48aa7277f9"
+              :source-dir "tree-sitter-markdown/src")
+             (markdown-inline
+              "https://github.com/tree-sitter-grammars/tree-sitter-markdown"
+              :commit "413285231ce8fa8b11e7074bbe265b48aa7277f9"
+              :source-dir "tree-sitter-markdown-inline/src")))
+    (setf (alist-get (car source) treesit-language-source-alist) (cdr source))))
+#+end_src
+
+** DONE Core Setup
+Configures editing defaults, code block language mappings, prose-friendly buffer hooks, and Evil initial states for the main Markdown mode.
+#+begin_src emacs-lisp
+(use-package markdown-ts-mode
+  :straight (:type built-in)
+  :if (treesit-available-p)
+  :custom
+  ;; Fontify fenced code blocks using the embedded language's mode.
+  (markdown-ts-fontify-code-blocks-natively t)
+  ;; Enable TAB/RET/xref context inside code blocks.
+  (markdown-ts-enable-code-block-context-mode t)
+  ;; Enable interactive table editing.
+  (markdown-ts-enable-table-mode t)
+  ;; Auto-align tables on cell navigation and transpose.
+  (markdown-ts-table-auto-align '(cell-navigation transpose))
+  ;; Justify cells according to the delimiter row alignment rules.
+  (markdown-ts-table-align-features '(justify-cells))
+  ;; Default mode for code blocks without a language tag.
+  (markdown-ts-default-code-block-mode 'text-mode)
+  ;; Show everything when editing; fold interactively via TAB.
+  (markdown-ts-default-folding 'show-all)
+  ;; Markup visible while editing (hidden in view mode).
+  (markdown-ts-hide-markup nil)
+  ;; Images off while editing (on in view mode).
+  (markdown-ts-inline-images nil)
+  ;; Constrain inline images to the window body width.
+  (markdown-ts-image-max-width 'window)
+  ;; Skip remote images by default for security.
+  (markdown-ts-display-remote-inline-images nil)
+  ;; Suppress noisy major-mode warnings from code block fontification.
+  (markdown-ts-inhibit-code-block-mode-warnings t)
+  ;; Suppress the code-block and table minor-mode lighters.
+  (markdown-ts-code-block-in-context-mode-lighter nil)
+  (markdown-ts-in-table-mode-lighter nil)
+  :hook
+  ;; Prose-friendly buffer settings.
+  (markdown-ts-mode . visual-line-mode)
+  (markdown-ts-mode . (lambda ()
+                        (setq-local show-trailing-whitespace nil)
+                        (setq-local fill-column 80)))
+  ;; Disable line numbers in prose buffers.
+  (markdown-ts-mode . (lambda ()
+                        (when (bound-and-true-p display-line-numbers-mode)
+                          (display-line-numbers-mode -1))))
+  ;; Enable color visualization for hex/rgb values.
+  (markdown-ts-mode . colorful-mode)
+  :config
+  ;; Extend code block language-to-mode mappings for common aliases.
+  (dolist (pair '((nix nix-ts-mode)
+                  (docker dockerfile-ts-mode)
+                  (dockerfile dockerfile-ts-mode)
+                  (vim vimrc-mode)
+                  (zsh bash-ts-mode)
+                  (fish bash-ts-mode)
+                  (console text-mode)
+                  (terminal text-mode)
+                  (txt text-mode)
+                  (text text-mode)
+                  (org org-mode)
+                  (r r-mode)
+                  (R r-mode)
+                  (diff diff-mode)
+                  (patch diff-mode)
+                  (ini conf-mode)
+                  (toml toml-ts-mode)
+                  (conf conf-mode)))
+    (setf (alist-get (car pair) markdown-ts-code-block-modes) (cdr pair)))
+  ;; Evil initial states.
+  (evil-set-initial-state 'markdown-ts-mode 'normal)
+  (evil-set-initial-state 'markdown-ts-view-mode 'normal)
+  ;; Wire evil-embrace markdown pairs into markdown-ts-mode buffers.
+  ;; The function is defined in the Evil Surround section (loaded earlier).
+  (add-hook 'markdown-ts-mode-hook
+            (lambda ()
+              (when (fboundp 'ar/embrace-markdown-setup)
+                (ar/embrace-markdown-setup)))))
+#+end_src
+
+** DONE Reading Mode
+Tunes the read-only view for comfortable long-form reading with hidden markup, inline images, and folded headings.
+#+begin_src emacs-lisp
+;; View-mode defaults are set internally by markdown-ts-view-mode:
+;; hide-markup=t, inline-images=t, code-block-context=nil, table-mode=nil.
+;; Additional tuning via the pre-init hook and post-mode hook.
+(with-eval-after-load 'markdown-ts-mode
+  ;; Fold to top-level headings on entry for a clean document overview.
+  (add-hook 'markdown-ts-view-mode-hook
+            (lambda ()
+              (when (eq markdown-ts-default-folding 'show-all)
+                (outline-hide-sublevels 1))
+              ;; Disable trailing whitespace and line numbers in view mode.
+              (setq-local show-trailing-whitespace nil)
+              (when (bound-and-true-p display-line-numbers-mode)
+                (display-line-numbers-mode -1))))
+  ;; Provide a quick command to open the current file in view mode.
+  (defun ar/markdown-view ()
+    "Open the current Markdown file in read-only view mode."
+    (interactive)
+    (if (derived-mode-p 'markdown-ts-mode)
+        (markdown-ts-view-mode)
+      (user-error "Not a Markdown buffer"))))
+#+end_src
+
+** DONE Appearance
+Applies the Tokyo Night color palette to all Markdown structural elements for visual consistency with the rest of the editor.
+#+begin_src emacs-lisp
+(with-eval-after-load 'markdown-ts-mode
+  (custom-set-faces
+   ;; Headings: distinct color per level with proportional height scaling.
+   '(markdown-ts-heading-1 ((t (:foreground "#7aa2f7" :weight bold :height 1.4))))
+   '(markdown-ts-heading-2 ((t (:foreground "#e0af68" :weight bold :height 1.3))))
+   '(markdown-ts-heading-3 ((t (:foreground "#9ece6a" :weight bold :height 1.2))))
+   '(markdown-ts-heading-4 ((t (:foreground "#1abc9c" :weight bold :height 1.1))))
+   '(markdown-ts-heading-5 ((t (:foreground "#bb9af7" :weight bold :height 1.05))))
+   '(markdown-ts-heading-6 ((t (:foreground "#ff9e64" :weight bold :height 1.0))))
+   '(markdown-ts-setext-heading ((t (:inherit markdown-ts-heading-1))))
+   ;; Delimiters: recessive gray for #, brackets, fence markers.
+   '(markdown-ts-delimiter ((t (:foreground "#565f89" :slant normal :weight normal))))
+   ;; Inline emphasis.
+   '(markdown-ts-emphasis ((t (:foreground "#bb9af7" :slant italic))))
+   '(markdown-ts-bold ((t (:foreground "#e0af68" :weight bold))))
+   '(markdown-ts-strikethrough ((t (:foreground "#f7768e" :strike-through t))))
+   ;; Code spans and blocks.
+   '(markdown-ts-code-span ((t (:foreground "#7dcfff" :background "#24283b"))))
+   '(markdown-ts-code-block ((t (:background "#24283b" :extend t))))
+   '(markdown-ts-code-block-markup-hidden ((t (:background "#24283b" :extend t))))
+   '(markdown-ts-indented-code-block ((t (:foreground "#7dcfff" :background "#24283b"))))
+   '(markdown-ts-language-keyword ((t (:foreground "#ff9e64" :weight bold))))
+   ;; Block elements.
+   '(markdown-ts-block-quote ((t (:foreground "#565f89" :slant italic))))
+   '(markdown-ts-thematic-break ((t (:foreground "#292e42" :extend t))))
+   ;; Links.
+   '(markdown-ts-link ((t (:foreground "#7aa2f7" :underline t))))
+   '(markdown-ts-link-destination ((t (:foreground "#9ece6a"))))
+   ;; Tables.
+   '(markdown-ts-table ((t (:background "#24283b" :extend t))))
+   '(markdown-ts-table-header ((t (:foreground "#7aa2f7" :weight bold))))
+   '(markdown-ts-table-cell ((t (:foreground "#c0caf5"))))
+   '(markdown-ts-table-delimiter-cell ((t (:foreground "#565f89"))))
+   ;; Lists and task checkboxes.
+   '(markdown-ts-list-marker ((t (:foreground "#565f89"))))
+   '(markdown-ts-task-unchecked ((t (:foreground "#7aa2f7"))))
+   '(markdown-ts-task-checked ((t (:foreground "#9ece6a"))))
+   ;; HTML, entities, and LaTeX.
+   '(markdown-ts-html-tag ((t (:foreground "#f7768e"))))
+   '(markdown-ts-html-block ((t (:foreground "#f7768e"))))
+   '(markdown-ts-entity-reference ((t (:foreground "#7dcfff"))))
+   '(markdown-ts-numeric-character-reference ((t (:foreground "#7dcfff"))))
+   '(markdown-ts-latex ((t (:foreground "#e0af68"))))
+   ;; Hard line breaks.
+   '(markdown-ts-hard-line-break-backslash ((t (:foreground "#565f89" :underline t))))
+   '(markdown-ts-hard-line-break-space ((t (:background "#292e42"))))
+   ;; Active context overlays (code block / table under cursor).
+   '(markdown-ts-in-code-block ((t (:background "#292e42" :extend t))))
+   '(markdown-ts-in-table ((t (:background "#292e42" :extend t))))))
+#+end_src
+
+** DONE Modal Editing
+Sets up Evil navigation, Unimpaired bracket motions, and view-mode keymaps for Vim-style Markdown editing.
+#+begin_src emacs-lisp
+(with-eval-after-load 'markdown-ts-mode
+  ;; Unimpaired-style heading and code block navigation (motion state).
+  (general-define-key
+   :states 'motion
+   :keymaps 'markdown-ts-mode-map
+   "]h" #'outline-next-heading
+   "[h" #'outline-previous-heading
+   "]b" #'markdown-ts-move-to-next-code-block
+   "[b" #'markdown-ts-move-to-previous-code-block)
+  ;; View-mode navigation mirrors the built-in n/p/u/f/b bindings.
+  (general-define-key
+   :states 'motion
+   :keymaps 'markdown-ts-view-mode-map
+   "]h" #'outline-next-heading
+   "[h" #'outline-previous-heading
+   "]b" #'markdown-ts-move-to-next-code-block
+   "[b" #'markdown-ts-move-to-previous-code-block)
+  ;; Force normal state in view mode; q buries the buffer.
+  (evil-define-key 'normal markdown-ts-view-mode-map
+    "q" #'quit-window))
+#+end_src
+
+** DONE Language Server
+Connects the Marksman language server for completion, diagnostics, rename, and cross-reference navigation in Markdown buffers.
+#+begin_src emacs-lisp
+;; Marksman provides completion, goto-definition, find-references,
+;; rename, and diagnostics for Markdown and wiki-link files.
+;; Install: pacman -S marksman  (or yay -S marksman-bin)
+(with-eval-after-load 'eglot
+  ;; Explicit entry for markdown-ts-mode; the built-in markdown-mode
+  ;; entry is inherited via derived-mode-add-parents, but an explicit
+  ;; entry avoids any matching ambiguity.
+  (add-to-list 'eglot-server-programs
+               '((markdown-ts-mode markdown-ts-view-mode)
+                 . ("marksman" "server"))))
+#+end_src
+
+** DONE Auto Formatting
+Routes Markdown buffers through Prettier for consistent formatting on save via the async Apheleia engine.
+#+begin_src emacs-lisp
+(with-eval-after-load 'apheleia
+  ;; Explicit mapping; apheleia uses provided-mode-derived-p which
+  ;; should inherit from markdown-mode, but this is defensive.
+  (setf (alist-get 'markdown-ts-mode apheleia-mode-alist) '(prettier)))
+#+end_src
+
+** DONE Keybindings
+Routes all Markdown editing, viewing, table, and structure commands through the local leader prefix.
+#+begin_src emacs-lisp
+;; Local leader (SPC m) for markdown-ts-mode buffers.
+(ar/local-leader
+ :keymaps 'markdown-ts-mode-map
+ ;; Structure & Editing
+ "x"   '(markdown-ts-toggle-checkbox :wk "Toggle checkbox")
+ "r"   '(markdown-ts-renumber-list :wk "Renumber list")
+ "i"   '(markdown-ts-insert-structure :wk "Insert block")
+ "e"   '(markdown-ts-emphasize :wk "Emphasize text")
+ "E"   '(markdown-ts-remove-emphasis :wk "Remove emphasis")
+ ;; Heading & Section Manipulation
+ "p"   '(markdown-ts-promote :wk "Promote heading/item")
+ "d"   '(markdown-ts-demote :wk "Demote heading/item")
+ "k"   '(markdown-ts-move-subtree-up :wk "Move section up")
+ "j"   '(markdown-ts-move-subtree-down :wk "Move section down")
+ ;; Display Toggles
+ "h"   '(markdown-ts-toggle-hide-markup :wk "Toggle hide markup")
+ "v"   '(markdown-ts-toggle-inline-images :wk "Toggle images")
+ "V"   '(ar/markdown-view :wk "Open view mode")
+ ;; Code Block Navigation
+ "n"   '(markdown-ts-move-to-next-code-block :wk "Next code block")
+ "N"   '(markdown-ts-move-to-previous-code-block :wk "Prev code block")
+ ;; Outline
+ "o"   '(:ignore t :wk "outline")
+ "o n" '(outline-next-heading :wk "Next heading")
+ "o p" '(outline-previous-heading :wk "Prev heading")
+ "o u" '(outline-up-heading :wk "Up heading")
+ "o f" '(outline-forward-same-level :wk "Forward same level")
+ "o b" '(outline-backward-same-level :wk "Backward same level")
+ "o c" '(markdown-ts-outline-cycle :wk "Cycle fold")
+ "o a" '(outline-show-all :wk "Show all")
+ ;; Table Operations
+ "t"   '(:ignore t :wk "table")
+ "t i" '(markdown-ts-table-insert-table :wk "Insert table")
+ "t d" '(markdown-ts-table-delete-table :wk "Delete table")
+ "t r" '(markdown-ts-table-insert-row-below :wk "Insert row below")
+ "t R" '(markdown-ts-table-insert-row-above :wk "Insert row above")
+ "t x" '(markdown-ts-table-delete-row :wk "Delete row")
+ "t c" '(markdown-ts-table-insert-column-right :wk "Insert col right")
+ "t C" '(markdown-ts-table-insert-column-left :wk "Insert col left")
+ "t X" '(markdown-ts-table-delete-column :wk "Delete col")
+ "t a" '(markdown-ts-table-align-table :wk "Align table")
+ "t t" '(markdown-ts-table-transpose-table :wk "Transpose table")
+ "t m" '(markdown-ts-table-move-row-down :wk "Move row down")
+ "t M" '(markdown-ts-table-move-row-up :wk "Move row up"))
+;; Local leader for view mode (subset of editing commands).
+(ar/local-leader
+ :keymaps 'markdown-ts-view-mode-map
+ "h"   '(markdown-ts-toggle-hide-markup :wk "Toggle hide markup")
+ "v"   '(markdown-ts-toggle-inline-images :wk "Toggle images")
+ "n"   '(markdown-ts-move-to-next-code-block :wk "Next code block")
+ "N"   '(markdown-ts-move-to-previous-code-block :wk "Prev code block")
+ "o"   '(:ignore t :wk "outline")
+ "o n" '(outline-next-heading :wk "Next heading")
+ "o p" '(outline-previous-heading :wk "Prev heading")
+ "o u" '(outline-up-heading :wk "Up heading")
+ "o c" '(markdown-ts-outline-cycle :wk "Cycle fold")
+ "o a" '(outline-show-all :wk "Show all"))
+#+end_src
+
+
+* Languages
+** TODO Python
+Configures Python editing, LSP server routing, workspace settings, formatting, and debug adapter integration.
+#+begin_src emacs-lisp
+(use-package python
+  :straight (:type built-in)
+  :custom
+  (python-shell-completion-native-enable nil)
+  (python-shell-interpreter "python3")
+  (python-indent-offset 3))
+
+(with-eval-after-load 'eglot
+  (add-to-list 'eglot-server-programs
+               `((python-mode python-ts-mode)
+                 . ,(eglot-alternatives
+                     '(("ty" "server")
+                       ("pyrefly" "lsp"))))))
+
+;; --- Workspace Configuration ---
+;; (setq eglot-workspace-configuration
+;;       (plist-put eglot-workspace-configuration :python
+;;                  '(:pythonPath "python3"
+;;                    :analysis (:typeCheckingMode "basic"
+;;                               :autoImportCompletions t
+;;                               :useLibraryCodeForTypes t))))
+
+;; --- Formatting (Apheleia) ---
+;; Explicitly map both modes; apheleia-mode-alist does not traverse derived-mode-p.
+(with-eval-after-load 'apheleia
+  (setf (alist-get 'python-mode apheleia-mode-alist) '(ruff-isort ruff))
+  (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(ruff-isort ruff)))
+
+;; --- Diagnostics (Flymake) ---
+;; `flymake-ruff` is the official Astral-recommended backend.
+;; Hooked into `eglot-managed-mode-hook` to prevent double-hooking and ensure
+;; proper initialization after Eglot injects its own backend.
+(use-package flymake-ruff
+  :defer t
+  :hook (eglot-managed-mode . flymake-ruff-load)
+  :config
+  ;; Filter overlapping diagnostic notes emitted by LSP servers (ty/pyrefly)
+  ;; to prevent echo-area and Flymake UI clutter.
+  (defun ar/filter-eglot-python-notes (diags)
+    "Drop LSP diagnostic notes in Python buffers to prevent overlap with Ruff."
+    (if (derived-mode-p 'python-base-mode)
+        (list (seq-remove (lambda (d)
+                            (eq (flymake-diagnostic-type d) 'eglot-note))
+                          (car diags)))
+      diags))
+  (advice-add 'eglot--report-to-flymake :filter-args #'ar/filter-eglot-python-notes)
+  ;; Bind M-RET in diagnostic buffers for instant Astral rule lookup.
+  (with-eval-after-load 'flymake
+    (define-key flymake-diagnostics-buffer-mode-map (kbd "M-RET") #'flymake-ruff-goto-doc)
+    (define-key flymake-project-diagnostics-mode-map (kbd "M-RET") #'flymake-ruff-goto-doc)))
+
+;; --- Region Formatting (Lazy Ruff) ---
+;; Formats only marked regions or Org src blocks via shell commands,
+;; complementing Apheleia's whole-file async formatting.
+(use-package lazy-ruff
+  :defer t
+  :hook (python-base-mode . lazy-ruff-mode)
+  :config
+  ;; Extend language whitelist for literate programming workflows.
+  (add-to-list 'lazy-ruff-org-src-languages "jupyter-python"))
+
+#+end_src
+
+
 
 * Misc Keybinds
 ** File Operations

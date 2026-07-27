@@ -1,16 +1,16 @@
 document:
-  title: "Unified AI Operational Protocol & Project State Checkpoint (v51: Dape Finalization, Projection-Dape & Bufferlo Isolation)"
-  version: 51
-  date: "July 26, 2026"
+  title: "Unified AI Operational Protocol & Project State Checkpoint (v52: straight.el Migration & Elpaca Excision)"
+  version: 52
+  date: "July 28, 2026"
   description: >
     Persistent memory anchor, behavioral boundary, and project tracker for the AI. Merges the
     system prompt protocol (rules, persona, formatting) with the project state (progress,
     architecture, checklists) to survive context-window truncation. All AI interactions must
     strictly adhere to the constraints and state defined herein.
-    v51: finalized the Dape (Debug Adapter Protocol) subsection, replacing dap-mode. Integrated
-    projection-dape for project-aware debug targets, bufferlo workspace isolation for ephemeral
-    debug chrome, and a comprehensive Transient dashboard. Corrected multiple upstream API
-    hallucinations (obsolete variables, phantom commands) via live source code verification.
+    v52: finalized the migration from Elpaca to straight.el. Purged all legacy Elpaca queue
+    processing, `elpaca-after-init-hook` references, and async load-order comments from
+    config.org. Aligned operational physics strictly with straight.el's synchronous build
+    model and use-package's internal keyword evaluation timeline.
   note_on_this_edit: >
     This file was condensed for brevity and deduplicated. No information was deleted — repeated
     facts (e.g. the 25-package Denote roster, the 14 org-super-agenda categories, and the
@@ -28,13 +28,13 @@ sections:
     initialization_protocol:
       trigger: >
         The user uploads/references the core files (`early-init.el.txt`, `config.org.txt`,
-        `elpaca_use_package_integration.yaml`, and this file). Note: the user appends `.txt` to
+        `straight_use_package_integration.yaml`, and this file). Note: the user appends `.txt` to
         bypass chat UI restrictions — parse `config.org.txt` as Org-mode/Elisp, not plain text.
       steps:
         - Ingest all files completely.
         - Acknowledge the current version and date from this file.
         - Scan `config.org.txt` and identify the exact next subsection lacking the `DONE` keyword.
-        - 'Output exactly: "I have ingested the source-of-truth files and the unified protocol. I acknowledge the strict formatting rules, the negative constraints, and the current project state (Version 51). The next pending subsection is [Subsection Name]. I am locked in and will write zero code until you give the signal."'
+        - 'Output exactly: "I have ingested the source-of-truth files and the unified protocol. I acknowledge the strict formatting rules, the negative constraints, and the current project state (Version 52). The next pending subsection is [Subsection Name]. I am locked in and will write zero code until you give the signal."'
     strict_greenlight_protocol:
       state: "READ-ONLY planning state by default."
       rule: "Only generate, rewrite, or output Elisp/Org-mode code if the user's prompt contains the exact phrase `GREEN LIGHT`."
@@ -78,7 +78,7 @@ sections:
       description: "The following belong in other source-of-truth files, not in `config.org`:"
       exclusions:
         - "Architectural justifications → project_operationals.yaml"
-        - "Load-order physics explanations → elpaca_use_package_integration.yaml"
+        - "Load-order physics explanations → straight_use_package_integration.yaml"
         - "Rejection reasoning → executive plan documents"
         - "Package comparison analysis → audit documents"
         - "Multi-paragraph tutorials → belong nowhere in the config"
@@ -96,9 +96,9 @@ sections:
     project_metadata:
       title: "Emacs Configuration Project"
       author: "Ahsanur Rahman"
-      config_version: "0.28"
+      config_version: "0.31"
       target_build: "emacs-pretest (PGTK) on Arch Linux (v31.0.90), compiled with --with-native-compilation=aot and --with-pgtk."
-      note: "Per-release change notes for config.org v0.16–v0.28 are folded into the unified changelog in Section 5 (architectural_decisions / version_history) to avoid tracking the same facts twice."
+      note: "Per-release change notes for config.org v0.16–v0.31 are folded into the unified changelog in Section 5 (architectural_decisions / version_history) to avoid tracking the same facts twice."
     editor_behaviour_paradigm:
       summary: >
         In v31 the IDE stack is strictly `eglot` + Emacs 31 native core, augmented by
@@ -133,7 +133,7 @@ sections:
             grouping. `org-refile` routes tasks from `* Inbox` to Project headings in the same file.
         - name: "Time & Tracking (Native Org-Agenda)"
           description: >
-            Native `org-agenda`/`org-habit` for scheduling, deadlines, and habit graphs, kept in
+            Native `org-agenda` / `org-habit` for scheduling, deadlines, and habit graphs, kept in
             separate files (`schedule.org`, `habits.org`) to avoid metadata pollution of the task list.
       rejected_non_denote_approaches:
         - "org-gtd: rigid multi-file state routing (inbox.org, next.org, ...) fragments project context, incompatible with Denote's unified linking and org-super-agenda tag grouping."
@@ -183,7 +183,7 @@ sections:
         - "consult-denote loads after consult+denote and MUST NOT use `:defer t` — it needs `advice-add` to upgrade native prompts immediately; deferring causes a 'Preview Gap' (native prompts lack Consult previews)."
         - "citar-denote loads after citar+denote. universal-sidecar loads before denote-sections and denote-citar-sections; denote-sections loads after universal-sidecar+denote; denote-citar-sections after universal-sidecar+denote+citar."
         - "denote-menu loads after denote (parses denote-directory into tabulated-list entries). org-transclusion loads after org+denote, via a custom bridge translating denote: URIs to file: AST nodes."
-        - "Elpaca's Package-Requires interception guarantees dependency resolution regardless of textual order; textual grouping is kept only for human readability."
+        - "straight.el's recipe resolution and `use-package` keyword pipeline guarantee dependency resolution regardless of textual order; textual grouping is kept only for human readability."
       packages:
         - { order: 1, package: "denote", status: "CONFIGURED", subsection: "Denote", notes: "Core engine: file naming, keyword inference, rename-buffer-mode." }
         - { order: 2, package: "denote-org", status: "CONFIGURED", subsection: "Denote Org", notes: "Org-specific link types and capture integration." }
@@ -211,7 +211,7 @@ sections:
         - { order: 24, package: "consult-denote", status: "CONFIGURED", subsection: "Consult Denote", notes: "Vertico-powered search/grep scoped to the active silo. Load-order hardened." }
         - { order: 25, package: "citar-denote", status: "CONFIGURED", subsection: "Citar Denote", notes: "Bibliography → literature-note pipeline. Implemented; header retains TODO pending user review." }
         - { order: "N/A", package: "org-transclusion-http / hyperdrive-org-transclusion", status: "REJECTED", subsection: "N/A", notes: "Network transclusion extensions — see rejected_non_denote_approaches above." }
-      scope_note: "As of v0.16 only 5 of the 25 numbered packages were configured; as of the current checkpoint 18 are CONFIGURED, 6 are REJECTED, and 1 (denote-markdown) is PLANNED."
+      scope_note: "As of v0.16 only 5 of the 25 numbered packages were configured; as of the current checkpoint 22 are CONFIGURED (including sidecar integrations), 6 are REJECTED, and 1 (denote-markdown) is PLANNED."
     org_super_agenda:
       summary: >
         14-category enhancement architecture turning the agenda from a static list into an
@@ -220,7 +220,7 @@ sections:
         - { id: 1, name: "Group Folding (native outline via TAB)", status: "IMPLEMENTED — Global Defaults (v36)", mechanism: "Overlays with `invisible` toggled via org-super-agenda-header-map TAB binding; NO origami dependency.", key_function: "ar/org-super-agenda-toggle-group" }
         - { id: 2, name: "Group Size Limiting (:take)", status: "IMPLEMENTED — Global Defaults (v46) & Custom Commands (v34)", mechanism: ":take on Overdue(10)/Due Soon(7)/Other Tasks(15), combined with org-super-agenda-keep-order t + deterministic org-agenda-sorting-strategy." }
         - { id: 3, name: "Project-Based Grouping (:auto-parent)", status: "IMPLEMENTED — Custom Commands (v34), PROVISIONAL", mechanism: ":auto-parent t groups by immediate parent heading in flat todo.org.", critical_note: "May change to :ancestor-with-todo or a custom :pred after Workflow Management (projection/bufferlo) finalization." }
-        - { id: 4, name: "Effort-Based Grouping (:effort </ >)", status: "IMPLEMENTED — Custom Commands (v34)", mechanism: "Dedicated custom command (SPC a e), not the main daily view — avoids consumption conflicts with :auto-parent." }
+        - { id: 4, name: "Effort-Based Grouping (:effort </>)", status: "IMPLEMENTED — Custom Commands (v34)", mechanism: "Dedicated custom command (SPC a e), not the main daily view — avoids consumption conflicts with :auto-parent." }
         - { id: 5, name: "Log Mode Integration (:log)", status: "IMPLEMENTED — Custom Commands (v34)", mechanism: ":log closed group at order 0, before :time-grid; org-agenda-start-with-log-mode t on daily/weekly/accomplishments commands." }
         - { id: 6, name: "Header Keymap Actions", status: "IMPLEMENTED — Global Defaults (v36)", mechanism: "TAB (fold) / RET (goto first item) / q (quit) bound in org-super-agenda-header-map." }
         - { id: 7, name: "Multiple View Profiles", status: "IMPLEMENTED — Custom Commands (v34)", placement: "Each custom command in org-agenda-custom-commands sets its own org-super-agenda-groups." }
@@ -262,8 +262,8 @@ sections:
           directly into Evil's C-level keymaps via `define-key` in a `:config` block guarded by
           `:after evil`. Arrow keys (not hjkl) in the minibuffer preserve type-to-filter. Never bind
           raw `C-c <letter>` globally — reserve for major modes.
-      - name: "Elpaca Load-Order Physics"
-        description: "Never use `:hook (elpaca-after-init . mode)` for global minor modes — invoke via `(mode 1)` in `:config`. Reserve elpaca-after-init-hook for cross-package state init."
+      - name: "straight.el Load-Order Physics"
+        description: "Never use `:hook (elpaca-after-init . mode)`. Invoke global minor modes via `(mode 1)` in `:config`. straight.el is synchronous, but `use-package`'s `:load` step still delays `(require)` until `:config`."
       - name: "Emacs 31 Targeting & MPS GC Exclusion"
         description: "Target Emacs 31; wrap experimental/unreleased APIs in defensive runtime guards. The MPS incremental/concurrent GC (`igc`) is deferred out of Emacs 31 — never treat it as an Emacs 31 feature."
       - name: "Org-Super-Agenda Enhancement Constraints"
@@ -299,7 +299,7 @@ sections:
   - id: 5
     title: "Version History, Edge Cases & Overall Progress"
     description: >
-      Single unified changelog spanning document versions v15–v51.
+      Single unified changelog spanning document versions v15–v52.
     architectural_decisions:
       v15: "IDE Stack Consolidation (committed to lsp-mode — later reversed, see v25). Workspace Management: selected bufferlo."
       v18: "Package Management Migration: officially transitioned to Elpaca v0.12; deprecated :pin and :vc."
@@ -336,9 +336,14 @@ sections:
         dap-mode with native dape (v0.27.1). Implemented persistent breakpoints, inline variable
         hints (inlay hints) with `too-long-file-p` guards, spatial `display-buffer-alist` routing
         (Ghostel/Eshell drawer paradigm), and a comprehensive Transient dashboard. Integrated
-        `projection-dape` for project-aware debug targets and wired `dape-info`/`dape-memory`
+        `projection-dape` for project-aware debug targets and wired `dape-info` / `dape-memory`
         buffers into `bufferlo-hidden-buffers` for strict workspace isolation. Excised obsolete
         upstream variables and phantom commands via live source code verification.
+      v52: >
+        straight.el Migration & Elpaca Excision: Purged all legacy Elpaca queue processing,
+        `elpaca-after-init-hook` references, and async load-order comments from config.org.
+        Aligned `project_operationals.yaml` and `config.org` strictly with straight.el's
+        synchronous physics and `use-package`'s internal keyword evaluation timeline.
     edge_cases_and_deferred_issues:
       - "Dirvish multi-frame flicker: patched via define-advice on dirvish-pre-redisplay-h."
       - "Emacs 31 unreleased APIs (e.g. grep-edit-mode) must be wrapped in defensive runtime guards."
@@ -361,33 +366,29 @@ sections:
       - "[v48] eglot-confirm-server-edits has a known type-error bug (#80549) when customized via M-x customize in Emacs 31.0.50."
       - "[v49] ide-features.md divergence: it still recommends eldoc-box; the project explicitly uses the local fork lisp/eldoc-childframe.el instead."
       - "[v51] Dape upstream hallucinations caught and corrected: `dape-breakpoint-condition` and `dape-breakpoint-disable` do not exist in upstream dape.el (condition is handled via `dape-breakpoint-expression`, disable is handled via the breakpoints info buffer). `dape-timeout` was renamed to `dape-request-timeout`. `dape-history-use-dash-form` was refactored to `dape-history-add` with the `'shell-like` symbol. `dape-select-stack-frame` was renamed to `dape-select-stack`. `dape-memory-read` was renamed to `dape-memory`. Manual `evil-set-initial-state` loops for dape buffers were excised in favor of `evil-collection`'s native dape module."
+      - "[v52] Elpaca to straight.el Migration: Excised dead `elpaca-process-queues` code from `reload-init-file`. Replaced `elpaca-after-init-hook` with `after-init-hook` in Dape breakpoint loading. Corrected load-order physics comments in `undo-fu-session`, `buffer-terminator`, and `hl-todo`."
     overall_progress:
       finalized:
         - "Core Emacs (13 subsections); Vim Emulation (12 subsections); General Keybindings (centralized leader routing)."
         - "Editor Behaviour Groups 1–7 (see editor_behaviour_paradigm.groups above)."
-        - "Workflow Management: Dired, Dirvish, Treemacs."
+        - "Workflow Management: Dired, Dirvish, Treemacs, Project Management (projection), Buffer Management (iBuffer, buffer-terminator), Workspaces (tab-bar, bufferlo)."
         - "IDE Architecture Blueprint defined (eglot + eldoc-childframe + flyover + breadcrumb)."
-        - "Org Mode & Second Brain: architecture blueprint, Dynamic Directory Structure, Task States & Contexts, Better Font Faces, Org Agenda Custom Commands, Org Habit, Org Super Agenda."
-        - "Org Capture: Doom Emacs parity bottom-drawer UI routing via display-buffer-alist, with Denote journal routing."
-        - "Org Structure Templates: Babel Lazy-Loading Engine plus org-tempo integration."
-        - "Transient Template System: named interactive commands via defalias and an O(1) spatial guard."
-        - "Denote Ecosystem: 18 of 25 numbered packages CONFIGURED, plus Org Transclusion's Denote bridge and Consult Denote."
+        - "Org Mode & Second Brain: architecture blueprint, Dynamic Directory Structure, Task States & Contexts, Better Font Faces, Org Agenda Custom Commands, Org Habit, Org Super Agenda, Org Capture, Org Structure Templates, Org Transclusion, Consult Denote, Evil Org, Org Block Wrap, and Denote Ecosystem (22 of 25 numbered packages CONFIGURED, plus Org Transclusion's Denote bridge and Consult Denote)."
         - "Undo Fu & Undo Fu Session; Auto Save & Auto Tangle."
         - "Tree-sitter: Emacs 31 native auto-installation and mode routing."
         - "Hideshow & Custom Folding Functions; Link Hint; Re-Builder."
         - "Font Family Unification; Org Mode Cross-Section Cleanup."
-        - "Development Tools: Eglot Core Configuration, Languages Eglot Server Programs, Keybinds (scoped), Eldoc Childframe (local fork finalized), Dape (Debug Adapter Protocol with projection-dape, repeat-mode sticky keys, and bufferlo workspace isolation)."
+        - "Development Tools: Eglot Core Configuration, Languages Eglot Server Programs, Keybinds (scoped), Eldoc Childframe (local fork finalized), Dape (Debug Adapter Protocol with projection-dape, repeat-mode sticky keys, and bufferlo workspace isolation), Flymake (with flyover), Xref, Eval Overlay, Apheleia, and Direnv."
+        - "Contextual Sidebars: universal-sidecar with denote-sections and denote-citar-sections."
+        - "Highlight TODOs: hl-todo, consult-todo, and magit-todos integration."
+        - "Markdown Mode: Native Emacs 31 `markdown-ts-mode` with tree-sitter grammars, marksman LSP, apheleia formatting, and evil/modal keybindings."
       in_progress:
-        - "Window Management (Winner, Popper pending)."
-        - "Workflow Management (Buffer Management, Project Management, Workspaces pending)."
-        - "Org Mode & Second Brain: ar-org-eldoc.el custom library written but header retains TODO; Citar Denote and Keybindings implemented but headers retain TODO pending user review."
-        - "Denote Ecosystem: 6 packages pending or planned (see denote_ecosystem table)."
-        - "Development Tools: apheleia, Flymake, Direnv subsections pending."
+        - "Org Mode & Second Brain: Keybindings subsection retains TODO pending user review."
+        - "Development Tools: Minimap (demap) subsection retains TODO."
+        - "Languages: Python subsection retains TODO."
       untouched:
-        - "Lexical Validation & Comparative Workflows (Group 8 — Jinx, Helpful, Ediff, Woman)."
-        - "Version Control."
-        - "Completion Framework (needs a rewrite to align with the eglot/cape/corfu pipeline)."
-        - "Highlight TODOs, Snippet Engine, LaTeX, Languages (non-eglot parts), XML Viewer, Study."
+        - "Version Control: Magit, Forge, Diff-hl, Git-Timemachine retain TODO."
+        - "Snippet Engine, LaTeX, Languages (non-Python/Markdown), XML Viewer, Study."
 
   - id: 6
     title: "Remaining Work Checklists & Global Questions"
@@ -409,14 +410,10 @@ sections:
           - { status: "pending", description: "Popper: configure popup management and echo dispatch." }
       - group: "Workflow Management"
         tasks:
-          - { status: "pending", description: "Buffer Management: finalize iBuffer, Nerd Icons iBuffer, iBuffer VC, Projection iBuffer, Buffer Terminator." }
-          - { status: "pending", description: "Project Management: implement `projection`; excise projectile glue code." }
-          - { status: "pending", description: "Workspaces: implement `bufferlo`; wire consult-buffer sources." }
           - { status: "pending", description: "Post-finalization: revisit org-super-agenda category 3 (:auto-parent) once the above is done." }
       - group: "Development Tools & Completion Framework (v26 rewrite required)"
         tasks:
           - { status: "pending", description: "Rewrite Completion Framework: strictly implement eglot → cape → corfu → orderless." }
-          - { status: "pending", description: "apheleia, Flymake, Direnv subsections: pending implementation." }
       - group: "Global Remaining Work"
         tasks:
           - { status: "pending", description: "Illustrate a workflow using iedit and evil-multiedit." }
@@ -429,7 +426,6 @@ sections:
           - { status: "pending", description: "`Important`: write a test org-mode file to practice all writing practices in org buffers." }
           - { status: "pending", description: "Need interactive custom functions for .dir-locals.el." }
           - { status: "pending", description: "`Important`: determine all related packages integrated together across the whole Emacs config." }
-          - { status: "pending", description: "Add flyover package." }
           - { status: "pending", description: "`Urgent`: revisit every header/subheader description to ensure it describes what the package actually does." }
     global_questions:
       - { status: "pending", question: "Can org-level variation only work for certain files and/or org buffers?" }
