@@ -63,7 +63,7 @@
   (push '(tool-bar-lines . 0) default-frame-alist)
   (push '(vertical-scroll-bars . nil) default-frame-alist)
   (push '(mouse-color . "white") default-frame-alist)
-
+  (push '(internal-border-width . 1) default-frame-alist)
 
   ;; ====================
   ;; STARTUP SCREEN

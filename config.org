@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.31
+#+VERSION: 0.34
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -434,21 +434,18 @@ Configures core editing behaviors, whitespace management, and text navigation pr
   :init
   ;; Enables column number display in the modeline.
   (column-number-mode 1)
-  ;; Core editing behaviors: logical line movement, EOL tracking, and mark ring repetition.
   (setq kill-whole-line t
         line-move-visual nil
         track-eol t
         set-mark-command-repeat-pop t)
-  ;; Zero-overhead trailing space highlighting. Bypasses `whitespace-mode`'s
-  ;; heavy font-lock injection to prevent Tree-sitter conflicts in Emacs 30/31.
-  (setq-default show-trailing-whitespace t)
-  ;; Disable in prose buffers where trailing spaces are structurally irrelevant.
-  (dolist (mode '(org-mode markdown-mode text-mode))
-    (add-hook (intern (format "%s-hook" mode))
-              (lambda () (setq-local show-trailing-whitespace nil))))
+  ;; Trailing whitespace highlighting: enabled per-mode in code/config buffers only.
+  ;; Global default stays nil so minibuffer, echo area, which-key, and UI
+  ;; buffers are never affected (mirrors Doom's per-mode hook approach).
+  (add-hook 'prog-mode-hook (lambda () (setq-local show-trailing-whitespace t)))
+  (add-hook 'conf-mode-hook (lambda () (setq-local show-trailing-whitespace t)))
   ;; Replaces verbose yes/no prompts with single-character y/n inputs (Emacs 28+).
   (setq use-short-answers t)
-  ;; Default buffer states: text mode, 80-column fill, 4-space indentation.
+  ;; Default buffer state: text mode, 80-column fill, 4-space indentation.
   (setq-default major-mode 'text-mode
                 fill-column 80
                 tab-width 4
@@ -474,6 +471,7 @@ Configures core editing behaviors, whitespace management, and text navigation pr
         sentence-end "\\([。！？]\\|……\\|[.?!][]\"')}]*\\($\\|[ \t]\\)\\)[ \t\n]*"
         sentence-end-double-space nil
         word-wrap-by-category t))
+
 #+end_src
 
 ** DONE Setup User
@@ -923,7 +921,7 @@ Applies the Tokyo Night palette and integrates downstream UI enhancements. Synch
 Swaps background faces to distinguish side-windows and popups. Deferred until the theme engine finalizes to prevent mapping race conditions.
 #+begin_src emacs-lisp
 (use-package solaire-mode
-  :demand t
+  ;; :demand t
   :after doom-themes
   :hook ((change-major-mode after-revert ediff-prepare-buffer org-capture-mode) . turn-on-solaire-mode)
   :config
@@ -944,39 +942,44 @@ Foundational API for ephemeral keybinding menus. Strictly deferred to respect do
 Keystroke discovery UI overlay. Renders prefix bindings in the echo area with alphabetical sorting and optimized pagination.
 #+begin_src emacs-lisp
 (use-package which-key
-  :straight (:type built-in)
-  :defer t
+  :straight(:type built-in)
   :hook (after-init . which-key-mode)
   :custom
-  (which-key-idle-delay 0.1)
-  (which-key-separator " → ")
-  (which-key-popup-type 'minibuffer))
+  (which-key-idle-delay 1.0) ; Initial delay
+  (which-key-idle-secondary-delay 0.05) ; Secondary delay
+  (which-key-popup-type 'minibuffer) ; Echo area rendering
+  (which-key-separator " → ") ; Separator
+  (which-key-sort-order 'which-key-key-order-alpha) ; Alphabetical sort
+  (which-key-sort-uppercase-first nil) ; Case-insensitive sort
+  (which-key-add-column-padding 1) ; Column padding
+  (which-key-max-description-length 30) ; Truncate descriptions
+  (which-key-min-display-lines 6) ; Minimum height
+  (which-key-allow-multiple-replacements t) ; Multiple replacements
+  (which-key-show-operator-state-maps t)) ; Operator-pending maps
 #+end_src
-
-
 
 ** DONE Prettify Symbols & Ligatures
 Delegates operator ligatures to HarfBuzz via ligature.el and reserves Elisp substitution strictly for semantic keywords.
 #+begin_src emacs-lisp
-(use-package ligature
-  :demand t
-  :config
-  ;; Maps ASCII sequences to JetBrains Mono's native OpenType GSUB ligatures.
-  ;; Excludes equality/inequality operators and ellipses to prevent visual ambiguity.
-  (ligature-set-ligatures 'prog-mode
-                          '("=>" "->" "->>" "-->" "<-" "<--" "<=" ">=" ">>" "<<"
-                            "&&" "||" "::" ":=" "~~" "**" "www" "##" "###" "####"
-                            "<!--" "|>" "<|" "</" "/>" ">>=" "<<="))
-  (global-ligature-mode t))
+;; (use-package ligature
+;;   :demand t
+;;   :config
+;;   ;; Maps ASCII sequences to JetBrains Mono's native OpenType GSUB ligatures.
+;;   ;; Excludes equality/inequality operators and ellipses to prevent visual ambiguity.
+;;   (ligature-set-ligatures 'prog-mode
+;;                           '("=>" "->" "->>" "-->" "<-" "<--" "<=" ">=" ">>" "<<"
+;;                             "&&" "||" "::" ":=" "~~" "**" "www" "##" "###" "####"
+;;                             "<!--" "|>" "<|" "</" "/>" ">>=" "<<="))
+;;   (global-ligature-mode t))
 
-;; Establishes the baseline alist for keywords lacking native OpenType ligatures.
-(setq-default prettify-symbols-alist '(("lambda" . ?λ)))
+;; ;; Establishes the baseline alist for keywords lacking native OpenType ligatures.
+;; (setq-default prettify-symbols-alist '(("lambda" . ?λ)))
 
-;; Reveals raw text when the cursor touches the symbol boundary for precise editing.
-(setq prettify-symbols-unprettify-at-point 'right-edge)
+;; ;; Reveals raw text when the cursor touches the symbol boundary for precise editing.
+;; (setq prettify-symbols-unprettify-at-point 'right-edge)
 
-;; Activates globally across prog-mode, text-mode, and conf-mode derivatives.
-(global-prettify-symbols-mode 1)
+;; ;; Activates globally across prog-mode, text-mode, and conf-mode derivatives.
+;; (global-prettify-symbols-mode 1)
 #+end_src
 
 ** DONE Autorevert
@@ -1140,7 +1143,6 @@ Strictly confined to `prog-mode' derivatives to prevent prose collision."
 
   (add-hook 'electric-indent-functions #'ar/electric-indent-words-fn))
 #+end_src
-
 
 ** DONE Evil Surround
 Provides retro-active Vim-style wrapping via =ys=, =cs=, and =ds= operators. Integrates =evil-embrace= to extend the base alist with regex-aware, multi-character, and asymmetric structural pairs for prose and LaTeX environments.
@@ -1505,7 +1507,6 @@ Unified folding dispatcher routing to Tree-sitter, Outline, Hideshow, or Vimish 
   (message "All folds closed"))
 #+end_src
 
-
 ** DONE Hideshow
 Folds code blocks in languages lacking Tree-sitter grammars using Emacs 31 native indicators.
 #+begin_src emacs-lisp
@@ -1529,9 +1530,6 @@ Folds code blocks in languages lacking Tree-sitter grammars using Emacs 31 nativ
   (hs-show-indicators t)
   (hs-indicator-type 'fringe)
   :config
-  ;; Emacs 31+: `hs-hide-block` hides the innermost block the line belongs to.
-  ;; Set `hs-hide-block-behavior` to 'after-cursor to restore legacy behavior.
-  ;; Aborts activation in massive buffers to prevent main-thread freezing.
   (define-advice hs-minor-mode (:before-while (&optional arg) guard-large-files)
     (or (and arg (< (prefix-numeric-value arg) 1))
         (not (too-long-file-p)))))
@@ -1624,108 +1622,92 @@ Restricts font-lock to mixed-indentation detection. Delegates trailing spaces an
 ** DONE Ws-Butler
 Unobtrusive trailing whitespace trimming confined to modified lines to prevent Git diff pollution. Exempts prose and terminal modes where trailing spaces carry structural meaning.
 #+begin_src emacs-lisp
-;;(use-package ws-butler
-;; :demand t
-;; :config
-;; ;; Exempts terminals and prose modes where trailing spaces carry structural meaning.
-;; (dolist (mode '(special-mode
-;;                 comint-mode
-;;                 term-mode
-;;                 vterm-mode
-;;                 eat-mode
-;;                 eshell-mode
-;;                 ghostel-mode
-;;                 diff-mode
-;;                 magit-status-mode
-;;                 org-mode
-;;                 markdown-mode
-;;                 gfm-mode))
-;;   (add-to-list 'ws-butler-global-exempt-modes mode))
-;; ;; Activates global unobtrusive trimming.
-;; (ws-butler-global-mode 1))
+(use-package ws-butler
+  :defer t
+  :hook (prog-mode . ws-butler-mode))
 #+end_src
 
 ** DONE Dtrt Indent
 Heuristic indentation detection for programming buffers. Executes post-mode initialization to preempt LSP spawning and aborts on massive files.
 #+begin_src emacs-lisp
-(use-package dtrt-indent
-  :defer t
-  :custom
-  ;; Defers to SMIE indentation engines in supported modes.
-  (dtrt-indent-run-after-smie t)
-  ;; Synchronizes Emacs' global fallback indentation variable.
-  (dtrt-indent-update-standard-indent t)
-  ;; Restricts line scanning to prevent main-thread micro-stutters.
-  (dtrt-indent-max-lines 2000)
-  ;; Minimum confidence threshold for indentation detection.
-  (dtrt-indent-min-quality 80.0)
-  ;; Suppresses echo-area logging.
-  (dtrt-indent-verbosity 0)
-  :init
-  (defun ar/dtrt-indent-maybe-enable ()
-    "Enable `dtrt-indent-mode' in programming buffers, excluding structural exceptions."
-    (when (and (derived-mode-p 'prog-mode 'conf-mode)
-               (not (too-long-file-p))
-               ;; Excludes Makefiles (requires hard tabs) and YAML (strict spacing).
-               (not (apply #'derived-mode-p '(makefile-mode yaml-mode))))
-      (dtrt-indent-mode 1)))
-  ;; Executes after major-mode body but before mode hooks and LSP spawning.
-  (add-hook 'change-major-mode-after-body-hook #'ar/dtrt-indent-maybe-enable)
-  :config
-  ;; Synchronizes Evil shift-width with the detected indentation offset.
-  (add-hook 'dtrt-indent-hook
-            (lambda () (setq-local evil-shift-width tab-width))))
+;; (use-package dtrt-indent
+;;   :defer t
+;;   :custom
+;;   ;; Defers to SMIE indentation engines in supported modes.
+;;   (dtrt-indent-run-after-smie t)
+;;   ;; Synchronizes Emacs' global fallback indentation variable.
+;;   (dtrt-indent-update-standard-indent t)
+;;   ;; Restricts line scanning to prevent main-thread micro-stutters.
+;;   (dtrt-indent-max-lines 2000)
+;;   ;; Minimum confidence threshold for indentation detection.
+;;   (dtrt-indent-min-quality 80.0)
+;;   ;; Suppresses echo-area logging.
+;;   (dtrt-indent-verbosity 0)
+;;   :init
+;;   (defun ar/dtrt-indent-maybe-enable ()
+;;     "Enable `dtrt-indent-mode' in programming buffers, excluding structural exceptions."
+;;     (when (and (derived-mode-p 'prog-mode 'conf-mode)
+;;                (not (too-long-file-p))
+;;                ;; Excludes Makefiles (requires hard tabs) and YAML (strict spacing).
+;;                (not (apply #'derived-mode-p '(makefile-mode yaml-mode))))
+;;       (dtrt-indent-mode 1)))
+;;   ;; Executes after major-mode body but before mode hooks and LSP spawning.
+;;   (add-hook 'change-major-mode-after-body-hook #'ar/dtrt-indent-maybe-enable)
+;;   :config
+;;   ;; Synchronizes Evil shift-width with the detected indentation offset.
+;;   (add-hook 'dtrt-indent-hook
+;;             (lambda () (setq-local evil-shift-width tab-width))))
 #+end_src
 
 ** DONE Indent Bars
 AST-aware vertical guides synchronizing depth colorization with rainbow-delimiters while restricting activation to programming buffers to prevent Org-mode structural corruption.
 #+begin_src emacs-lisp
-;; (use-package indent-bars
-;;   :defer t
-;;   :init
-;;   ;; Blocks activation in massive files, child frames, fontification buffers, and Org buffers.
-;;   (defun ar/indent-bars-should-enable-p ()
-;;     "Return non-nil if indent-bars should be enabled in current buffer."
-;;     (not (or (too-long-file-p)
-;;              (frame-parameter nil 'parent-frame)
-;;              (bound-and-true-p org-indent-mode)
-;;              (string-prefix-p " *org-src-fontification:" (buffer-name))
-;;              (derived-mode-p 'org-mode
-;;                              'lisp-mode
-;;                              'emacs-lisp-mode
-;;                              'lisp-interaction-mode 'lisp-data-mode))))
+(use-package indent-bars
+  :defer t
+  :init
+  ;; Blocks activation in massive files, child frames, fontification buffers, and Org buffers.
+  (defun ar/indent-bars-should-enable-p ()
+    "Return non-nil if indent-bars should be enabled in current buffer."
+    (not (or (too-long-file-p)
+             (frame-parameter nil 'parent-frame)
+             (bound-and-true-p org-indent-mode)
+             (string-prefix-p " *org-src-fontification:" (buffer-name))
+             (derived-mode-p 'org-mode
+                             'lisp-mode
+                             'emacs-lisp-mode
+                             'lisp-interaction-mode 'lisp-data-mode))))
 
-;;   (defun ar/indent-bars-maybe-enable ()
-;;     "Enable indent-bars-mode if conditions are met."
-;;     (when (ar/indent-bars-should-enable-p)
-;;       (indent-bars-mode 1)))
-;;   :custom
-;;   ;; Enforces AST structural boundaries and prevents string descent.
-;;   (indent-bars-treesit-support t)
-;;   (indent-bars-no-descend-lists t)
-;;   (indent-bars-prefer-character t)
-;;   (indent-bars-no-descend-string 'all)
-;;   ;; Encapsulates multi-line AST nodes to prevent visual fragmentation.
-;;   (indent-bars-treesit-wrap '((python argument_list parameters)
-;;                               (c argument_list parameter_list)
-;;                               (cpp argument_list parameter_list)
-;;                               (rust arguments parameters)
-;;                               (javascript arguments formal_parameters)
-;;                               (typescript arguments formal_parameters)
-;;                               (tsx arguments formal_parameters)))
-;;   ;; Renders ghost bars on empty lines to connect structural blocks.
-;;   (indent-bars-display-on-blank-lines t)
-;;   ;; Unicode fallback for terminals and PGTK stipple failures.
-;;   ;;(indent-bars-no-stipple-char ?▍)
-;;   ;; Tokyo Night depth palette matching rainbow-delimiters.
-;;   (indent-bars-color-by-depth '(:palette ("#7aa2f7" "#e0af68" "#9ece6a" "#1abc9c" "#bb9af7" "#9d7cd8" "#ff9e64" "#f7768e") :blend 1))
-;;   ;; High-contrast active scope tracking.
-;;   (indent-bars-highlight-current-depth '(:color "#c0caf5" :blend 0.3 :width 0.25))
-;;   :hook ((prog-mode conf-mode yaml-mode) . ar/indent-bars-maybe-enable)
-;;   :config
-;;   ;; Disables rendering inside magit-blame overlays.
-;;   (with-eval-after-load 'magit-blame
-;;     (add-to-list 'magit-blame-disable-modes 'indent-bars-mode)))
+  (defun ar/indent-bars-maybe-enable ()
+    "Enable indent-bars-mode if conditions are met."
+    (when (ar/indent-bars-should-enable-p)
+      (indent-bars-mode 1)))
+  :custom
+  ;; Enforces AST structural boundaries and prevents string descent.
+  (indent-bars-treesit-support t)
+  (indent-bars-no-descend-lists t)
+  (indent-bars-prefer-character t)
+  (indent-bars-no-descend-string 'all)
+  ;; Encapsulates multi-line AST nodes to prevent visual fragmentation.
+  (indent-bars-treesit-wrap '((python argument_list parameters)
+                              (c argument_list parameter_list)
+                              (cpp argument_list parameter_list)
+                              (rust arguments parameters)
+                              (javascript arguments formal_parameters)
+                              (typescript arguments formal_parameters)
+                              (tsx arguments formal_parameters)))
+  ;; Renders ghost bars on empty lines to connect structural blocks.
+  (indent-bars-display-on-blank-lines t)
+  ;; Unicode fallback for terminals and PGTK stipple failures.
+  ;;(indent-bars-no-stipple-char ?▍)
+  ;; Tokyo Night depth palette matching rainbow-delimiters.
+  (indent-bars-color-by-depth '(:palette ("#7aa2f7" "#e0af68" "#9ece6a" "#1abc9c" "#bb9af7" "#9d7cd8" "#ff9e64" "#f7768e") :blend 1))
+  ;; High-contrast active scope tracking.
+  (indent-bars-highlight-current-depth '(:color "#c0caf5" :blend 0.3 :width 0.25))
+  :hook ((prog-mode conf-mode yaml-mode) . ar/indent-bars-maybe-enable)
+  :config
+  ;; Disables rendering inside magit-blame overlays.
+  (with-eval-after-load 'magit-blame
+    (add-to-list 'magit-blame-disable-modes 'indent-bars-mode)))
 #+end_src
 
 ** DONE Move Text
@@ -1798,7 +1780,6 @@ Native C-level display primitive rendering vertical window boundaries. Confined 
   (window-divider-mode 1))
 #+end_src
 
-
 ** DONE Active Line Highlight
 Native C-level overlay rendering for active line tracking. Confines focus to the selected window and suspends rendering during Evil visual selections and excluded major modes.
 #+begin_src emacs-lisp
@@ -1863,10 +1844,9 @@ Minimalist modeline engine featuring native Evil state tracking, IDE synergy, an
 #+begin_src emacs-lisp
 (use-package doom-modeline
   :init
-  ;; Disables native size indicators and percentage formats before package load
-  ;; to prevent doom-modeline from inheriting and rendering redundant segments.
   (size-indication-mode -1)
   (setq-default mode-line-percent-position nil)
+  (doom-modeline-mode 1)
   :custom
   ;; Visual dimensions and split-window overflow safeguard.
   (doom-modeline-height 25)
@@ -1874,7 +1854,7 @@ Minimalist modeline engine featuring native Evil state tracking, IDE synergy, an
   (doom-modeline-window-width-limit 90)
   ;; Project detection safely falls back to native `project.el'.
   (doom-modeline-project-detection 'auto)
-  (doom-modeline-buffer-file-name-style 'relative-from-project)
+  (doom-modeline-buffer-file-name-style 'auto)
   ;; Disables redundant size, encoding, and percentage indicators.
   (doom-modeline-buffer-file-size nil)
   (doom-modeline-buffer-encoding nil)
@@ -1883,7 +1863,6 @@ Minimalist modeline engine featuring native Evil state tracking, IDE synergy, an
   (doom-modeline-modal t)
   (doom-modeline-modal-icon t)
   (doom-modeline-major-mode-icon t)
-  ;; IDE synergy: LSP server status and active language version rendering.
   (doom-modeline-lsp t)
   (doom-modeline-env-version t)
   ;; Version control integration.
@@ -1894,13 +1873,10 @@ Minimalist modeline engine featuring native Evil state tracking, IDE synergy, an
   (doom-modeline-github nil)
   (doom-modeline-mu4e nil)
   (doom-modeline-persp-name nil)
-  (doom-modeline-minor-modes nil)
-  :config
-  ;; Activates the modeline engine directly; Elpaca guarantees deferred execution.
-  (doom-modeline-mode 1))
+  (doom-modeline-minor-modes nil))
 #+end_src
 
-** DONE Hide Modeline
+** TODO Hide Modeline
 Native redisplay concealment for terminal, agenda, and UI buffers. Replaces unmaintained dependencies with a zero-overhead buffer-local minor mode.
 #+begin_src emacs-lisp
 (defvar-local ar/saved-mode-line-format nil "Cached modeline format.")
@@ -1940,7 +1916,6 @@ Native redisplay concealment for terminal, agenda, and UI buffers. Replaces unma
                 ghostel-compile-view-mode pdf-annot-list-mode))
   (add-hook (intern (format "%s-hook" mode)) #'ar/enable-hide-modeline))
 #+end_src
-
 
 
 ** DONE Text Scaling
@@ -3701,7 +3676,7 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
   (corfu-auto t)
   (corfu-quit-at-boundary 'separator)
   (corfu-quit-no-match 'separator)
-  (corfu-count 16)
+  (corfu-count 8)
   (corfu-max-width 120)
   ;; Preselects the prompt to prevent accidental candidate commits.
   (corfu-preselect 'prompt)
@@ -3728,6 +3703,15 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
               ("RET"       . corfu-insert)
               ("<escape>"  . corfu-quit))
   :config
+    ;; Guards the minibuffer against Corfu popups and routes CAPF to Vertico.
+  (defun ar/corfu-minibuffer-guard ()
+    "Disable Corfu in the minibuffer and route completion-in-region to Vertico."
+    (setq-local corfu-auto nil)
+    (corfu-mode -1)
+    ;; Route minibuffer CAPF (like cape-history) to Vertico via Consult.
+    (when (fboundp 'consult-completion-in-region)
+      (setq-local completion-in-region-function #'consult-completion-in-region)))
+  (add-hook 'minibuffer-setup-hook #'ar/corfu-minibuffer-guard)
   ;; Closes the popup on insert state exit or buffer save.
   (add-hook 'evil-insert-state-exit-hook #'corfu-quit)
   (add-hook 'before-save-hook #'corfu-quit))
@@ -3810,8 +3794,8 @@ Wraps and merges completion-at-point functions for global and local pipelines.
             (lambda () (add-hook 'completion-at-point-functions #'cape-file nil t)))
   ;; Shields Eglot from quit signals, busts cache for Orderless, and enables merging.
   (with-eval-after-load 'eglot
-    (advice-add #'eglot-completion-at-point :around #'cape-wrap-buster)
-    (advice-add #'eglot-completion-at-point :around #'cape-wrap-noninterruptible)
+    ;; (advice-add #'eglot-completion-at-point :around #'cape-wrap-buster)
+    ;; (advice-add #'eglot-completion-at-point :around #'cape-wrap-noninterruptible)
     (advice-add #'eglot-completion-at-point :around #'cape-wrap-nonexclusive))
   ;; Applies non-exclusive merging to Comint and Pcomplete.
   (with-eval-after-load 'comint
@@ -3872,6 +3856,7 @@ Provides dynamic abbreviation expansion from open buffers.
                   special-mode))
     (add-to-list 'dabbrev-ignored-buffer-modes mode)))
 #+end_src
+
 
 * TODO Org Mode & Second Brain
 ** DONE Dynamic Directory Structure
@@ -5486,7 +5471,6 @@ Configures Org structure templates for rapid block insertion and implements a de
   (advice-add #'org-babel-do-load-languages :override #'ignore))
 #+end_src
 
-
 ** DONE Evil Org
 Vim-modal integration for Org buffers with context-aware RET and table/list continuation.
 #+begin_src emacs-lisp
@@ -5670,16 +5654,19 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
 ** DONE Eglot
 Connects Emacs to external language servers for smart code navigation, error checking, and refactoring.
 #+begin_src emacs-lisp
+;; (use-package markdown-mode :demand t)
+
 (use-package eglot
   :straight (:type built-in)
   :hook (prog-mode . eglot-ensure)
   :custom
   (eglot-autoshutdown t)
   (eglot-documentation-renderer 'markdown-ts-view-mode)
-  ;;(eglot-documentation-renderer 'gfm-view-mode)
+  ;; (eglot-documentation-renderer 'gfm-view-mode)
   (eglot-ignored-server-capabilities '(:documentFormattingProvider
                                        :documentOnTypeFormattingProvider
                                        :colorProvider
+                                       :inlayHintProvider
                                        :foldingRangeProvider))
   ;; Render the code action indicators strictly in the margin to prevent echo-area noise.
   (eglot-code-action-indications '(eldoc-hint))
@@ -5688,12 +5675,6 @@ Connects Emacs to external language servers for smart code navigation, error che
   ;; Always prompt with a summary before applying multi-file server edits.
   (eglot-confirm-server-edits 'summary)
   :config
-  ;; Inject Emacs 31 native UI parity modes when a buffer becomes managed by an LSP server.
-  (add-hook 'eglot-managed-mode-hook
-            (lambda ()
-              (when (eglot-managed-p)
-                (eglot-inlay-hints-mode 1)
-                (eglot-semantic-tokens-mode 1))))
 
   ;; LSP-aware file rename sequencing will/didRenameFiles payloads.
   (defun ar/eglot-rename-file (new-name)
@@ -5822,7 +5803,8 @@ Configures the core documentation engine with strict 2-line echo area limits and
 Routes complex documentation to a floating popup and keeps the echo area concise.
 #+begin_src emacs-lisp
 (use-package eldoc-childframe
-  :straight (:type built-in)
+  :defer t
+  :straight nil
   :hook (prog-mode . eldoc-childframe-hover-at-point-mode)
   :bind ("M-h" . eldoc-childframe-help-at-point)
   :custom
@@ -5957,8 +5939,15 @@ Routes code evaluation results to inline overlays, floating childframes, or bott
   (quickrun-timeout-seconds 15))
 
 (use-package eval-overlay
-  :straight (:type built-in)
+  :straight nil
+  :defer t
   :after (posframe eros quickrun)
+  :commands (eval-overlay-buffer
+             eval-overlay-region
+             eval-overlay-line
+             eval-overlay-region-or-buffer
+             eval-overlay-region-and-replace
+             eval-overlay-dismiss)
   :custom
   ;; Routing thresholds for inline overlays, childframes, and bottom popups.
   (eval-overlay-inline-max-lines 2)
@@ -6217,25 +6206,6 @@ Injects bibliography abstracts and formatted references into the universal sidec
 #+begin_src emacs-lisp
 (use-package magit
   :defer t
-  :commands (magit-status
-             magit-blame
-             magit-log-buffer-file
-             magit-stage-file
-             magit-unstage-file
-             magit-stage
-             magit-unstage
-             magit-commit
-             magit-push-current-to-pushremote
-             magit-pull-from-upstream
-             magit-fetch
-             magit-run-git
-             magit-branch
-             magit-merge
-             magit-rebase
-             magit-diff-unstaged
-             magit-diff-staged
-             magit-stash
-             magit-dispatch)
   :custom
   ;; Display settings
   (magit-display-buffer-function #'magit-display-buffer-fullframe-status-v1)
@@ -6266,12 +6236,7 @@ Injects bibliography abstracts and formatted references into the universal sidec
 
 ** TODO Forge
 #+begin_src emacs-lisp
-(use-package forge
-  :after magit
-  :defer t
-  :config
-  ;; Configure forge to use sqlite for storage
-  (setq forge-database-connector 'sqlite-builtin))
+(use-package forge :after magit :defer t)
 #+end_src
 
 ** TODO Diff-hl
@@ -6279,7 +6244,6 @@ Injects bibliography abstracts and formatted references into the universal sidec
 (use-package diff-hl
   :hook ((after-init . global-diff-hl-mode)
          (dired-mode . diff-hl-dired-mode))
-  :hook (magit-pre-refresh . diff-hl-magit-pre-refresh)
   :hook (magit-post-refresh . diff-hl-magit-post-refresh)
   :init
   ;; Doom Emacs aesthetic: Thin vertical bars instead of blocks
@@ -6293,7 +6257,6 @@ Injects bibliography abstracts and formatted references into the universal sidec
   (diff-hl-flydiff-delay 0.1) ;; Update immediately while typing
 
   :config
-  ;; Enable real-time updates (equivalent to git-gutter+)
   (diff-hl-flydiff-mode 1)
 
   ;; Force the custom thin bitmaps defined in :init
@@ -6312,7 +6275,7 @@ Injects bibliography abstracts and formatted references into the universal sidec
    '(diff-hl-delete ((t (:foreground "#f7768e" :background unspecified))))))
 #+end_src
 
-** TODO Git-Timemachine: Step Through File History
+** TODO Git-Timemachine
 #+begin_src emacs-lisp
 (use-package git-timemachine
   :defer t
@@ -6512,11 +6475,9 @@ Registers the two required tree-sitter grammars so they are available before the
   (dolist (source
            '((markdown
               "https://github.com/tree-sitter-grammars/tree-sitter-markdown"
-              :commit "413285231ce8fa8b11e7074bbe265b48aa7277f9"
               :source-dir "tree-sitter-markdown/src")
              (markdown-inline
               "https://github.com/tree-sitter-grammars/tree-sitter-markdown"
-              :commit "413285231ce8fa8b11e7074bbe265b48aa7277f9"
               :source-dir "tree-sitter-markdown-inline/src")))
     (setf (alist-get (car source) treesit-language-source-alist) (cdr source))))
 #+end_src
@@ -6805,8 +6766,8 @@ Configures Python editing, LSP server routing, workspace settings, formatting, a
   (add-to-list 'eglot-server-programs
                `((python-mode python-ts-mode)
                  . ,(eglot-alternatives
-                     '(("ty" "server")
-                       ("pyrefly" "lsp"))))))
+                     '(("pyrefly" "lsp")
+                       ("ty" "server"))))))
 
 ;; --- Workspace Configuration ---
 ;; (setq eglot-workspace-configuration
