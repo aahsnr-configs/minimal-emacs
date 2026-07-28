@@ -8,11 +8,11 @@
 - [ ] org transient template not working because of the following error: transient-setup: Suffix command ar/org-block-A-ASCII is not defined or autoloaded
 - [ ] super-save gives off the following error: super-save: predicate (lambda nil (super-save-include-p buffer-file-name)) failed: (wrong-type-argument stringp magit-status-mode)
 - [ ] eglot gives the warnin: Wrong type argument: processp, nil
-- [ ] implement evil redo functionality
+- [x] implement evil redo functionality
 - [ ] Current org-src-context breaks org source code block in org buffers
 - [x] remove bufferlo indicator from modeline
 - [ ] SPC v is undefined
-- [ ] Invalid face reference dired directory
+- [x] Invalid face reference dired directory
 
 ```txt
 
