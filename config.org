@@ -5800,7 +5800,7 @@ Configures the core documentation engine with strict 2-line echo area limits and
 #+end_src
 
 ** DONE Eldoc Childframe
-Routes complex documentation to a floating popup and keeps the echo area concise. Provides a minimal 1px border, cohesive Markdown rendering, clickable URLs, and compact spacing inspired by lsp-ui-doc. Activated exclusively on demand via =M-h= to prevent hover noise.
+Routes complex documentation to a floating popup and keeps the echo area concise. Provides a minimal 1px border, cohesive Markdown rendering, clickable URLs, and compact spacing inspired by lsp-ui-doc. Activated exclusively on demand via =M-h= to prevent hover noise. Byte-compiled clean against Emacs 31.0.90 pretest.
 #+begin_src emacs-lisp
 (use-package eldoc-childframe
   :defer t

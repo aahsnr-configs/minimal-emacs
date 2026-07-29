@@ -147,7 +147,7 @@ This is LOCAL introspection only; Eglot does not run in inline Org blocks."
                  (concat ": "
                          (mapconcat
                           (lambda (pair)
-                            (when-let ((val (and (cdr pair)
+                            (when-let* ((val (and (cdr pair)
                                                  (format "%s" (cdr pair)))))
                               (unless (string-empty-p val)
                                 (concat
