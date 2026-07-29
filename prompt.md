@@ -32,7 +32,12 @@
 
 - There appears to be errors in Org Super Agenda and Org Agenda Custom Commands because of (cl-defun org-super-agenda--group-dispatch-take (items (n group)) ...)
 
-- In eglot, all eldoc related documentation should be shown using eldoc-childframe.el file. I don't want eldoc to appear in the echo area or a minibuffer under any circumstances. To make this happen, eldoc-childframe.el must implement a fixed small size for eldoc-childframe popups and then implement scroll features using keybindings like how lsp-ui does for lsp-ui-doc. Only vertical scrolling is needed. And the width of the eldoc-childframe window should be set to 3/4 of the emacs buffer itself so that the eldoc-childframe popup wraps the documentation for eldoc. For eldoc-childframe.el, e
+- In eglot, all eldoc related documentation should be shown using eldoc-childframe.el file. I don't want eldoc to appear in the echo area or a minibuffer under any circumstances. To make this happen, eldoc-childframe.el must implement a fixed small size for eldoc-childframe popups and then implement scroll features using keybindings like how lsp-ui does for lsp-ui-doc. Only vertical scrolling is needed. And the width of the eldoc-childframe window should be set to 3/4 of the emacs buffer itself so that the eldoc-childframe popup wraps the documentation for eldoc. For Issue 1 ub eldoc-childframe.el and my eldoc-childframe subsection, ingest the eldoc.el source code I attached as .el.txt file and then decide how to approach Issue 1. For Issue 2, also check with the eldoc source code and only then apply the fix for Issue 2. Determine what to do with Issue 3, given the fact I only use emacs as a GUI using emacsclient instances. Also determine what the best approach is to fix Issue 4. Fix Issues 5 and 6 like the way you wanted.
+- For peek.el file issues, apply the fixes as you see fit.
+- For the conflicts between eldoc-childframe.el and peek.el determine what is the approach to deal with this and apply the fixes to either of the two files.
+- Also apply your recommendation for eldoc-childframe and markdown-ts-view-mode rendering.
+- For both eldoc-childframe.el and peek.el apply the emacs 31 specific recommendations as you see fit.
+For all these tasks, as always, use best emacs 31 practices, optimizations and APIs. Search the web and think longer for these tasks. Then rewrite the next versions of both eldoc-childframe and peek.el with the changes, corrections and optimizations with GREEN LIGHT in 2 separate emacs-lisp markdown code blocks
 
 ---
 

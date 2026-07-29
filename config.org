@@ -5654,15 +5654,15 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
 ** DONE Eglot
 Connects Emacs to external language servers for smart code navigation, error checking, and refactoring.
 #+begin_src emacs-lisp
-;; (use-package markdown-mode :demand t)
+(use-package markdown-mode :demand t)
 
 (use-package eglot
   :straight (:type built-in)
   :hook (prog-mode . eglot-ensure)
   :custom
   (eglot-autoshutdown t)
-  (eglot-documentation-renderer 'markdown-ts-view-mode)
-  ;; (eglot-documentation-renderer 'gfm-view-mode)
+  ;;(eglot-documentation-renderer 'markdown-ts-view-mode)
+  (eglot-documentation-renderer 'gfm-view-mode)
   (eglot-ignored-server-capabilities '(:documentFormattingProvider
                                        :documentOnTypeFormattingProvider
                                        :colorProvider
@@ -5806,18 +5806,18 @@ Routes complex documentation to a floating popup and keeps the echo area concise
   :defer t
   :straight nil
   :hook (prog-mode . eldoc-childframe-hover-at-point-mode)
-  :bind ("M-h" . eldoc-childframe-help-at-point)
-  :custom
-  ;; Clear the popup instantly when the cursor moves off the symbol.
-  (eldoc-childframe-clear-with-C-g t)
-  ;; Expand maximum dimensions for massive type signatures.
-  (eldoc-childframe-max-pixel-width 900)
-  (eldoc-childframe-max-pixel-height 800)
-  :custom-face
-  (eldoc-childframe-border ((t (:background "#292e42"))))
-  (eldoc-childframe-body ((t (:background "#24283b" :foreground "#c0caf5"))))
-  (eldoc-childframe-markdown-separator
-   ((t (:inherit shadow :strike-through t :height 0.4)))))
+  :bind ("M-h" . eldoc-childframe-help-at-point))
+  ;; :custom
+  ;; ;; Clear the popup instantly when the cursor moves off the symbol.
+  ;; (eldoc-childframe-clear-with-C-g t)
+  ;; ;; Expand maximum dimensions for massive type signatures.
+  ;; (eldoc-childframe-max-pixel-width 900)
+  ;; (eldoc-childframe-max-pixel-height 800)
+  ;; :custom-face
+  ;; (eldoc-childframe-border ((t (:background "#292e42"))))
+  ;; (eldoc-childframe-body ((t (:background "#24283b" :foreground "#c0caf5"))))
+  ;; (eldoc-childframe-markdown-separator
+  ;;  ((t (:inherit shadow :strike-through t :height 0.4)))))
 #+end_src
 
 ** DONE Xref
