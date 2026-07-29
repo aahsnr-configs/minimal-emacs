@@ -1,15 +1,18 @@
 document:
-  title: "Unified AI Operational Protocol & Project State Checkpoint (v53: UI Polish, Load-Order Hardening, & Consult Preview Tuning)"
-  version: 53
-  date: "July 28, 2026"
+  title: "Unified AI Operational Protocol & Project State Checkpoint (v54: The Second IDE Pivot — lsp-mode/lsp-ui Migration)"
+  version: 54
+  date: "July 29, 2026"
   description: >
     Persistent memory anchor, behavioral boundary, and project tracker for the AI. Merges the
     system prompt protocol (rules, persona, formatting) with the project state (progress,
     architecture, checklists) to survive context-window truncation. All AI interactions must
     strictly adhere to the constraints and state defined herein.
+    v54: THE SECOND IDE PIVOT. Migrated from eglot to lsp-mode/lsp-ui ecosystem. Replaced
+    flymake/flyover with flycheck/lsp-ui-sideline. Replaced eldoc-childframe with lsp-ui-doc.
+    Replaced breadcrumb with lsp-headerline-breadcrumb-mode. Implemented dual LSP server
+    architecture for Python (ty/pyrefly + ruff). Excised flymake-ruff and lazy-ruff.
     v53: Hardened load-order physics across Dirvish, Vertico-Multiform, and Evil. Fixed
-    Tree-sitter query crashes in indent-bars. Unified the <escape> key behavior. Recorded
-    user's manual disablement of consult-buffer/consult-recent-file previews.
+    Tree-sitter query crashes in indent-bars. Unified the <escape> key behavior.
     v52: finalized the migration from Elpaca to straight.el.
   note_on_this_edit: >
     This file was condensed for brevity and deduplicated. No information was deleted — repeated
@@ -34,7 +37,7 @@ sections:
         - Ingest all files completely.
         - Acknowledge the current version and date from this file.
         - Scan `config.org.txt` and identify the exact next subsection lacking the `DONE` keyword.
-        - 'Output exactly: "I have ingested the source-of-truth files and the unified protocol. I acknowledge the strict formatting rules, the negative constraints, and the current project state (Version 53). The next pending subsection is [Subsection Name]. I am locked in and will write zero code until you give the signal."'
+        - 'Output exactly: "I have ingested the source-of-truth files and the unified protocol. I acknowledge the strict formatting rules, the negative constraints, and the current project state (Version 54). The next pending subsection is [Subsection Name]. I am locked in and will write zero code until you give the signal."'
     strict_greenlight_protocol:
       state: "READ-ONLY planning state by default."
       rule: "Only generate, rewrite, or output Elisp/Org-mode code if the user's prompt contains the exact phrase `GREEN LIGHT`."
@@ -96,16 +99,17 @@ sections:
     project_metadata:
       title: "Emacs Configuration Project"
       author: "Ahsanur Rahman"
-      config_version: "0.32"
+      config_version: "0.34"
       target_build: "emacs-pretest (PGTK) on Arch Linux (v31.0.90), compiled with --with-native-compilation=aot and --with-pgtk."
-      note: "Per-release change notes for config.org v0.16–v0.32 are folded into the unified changelog in Section 5 (architectural_decisions / version_history) to avoid tracking the same facts twice."
+      note: "Per-release change notes for config.org v0.16–v0.34 are folded into the unified changelog in Section 5 (architectural_decisions / version_history) to avoid tracking the same facts twice."
     editor_behaviour_paradigm:
       summary: >
-        In v31 the IDE stack is strictly `eglot` + Emacs 31 native core, augmented by
-        `eldoc-childframe` (custom local fork for GUI childframe hover tooltips) and `flyover`
-        (inline diagnostic overlays). `breadcrumb` is the EXCLUSIVE headerline provider — `eglot`
-        renders no headerline. This guarantees zero-latency, C-level performance, strict LSP
-        compliance, and VS Code UI parity.
+        In v31 the IDE stack is strictly `lsp-mode` + `lsp-ui` + Emacs 31 native core.
+        Hover/Docs: `lsp-ui-doc`. Diagnostics: `flycheck` + `lsp-ui-sideline`.
+        Headerline: `lsp-headerline-breadcrumb-mode` exclusively.
+        Completion: lsp-mode (CAPF) -> corfu. Formatting: `apheleia` (async CLI) for whole-file,
+        `lsp-mode` for range. Debugging: `dape` with inline variables and projection-dape.
+        This guarantees rich VS Code UI parity, semantic symbol highlighting, and dual-server capabilities.
       groups:
         - { id: 1, name: "Visual Chrome & UI Overlays", status: "FULLY FINALIZED" }
         - { id: 2, name: "Interactive Buffers & Redisplay Physics", status: "FULLY FINALIZED" }
@@ -241,13 +245,13 @@ sections:
         description: "Zero Markdown syntax may bleed into Org-mode text or source blocks. Use =code=, bold, /italics/, standard Org headings."
       - name: "Vanilla Emacs Paradigm"
         description: "No Doom Emacs proprietary macros (map!, defadvice!, use-package!) — translate to native Vanilla Emacs equivalents."
-      - name: "The eglot-Only IDE Mandate"
+      - name: "The lsp-mode IDE Mandate"
         description: >
-          Canonical stack: `eglot` + Emacs 31 native core + UI-parity packages. Hover/Docs:
-          `eldoc-childframe` (custom fork) + native `eldoc` fallback. Diagnostics: `flyover` +
-          native `flymake`. Headerline: `breadcrumb` exclusively (`eglot` provides none).
-          Completion: eglot → cape → corfu (strictly in-buffer). Formatting: `apheleia` (async CLI)
-          for whole-file, native electric-* for on-type. Debugging: `dape` with inline variables and projection-dape.
+          Canonical stack: `lsp-mode` + `lsp-ui` + Emacs 31 native core. Hover/Docs:
+          `lsp-ui-doc`. Diagnostics: `flycheck` + `lsp-ui-sideline`. Headerline:
+          `lsp-headerline-breadcrumb-mode` exclusively. Completion: lsp-mode CAPF → corfu.
+          Formatting: `apheleia` (async CLI) for whole-file, `lsp-mode` for range.
+          Debugging: `dape` with inline variables and projection-dape.
       - name: "Knowledge & Task Separation (Org Paradigm)"
         description: "Denote (knowledge) and Org-Agenda (tasks) stay strictly decoupled. Never mix GTD states into Denote notes or fragment tasks across multiple state-based files."
       - name: "org-modern Face Consumption Rule"
@@ -278,13 +282,14 @@ sections:
         description: "Keys inside transient/ephemeral package maps use raw `define-key` — `general-define-key` with `:states` silently fails on non-Evil-inheriting keymaps."
       - name: "Domain-Driven Hook Encapsulation (v46)"
         description: "UI mutation hooks go inside the `:config` block of the package they mutate — never scattered into isolated utility subsections."
-      - name: "Language-Specific Eglot Placement Rule (v48)"
-        description: "All eglot-server-programs entries and eglot-workspace-configuration settings live in their Languages-section subsection."
+      - name: "Language-Specific LSP Placement Rule (v54)"
+        description: "All lsp-mode client registrations, dual-server setups, and workspace configurations live in their Languages-section subsection."
       - name: "Keybinds Subsection Scoping Rule (v48)"
         description: "The Development Tools Keybinds subsection holds ONLY Development Tools keybindings. All other keybindings stay in General Keybindings."
     strict_negative_constraints:
-      - "NO lsp-mode ecosystem (lsp-mode, lsp-ui, lsp-signature, lsp-ui-peek, lsp-ui-doc) — strictly forbidden."
-      - "NO flycheck (replaced by native flymake + flyover); NO dap-mode (replaced by dape); NO company-mode (replaced by native completion-at-point / CAPF pipeline)."
+      - "NO eglot (replaced by lsp-mode/lsp-ui); NO flymake (replaced by flycheck + lsp-ui-sideline); NO dap-mode (replaced by dape); NO company-mode (replaced by native completion-at-point / CAPF pipeline)."
+      - "NO eldoc-childframe (replaced by lsp-ui-doc); NO flyover (replaced by lsp-ui-sideline); NO breadcrumb.el (replaced by lsp-headerline-breadcrumb-mode)."
+      - "NO flymake-ruff or lazy-ruff (replaced by ruff LSP server as add-on); NO symbol-overlay (replaced by lsp-mode semantic highlighting)."
       - "NO synchronous LSP whole-file formatting (textDocument/formatting) — use apheleia."
       - "NO smartparens/puni; NO combobulate; NO tree-edit; NO expand-region (use expreg); NO stripspace (use ws-butler); NO kirigami.el/origami.el."
       - "NO completion-in-region-function overrides (Corfu stays strictly in-buffer); NO which-key Embark hacks; NO consult-projectile."
@@ -294,12 +299,12 @@ sections:
       - "NO :pin or :vc keywords; NO Chinese-language sources in web research; NO blind legacy fixes."
       - "NO org-modern face removal while the matching badge feature is enabled; NO compose-region/font-lock-add-keywords bullet replacement in Org buffers."
       - "NO undo-fu Package Merging: undo-fu and undo-fu-session MUST be isolated in distinct use-package blocks."
-      - "NO obsolete eglot-events-buffer-size / eglot-confirm-server-initiated-edits. NO 3-arg eglot--apply-workspace-edit. NO eglot-code-action-indications 'mode-line."
+      - "NO lsp-mode IO logging (lsp-log-io nil); NO lsp-lens (disabled for minimal aesthetic); NO lsp-enable-links (handled by link-hint)."
 
   - id: 5
     title: "Version History, Edge Cases & Overall Progress"
     description: >
-      Single unified changelog spanning document versions v15–v53.
+      Single unified changelog spanning document versions v15–v54.
     architectural_decisions:
       v15: "IDE Stack Consolidation (committed to lsp-mode — later reversed, see v25). Workspace Management: selected bufferlo."
       v18: "Package Management Migration: officially transitioned to Elpaca v0.12; deprecated :pin and :vc."
@@ -352,6 +357,12 @@ sections:
         Bridged Evil redo to `undo-fu` via `evil-undo-system`. Unified `<escape>` key to clear
         search highlights and abort minibuffer. User manually disabled Consult previews for
         `consult-buffer` and `consult-recent-file` (`:preview-key nil`) to eliminate I/O overhead.
+      v54: >
+        THE SECOND IDE PIVOT: Migrated from eglot to lsp-mode/lsp-ui ecosystem. Replaced
+        flymake/flyover with flycheck/lsp-ui-sideline. Replaced eldoc-childframe with lsp-ui-doc.
+        Replaced breadcrumb with lsp-headerline-breadcrumb-mode. Implemented dual LSP server
+        architecture for Python (ty/pyrefly + ruff). Excised flymake-ruff and lazy-ruff.
+        Mandated LSP_USE_PLISTS=true in early-init.el for JSON-RPC performance.
     edge_cases_and_deferred_issues:
       - "Dirvish multi-frame flicker: patched via define-advice on dirvish-pre-redisplay-h."
       - "Emacs 31 unreleased APIs (e.g. grep-edit-mode) must be wrapped in defensive runtime guards."
@@ -379,25 +390,28 @@ sections:
       - "[v53] vertico-multiform Invalid face reference: `dired-directory` face unregistered during `find-file`. Fixed via `(require 'dired)` in `:config`."
       - "[v53] dirvish void-function crash: `dirvish-dired-noselect-a` evaluated in `:init` before package load. Excised; `dirvish-override-dired-mode` handles it safely in `:config`."
       - "[v53] Consult preview I/O overhead: User explicitly disabled previews for `consult-buffer` and `consult-recent-file` via `:preview-key nil`."
+      - "[v54] lsp-mode plist deserialization: `LSP_USE_PLISTS=true` must be set via `setenv` in early-init.el before byte-compilation to prevent hash-table GC pressure."
+      - "[v54] Python dual-server architecture: ty/pyrefly acts as primary, ruff as add-on (`:add-on? t`) for linting/formatting. Eliminates need for external flymake/lazy-ruff wrappers."
+      - "[v54] lsp-mode completion category overrides: Must inject `(lsp-capf (styles orderless basic))` into `completion-category-overrides` to preserve Orderless fuzzy matching."
     overall_progress:
       finalized:
         - "Core Emacs (13 subsections); Vim Emulation (12 subsections); General Keybindings (centralized leader routing)."
         - "Editor Behaviour Groups 1–7 (see editor_behaviour_paradigm.groups above)."
         - "Workflow Management: Dired, Dirvish, Treemacs, Project Management (projection), Buffer Management (iBuffer, buffer-terminator), Workspaces (tab-bar, bufferlo)."
-        - "IDE Architecture Blueprint defined (eglot + eldoc-childframe + flyover + breadcrumb)."
+        - "IDE Architecture Blueprint defined (lsp-mode + lsp-ui + flycheck + lsp-ui-doc + lsp-headerline-breadcrumb-mode)."
         - "Org Mode & Second Brain: architecture blueprint, Dynamic Directory Structure, Task States & Contexts, Better Font Faces, Org Agenda Custom Commands, Org Habit, Org Super Agenda, Org Capture, Org Structure Templates, Org Transclusion, Consult Denote, Evil Org, Org Block Wrap, and Denote Ecosystem (22 of 25 numbered packages CONFIGURED, plus Org Transclusion's Denote bridge and Consult Denote)."
         - "Undo Fu & Undo Fu Session; Auto Save & Auto Tangle."
         - "Tree-sitter: Emacs 31 native auto-installation and mode routing."
         - "Hideshow & Custom Folding Functions; Link Hint; Re-Builder."
         - "Font Family Unification; Org Mode Cross-Section Cleanup."
-        - "Development Tools: Eglot Core Configuration, Languages Eglot Server Programs, Keybinds (scoped), Eldoc Childframe (local fork finalized), Dape (Debug Adapter Protocol with projection-dape, repeat-mode sticky keys, and bufferlo workspace isolation), Flymake (with flyover), Xref, Eval Overlay, Apheleia, and Direnv."
         - "Contextual Sidebars: universal-sidecar with denote-sections and denote-citar-sections."
         - "Highlight TODOs: hl-todo, consult-todo, and magit-todos integration."
         - "Markdown Mode: Native Emacs 31 `markdown-ts-mode` with tree-sitter grammars, marksman LSP, apheleia formatting, and evil/modal keybindings."
       in_progress:
         - "Org Mode & Second Brain: Keybindings subsection retains TODO pending user review."
         - "Development Tools: Minimap (demap) subsection retains TODO."
-        - "Languages: Python subsection retains TODO."
+        - "Languages: Python subsection retains TODO (requires rewrite for dual LSP servers)."
+        - "IDE Migration: Rewriting config.org subsections to replace eglot/flymake/eldoc-childframe with lsp-mode/lsp-ui/flycheck/lsp-ui-doc."
       untouched:
         - "Version Control: Magit, Forge, Diff-hl, Git-Timemachine retain TODO."
         - "Snippet Engine, LaTeX, Languages (non-Python/Markdown), XML Viewer, Study."
@@ -423,9 +437,9 @@ sections:
       - group: "Workflow Management"
         tasks:
           - { status: "pending", description: "Post-finalization: revisit org-super-agenda category 3 (:auto-parent) once the above is done." }
-      - group: "Development Tools & Completion Framework (v26 rewrite required)"
+      - group: "Development Tools & Completion Framework (v54 rewrite required)"
         tasks:
-          - { status: "pending", description: "Rewrite Completion Framework: strictly implement eglot → cape → corfu → orderless." }
+          - { status: "pending", description: "Rewrite Completion Framework & Development Tools: implement lsp-mode CAPF -> corfu -> orderless, flycheck, lsp-ui-doc, and dual-server Python configuration." }
       - group: "Global Remaining Work"
         tasks:
           - { status: "pending", description: "Illustrate a workflow using iedit and evil-multiedit." }

@@ -83,6 +83,8 @@
   ;; ====================
   (setq site-run-file nil)
 
+
+  (setenv "LSP_USE_PLISTS" "true")
   ;; ====================
   ;; RESTORE AFTER STARTUP
   ;; ====================
