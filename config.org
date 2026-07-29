@@ -5800,24 +5800,37 @@ Configures the core documentation engine with strict 2-line echo area limits and
 #+end_src
 
 ** DONE Eldoc Childframe
-Routes complex documentation to a floating popup and keeps the echo area concise.
+Routes complex documentation to a floating popup and keeps the echo area concise. Provides a minimal 1px border, cohesive Markdown rendering, clickable URLs, and compact spacing inspired by lsp-ui-doc. Activated exclusively on demand via =M-h= to prevent hover noise.
 #+begin_src emacs-lisp
 (use-package eldoc-childframe
   :defer t
   :straight nil
   :hook (prog-mode . eldoc-childframe-hover-at-point-mode)
-  :bind ("M-h" . eldoc-childframe-help-at-point))
-  ;; :custom
-  ;; ;; Clear the popup instantly when the cursor moves off the symbol.
-  ;; (eldoc-childframe-clear-with-C-g t)
-  ;; ;; Expand maximum dimensions for massive type signatures.
-  ;; (eldoc-childframe-max-pixel-width 900)
-  ;; (eldoc-childframe-max-pixel-height 800)
-  ;; :custom-face
-  ;; (eldoc-childframe-border ((t (:background "#292e42"))))
-  ;; (eldoc-childframe-body ((t (:background "#24283b" :foreground "#c0caf5"))))
-  ;; (eldoc-childframe-markdown-separator
-  ;;  ((t (:inherit shadow :strike-through t :height 0.4)))))
+  :bind ("M-h" . eldoc-childframe-help-at-point)
+  :custom
+  ;; Clear the popup instantly when C-g is pressed.
+  (eldoc-childframe-clear-with-C-g t)
+  ;; Maximum dimensions for the documentation childframe.
+  (eldoc-childframe-max-pixel-width 900)
+  (eldoc-childframe-max-pixel-height 800)
+  ;; Prefer below-point placement; flip above when space is insufficient.
+  (eldoc-childframe-prefer-above nil)
+  ;; Show the symbol name as a header line for quick identification.
+  (eldoc-childframe-show-header t)
+  ;; Pixel offsets: (LEFT RIGHT TOP) for upper-corner positioning.
+  (eldoc-childframe-offset '(16 16 16))
+  :custom-face
+  ;; Tokyo Night border: subtle 1px frame separation.
+  (eldoc-childframe-border ((t (:background "#292e42"))))
+  ;; Tokyo Night body: dark blue-gray background with soft foreground.
+  (eldoc-childframe-body ((t (:background "#24283b" :foreground "#c0caf5"))))
+  ;; Header: Tokyo Night blue for symbol names with slight height bump.
+  (eldoc-childframe-header ((t (:foreground "#7aa2f7" :weight bold :height 1.1))))
+  ;; Markdown separator: recessive strike-through line.
+  (eldoc-childframe-markdown-separator
+   ((t (:inherit shadow :strike-through t :height 0.4 :extend t))))
+  ;; Clickable URLs: inherit link face for consistency.
+  (eldoc-childframe-url ((t (:inherit link)))))
 #+end_src
 
 ** DONE Xref
