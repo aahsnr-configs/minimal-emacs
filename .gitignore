@@ -16,7 +16,8 @@ auto-save-list/
 undo-fu-session/
 tramp
 projects
-*.txt
+config.org.txt
+early-init.el.txt
 persp-auto-save
 projectile-bookmarks.eld
 org-roam.db

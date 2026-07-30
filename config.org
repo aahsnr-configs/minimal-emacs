@@ -1873,8 +1873,9 @@ Renders hex, RGB, and named color previews via overlay stacking. Context-aware s
         (not (too-long-file-p)))))
 #+end_src
 
-** DONE Modeline
+** TODO Modeline
 Minimalist modeline engine featuring native Evil state tracking, IDE synergy, and prose word-count integration. Redundant native indicators are disabled to preserve horizontal space and prevent variable inheritance collisions.
+TODO: Replace doom-modeline with sleek modeline from https://github.com/abidanBrito/sleek-modeline/tree/main
 #+begin_src emacs-lisp
 (use-package doom-modeline
   :init

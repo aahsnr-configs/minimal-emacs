@@ -1,17 +1,27 @@
-# TODOs
-
-- [x] line numbers cannot be absolute
-- [ ] eldoc-childframe not rendering markdown documentation like eldoc-box
-- [ ] eldoc-childframe should only open on keybinding
-- [x] eldoc-childframe should not show modeline
-- [x] eldoc-childframe should not render breadcrumb
-- [x] eldoc-childframe does not disappear when buffer is changed. that behaviour needs to be fixed.
-- [x] flyover should only appear when cursor is in the position of the error, warning, etc.
-- [ ] org transient template not working because of the following error: transient-setup: Suffix command ar/org-block-A-ASCII is not defined or autoloaded
-- [ ] super-save gives off the following error: super-save: predicate (lambda nil (super-save-include-p buffer-file-name)) failed: (wrong-type-argument stringp magit-status-mode)
-- [ ] eglot gives the warnin: Wrong type argument: processp, nil
-- [x] implement evil redo functionality
-- [ ] Current org-src-context breaks org source code block in org buffers
-- [x] remove bufferlo indicator from modeline
-- [ ] SPC v is undefined
-- [x] Invalid face reference dired directory
+- [ ] Move onto the following sections: 1. Workflow Management 2. Completion Framework 3. Development Tools 4. Treesitter/Folding
+- [ ] implement the email setup
+- [ ] move customs.el to var
+- [ ] add more padding to emacs buffer
+- [ ] move perspective-state to var/ or etc/
+- [ ] move tree-sitter grammars to var/ or etc/
+- [ ] don't add ~/.config/emacs or ~/.config/emacs/var/elpa/flycheck-hl-todo/ to projects
+- [ ] add eval +overlay module packages from doom emacs into my vanilla emacs config
+- [ ] go back to openrouter.ai for my corfu configuration.
+- [ ] make sure there are no modelines for popper and winne
+- [ ] implement settings from eval-overlay.md
+- [ ] recentf-mode not showing files in dashboard, but shows recent files in working buffers
+- [ ] I don't want to see files enclosed with \*\* when I execute consult-buffer
+- [ ] Add epithet and math-delimiters package from https://github.com/oantolin
+- [ ] Mismatched bracket error in the new consult config
+- [ ] show-paren-mode should highlight matching brackets when cursor is inside that the bracket pair
+- [ ] orderless only matches letters next to each other; I dont want that
+- [ ] add keybindings for embark
+- [ ] add lsp-ltex-plus
+- [ ] `Important`: Write a test org-mode file to practice all the writing practices in org buffers. Then determine what and how to optimize the writing workflow.
+- [ ] lsp-mode ideas: 1. how would code lens be useful in python programming
+- [ ] I also need interactive custom functions for .dir-locals.el
+- [ ] `Important`: When working on development tools, after finalizing development tools main section, ask qwen to review the completion framework again to make sure if there are any overlapping configurations that need to be integrated with each other like vertico, cape and corfu.
+- [ ] `Important`: For both Completion Framework and Development Tools sections, use doom emacs keybindings whereever possible.
+- [ ] `Important`: Determine all the related packages that are integrated together in the whole emacs config.
+- [ ] `Urgent`: Update project-state.md file with the following additions: 1. Keep track of TODO, NOTE, etc. keywords in the source code block itself; 2. Keep track of all the NOTE keywords anywhere they appear. 3. Also keep track of tasks that still needs to be done from the Remaining Work section near the end of file. This section just contains checkboxes. 4. Also keep track of questions from the Questions sections near end of file. 5. Keep track of TODO, NOTE, etc. keywords in areas other than org headers and org source code blocks, in other words, in general org text
+- [ ] `Important`: add denote-explore package
