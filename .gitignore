@@ -9,6 +9,7 @@ etc/
 perspective-state
 places
 init.el
+init.elc
 history
 tabsession.el
 auto-save-list/
