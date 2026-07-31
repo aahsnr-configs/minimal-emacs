@@ -4294,6 +4294,7 @@ Defines the lifecycle of actionable items and groups them by physical or digital
   (setq org-archive-location "archive/%s_archive::"))
 #+end_src
 
+
 ** DONE Org Agenda
 Configures the task overview display, sorting, and window behavior.
 #+begin_src emacs-lisp
@@ -4344,14 +4345,23 @@ Configures the task overview display, sorting, and window behavior.
   ;; Tag alignment: right-aligned at column 80.
   (org-tags-column -80)
   :config
-  (add-to-list 'display-buffer-alist
-             '("\\*\\(?:Org \\)?Agenda Commands\\*"
-               nil
-               (window-parameters (mode-line-format . none))))
+  ;; Doom Emacs Parity: Route the native dispatcher, calendar, and export dispatcher
+  ;; to a shrink-to-fit bottom drawer. `display-buffer-at-bottom` creates a standard
+  ;; horizontal split that `org-fit-window-to-buffer` can successfully resize,
+  ;; bypassing the rigid side-window locking that causes empty space artifacts.
+  ;; (add-to-list 'display-buffer-alist
+  ;;              '("\\*\\(?:Org \\)?Agenda Commands\\*\\|\\*Calendar\\*\\|\\*Org Export Dispatcher\\*"
+  ;;                (display-buffer-at-bottom)
+  ;;                (window-height . fit-window-to-buffer)
+  ;;                (window-parameters (no-delete-other-windows . t)
+  ;;                                   (mode-line-format . none))))
   ;; Org-agenda aggressively resets the modeline during finalization.
   ;; Hook injected here to obey Domain-Driven encapsulation (migrated from Hide Modeline).
   (add-hook 'org-agenda-finalize-hook #'ar/enable-hide-modeline))
 #+end_src
+
+
+
 
 ** DONE Org Super Agenda
 Groups agenda items into labeled sections by urgency, context, and status.
@@ -7122,7 +7132,6 @@ Routes quit and session persistence commands through the global leader prefix.
   "q s" '(bufferlo-bookmarks-save :wk "Save session")
   "q l" '(bufferlo-bookmarks-load :wk "Load session"))
 #+end_src
-
 
 ** DONE Open / Applications
 Routes centralized leader keybindings for opening sidebars, terminals, frames, and Org agenda dispatchers.
