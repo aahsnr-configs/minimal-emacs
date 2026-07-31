@@ -945,19 +945,33 @@ Configures global typography, baseline monospaced faces, fontset fallback regist
 Applies the Tokyo Night palette and integrates downstream UI enhancements. Synchronously loaded to prevent initial frame Flash of Unstyled Content (FOUC).
 #+begin_src emacs-lisp
 (use-package doom-themes
-  :demand t
   :custom
-  (doom-themes-enable-bold t)
-  (doom-themes-enable-italic t)
-  (doom-themes-treemacs-theme "doom-atom")
+  ;; Global settings (defaults)
+  (doom-themes-enable-bold t)   ; if nil, bold is universally disabled
+  (doom-themes-enable-italic t) ; if nil, italics is universally disabled
+  ;; for treemacs users
+  (doom-themes-treemacs-theme "doom-atom") ; use "doom-colors" for less minimal icon theme
   :config
+  ;; CRITICAL: Patch the face alist BEFORE the theme engine evaluates it.
+  ;; Emacs 31 strictly forbids face inheritance cycles (doomemacs/themes#875).
+  (when (boundp 'doom-themes-base-faces)
+    (setcdr (assoc 'gnus-group-news-low-empty doom-themes-base-faces)
+            '(:inherit 'gnus-group-mail-1-empty :weight 'normal)))
   (load-theme 'doom-tokyo-night t)
-  ;; Defers injection until Treemacs is lazily loaded.
-  (with-eval-after-load 'treemacs
-    (doom-themes-treemacs-config))
-  ;; Defers Org font-lock patches until the AST engine loads.
-  (with-eval-after-load 'org
-    (doom-themes-org-config)))
+  ;; Enable flashing mode-line on errors
+  (doom-themes-visual-bell-config)
+  ;; Enable custom neotree theme (nerd-icons must be installed!)
+  (doom-themes-neotree-config)
+  ;; or for treemacs users
+  (doom-themes-treemacs-config)
+  ;; Corrects (and improves) org-mode's native fontification.
+  (doom-themes-org-config))
+
+;; (use-package batppuccin
+;;   :vc (:url "https://github.com/bbatsov/batppuccin-emacs" :rev :newest)
+;;   :config
+;;   (load-theme 'batppuccin-mocha t))
+
 #+end_src
 
 
@@ -4109,7 +4123,7 @@ Configures Org's core behavior, display, source editing, and performance setting
 #+begin_src emacs-lisp
 (use-package org
   :ensure nil
-  :defer t
+  :demand t
   :preface
   ;; Prevent eager loading of legacy modules. Only org-habit is required.
   (defvar org-modules '(org-habit))
@@ -4304,7 +4318,6 @@ Defines the lifecycle of actionable items and groups them by physical or digital
   (setq org-archive-location "archive/%s_archive::"))
 #+end_src
 
-
 ** DONE Org Agenda
 Configures the task overview display, sorting, and window behavior.
 #+begin_src emacs-lisp
@@ -4369,9 +4382,6 @@ Configures the task overview display, sorting, and window behavior.
   ;; Hook injected here to obey Domain-Driven encapsulation (migrated from Hide Modeline).
   (add-hook 'org-agenda-finalize-hook #'ar/enable-hide-modeline))
 #+end_src
-
-
-
 
 ** DONE Org Super Agenda
 Groups agenda items into labeled sections by urgency, context, and status.
