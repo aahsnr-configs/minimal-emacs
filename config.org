@@ -4344,61 +4344,6 @@ Configures the task overview display, sorting, and window behavior.
   ;; Tag alignment: right-aligned at column 80.
   (org-tags-column -80)
   :config
-  ;; Org-agenda aggressively resets the modeline during finalization.
-  ;; Hook injected here to obey Domain-Driven encapsulation (migrated from Hide Modeline).
-  (add-hook 'org-agenda-finalize-hook #'ar/enable-hide-modeline))
-#+end_src
-
-** DONE Org Agenda
-Configures the task overview display, sorting, and window behavior.
-#+begin_src emacs-lisp
-(use-package org-agenda
-  :straight (:type built-in)
-  :defer t
-  :after org
-  :custom
-  ;; Compact blocks: suppresses default headers (org-super-agenda adds its own).
-  (org-agenda-compact-blocks t)
-  ;; Performance: skip startup, tag inheritance, and unavailable files.
-  (org-agenda-inhibit-startup t)
-  (org-agenda-use-tag-inheritance nil)
-  (org-agenda-skip-unavailable-files t)
-  (org-agenda-ignore-properties '(effort appt))
-  ;; Task visibility: hide completed scheduled/deadline items.
-  (org-agenda-skip-scheduled-if-done t)
-  (org-agenda-skip-deadline-if-done t)
-  (org-agenda-dim-blocked-tasks nil)
-  ;; Window management: reuse current window, restore layout on quit.
-  (org-agenda-window-setup 'current-window)
-  (org-agenda-restore-windows-after-quit t)
-  (org-agenda-sticky nil)
-  ;; Span and calendar: daily default, start on current day, show all dates.
-  (org-agenda-span 'day)
-  (org-agenda-start-on-weekday nil)
-  (org-agenda-show-all-dates t)
-  ;; Time grid: visual hour markers with current-time indicator.
-  (org-agenda-time-grid
-   '((daily today require-timed)
-     (800 1000 1200 1400 1600 1800 2000)
-     " ┄┄┄┄┄ " "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"))
-  (org-agenda-current-time-string
-   "◀ now ─────────────────────────────────────────────────")
-  ;; Sorting: habits first, then time, then priority.
-  ;; org-super-agenda :order overrides within groups; this is the fallback.
-  (org-agenda-sorting-strategy
-   '((agenda habit-down time-up priority-down category-keep)
-     (todo priority-down category-keep)
-     (tags priority-down category-keep)
-     (search category-keep)))
-  ;; Prefix format: category + timestamp per item.
-  (org-agenda-prefix-format
-   '((agenda . " %i %-12:c%?-12t% s")
-     (todo . " %i %-12:c")
-     (tags . " %i %-12:c")
-     (search . " %i %-12:c")))
-  ;; Tag alignment: right-aligned at column 80.
-  (org-tags-column -80)
-  :config
   (add-to-list 'display-buffer-alist
              '("\\*\\(?:Org \\)?Agenda Commands\\*"
                nil
