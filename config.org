@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.35
+#+VERSION: 0.36
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -945,16 +945,21 @@ Applies the Tokyo Night palette and integrates downstream UI enhancements. Synch
     (doom-themes-org-config)))
 #+end_src
 
+
+
 ** DONE Solaire Mode
 Swaps background faces to distinguish side-windows and popups. Deferred until the theme engine finalizes to prevent mapping race conditions.
 #+begin_src emacs-lisp
 (use-package solaire-mode
-  ;; :demand t
   :after doom-themes
-  :hook ((change-major-mode after-revert ediff-prepare-buffer org-capture-mode) . turn-on-solaire-mode)
+  :hook ((change-major-mode ghostel-mode ghostel-compile-mode after-revert ediff-prepare-buffer org-capture-mode) . turn-on-solaire-mode)
   :config
+  ;; Ghostel's C-engine queries its custom `ghostel-default` face directly, bypassing the standard `default` remap.
+  ;; Injecting it into the remap alist forces the terminal to adopt the swapped background via native buffer-local remapping.
+  (add-to-list 'solaire-mode-remap-alist '(ghostel-default . solaire-default-face))
   (solaire-global-mode +1))
 #+end_src
+
 
 ** DONE Transient
 Foundational API for ephemeral keybinding menus. Strictly deferred to respect downstream evaluation wrappers and configured for variable-pitch grid alignment.
@@ -1021,6 +1026,92 @@ Synchronizes buffers with external disk modifications via native OS file notific
   :config
   (global-auto-revert-mode 1))
 #+end_src
+
+
+** DONE Ghostel
+Terminal emulation powered by =libghostty-vt=, rendering as a persistent bottom drawer with strict Evil integration and automatic TRAMP support.
+#+begin_src emacs-lisp
+(use-package ghostel
+  :straight (ghostel :host github :repo "dakra/ghostel")
+  :defer t
+  :commands (ghostel
+             ghostel-project)
+  :bind (:map ghostel-semi-char-mode-map
+              ("C-s" . consult-line)
+              ("C-k" . ar/ghostel-send-C-k-and-kill)
+              ("M-p" . (lambda () (interactive) (ghostel-send-key "p" "ctrl")))
+              ("M-n" . (lambda () (interactive) (ghostel-send-key "n" "ctrl"))))
+  :config
+  ;; Route all ghostel-derived buffers to a dedicated 30% bottom side-window.
+  (add-to-list 'display-buffer-alist
+               '((derived-mode . ghostel-mode)
+                 (display-buffer-in-side-window)
+                 (side . bottom)
+                 (window-height . 0.3)
+                 (window-parameters (no-delete-other-windows . t))))
+  ;; Whitelist Magit for OSC 52 shell evaluation.
+  (add-to-list 'ghostel-eval-cmds '("magit-status-setup-buffer" magit-status-setup-buffer))
+  ;; Synchronize C-k kill-ring behavior with terminal line deletion.
+  (defun ar/ghostel-send-C-k-and-kill ()
+    "Send `C-k' to ghostel and save to kill-ring."
+    (interactive)
+    (kill-ring-save (point) (line-end-position))
+    (ghostel-send-key "k" "ctrl"))
+  ;; Strip DIRENV_ variables to enforce local .envrc evaluation.
+  (add-hook 'ghostel-pre-spawn-hook
+            (lambda ()
+              (setq process-environment
+                    (seq-remove (lambda (env) (string-prefix-p "DIRENV_" env))
+                                process-environment))))
+  ;; Enable automatic TRAMP shell integration via temporary SCP transfers.
+  (setq ghostel-tramp-shell-integration t))
+
+;; State-aware toggle for the persistent bottom terminal drawer.
+;; Respects bufferlo workspace boundaries when active.
+(defun ar/ghostel-toggle ()
+  "Toggle the Ghostel terminal drawer at the bottom of the frame."
+  (interactive)
+  (let* ((bufs (if (bound-and-true-p bufferlo-mode)
+                   (bufferlo-buffer-list)
+                 (buffer-list)))
+         (buf (seq-find (lambda (b)
+                          (with-current-buffer b (derived-mode-p 'ghostel-mode)))
+                        bufs))
+         (win (and buf (get-buffer-window buf))))
+    (cond
+     ((and win (eq win (selected-window))) (delete-window win))
+     (win (select-window win))
+     (buf (pop-to-buffer buf))
+     (t (call-interactively #'ghostel)))))
+
+;; Synchronizes the terminal cursor with Emacs point during Evil state transitions.
+(use-package evil-ghostel
+  :straight (evil-ghostel :host github :repo "dakra/ghostel"
+                          :files ("extensions/evil-ghostel/*.el"))
+  :after (ghostel evil)
+  :hook (ghostel-mode . evil-ghostel-mode))
+
+;; Routes Eshell visual commands to dedicated Ghostel buffers for proper TTY rendering.
+(use-package ghostel-eshell
+  :straight nil
+  :after ghostel
+  :hook (eshell-load . ghostel-eshell-visual-command-mode))
+
+;; Replaces standard compilation buffers with live TTY-backed Ghostel sessions.
+(use-package ghostel-compile
+  :straight nil
+  :after ghostel
+  :config
+  (ghostel-compile-global-mode 1))
+
+;; Upgrades Comint and REPL output with libghostty-vt ANSI and OSC parsing fidelity.
+(use-package ghostel-comint
+  :straight nil
+  :after ghostel
+  :config
+  (ghostel-comint-global-mode 1))
+#+end_src
+
 
 ** DONE Subword
 Modifies word boundaries to recognize camelCase transitions. Globally enables native and Evil motions to traverse compound identifiers.
@@ -1874,8 +1965,7 @@ Renders hex, RGB, and named color previews via overlay stacking. Context-aware s
 #+end_src
 
 ** TODO Modeline
-Minimalist modeline engine featuring native Evil state tracking, IDE synergy, and prose word-count integration. Redundant native indicators are disabled to preserve horizontal space and prevent variable inheritance collisions.
-TODO: Replace doom-modeline with sleek modeline from https://github.com/abidanBrito/sleek-modeline/tree/main
+Minimalist modeline engine featuring native Evil state tracking, LSP/VC diagnostics, and nerd-icons integration.
 #+begin_src emacs-lisp
 (use-package doom-modeline
   :init
@@ -3412,14 +3502,13 @@ Provides flexible, multi-component fuzzy matching for minibuffer and in-buffer c
 #+begin_src emacs-lisp
 (use-package orderless
   :defer t
-  :init
-  ;; Core completion variables must be set in :init before the package loads.
-  (setq completion-styles '(orderless basic)
-        completion-category-defaults nil
-        completion-pcm-leading-wildcard t
-        ;; File routing uses partial-completion for paths; eglot relies on global styles.
-        completion-category-overrides '((file (styles basic partial-completion orderless))))
   :custom
+  (completion-styles '(orderless basic))
+  ;; (completion-category-defaults nil) ; NOTE: Does not exist in source code 
+  (completion-pcm-leading-wildcard t)
+  (completion-category-overrides '((file (styles orderless partial-completion))))
+                                                                  
+  ;; :custom-face
   ;; Prioritize fast literal matching before falling back to regex compilation.
   (orderless-matching-styles '(orderless-literal orderless-regexp))
   :config
@@ -3711,20 +3800,20 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
 #+begin_src emacs-lisp
 (use-package corfu
   :init
-  (global-corfu-mode 1)
+  (global-corfu-mode)
   :custom
   (corfu-cycle t)
   (corfu-auto t)
   (corfu-quit-at-boundary 'separator)
   (corfu-quit-no-match 'separator)
-  (corfu-count 8)
+  (corfu-count 5)
   (corfu-max-width 120)
   ;; Preselects the prompt to prevent accidental candidate commits.
   (corfu-preselect 'prompt)
   (corfu-on-exact-match nil)
   ;; Delays auto-completion to prevent GC stutter with Orderless.
   (corfu-auto-delay 0.2)
-  (corfu-auto-prefix 2)
+  (corfu-auto-prefix 3)
   (global-corfu-modes '((not erc-mode
                              eshell-mode
                              circe-mode
@@ -3734,16 +3823,19 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
                              ghostel-mode
                              ghostel-compile-view-mode)
                         t))
-  :custom-face
-  (corfu-border ((t (:inherit region :background unspecified))))
+  ;; :custom-face
+  ;; (corfu-border ((t (:inherit region :background unspecified))))
   :bind (:map corfu-map
               ("TAB"       . corfu-next)
               ("<tab>"     . corfu-next)
               ("S-TAB"     . corfu-previous)
-              ("<backtab>" . corfu-previous)
-              ("RET"       . corfu-insert)
-              ("<escape>"  . corfu-quit))
+              ("<backtab>" . corfu-previous))
+              ;; ("RET"       . corfu-insert)
+              ;; ("<escape>"  . corfu-quit))
   :config
+  ;; Free the RET key for less intrusive behavior.
+  (keymap-unset corfu-map "RET")
+
     ;; Guards the minibuffer against Corfu popups and routes CAPF to Vertico.
   (defun ar/corfu-minibuffer-guard ()
     "Disable Corfu in the minibuffer and route completion-in-region to Vertico."
@@ -3757,33 +3849,33 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
   (add-hook 'evil-insert-state-exit-hook #'corfu-quit)
   (add-hook 'before-save-hook #'corfu-quit))
 
-;; Bundled extensions isolated for load-order safety.
-(use-package corfu-history
-  :straight nil
-  :after corfu
-  :config
-  (corfu-history-mode 1)
-  (with-eval-after-load 'savehist
-    (add-to-list 'savehist-additional-variables 'corfu-history)))
+;; ;; Bundled extensions isolated for load-order safety.
+;; (use-package corfu-history
+;;   :straight nil
+;;   :after corfu
+;;   :config
+;;   (corfu-history-mode 1)
+;;   (with-eval-after-load 'savehist
+;;     (add-to-list 'savehist-additional-variables 'corfu-history)))
 
-(use-package corfu-popupinfo
-  :straight nil
-  :after corfu
-  :bind (:map corfu-map
-              ;; Toggles the documentation popup manually.
-              ("M-h" . corfu-popupinfo-toggle))
-  :config
-  (corfu-popupinfo-mode 1)
-  ;; Disables automatic hover trigger to prevent UI flicker.
-  (setq corfu-popupinfo-delay nil))
+;; (use-package corfu-popupinfo
+;;   :straight nil
+;;   :after corfu
+;;   :bind (:map corfu-map
+;;               ;; Toggles the documentation popup manually.
+;;               ("M-h" . corfu-popupinfo-toggle))
+;;   :config
+;;   (corfu-popupinfo-mode 1)
+;;   ;; Disables automatic hover trigger to prevent UI flicker.
+;;   (setq corfu-popupinfo-delay nil))
 
-(use-package corfu-quick
-  :straight nil
-  :after corfu
-  :bind (:map corfu-map
-              ;; Avy-style candidate selection.
-              ("M-q" . corfu-quick-insert)
-              ("M-Q" . corfu-quick-complete)))
+;; (use-package corfu-quick
+;;   :straight nil
+;;   :after corfu
+;;   :bind (:map corfu-map
+;;               ;; Avy-style candidate selection.
+;;               ("M-q" . corfu-quick-insert)
+;;               ("M-Q" . corfu-quick-complete)))
 #+end_src
 
 ** DONE Basic Completion
@@ -3805,10 +3897,11 @@ Configures native Emacs completion styles and indentation triggers.
 Appends visual glyphs to in-buffer completion candidates.
 #+begin_src emacs-lisp
 (use-package nerd-icons-corfu
-  :after corfu
-  :config
-  ;; Registers the formatter with Corfu's margin API.
-  (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter))
+  :defer t 
+  :init
+  (with-eval-after-load 'corfu
+    ;; Registers the formatter with Corfu's margin API.
+    (add-to-list 'corfu-margin-formatters #'nerd-icons-corfu-formatter)))
 #+end_src
 
 ** DONE Cape
@@ -3830,17 +3923,10 @@ Wraps and merges completion-at-point functions for global and local pipelines.
             (lambda () (add-hook 'completion-at-point-functions #'cape-file nil t)))
   (add-hook 'bash-ts-mode-hook
             (lambda () (add-hook 'completion-at-point-functions #'cape-file nil t)))
-  ;; TODO: 
-  ;; Shields Eglot from quit signals, busts cache for Orderless, and enables merging.
-  ;; (with-eval-after-load 'eglot
-  ;;   ;; (advice-add #'eglot-completion-at-point :around #'cape-wrap-buster)
-  ;;   ;; (advice-add #'eglot-completion-at-point :around #'cape-wrap-noninterruptible)
-  ;;   (advice-add #'eglot-completion-at-point :around #'cape-wrap-nonexclusive))
-  ;; Applies non-exclusive merging to Comint and Pcomplete.
-  (with-eval-after-load 'comint
-    (advice-add #'comint-completion-at-point :around #'cape-wrap-nonexclusive))
-  (with-eval-after-load 'pcomplete
-    (advice-add #'pcomplete-completions-at-point :around #'cape-wrap-nonexclusive)))
+  (advice-add #'lsp-completion-at-point :around #'cape-wrap-noninterruptible)
+  (advice-add #'lsp-completion-at-point :around #'cape-wrap-nonexclusive)
+  (advice-add #'comint-completion-at-point :around #'cape-wrap-nonexclusive) 
+  (advice-add #'pcomplete-completions-at-point :around #'cape-wrap-nonexclusive))
 #+end_src
 
 ** DONE Dabbrev
@@ -3865,7 +3951,7 @@ Provides dynamic abbreviation expansion from open buffers.
   (dabbrev-friend-buffer-function #'ar/dabbrev-friend-buffer-p)
   (dabbrev-upcase-means-case-search t)
   ;; Enables cross-buffer scanning for global word discovery.
-  (dabbrev-check-other-buffers t)
+  (dabbrev-check-other-buffers nil)
   :config
   ;; O(1) exact string matching for known ephemeral and internal buffers.
   (setq dabbrev-ignored-buffer-names '("*Messages*"
@@ -4313,6 +4399,10 @@ Configures the task overview display, sorting, and window behavior.
   ;; Tag alignment: right-aligned at column 80.
   (org-tags-column -80)
   :config
+  (add-to-list 'display-buffer-alist
+             '("\\*\\(?:Org \\)?Agenda Commands\\*"
+               nil
+               (window-parameters (mode-line-format . none))))
   ;; Org-agenda aggressively resets the modeline during finalization.
   ;; Hook injected here to obey Domain-Driven encapsulation (migrated from Hide Modeline).
   (add-hook 'org-agenda-finalize-hook #'ar/enable-hide-modeline))
@@ -5449,17 +5539,6 @@ Configures Org structure templates for rapid block insertion and implements a de
                   ("kdl" . "src kdl")))
     (add-to-list 'org-structure-template-alist pair))
 
-  ;; Babel Lazy-Loading Engine
-  ;; NOTE: Jupyter/Python Paradigm Shift Deferred
-  ;; `emacs-jupyter` relies on heavy, stateful ZeroMQ kernel initialization hooks
-  ;; that expect `ob-jupyter` to be fully loaded BEFORE interacting with a block.
-  ;; The lazy-loader only triggers on execution (C-c C-c), which is mathematically
-  ;; too late for the kernel handshake. To implement `emacs-jupyter` in the future,
-  ;; explicitly `(require 'ob-jupyter)` in your Jupyter setup block, add
-  ;; `(python . jupyter)` to `ar/org-babel-mode-alist`, and map `"jpy"` to
-  ;; `"src jupyter-python"` in the structure templates above. For now, standard
-  ;; `ob-python` is utilized.
-
   (defvar ar/org-babel-mode-alist
     '((c . C) (cpp . C) (C++ . C) (D . C)
       (elisp . emacs-lisp) (sh . shell) (bash . shell)
@@ -5477,7 +5556,6 @@ Configures Org structure templates for rapid block insertion and implements a de
           ;; Update the registry so Org's execution engine recognizes it.
           (add-to-list 'org-babel-load-languages (cons lang t))))))
 
-  ;; 1. EXPORT HOOK: Lazy load when exporting the document.
   (define-advice org-babel-exp-src-block (:before (&optional element) lazy-load-export)
     "Lazy load a babel package when a block is processed during exporting."
     (let* ((info (org-babel-get-src-block-info nil element))
@@ -5486,7 +5564,6 @@ Configures Org structure templates for rapid block insertion and implements a de
            (lang (or (cdr (assq lang ar/org-babel-mode-alist)) lang)))
       (ar/org--babel-lazy-load lang)))
 
-  ;; 2. SYNTAX HOOK: Lazy load when opening a block edit buffer (C-c ').
   (define-advice org-src--get-lang-mode (:before (lang) lazy-load-syntax)
     "Lazy load a babel package to ensure syntax highlighting in edit buffers."
     (let* ((lang-str (if (stringp lang) lang (symbol-name lang)))
@@ -5495,9 +5572,6 @@ Configures Org structure templates for rapid block insertion and implements a de
       (unless (cdr (assoc-string lang-str org-src-lang-modes))
         (ar/org--babel-lazy-load lang-sym))))
 
-  ;; 3. EXECUTION HOOK: Lazy load when executing the block (C-c C-c).
-  ;; Uses `:after-while` to ensure the package only loads if the user
-  ;; actually confirms execution (or if confirmation is disabled).
   (define-advice org-babel-confirm-evaluate (:after-while (info) lazy-load-execute)
     "Load babel libraries lazily when babel blocks are executed."
     (let* ((lang (nth 0 info))
@@ -5506,9 +5580,148 @@ Configures Org structure templates for rapid block insertion and implements a de
       (ar/org--babel-lazy-load lang)
       t))
 
-  ;; 4. THE OVERRIDE: Neuter the synchronous startup tax.
   (advice-add #'org-babel-do-load-languages :override #'ignore))
 #+end_src
+
+** DONE Transient Template System
+Provides a centralized, context-aware dashboard for inserting Org structure blocks via a dedicated Transient menu.
+#+begin_src emacs-lisp
+(with-eval-after-load 'org
+  (defun ar/org-insert-block (type &optional modifier region-text)
+    "Insert an Org block of TYPE with optional MODIFIER.
+If REGION-TEXT is provided, wrap it inside the block."
+    (let* ((beg-str (if modifier
+                        (format "#+begin_%s %s\n" type modifier)
+                      (format "#+begin_%s\n" type)))
+           (end-str (format "#+end_%s\n" type)))
+      (if region-text
+          (insert beg-str region-text "\n" end-str)
+        (insert beg-str "\n" end-str)
+        (forward-line -1)
+        (end-of-line))))
+
+  (defun ar/org-insert-perl-tangled ()
+    "Insert a Perl source block configured for tangled execution."
+    (interactive)
+    (insert "#+HEADERS: :results output :exports both :shebang \"#!/usr/bin/env perl\"\n")
+    (ar/org-insert-block "src" "perl"))
+
+  (defun ar/org-insert-ipython ()
+    "Insert an IPython session block."
+    (interactive)
+    (ar/org-insert-block "src" "ipython :session :exports both :results raw drawer"))
+
+  (defvar ar/org-block-definitions
+    '(;; Basic blocks
+      ("a" "ascii"   "ascii"   nil)
+      ("c" "center"  "center"  nil)
+      ("C" "comment" "comment" nil)
+      ("x" "example" "example" nil)
+      ("E" "export"  "export"  nil)
+      ("h" "html"    "html"    nil)
+      ("l" "latex"   "latex"   nil)
+      ("n" "note"    "note"    nil)
+      ("o" "quote"   "quote"   nil)
+      ("v" "verse"   "verse"   nil)
+      ;; Head blocks
+      ("i" "index"   "index"   nil)
+      ("A" "ASCII"   "ASCII"   nil)
+      ("I" "INCLUDE" "INCLUDE" nil)
+      ("H" "HTML"    "HTML"    nil)
+      ("L" "LaTeX"   "LaTeX"   nil)
+      ;; Source blocks
+      ("s" "src"        "src" nil)
+      ("e" "emacs-lisp" "src" "emacs-lisp")
+      ("y" "python"     "src" "python")
+      ("w" "powershell" "src" "powershell")
+      ("r" "ruby"       "src" "ruby")
+      ("S" "sh"         "src" "sh")
+      ("g" "golang"     "src" "go :imports '(\"fmt\")")
+      ;; Misc blocks
+      ("m" "mermaid"   "src" "mermaid :file chart.png")
+      ("k" "kdl"       "src" "kdl")
+      ("u" "plantuml"  "src" "plantuml :file chart.png")
+      ("K" "kbd"       "src" "kbd")
+      ("Z" "yaml"      "src" "yaml"))
+    "List of (key description type modifier) for Org block generation.")
+
+  ;; Generate named interactive commands to prevent Transient lambda bloat.
+  (dolist (def ar/org-block-definitions)
+    (let* ((key (nth 0 def))
+           (desc (nth 1 def))
+           (type (nth 2 def))
+           (mod (nth 3 def))
+           (cmd-name (intern (format "ar/org-block-%s-%s"
+                                     key
+                                     (downcase (replace-regexp-in-string "[^a-zA-Z0-9]" "-" desc))))))
+      (defalias cmd-name
+        `(lambda ()
+           ,(format "Insert Org %s block." desc)
+           (interactive)
+           (let ((text (when (region-active-p)
+                         (prog1 (buffer-substring-no-properties (region-beginning) (region-end))
+                           (delete-region (region-beginning) (region-end))))))
+             (ar/org-insert-block ,type ,mod text))))))
+
+  (defun ar/org-smart-less-than ()
+    "Smart less-than key: trigger transient menu or insert character."
+    (interactive)
+    ;; O(1) spatial guard: check if we are at the beginning of the line.
+    (if (or (region-active-p)
+            (save-excursion (skip-chars-backward " \t") (bolp)))
+        (ar/org-template-transient)
+      (self-insert-command 1)))
+
+  (define-key org-mode-map (kbd "<") #'ar/org-smart-less-than))
+
+(with-eval-after-load 'transient
+  (defun ar/org-transient-title ()
+    (concat
+     (if (and (fboundp 'nerd-icons-sucicon) (display-graphic-p))
+         (nerd-icons-sucicon "nf-custom-orgmode" :face 'transient-heading :v-adjust 0.02)
+       "")
+     (propertize " Org Template" 'face 'transient-heading)))
+
+  (transient-define-prefix ar/org-template-transient ()
+    "Org Mode Structure Templates"
+    [:description ar/org-transient-title
+     ["Basic"
+      ("a" "ascii"   ar/org-block-a-ascii)
+      ("c" "center"  ar/org-block-c-center)
+      ("C" "comment" ar/org-block-C-comment)
+      ("x" "example" ar/org-block-x-example)
+      ("E" "export"  ar/org-block-E-export)
+      ("h" "html"    ar/org-block-h-html)
+      ("l" "latex"   ar/org-block-l-latex)
+      ("n" "note"    ar/org-block-n-note)
+      ("o" "quote"   ar/org-block-o-quote)
+      ("v" "verse"   ar/org-block-v-verse)]
+     ["Head"
+      ("i" "index"   ar/org-block-i-index)
+      ("A" "ASCII"   ar/org-block-A-ASCII)
+      ("I" "INCLUDE" ar/org-block-I-INCLUDE)
+      ("H" "HTML"    ar/org-block-H-HTML)
+      ("L" "LaTeX"   ar/org-block-L-LaTeX)]
+     ["Source"
+      ("s" "src"        ar/org-block-s-src)
+      ("e" "emacs-lisp" ar/org-block-e-emacs-lisp)
+      ("y" "python"     ar/org-block-y-python)
+      ("w" "powershell" ar/org-block-w-powershell)
+      ("r" "ruby"       ar/org-block-r-ruby)
+      ("S" "sh"         ar/org-block-S-sh)
+      ("g" "golang"     ar/org-block-g-golang)]
+     ["Misc"
+      ("m" "mermaid"      ar/org-block-m-mermaid)
+      ("k" "kdl"          ar/org-block-k-kdl)
+      ("u" "plantuml"     ar/org-block-u-plantuml)
+      ("K" "kbd"          ar/org-block-K-kbd)
+      ("Z" "yaml"         ar/org-block-Z-yaml)
+      ("Y" "ipython"      ar/org-insert-ipython)
+      ("P" "Perl tangled" ar/org-insert-perl-tangled)
+      ("<" "insert <"     self-insert-command)]]))
+#+end_src
+
+
 
 ** DONE Org Block Wrap
 #+begin_src emacs-lisp
@@ -5647,6 +5860,8 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
   "n A" '(denote-agenda :wk "Chronological view")
   "n w" '(ar/weekly-review :wk "Weekly review"))
 #+end_src
+
+
 
 
 * TODO Development Tools
@@ -5820,39 +6035,39 @@ Highlights syntax errors and warnings directly in the code buffer.
 ** TODO Flycheck Posframe
 Routes diagnostic messages to a floating childframe popup with Corfu and Evil state inhibition.
 #+begin_src emacs-lisp
-(use-package flycheck-posframe
-  :defer t
-  :after flycheck
-  :hook (flycheck-mode . flycheck-posframe-mode)
-  :custom
-  ;; Unicode prefixes for visual severity identification.
-  (flycheck-posframe-warning-prefix "⚠ ")
-  (flycheck-posframe-info-prefix "ⓘ ")
-  (flycheck-posframe-error-prefix "⮾ ")
-  :custom-face
-  ;; Themes the childframe to match the Tokyo Night palette and lsp-ui-doc.
-  (flycheck-posframe-background-face ((t (:background "#24283b"))))
-  (flycheck-posframe-border-face ((t (:background "#292e42"))))
-  :config
-  ;; Hides the posframe immediately on the next keypress or user action.
-  (defun ar/flycheck-posframe-hide-h ()
-    (unless (flycheck-posframe-check-position)
-      (posframe-hide flycheck-posframe-buffer))
-    (remove-hook 'post-command-hook #'ar/flycheck-posframe-hide-h))
+;; (use-package flycheck-posframe
+;;   :defer t
+;;   :after flycheck
+;;   :hook (flycheck-mode . flycheck-posframe-mode)
+;;   :custom
+;;   ;; Unicode prefixes for visual severity identification.
+;;   (flycheck-posframe-warning-prefix "⚠ ")
+;;   (flycheck-posframe-info-prefix "ⓘ ")
+;;   (flycheck-posframe-error-prefix "⮾ ")
+;;   :custom-face
+;;   ;; Themes the childframe to match the Tokyo Night palette and lsp-ui-doc.
+;;   (flycheck-posframe-background-face ((t (:background "#24283b"))))
+;;   (flycheck-posframe-border-face ((t (:background "#292e42"))))
+;;   :config
+;;   ;; Hides the posframe immediately on the next keypress or user action.
+;;   (defun ar/flycheck-posframe-hide-h ()
+;;     (unless (flycheck-posframe-check-position)
+;;       (posframe-hide flycheck-posframe-buffer))
+;;     (remove-hook 'post-command-hook #'ar/flycheck-posframe-hide-h))
 
-  (define-advice flycheck-posframe-show-posframe (:around (fn &rest args) hide-on-next-command)
-    (cl-letf (((symbol-function 'posframe-show)
-               (lambda (&rest posframe-args)
-                 (add-hook 'post-command-hook #'ar/flycheck-posframe-hide-h)
-                 (apply posframe-show posframe-args))))
-      (apply fn args)))
+;;   (define-advice flycheck-posframe-show-posframe (:around (fn &rest args) hide-on-next-command)
+;;     (cl-letf (((symbol-function 'posframe-show)
+;;                (lambda (&rest posframe-args)
+;;                  (add-hook 'post-command-hook #'ar/flycheck-posframe-hide-h)
+;;                  (apply posframe-show posframe-args))))
+;;       (apply fn args)))
 
-  ;; Inhibits popups when Corfu completion is active to prevent spatial collisions.
-  (add-hook 'flycheck-posframe-inhibit-functions
-            (lambda () (and (boundp 'corfu--index) (>= corfu--index 0))))
-  ;; Inhibits popups in Evil insert/replace states to prevent cursor displacement and input delay.
-  (add-hook 'flycheck-posframe-inhibit-functions #'evil-insert-state-p)
-  (add-hook 'flycheck-posframe-inhibit-functions #'evil-replace-state-p))
+;;   ;; Inhibits popups when Corfu completion is active to prevent spatial collisions.
+;;   (add-hook 'flycheck-posframe-inhibit-functions
+;;             (lambda () (and (boundp 'corfu--index) (>= corfu--index 0))))
+;;   ;; Inhibits popups in Evil insert/replace states to prevent cursor displacement and input delay.
+;;   (add-hook 'flycheck-posframe-inhibit-functions #'evil-insert-state-p)
+;;   (add-hook 'flycheck-posframe-inhibit-functions #'evil-replace-state-p))
 #+end_src
 
 ** TODO Flycheck Keybindings
@@ -6235,6 +6450,8 @@ Automatically formats code using external tools when saving files.
 #+end_src
 
 
+
+
 * DONE Contextual Sidebars
 Persistent side windows displaying dynamic metadata, backlinks, and bibliography context for the active buffer.
 
@@ -6415,6 +6632,7 @@ Provides interactive navigation through the Git history of the current buffer.
   (add-hook 'git-timemachine-mode-hook #'ar/git-timemachine-setup)
   (add-hook 'git-timemachine-mode-exit-hook #'ar/git-timemachine-teardown))
 #+end_src
+
 
 * DONE Highlight TODOs
 
@@ -6959,6 +7177,49 @@ Routes quit and session persistence commands through the global leader prefix.
   "q s" '(bufferlo-bookmarks-save :wk "Save session")
   "q l" '(bufferlo-bookmarks-load :wk "Load session"))
 #+end_src
+
+
+** DONE Open / Applications
+Routes centralized leader keybindings for opening sidebars, terminals, frames, and Org agenda dispatchers.
+#+begin_src emacs-lisp
+(ar/global-leader
+  "o"     '(:ignore t :wk "open")
+  ;; Directory and file navigation.
+  "o /"   '(dirvish :wk "Dirvish")
+  "o b"   '(browse-url-of-file :wk "Browser")
+  ;; Frame management.
+  "o f"   '(make-frame :wk "New frame")
+  "o F"   '(select-frame-by-name :wk "Select frame")
+  ;; Project sidebar.
+  "o p"   '(treemacs :wk "Toggle sidebar")
+  "o P"   '(treemacs-find-file :wk "Reveal in sidebar")
+  ;; Debugger routing.
+  "o d"   '(:ignore t :wk "debugger")
+  "o d d" '(dape :wk "Start debugger")
+  "o d p" '(projection-dape :wk "Debug project")
+  ;; Terminal and REPL spawning (Ghostel & Eshell).
+  "o t"   '(ar/ghostel-toggle :wk "Toggle terminal drawer")
+  "o T"   '(ghostel :wk "Open terminal here")
+  "o e"   '(project-eshell :wk "Toggle Eshell")
+  "o E"   '(eshell :wk "Open Eshell here")
+  "o r"   '(ielm :wk "REPL (Elisp)")
+  ;; Org capture and linking.
+  "o c"   '(org-capture :wk "Capture")
+  "o l"   '(org-store-link :wk "Store link")
+  ;; Org agenda dispatchers and custom views.
+  "o a"   '(:ignore t :wk "agenda")
+  "o a a" '(org-agenda :wk "Agenda dashboard")
+  "o a m" '(org-tags-view :wk "Tags search")
+  "o a t" '(org-todo-list :wk "Global TODO list")
+  "o a v" '(consult-org-heading :wk "Fuzzy heading jump")
+  "o a d" '((lambda () (interactive) (org-agenda nil "d")) :wk "Daily dashboard")
+  "o a w" '((lambda () (interactive) (org-agenda nil "w")) :wk "Weekly review")
+  "o a e" '((lambda () (interactive) (org-agenda nil "e")) :wk "Effort-based")
+  "o a A" '((lambda () (interactive) (org-agenda nil "A")) :wk "Accomplishments")
+  "o a p" '((lambda () (interactive) (org-agenda nil "p")) :wk "Project status"))
+#+end_src
+
+
 
 * TODO Window
 ** TODO Winner

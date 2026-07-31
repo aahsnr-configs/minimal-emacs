@@ -37,7 +37,9 @@
 - For the conflicts between eldoc-childframe.el and peek.el determine what is the approach to deal with this and apply the fixes to either of the two files.
 - Also apply your recommendation for eldoc-childframe and markdown-ts-view-mode rendering.
 - For both eldoc-childframe.el and peek.el apply the emacs 31 specific recommendations as you see fit.
-For all these tasks, as always, use best emacs 31 practices, optimizations and APIs. Search the web and think longer for these tasks. Then rewrite the next versions of both eldoc-childframe and peek.el with the changes, corrections and optimizations with GREEN LIGHT in 2 separate emacs-lisp markdown code blocks
+  For all these tasks, as always, use best emacs 31 practices, optimizations and APIs. Search the web and think longer for these tasks. Then rewrite the next versions of both eldoc-childframe and peek.el with the changes, corrections and optimizations with GREEN LIGHT in 2 separate emacs-lisp markdown code blocks
+
+- symbol's function definition is void: ar/org-template-transient
 
 ---
 
