@@ -42,8 +42,12 @@
   ;; ====================
   ;; PACKAGE SYSTEM
   ;; ====================
-  (setq package-enable-at-startup nil)
 
+  ;; Pre-compute load paths and autoloads into a single compiled file
+  ;; to bypass expensive directory iteration during startup.
+  ;;(setq package-quickstart t)
+
+  (setq package-enable-at-startup nil)
   ;; ====================
   ;; NATIVE COMPILATION
   ;; ====================

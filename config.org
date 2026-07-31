@@ -36,18 +36,38 @@ The =no-byte-compile: t= header directive stops Emacs from prematurely compiling
 
 (require 'package)
 
-;; Pre-compute load paths and autoloads into a single compiled file
-;; to bypass expensive directory iteration during startup.
-(setq package-quickstart t)
-
 (setq package-archives '(("gnu" . "https://elpa.gnu.org/packages/")
                          ("nongnu" . "https://elpa.nongnu.org/nongnu/")
                          ("melpa" . "https://melpa.org/packages/")))
 
-(unless package-archive-contents
-  (package-refresh-contents))
+(package-activate-all)
 
-(require 'use-package)
+;;(unless package-archive-contents
+;;  (package-refresh-contents))
+
+;; Bootstrap `no-littering` to manage Emacs file paths cleanly.
+;; This must happen before any other packages are loaded so they respect
+;; the XDG-like directory structure it enforces.
+(unless (package-installed-p 'no-littering)
+  (package-install 'no-littering))
+(require 'no-littering)
+
+;; Redirect the custom.el file (where Emacs saves UI customizations)
+;; to the no-littering etc/ directory to prevent it from polluting init.el.
+(setq custom-file (no-littering-expand-etc-file-name "custom.el"))
+(when (file-exists-p custom-file)
+  (load custom-file))
+
+;; Theme backup files (e.g., #file# or .~1~) to prevent them from cluttering
+;; the working directory, moving them to a centralized backup location.
+(no-littering-theme-backups)
+
+;; Local personal libraries (for custom .el files stored in ~/.config/emacs/lisp)
+(add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
+
+;; Bootstrap `use-package` for declarative, lazy-loading configuration.
+;; `eval-when-compile` ensures the macro is available during byte-compilation.
+(eval-when-compile (require 'use-package))
 (require 'bind-key)
 
 ;; --- USE-PACKAGE CONFIGURATION ---
@@ -56,20 +76,6 @@ The =no-byte-compile: t= header directive stops Emacs from prematurely compiling
       use-package-always-ensure t
       use-package-compute-statistics nil
       use-package-enable-imenu-support t)
-
-
-;; NO-LITTERING & CUSTOM FILE
-;; Synchronously load no-littering to preempt async package cache paths.
-(use-package no-littering
-  :demand t
-  :config
-  (setq custom-file (no-littering-expand-etc-file-name "custom.el"))
-  ;; Defer custom.el loading until Elpaca queues finish processing.
-  (add-hook 'after-init-hook (lambda () (load custom-file 'noerror)))
-  (no-littering-theme-backups))
-
-;; Register local personal libraries.
-(add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
 #+end_src
 
 ** DONE Custom Functions
@@ -984,7 +990,7 @@ Foundational API for ephemeral keybinding menus. Strictly deferred to respect do
 Keystroke discovery UI overlay. Renders prefix bindings in the echo area with alphabetical sorting and optimized pagination.
 #+begin_src emacs-lisp
 (use-package which-key
-  :straight(:type built-in)
+  :ensure nil 
   :hook (after-init . which-key-mode)
   :custom
   (which-key-idle-delay 1.0) ; Initial delay
@@ -1041,7 +1047,6 @@ Synchronizes buffers with external disk modifications via native OS file notific
 Terminal emulation powered by =libghostty-vt=, rendering as a persistent bottom drawer with strict Evil integration and automatic TRAMP support.
 #+begin_src emacs-lisp
 (use-package ghostel
-  :straight (ghostel :host github :repo "dakra/ghostel")
   :defer t
   :commands (ghostel
              ghostel-project)
@@ -1095,8 +1100,9 @@ Terminal emulation powered by =libghostty-vt=, rendering as a persistent bottom 
 
 ;; Synchronizes the terminal cursor with Emacs point during Evil state transitions.
 (use-package evil-ghostel
-  :straight (evil-ghostel :host github :repo "dakra/ghostel"
-                          :files ("extensions/evil-ghostel/*.el"))
+  ;; :vc (:url "https://github.com/dakra/ghostel"
+  ;;      :lisp-dir "extensions/evil-ghostel"
+  ;;      :rev :newest)
   :after (ghostel evil)
   :hook (ghostel-mode . evil-ghostel-mode))
 
@@ -1485,8 +1491,7 @@ Maps native Tree-sitter AST nodes to Evil operator-pending text objects and Unim
 Provides AST-aware structural manipulation via the Emacs 30 =treesit-thing= API. Refactoring operators are isolated within a Transient menu to prevent global keymap collisions.
 #+begin_src emacs-lisp
 (use-package evil-ts-obj
-  :straight (evil-ts-obj :host github
-                       :repo "dvzubarev/evil-ts-obj")
+  :vc (:url "https://github.com/dvzubarev/evil-ts-obj" :branch "master" :rev :newest)
   :defer t
   :after evil
   :hook ((prog-mode . ar/evil-ts-obj-maybe-enable)
@@ -1754,10 +1759,6 @@ Trims trailing whitespace only on lines you edit to keep version control diffs c
 (use-package ws-butler
   :defer t
   ;; Routes to the maintained NonGNU ELPA fork to prevent Emacs 29+ byte-compile failures.
-  :straight (:host github
-             :repo "emacsmirror/nongnu_elpa"
-             :branch "elpa/ws-butler"
-             :local-repo "ws-butler")
   :hook (prog-mode . ws-butler-mode))
 #+end_src
 
@@ -2699,7 +2700,7 @@ Provides a visual directory editor and file manager for navigating the filesyste
 Transforms the native directory editor into a modern, visual file manager with live previews, sidebars, and integrated version control overlays.
 #+begin_src emacs-lisp
 (use-package dirvish
-  :straight (:host github :repo "latiagertrutis/dirvish")
+  :vc (:url "https://github.com/latiagertrutis/dirvish" :branch "main" :rev :newest)
   :defer t
   :custom
   ;; Route cache to no-littering var directory to prevent ~/.cache pollution.
@@ -4947,7 +4948,7 @@ Tabulated-list interface for decluttered viewing, regex/keyword filtering, and e
 Consolidates fragmented notes by merging file contents or active regions while automatically rewiring the backlink graph.
 #+begin_src emacs-lisp
 (use-package denote-merge
-  :straight (denote-merge :host github :repo "protesilaos/denote-merge")
+  :vc (:url "https://github.com/protesilaos/denote-merge" :branch "main" :rev :newest)
   :defer t
   :after denote
   :commands (denote-merge-file
@@ -4970,7 +4971,7 @@ Consolidates fragmented notes by merging file contents or active regions while a
 Switches the active Denote directory context globally, persisting the choice across sessions and isolating keyword completions per silo.
 #+begin_src emacs-lisp
 (use-package denote-solo
-  :straight (:host github :repo "pavlo/denote-solo")
+  :vc (:url "https://github.com/pavlo/denote-solo" :branch "main" :rev :newest)
   :after denote
   :custom
   ;; Dynamically map existing Denote silos from the Dynamic Directory Structure.
@@ -5010,7 +5011,7 @@ Provides summary statistics, random walks, structural maintenance, and network v
 #+begin_src emacs-lisp
 (use-package denote-explore
   :defer t
-  :straight (:host github :repo "pprevos/denote-explore")
+  :vc (:url "https://github.com/pprevos/denote-explore" :branch "main" :rev :newest)
   :after (denote denote-regexp)
   :commands (denote-explore-count-notes
              denote-explore-count-keywords
@@ -5690,7 +5691,7 @@ If REGION-TEXT is provided, wrap it inside the block."
 ** DONE Org Block Wrap
 #+begin_src emacs-lisp
 (use-package org-block-wrap
-  :straight (org-block-wrap :host gitlab :repo "vegasharmon/org-block-wrap")
+  :vc (:url "https://gitlab.com/vegasharmon/org-block-wrap" :rev :newest)
   :hook (org-mode . org-block-wrap-mode))
 #+end_src
 
