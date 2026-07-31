@@ -1,18 +1,18 @@
 document:
-  title: "Unified AI Operational Protocol & Project State Checkpoint (v54: The Second IDE Pivot — lsp-mode/lsp-ui Migration)"
-  version: 54
-  date: "July 29, 2026"
+  title: "Unified AI Operational Protocol & Project State Checkpoint (v55: The Third IDE Pivot — Native package.el Migration)"
+  version: 55
+  date: "July 31, 2026"
   description: >
     Persistent memory anchor, behavioral boundary, and project tracker for the AI. Merges the
     system prompt protocol (rules, persona, formatting) with the project state (progress,
     architecture, checklists) to survive context-window truncation. All AI interactions must
     strictly adhere to the constraints and state defined herein.
-    v54: THE SECOND IDE PIVOT. Migrated from eglot to lsp-mode/lsp-ui ecosystem. Replaced
-    flymake/flyover with flycheck/lsp-ui-sideline. Replaced eldoc-childframe with lsp-ui-doc.
-    Replaced breadcrumb with lsp-headerline-breadcrumb-mode. Implemented dual LSP server
-    architecture for Python (ty/pyrefly + ruff). Excised flymake-ruff and lazy-ruff.
-    v53: Hardened load-order physics across Dirvish, Vertico-Multiform, and Evil. Fixed
-    Tree-sitter query crashes in indent-bars. Unified the <escape> key behavior.
+    v55: THE THIRD IDE PIVOT. Migrated from straight.el to native Emacs 31 package.el + package-vc.el.
+    Excised straight.el bootstrap, lockfile mechanisms, and :straight keywords. Mandated
+    package-quickstart for startup performance. Replaced straight-use-package-by-default with
+    use-package-always-ensure.
+    v54: THE SECOND IDE PIVOT. Migrated from eglot to lsp-mode/lsp-ui ecosystem.
+    v53: Hardened load-order physics across Dirvish, Vertico-Multiform, and Evil.
     v52: finalized the migration from Elpaca to straight.el.
   note_on_this_edit: >
     This file was condensed for brevity and deduplicated. No information was deleted — repeated
@@ -31,13 +31,13 @@ sections:
     initialization_protocol:
       trigger: >
         The user uploads/references the core files (`early-init.el.txt`, `config.org.txt`,
-        `straight_use_package_integration.yaml`, and this file). Note: the user appends `.txt` to
+        `package_el_use_package_integration.yaml`, and this file). Note: the user appends `.txt` to
         bypass chat UI restrictions — parse `config.org.txt` as Org-mode/Elisp, not plain text.
       steps:
         - Ingest all files completely.
         - Acknowledge the current version and date from this file.
         - Scan `config.org.txt` and identify the exact next subsection lacking the `DONE` keyword.
-        - 'Output exactly: "I have ingested the source-of-truth files and the unified protocol. I acknowledge the strict formatting rules, the negative constraints, and the current project state (Version 54). The next pending subsection is [Subsection Name]. I am locked in and will write zero code until you give the signal."'
+        - 'Output exactly: "I have ingested the source-of-truth files and the unified protocol. I acknowledge the strict formatting rules, the negative constraints, and the current project state (Version 55). The next pending subsection is [Subsection Name]. I am locked in and will write zero code until you give the signal."'
     strict_greenlight_protocol:
       state: "READ-ONLY planning state by default."
       rule: "Only generate, rewrite, or output Elisp/Org-mode code if the user's prompt contains the exact phrase `GREEN LIGHT`."
@@ -81,7 +81,7 @@ sections:
       description: "The following belong in other source-of-truth files, not in `config.org`:"
       exclusions:
         - "Architectural justifications → project_operationals.yaml"
-        - "Load-order physics explanations → straight_use_package_integration.yaml"
+        - "Load-order physics explanations → package_el_use_package_integration.yaml"
         - "Rejection reasoning → executive plan documents"
         - "Package comparison analysis → audit documents"
         - "Multi-paragraph tutorials → belong nowhere in the config"
@@ -99,9 +99,9 @@ sections:
     project_metadata:
       title: "Emacs Configuration Project"
       author: "Ahsanur Rahman"
-      config_version: "0.34"
+      config_version: "0.35"
       target_build: "emacs-pretest (PGTK) on Arch Linux (v31.0.90), compiled with --with-native-compilation=aot and --with-pgtk."
-      note: "Per-release change notes for config.org v0.16–v0.34 are folded into the unified changelog in Section 5 (architectural_decisions / version_history) to avoid tracking the same facts twice."
+      note: "Per-release change notes for config.org v0.16–v0.35 are folded into the unified changelog in Section 5 (architectural_decisions / version_history) to avoid tracking the same facts twice."
     editor_behaviour_paradigm:
       summary: >
         In v31 the IDE stack is strictly `lsp-mode` + `lsp-ui` + Emacs 31 native core.
@@ -187,7 +187,7 @@ sections:
         - "consult-denote loads after consult+denote and MUST NOT use `:defer t` — it needs `advice-add` to upgrade native prompts immediately; deferring causes a 'Preview Gap' (native prompts lack Consult previews)."
         - "citar-denote loads after citar+denote. universal-sidecar loads before denote-sections and denote-citar-sections; denote-sections loads after universal-sidecar+denote; denote-citar-sections after universal-sidecar+denote+citar."
         - "denote-menu loads after denote (parses denote-directory into tabulated-list entries). org-transclusion loads after org+denote, via a custom bridge translating denote: URIs to file: AST nodes."
-        - "straight.el's recipe resolution and `use-package` keyword pipeline guarantee dependency resolution regardless of textual order; textual grouping is kept only for human readability."
+        - "package.el's dependency resolution and `use-package` keyword pipeline guarantee dependency resolution regardless of textual order; textual grouping is kept only for human readability."
       packages:
         - { order: 1, package: "denote", status: "CONFIGURED", subsection: "Denote", notes: "Core engine: file naming, keyword inference, rename-buffer-mode." }
         - { order: 2, package: "denote-org", status: "CONFIGURED", subsection: "Denote Org", notes: "Org-specific link types and capture integration." }
@@ -224,7 +224,7 @@ sections:
         - { id: 1, name: "Group Folding (native outline via TAB)", status: "IMPLEMENTED — Global Defaults (v36)", mechanism: "Overlays with `invisible` toggled via org-super-agenda-header-map TAB binding; NO origami dependency.", key_function: "ar/org-super-agenda-toggle-group" }
         - { id: 2, name: "Group Size Limiting (:take)", status: "IMPLEMENTED — Global Defaults (v46) & Custom Commands (v34)", mechanism: ":take on Overdue(10)/Due Soon(7)/Other Tasks(15), combined with org-super-agenda-keep-order t + deterministic org-agenda-sorting-strategy." }
         - { id: 3, name: "Project-Based Grouping (:auto-parent)", status: "IMPLEMENTED — Custom Commands (v34), PROVISIONAL", mechanism: ":auto-parent t groups by immediate parent heading in flat todo.org.", critical_note: "May change to :ancestor-with-todo or a custom :pred after Workflow Management (projection/bufferlo) finalization." }
-        - { id: 4, name: "Effort-Based Grouping (:effort </>)", status: "IMPLEMENTED — Custom Commands (v34)", mechanism: "Dedicated custom command (SPC a e), not the main daily view — avoids consumption conflicts with :auto-parent." }
+        - { id: 4, name: "Effort-Based Grouping (:effort </ >)", status: "IMPLEMENTED — Custom Commands (v34)", mechanism: "Dedicated custom command (SPC a e), not the main daily view — avoids consumption conflicts with :auto-parent." }
         - { id: 5, name: "Log Mode Integration (:log)", status: "IMPLEMENTED — Custom Commands (v34)", mechanism: ":log closed group at order 0, before :time-grid; org-agenda-start-with-log-mode t on daily/weekly/accomplishments commands." }
         - { id: 6, name: "Header Keymap Actions", status: "IMPLEMENTED — Global Defaults (v36)", mechanism: "TAB (fold) / RET (goto first item) / q (quit) bound in org-super-agenda-header-map." }
         - { id: 7, name: "Multiple View Profiles", status: "IMPLEMENTED — Custom Commands (v34)", placement: "Each custom command in org-agenda-custom-commands sets its own org-super-agenda-groups." }
@@ -266,8 +266,8 @@ sections:
           directly into Evil's C-level keymaps via `define-key` in a `:config` block guarded by
           `:after evil`. Arrow keys (not hjkl) in the minibuffer preserve type-to-filter. Never bind
           raw `C-c <letter>` globally — reserve for major modes.
-      - name: "straight.el Load-Order Physics"
-        description: "Never use `:hook (elpaca-after-init . mode)`. Invoke global minor modes via `(mode 1)` in `:config`. straight.el is synchronous, but `use-package`'s `:load` step still delays `(require)` until `:config`."
+      - name: "package.el & package-vc.el Load-Order Physics"
+        description: "Invoke global minor modes via `(mode 1)` in `:config`. `package.el` activation is synchronous via `package-quickstart`, but `use-package`'s `:load` step still delays `(require)` until `:config`."
       - name: "Emacs 31 Targeting & MPS GC Exclusion"
         description: "Target Emacs 31; wrap experimental/unreleased APIs in defensive runtime guards. The MPS incremental/concurrent GC (`igc`) is deferred out of Emacs 31 — never treat it as an Emacs 31 feature."
       - name: "Org-Super-Agenda Enhancement Constraints"
@@ -296,7 +296,7 @@ sections:
       - "NO minibuffer Evil normal state; NO custom RET intercepts for comment continuation; NO custom window-movement functions."
       - "NO Nerd Icons inside prettify-symbols-alist; NO custom ElDoc backends for show-paren."
       - "NO package merging; NO scope creep; NO mixed directory scaffolding."
-      - "NO :pin or :vc keywords; NO Chinese-language sources in web research; NO blind legacy fixes."
+      - "NO straight.el; NO elpaca; NO :straight keyword; NO straight-use-package-by-default; NO Chinese-language sources in web research; NO blind legacy fixes."
       - "NO org-modern face removal while the matching badge feature is enabled; NO compose-region/font-lock-add-keywords bullet replacement in Org buffers."
       - "NO undo-fu Package Merging: undo-fu and undo-fu-session MUST be isolated in distinct use-package blocks."
       - "NO lsp-mode IO logging (lsp-log-io nil); NO lsp-lens (disabled for minimal aesthetic); NO lsp-enable-links (handled by link-hint)."
@@ -304,7 +304,7 @@ sections:
   - id: 5
     title: "Version History, Edge Cases & Overall Progress"
     description: >
-      Single unified changelog spanning document versions v15–v54.
+      Single unified changelog spanning document versions v15–v55.
     architectural_decisions:
       v15: "IDE Stack Consolidation (committed to lsp-mode — later reversed, see v25). Workspace Management: selected bufferlo."
       v18: "Package Management Migration: officially transitioned to Elpaca v0.12; deprecated :pin and :vc."
@@ -360,9 +360,14 @@ sections:
       v54: >
         THE SECOND IDE PIVOT: Migrated from eglot to lsp-mode/lsp-ui ecosystem. Replaced
         flymake/flyover with flycheck/lsp-ui-sideline. Replaced eldoc-childframe with lsp-ui-doc.
-        Replaced breadcrumb with lsp-headerline-breadcrumb-mode. Implemented dual LSP server
+        Replace d breadcrumb with lsp-headerline-breadcrumb-mode. Implemented dual LSP server
         architecture for Python (ty/pyrefly + ruff). Excised flymake-ruff and lazy-ruff.
         Mandated LSP_USE_PLISTS=true in early-init.el for JSON-RPC performance.
+      v55: >
+        THE THIRD IDE PIVOT: Migrated from straight.el to native Emacs 31 package.el + package-vc.el.
+        Excised straight.el bootstrap, lockfile mechanisms, and :straight keywords. Mandated
+        package-quickstart for startup performance. Replaced straight-use-package-by-default with
+        use-package-always-ensure. Mapped GitHub orphans to :vc plists.
     edge_cases_and_deferred_issues:
       - "Dirvish multi-frame flicker: patched via define-advice on dirvish-pre-redisplay-h."
       - "Emacs 31 unreleased APIs (e.g. grep-edit-mode) must be wrapped in defensive runtime guards."
@@ -393,6 +398,8 @@ sections:
       - "[v54] lsp-mode plist deserialization: `LSP_USE_PLISTS=true` must be set via `setenv` in early-init.el before byte-compilation to prevent hash-table GC pressure."
       - "[v54] Python dual-server architecture: ty/pyrefly acts as primary, ruff as add-on (`:add-on? t`) for linting/formatting. Eliminates need for external flymake/lazy-ruff wrappers."
       - "[v54] lsp-mode completion category overrides: Must inject `(lsp-capf (styles orderless basic))` into `completion-category-overrides` to preserve Orderless fuzzy matching."
+      - "[v55] package-quickstart desync: if `package-selected-packages` drifts from installed packages, `M-x package-quickstart-refresh` must be run manually."
+      - "[v55] package-vc.el first-run blocking: `package-vc-install` can block the main thread on the very first startup while cloning large repositories; first boot must not be headless."
     overall_progress:
       finalized:
         - "Core Emacs (13 subsections); Vim Emulation (12 subsections); General Keybindings (centralized leader routing)."
@@ -407,11 +414,13 @@ sections:
         - "Contextual Sidebars: universal-sidecar with denote-sections and denote-citar-sections."
         - "Highlight TODOs: hl-todo, consult-todo, and magit-todos integration."
         - "Markdown Mode: Native Emacs 31 `markdown-ts-mode` with tree-sitter grammars, marksman LSP, apheleia formatting, and evil/modal keybindings."
+        - "Package Management: Native Emacs 31 `package.el` + `package-vc.el` + `package-quickstart` migration."
       in_progress:
         - "Org Mode & Second Brain: Keybindings subsection retains TODO pending user review."
         - "Development Tools: Minimap (demap) subsection retains TODO."
         - "Languages: Python subsection retains TODO (requires rewrite for dual LSP servers)."
         - "IDE Migration: Rewriting config.org subsections to replace eglot/flymake/eldoc-childframe with lsp-mode/lsp-ui/flycheck/lsp-ui-doc."
+        - "GitHub Orphans: User is manually migrating `:straight` recipes to `:vc` plists across config.org."
       untouched:
         - "Version Control: Magit, Forge, Diff-hl, Git-Timemachine retain TODO."
         - "Snippet Engine, LaTeX, Languages (non-Python/Markdown), XML Viewer, Study."

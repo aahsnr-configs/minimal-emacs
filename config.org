@@ -22,29 +22,38 @@ The =no-byte-compile: t= header directive stops Emacs from prematurely compiling
 
 ** DONE Package Management
 #+begin_src emacs-lisp
-(defvar bootstrap-version)
-(let ((bootstrap-file
-       (expand-file-name
-        "straight/repos/straight.el/bootstrap.el"
-        (or (bound-and-true-p straight-base-dir)
-            user-emacs-directory)))
-      (bootstrap-version 7))
-  (unless (file-exists-p bootstrap-file)
-    (with-current-buffer
-        (url-retrieve-synchronously
-         "https://radian-software.github.io/straight.el/install.el"
-         'silent 'inhibit-cookies)
-      (goto-char (point-max))
-      (eval-print-last-sexp)))
-  (load bootstrap-file nil 'nomessage))
+;; Prefer newer versions of files when loading (e.g., .el over .elc if edited).
+;; This prevents Emacs from silently loading stale byte-compiled artifacts
+;; when you are actively debugging or modifying Elisp source files.
+(setq load-prefer-newer t)
 
-(straight-use-package 'use-package)
-(straight-use-package 'esup)
-(straight-use-package 'bind-key)
+;; Redirect ELPA packages to a subdirectory to keep the root directory clean.
+(setq package-user-dir (expand-file-name "var/elpa/" user-emacs-directory))
 
-(setq straight-use-package-by-default t)
+;; Force package.el to allow upgrading built-in packages (e.g., org, project)
+;; when newer versions are available on ELPA/MELPA.
+(setq package-install-upgrade-built-in t)
+
+(require 'package)
+
+;; Pre-compute load paths and autoloads into a single compiled file
+;; to bypass expensive directory iteration during startup.
+(setq package-quickstart t)
+
+(setq package-archives '(("gnu" . "https://elpa.gnu.org/packages/")
+                         ("nongnu" . "https://elpa.nongnu.org/nongnu/")
+                         ("melpa" . "https://melpa.org/packages/")))
+
+(unless package-archive-contents
+  (package-refresh-contents))
+
+(require 'use-package)
+(require 'bind-key)
+
+;; --- USE-PACKAGE CONFIGURATION ---
 (setq use-package-verbose nil
       use-package-expand-minimally t
+      use-package-always-ensure t
       use-package-compute-statistics nil
       use-package-enable-imenu-support t)
 
@@ -264,7 +273,7 @@ Quality-of-life settings, safety guards, and core minor modes. Disables unused V
 Enables native sticky-key repetition for debugging and spatial commands while suppressing echo area noise.
 #+begin_src emacs-lisp
 (use-package repeat
-  :straight (:type built-in)
+  :ensure nil
   :hook (after-init . repeat-mode)
   :custom
   ;; Suppresses echo area hints to prevent collisions with Eldoc and Which-Key.
@@ -317,7 +326,7 @@ Enforces UTF-8 across all I/O boundaries. Excludes the selection coding system o
 Saves your cursor positions, recently opened files, and minibuffer history between sessions.
 #+begin_src emacs-lisp
 (use-package saveplace
-  :straight (:type built-in)
+  :ensure nil
   :custom
   ;; Prevents startup hangs from restoring point in offline/unmounted volumes.
   (save-place-forget-unreadable-files t)
@@ -325,7 +334,7 @@ Saves your cursor positions, recently opened files, and minibuffer history betwe
   (save-place-mode 1))
 
 (use-package recentf
-  :straight (:type built-in)
+  :ensure nil
   :init
   (setq recentf-max-saved-items 300
         recentf-exclude
@@ -368,7 +377,7 @@ Saves your cursor positions, recently opened files, and minibuffer history betwe
     (run-with-idle-timer 30 t #'ar/update-recentf-org-agenda-cache)))
 
 (use-package savehist
-  :straight (:type built-in)
+  :ensure nil
   :init
   (setq enable-recursive-minibuffers t
         history-length 1000
@@ -385,7 +394,7 @@ Saves your cursor positions, recently opened files, and minibuffer history betwe
 Configures core editing behaviors, whitespace management, and text navigation primitives.
 #+begin_src emacs-lisp
 (use-package simple
-  :straight (:type built-in)
+  :ensure nil
   :hook (text-mode . visual-line-mode)
   :init
   ;; Enables column number display in the modeline.
@@ -1019,7 +1028,7 @@ Delegates operator ligatures to HarfBuzz via ligature.el and reserves Elisp subs
 Synchronizes buffers with external disk modifications via native OS file notifications. Suppresses echo-area logging and avoids interval polling to eliminate I/O overhead.
 #+begin_src emacs-lisp
 (use-package autorevert
-  :straight (:type built-in)
+  :ensure nil
   :custom
   (auto-revert-verbose nil)
   (auto-revert-avoid-polling t)
@@ -1093,20 +1102,20 @@ Terminal emulation powered by =libghostty-vt=, rendering as a persistent bottom 
 
 ;; Routes Eshell visual commands to dedicated Ghostel buffers for proper TTY rendering.
 (use-package ghostel-eshell
-  :straight nil
+  :ensure nil
   :after ghostel
   :hook (eshell-load . ghostel-eshell-visual-command-mode))
 
 ;; Replaces standard compilation buffers with live TTY-backed Ghostel sessions.
 (use-package ghostel-compile
-  :straight nil
+  :ensure nil
   :after ghostel
   :config
   (ghostel-compile-global-mode 1))
 
 ;; Upgrades Comint and REPL output with libghostty-vt ANSI and OSC parsing fidelity.
 (use-package ghostel-comint
-  :straight nil
+  :ensure nil
   :after ghostel
   :config
   (ghostel-comint-global-mode 1))
@@ -1117,7 +1126,7 @@ Terminal emulation powered by =libghostty-vt=, rendering as a persistent bottom 
 Modifies word boundaries to recognize camelCase transitions. Globally enables native and Evil motions to traverse compound identifiers.
 #+begin_src emacs-lisp
 (use-package subword
-  :straight (:type built-in)
+  :ensure nil
   :config
   (global-subword-mode 1))
 #+end_src
@@ -1145,7 +1154,7 @@ Native pixel-precision viewport translation for hardware input and keyboard inte
 
 ;; Native pixel-precision engine (Emacs 29+).
 (use-package pixel-scroll
-  :straight (:type built-in)
+  :ensure nil
   :custom
   ;; Disables synthetic momentum to prevent Wayland/PGTK compositor feedback loops.
   (pixel-scroll-precision-use-momentum nil)
@@ -1160,7 +1169,7 @@ Native pixel-precision viewport translation for hardware input and keyboard inte
 Downloads language parsers that power code coloring and structural navigation.
 #+begin_src emacs-lisp
 (use-package treesit
-  :straight (:type built-in)
+  :ensure nil
   :if (treesit-available-p)
   :preface
   ;; Must precede :custom (load-order constraint).
@@ -1203,7 +1212,7 @@ Downloads language parsers that power code coloring and structural navigation.
 Native auto-pairing, O(1) prose formatting, and AST-aware re-indentation.
 #+begin_src emacs-lisp
 (use-package elec-pair
-  :straight (:type built-in)
+  :ensure nil
   :init
   ;; Conservative inhibition prevents pairing in unbalanced buffers and complex strings.
   (setq electric-pair-inhibit-predicate #'electric-pair-conservative-inhibit
@@ -1341,7 +1350,7 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
 Native delimiter highlighting and Emacs 29+ overlay context rendering.
 #+begin_src emacs-lisp
 (use-package paren
-  :straight (:type built-in)
+  :ensure nil
   :custom
   ;; Delay before highlighting matching delimiters.
   (show-paren-delay 0.05)
@@ -1631,7 +1640,7 @@ Unified folding dispatcher routing to Tree-sitter, Outline, Hideshow, or Vimish 
 Folds code blocks in languages lacking Tree-sitter grammars using Emacs 31 native indicators.
 #+begin_src emacs-lisp
 (use-package hideshow
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :commands (hs-toggle-hiding
              hs-hide-block
@@ -1726,7 +1735,7 @@ Folds manually selected text regions with persistent storage across sessions.
 Restricts font-lock to mixed-indentation detection. Delegates trailing spaces and line limits to native display engines.
 #+begin_src emacs-lisp
 (use-package whitespace
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :hook ((prog-mode conf-mode) . whitespace-mode)
   :custom
@@ -1858,7 +1867,7 @@ Provides O(1) line and region dragging. Automatically re-indents displaced lines
 Native C-level margin rendering for spatial orientation. Utilizes hybrid relative numbering for Vim motions and aborts on massive files.
 #+begin_src emacs-lisp
 (use-package display-line-numbers
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :hook ((prog-mode conf-mode yaml-mode LaTeX-mode tex-mode) . display-line-numbers-mode)
   :custom
@@ -1891,7 +1900,7 @@ Native C-level display primitive rendering vertical boundary at =fill-column=. C
 Native C-level display primitive rendering vertical window boundaries. Confined to right-only placement to eliminate horizontal redundancy.
 #+begin_src emacs-lisp
 (use-package frame
-  :straight (:type built-in)
+  :ensure nil
   :custom
   ;; Restricts rendering to vertical boundaries and enforces a 1px baseline.
   (window-divider-default-places 'right-only)
@@ -1909,7 +1918,7 @@ Native C-level display primitive rendering vertical window boundaries. Confined 
 Native C-level overlay rendering for active line tracking. Confines focus to the selected window and suspends rendering during Evil visual selections and excluded major modes.
 #+begin_src emacs-lisp
 (use-package hl-line
-  :straight (:type built-in)
+  :ensure nil
   :custom
   ;; Confines highlight strictly to the active window.
   (hl-line-sticky-flag nil)
@@ -2363,7 +2372,7 @@ Provides multiple cursor editing in Evil mode by wrapping the iedit lexical engi
 Finds text across files and allows direct editing of the search results to update the original files.
 #+begin_src emacs-lisp
 (use-package grep
-  :straight (:type built-in)
+  :ensure nil
   :commands (grep
              lgrep
              rgrep
@@ -2519,7 +2528,7 @@ Shows rich documentation with source code, callers, and keybindings for any symb
 Compares and merges two or three versions of a file side by side with interactive difference navigation.
 #+begin_src emacs-lisp
 (use-package ediff
-  :straight (:type built-in)
+  :ensure nil
   :commands (ediff
              ediff-files
              ediff-buffers
@@ -2628,7 +2637,7 @@ Compares and merges two or three versions of a file side by side with interactiv
 Extracts system =manpath= directories to guarantee native Emacs =woman= can locate modern Arch Linux manuals without external dependencies.
 #+begin_src emacs-lisp
 (use-package woman
-  :straight (:type built-in)
+  :ensure nil
   :commands (woman)
   :config
   ;; Extract system manpath to guarantee `woman` locates modern Arch Linux manuals.
@@ -2646,7 +2655,7 @@ Extracts system =manpath= directories to guarantee native Emacs =woman= can loca
 Provides a visual directory editor and file manager for navigating the filesystem, copying, moving, and deleting files.
 #+begin_src emacs-lisp
 (use-package dired
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :hook (dired-mode . hl-line-mode)
   :custom
@@ -2856,7 +2865,7 @@ Transforms the native directory editor into a modern, visual file manager with l
 Provides advanced file omitting, OS-integration, and extended commands for the native directory editor.
 #+begin_src emacs-lisp
 (use-package dired-x
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :hook (dired-mode . dired-omit-mode)
   :custom
@@ -2894,7 +2903,7 @@ Adds modern syntax highlighting and colorization to directory listings.
 Allows direct editing of the directory buffer like a standard text file to rename or move files in bulk.
 #+begin_src emacs-lisp
 (use-package wdired
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :after dired
   :custom
@@ -3002,7 +3011,7 @@ Provides a unified workspace engine for navigating, compiling, and managing code
 Identifies repository boundaries, manages ignore patterns, and routes project-scoped searches into the completion framework.
 #+begin_src emacs-lisp
 (use-package project
-  :straight (:type built-in)
+  :ensure nil
   :custom
   ;; Route known projects list to the no-littering etc directory.
   (project-list-file (no-littering-expand-etc-file-name "projects.el"))
@@ -3205,7 +3214,7 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
 Displays all open buffers in a filterable, sortable dashboard with project and workspace awareness.
 #+begin_src emacs-lisp
 (use-package ibuffer
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :bind ([remap list-buffers] . ibuffer)
   :init
@@ -3279,7 +3288,7 @@ Groups all open buffers by their active project roots while respecting workspace
 ;; projection-ibuffer is bundled inside the `projection` monorepo.
 ;; It dynamically generates ibuffer filter groups based on project.el roots.
 (use-package projection-ibuffer
-  :straight nil 
+  :ensure nil 
   :after projection
   :commands
   ibuffer-projection-set-filter-groups
@@ -3354,7 +3363,7 @@ Provides strict buffer isolation per workflow context using a headless native ta
 Serves as the foundational workspace container, configured headlessly to provide structural boundaries without rendering visual UI chrome.
 #+begin_src emacs-lisp
 (use-package tab-bar
-  :straight (:type built-in)
+  :ensure nil
   :custom
   ;; Hide UI chrome to maintain a minimalist aesthetic while preserving structural boundaries.
   (tab-bar-show nil)
@@ -3575,7 +3584,7 @@ Renders completion candidates in a vertical, interactive dropdown list.
 Provides directory navigation commands for the minibuffer.
 #+begin_src emacs-lisp
 (use-package vertico-directory
-  :straight nil
+  :ensure nil
   :after vertico
   :bind (:map vertico-map
               ("RET"   . vertico-directory-enter)
@@ -3588,7 +3597,7 @@ Provides directory navigation commands for the minibuffer.
 Enables rapid candidate selection via Avy-style shortcuts.
 #+begin_src emacs-lisp
 (use-package vertico-quick
-  :straight nil
+  :ensure nil
   :after vertico
   :bind (:map vertico-map
               ("M-q" . vertico-quick-jump)
@@ -3600,7 +3609,7 @@ Enables rapid candidate selection via Avy-style shortcuts.
 Saves and replays minibuffer completion sessions.
 #+begin_src emacs-lisp
 (use-package vertico-repeat
-  :straight nil
+  :ensure nil
   :after vertico
   :init
   ;; Registers the save hook immediately via autoloads to capture all sessions.
@@ -3615,7 +3624,7 @@ Saves and replays minibuffer completion sessions.
 Customizes completion dropdown layouts and applies visual highlighting to candidates based on the active command.
 #+begin_src emacs-lisp
 (use-package vertico-multiform
-  :straight nil
+  :ensure nil
   :after vertico
   :config
   ;; Guarantees the `dired-directory` face is registered before minibuffer rendering.
@@ -3791,7 +3800,7 @@ Provides context-aware action menus for minibuffer candidates and buffer targets
 
 #+begin_src emacs-lisp
 (use-package embark-org
-  :straight nil
+  :ensure nil
   :after (embark org))
 #+end_src
 
@@ -3851,7 +3860,7 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
 
 ;; ;; Bundled extensions isolated for load-order safety.
 ;; (use-package corfu-history
-;;   :straight nil
+;;   :ensure nil
 ;;   :after corfu
 ;;   :config
 ;;   (corfu-history-mode 1)
@@ -3859,7 +3868,7 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
 ;;     (add-to-list 'savehist-additional-variables 'corfu-history)))
 
 ;; (use-package corfu-popupinfo
-;;   :straight nil
+;;   :ensure nil
 ;;   :after corfu
 ;;   :bind (:map corfu-map
 ;;               ;; Toggles the documentation popup manually.
@@ -3870,7 +3879,7 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
 ;;   (setq corfu-popupinfo-delay nil))
 
 ;; (use-package corfu-quick
-;;   :straight nil
+;;   :ensure nil
 ;;   :after corfu
 ;;   :bind (:map corfu-map
 ;;               ;; Avy-style candidate selection.
@@ -3882,7 +3891,7 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
 Configures native Emacs completion styles and indentation triggers.
 #+begin_src emacs-lisp
 (use-package emacs
-  :straight nil
+  :ensure nil
   :no-require t
   :custom
   ;; Triggers completion-at-point if the line is already indented.
@@ -3943,7 +3952,7 @@ Provides dynamic abbreviation expansion from open buffers.
        (< (buffer-size other-buffer) ar/dabbrev-buffer-scanning-size-limit)))
 
 (use-package dabbrev
-  :straight (:type built-in)
+  :ensure nil
   :bind (;; Swaps M-/ and C-M-/ for in-buffer completion routing.
          ("M-/" . dabbrev-completion)
          ("C-M-/" . dabbrev-expand))
@@ -4098,7 +4107,7 @@ Routes global Org-mode settings to the newly created folders.
 Configures Org's core behavior, display, source editing, and performance settings.
 #+begin_src emacs-lisp
 (use-package org
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :preface
   ;; Prevent eager loading of legacy modules. Only org-habit is required.
@@ -4299,7 +4308,7 @@ Defines the lifecycle of actionable items and groups them by physical or digital
 Configures the task overview display, sorting, and window behavior.
 #+begin_src emacs-lisp
 (use-package org-agenda
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :after org
   :custom
@@ -4722,7 +4731,7 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
 Renders habit consistency graphs in the daily agenda with configurable history, future span, and custom completion glyphs.
 #+begin_src emacs-lisp
 (use-package org-habit
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :after org
   :custom
@@ -5432,7 +5441,7 @@ Spawns a new Denote note via org-capture with front-matter handled by denote-org
 Wires all template groups into org-capture, routes the UI to a dedicated bottom drawer, and saves buffers on successful capture.
 #+begin_src emacs-lisp
 (use-package org-capture
-  :straight (:type built-in)
+  :ensure nil
   :defer t
   :after org
   :custom
@@ -6056,7 +6065,7 @@ Upgrades buffer diagnostic navigation with live minibuffer previews and severity
 Configures the core documentation engine with strict 2-line echo area limits and Emacs 31 help-at-point integration.
 #+begin_src emacs-lisp
 (use-package eldoc
-  :straight (:type built-in)
+  :ensure nil
   :custom
   ;; Strict 2-line maximum in the echo area.
   (eldoc-echo-area-use-multiline-p 2)
@@ -6084,7 +6093,7 @@ Configures the core documentation engine with strict 2-line echo area limits and
 Navigates to definitions, references, and symbols across the project.
 #+begin_src emacs-lisp
 (use-package xref
-  :straight (:type built-in)
+  :ensure nil
   :custom
   ;; Route regex search backend to ripgrep.
   (xref-search-program 'ripgrep)
@@ -6129,7 +6138,7 @@ Native on-the-fly syntax checking and diagnostic aggregation with inline overlay
 #+begin_src emacs-lisp
 ;; ;; Foundational diagnostic aggregator and LSP payload router.
 ;; (use-package flymake
-;;   :straight (:type built-in)
+;;   :ensure nil
 ;;   :custom
 ;;   ;; Disable native EOL to prevent spatial stacking collisions with flyover.
 ;;   (flymake-show-diagnostics-at-end-of-line nil)
@@ -6199,7 +6208,7 @@ Routes code evaluation results to inline overlays, floating childframes, or bott
   (quickrun-timeout-seconds 15))
 
 ;; (use-package eval-overlay
-;;   :straight nil
+;;   :ensure nil
 ;;   :defer t
 ;;   :after (posframe eros quickrun)
 ;;   :commands (eval-overlay-buffer
@@ -6746,7 +6755,7 @@ Registers the two required tree-sitter grammars so they are available before the
 Configures editing defaults, code block language mappings, prose-friendly buffer hooks, and Evil initial states for the main Markdown mode.
 #+begin_src emacs-lisp
 ;; (use-package markdown-ts-mode
-;;   :straight (:type built-in)
+;;   :ensure nil
 ;;   :if (treesit-available-p)
 ;;   :custom
 ;;   ;; Fontify fenced code blocks using the embedded language's mode.
@@ -7016,7 +7025,7 @@ Routes all Markdown editing, viewing, table, and structure commands through the 
 Configures Python editing, LSP server routing, workspace settings, formatting, and debug adapter integration.
 #+begin_src emacs-lisp
 (use-package python
-  :straight (:type built-in)
+  :ensure nil
   :custom
   (python-shell-completion-native-enable nil)
   (python-shell-interpreter "python3")
@@ -7180,7 +7189,7 @@ Routes centralized leader keybindings for opening sidebars, terminals, frames, a
 #+begin_src emacs-lisp
 (use-package winner
   :defer t
-  :straight (:type built-in)
+  :ensure nil
   :commands (winner-undo winner-redo)
   :hook (after-init . winner-mode)
   :init (setq winner-boring-buffers '("*Completions*"

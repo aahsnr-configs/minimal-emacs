@@ -18,6 +18,7 @@ tramp
 projects
 config.org.txt
 early-init.el.txt
+package-quickstart*
 persp-auto-save
 projectile-bookmarks.eld
 org-roam.db
