@@ -1781,33 +1781,33 @@ Trims trailing whitespace only on lines you edit to keep version control diffs c
 ** DONE Dtrt Indent
 Heuristic indentation detection for programming buffers. Executes post-mode initialization to preempt LSP spawning and aborts on massive files.
 #+begin_src emacs-lisp
-;; (use-package dtrt-indent
-;;   :defer t
-;;   :custom
-;;   ;; Defers to SMIE indentation engines in supported modes.
-;;   (dtrt-indent-run-after-smie t)
-;;   ;; Synchronizes Emacs' global fallback indentation variable.
-;;   (dtrt-indent-update-standard-indent t)
-;;   ;; Restricts line scanning to prevent main-thread micro-stutters.
-;;   (dtrt-indent-max-lines 2000)
-;;   ;; Minimum confidence threshold for indentation detection.
-;;   (dtrt-indent-min-quality 80.0)
-;;   ;; Suppresses echo-area logging.
-;;   (dtrt-indent-verbosity 0)
-;;   :init
-;;   (defun ar/dtrt-indent-maybe-enable ()
-;;     "Enable `dtrt-indent-mode' in programming buffers, excluding structural exceptions."
-;;     (when (and (derived-mode-p 'prog-mode 'conf-mode)
-;;                (not (too-long-file-p))
-;;                ;; Excludes Makefiles (requires hard tabs) and YAML (strict spacing).
-;;                (not (apply #'derived-mode-p '(makefile-mode yaml-mode))))
-;;       (dtrt-indent-mode 1)))
-;;   ;; Executes after major-mode body but before mode hooks and LSP spawning.
-;;   (add-hook 'change-major-mode-after-body-hook #'ar/dtrt-indent-maybe-enable)
-;;   :config
-;;   ;; Synchronizes Evil shift-width with the detected indentation offset.
-;;   (add-hook 'dtrt-indent-hook
-;;             (lambda () (setq-local evil-shift-width tab-width))))
+(use-package dtrt-indent
+  :defer t
+  :custom
+  ;; Defers to SMIE indentation engines in supported modes.
+  (dtrt-indent-run-after-smie t)
+  ;; Synchronizes Emacs' global fallback indentation variable.
+  (dtrt-indent-update-standard-indent t)
+  ;; Restricts line scanning to prevent main-thread micro-stutters.
+  (dtrt-indent-max-lines 2000)
+  ;; Minimum confidence threshold for indentation detection.
+  (dtrt-indent-min-quality 80.0)
+  ;; Suppresses echo-area logging.
+  (dtrt-indent-verbosity 0)
+  :init
+  (defun ar/dtrt-indent-maybe-enable ()
+    "Enable `dtrt-indent-mode' in programming buffers, excluding structural exceptions."
+    (when (and (derived-mode-p 'prog-mode 'conf-mode)
+               (not (too-long-file-p))
+               ;; Excludes Makefiles (requires hard tabs) and YAML (strict spacing).
+               (not (apply #'derived-mode-p '(makefile-mode yaml-mode))))
+      (dtrt-indent-mode 1)))
+  ;; Executes after major-mode body but before mode hooks and LSP spawning.
+  (add-hook 'change-major-mode-after-body-hook #'ar/dtrt-indent-maybe-enable)
+  :config
+  ;; Synchronizes Evil shift-width with the detected indentation offset.
+  (add-hook 'dtrt-indent-hook
+            (lambda () (setq-local evil-shift-width tab-width))))
 #+end_src
 
 ** DONE Indent Bars
@@ -5855,14 +5855,6 @@ Configures the core documentation engine with strict echo area limits, Emacs 31 
   ;; Emacs 31: show only the first sentence of docstrings (default 'short).
   (when (boundp 'elisp-eldoc-funcall-with-docstring-length)
     (setq elisp-eldoc-funcall-with-docstring-length 'short)))
-
-;; ;; Eglot buffers: use eager composition for async LSP hover payloads.
-;; ;; DEAD CODE: architecture mandates lsp-mode, not eglot. Retained per policy.
-;; (add-hook 'eglot-managed-mode-hook
-;;           (lambda ()
-;;             (when (eglot-managed-p)
-;;               (setq-local eldoc-documentation-strategy
-;;                           #'eldoc-documentation-compose-eagerly))))
 #+end_src
 
 
@@ -5900,21 +5892,25 @@ Navigates to definitions, references, and symbols across the project via native 
 ;; Evil + Avy/EasyMotion provide superior keyboard-driven spatial navigation.
 #+end_src
 
-
 ** TODO Language Server Client
-Provides smart code completion, navigation, and analysis by connecting to external language tools.
+Connects to external language servers for completion, navigation, diagnostics, and analysis across programming buffers.
 #+begin_src emacs-lisp
 (use-package lsp-mode
   :defer t
   :hook (prog-mode . lsp-deferred)
   :custom
+  ;; Route completion through native CAPF → corfu pipeline.
   (lsp-completion-provider :none)
-  (lsp-idle-delay 0.3)
-  ;;(lsp-session-file (expand-file-name ".lsp-session" user-emacs-directory))
+  ;; 0.5 balances responsiveness against main-thread GC pressure.
+  (lsp-idle-delay 0.5)
+  ;; Route session persistence to no-littering var directory.
+  (lsp-session-file (no-littering-expand-var-file-name "lsp/session.el"))
   (lsp-keymap-prefix nil)
   (lsp-enable-xref t)
   (lsp-log-io nil)
+  ;; Raise file watcher threshold for large monorepos.
   (lsp-file-watch-threshold 4000)
+  ;; Disable features superseded by dedicated packages.
   (lsp-enable-folding nil)
   (lsp-enable-on-type-formatting nil)
   (lsp-enable-text-document-color nil)
@@ -5922,15 +5918,62 @@ Provides smart code completion, navigation, and analysis by connecting to extern
   (lsp-format-buffer-on-save nil)
   (lsp-lens-enable nil)
   (lsp-inlay-hint-enable nil)
+  ;; Tree-sitter handles syntax coloring; this handles semantic symbol tracking.
   (lsp-enable-symbol-highlighting t)
+  ;; Disable LSP semantic tokens to prevent double-rendering with Tree-sitter.
+  (lsp-semantic-tokens-enable nil)
+  ;; Breadcrumb disabled by default
   (lsp-headerline-breadcrumb-enable nil)
   (lsp-headerline-breadcrumb-enable-diagnostics nil)
-  ;;(lsp-headerline-breadcrumb-icons-enable t)
-  ;; Activates signature help on trigger characters and server requests.
+  ;; (lsp-headerline-breadcrumb-icons-enable t)
+  ;; Signature help: activate on trigger chars and server requests only.
   (lsp-signature-auto-activate '(:on-trigger-char :on-server-request))
   (lsp-signature-render-documentation t)
-  ;;(lsp-diagnostics-provider :flycheck)
-  (lsp-signature-doc-lines 2))
+  ;; (lsp-signature-doc-lines 2)
+  (lsp-signature-doc-lines 2)
+  ;; Route diagnostics explicitly to flycheck (negative constraint bans flymake).
+  (lsp-diagnostics-provider :flycheck)
+  ;; Prevent echo-area hover duplication with lsp-ui-doc childframe.
+  (lsp-eldoc-enable-hover nil)
+  ;; Server lifecycle: do not keep workspaces alive after last buffer is killed.
+  (lsp-keep-workspace-alive nil)
+  ;; Suppress server download prompts; direnv manages LSP server binaries.
+  (lsp-enable-suggest-server-download nil)
+  ;; doom-modeline renders its own LSP section.
+  (lsp-modeline-code-actions-enable nil)
+  (lsp-modeline-diagnostics-enable nil)
+  (lsp-modeline-workspace-status-enable nil)
+  :config
+  (defvar ar/lsp--deferred-shutdown-timer nil
+    "Timer for deferred LSP workspace shutdown.")
+  (define-advice lsp--shutdown-workspace (:around (fn &optional restart) defer-shutdown)
+    "Defer server shutdown to prevent expensive restarts when switching buffers."
+    (if (or lsp-keep-workspace-alive restart)
+        (funcall fn restart)
+      (when (timerp ar/lsp--deferred-shutdown-timer)
+        (cancel-timer ar/lsp--deferred-shutdown-timer))
+      (setq ar/lsp--deferred-shutdown-timer
+            (run-at-time 3 nil
+                         (lambda (workspaces)
+                           (dolist (ws workspaces)
+                             (or (cl-some #'lsp-buffer-live-p
+                                          (lsp--workspace-buffers ws))
+                                 (with-lsp-workspace ws
+                                   (let ((lsp-restart 'ignore))
+                                     (funcall fn))))))
+                         lsp--buffer-workspaces))))
+  ;; Breadcrumb toggle: enables headerline breadcrumb on demand.
+  (defun ar/lsp-breadcrumb-toggle ()
+    "Toggle LSP headerline breadcrumb mode."
+    (interactive)
+    (lsp-headerline-breadcrumb-mode
+     (if lsp-headerline-breadcrumb-mode -1 1))))
+
+;; Breadcrumb toggle bound to local leader for on-demand activation.
+(ar/local-leader
+  :keymaps 'lsp-mode-map
+  "T"   '(:ignore t :wk "toggle")
+  "T b" '(ar/lsp-breadcrumb-toggle :wk "Breadcrumb"))
 #+end_src
 
 ** TODO Language Server Visuals
