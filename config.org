@@ -809,7 +809,7 @@ Saves buffer contents directly to disk on idle, focus loss, and window/buffer sw
   (super-save-mode +1)
   :custom
   (super-save-auto-save-when-idle t)
-  (super-save-idle-duration 60)
+  (super-save-idle-duration 10 )
   (super-save-remote-files nil)
   ;; Event-driven triggers at natural navigation boundaries.
   (super-save-triggers
@@ -819,43 +819,45 @@ Saves buffer contents directly to disk on idle, focus loss, and window/buffer sw
      windmove-left
      windmove-right
      ace-window))
+  ;; TODO: Need a regexp list
   ;; Exclude read-only, terminal, and UI buffers.
-  (super-save-exclude
-   '(magit-status-mode
-     magit-log-mode
-     magit-diff-mode
-     dired-mode
-     dirvish-mode
-     dirvish-directory-view-mode
-     treemacs-mode
-     dashboard-mode
-     eshell-mode
-     ghostel-mode
-     ghostel-compile-view-mode
-     vterm-mode
-     term-mode
-     eat-mode
-     compilation-mode
-     grep-mode
-     occur-mode
-     org-agenda-mode
-     xref--xref-buffer-mode
-     embark-collect-mode
-     lsp-ui-imenu-mode
-     help-mode
-     helpful-mode
-     Info-mode
-     woman-mode
-     eww-mode
-     pdf-view-mode
-     docker-container-mode
-     docker-image-mode
-     Custom-mode
-     ediff-mode-map
-     profiler-report-mode
-     messages-buffer-mode
-     backtrace-mode
-     special-mode)))
+  ;; (super-save-exclude
+  ;;  '(magit-status-mode
+  ;;    magit-log-mode
+  ;;    magit-diff-mode
+  ;;    dired-mode
+  ;;    dirvish-mode
+  ;;    dirvish-directory-view-mode
+  ;;    treemacs-mode
+  ;;    dashboard-mode
+  ;;    eshell-mode
+  ;;    ghostel-mode
+  ;;    ghostel-compile-view-mode
+  ;;    vterm-mode
+  ;;    term-mode
+  ;;    eat-mode
+  ;;    compilation-mode
+  ;;    grep-mode
+  ;;    occur-mode
+  ;;    org-agenda-mode
+  ;;    xref--xref-buffer-mode
+  ;;    embark-collect-mode
+  ;;    lsp-ui-imenu-mode
+  ;;    help-mode
+  ;;    helpful-mode
+  ;;    Info-mode
+  ;;    woman-mode
+  ;;    eww-mode
+  ;;    pdf-view-mode
+  ;;    docker-container-mode
+  ;;    docker-image-mode
+  ;;    Custom-mode
+  ;;    ediff-mode-map
+  ;;    profiler-report-mode
+  ;;    messages-buffer-mode
+  ;;    backtrace-mode
+  ;;    special-mode))
+)
 #+end_src
 
 ** DONE Auto Tangle
@@ -981,7 +983,7 @@ Swaps background faces to distinguish side-windows and popups. Deferred until th
 #+begin_src emacs-lisp
 (use-package solaire-mode
   :after doom-themes
-  :hook ((change-major-mode ghostel-mode ghostel-compile-mode after-revert ediff-prepare-buffer org-capture-mode) . turn-on-solaire-mode)
+  ;; :hook ((change-major-mode ghostel-mode ghostel-compile-mode after-revert ediff-prepare-buffer org-capture-mode) . turn-on-solaire-mode)
   :config
   ;; Ghostel's C-engine queries its custom `ghostel-default` face directly, bypassing the standard `default` remap.
   ;; Injecting it into the remap alist forces the terminal to adopt the swapped background via native buffer-local remapping.
@@ -994,7 +996,7 @@ Swaps background faces to distinguish side-windows and popups. Deferred until th
 Foundational API for ephemeral keybinding menus. Strictly deferred to respect downstream evaluation wrappers and configured for variable-pitch grid alignment.
 #+begin_src emacs-lisp
 (use-package transient
-  :defer t
+  :demand t
   :custom
   ;; Guarantees rectangular grid alignment when invoked inside proportional Org buffers.
   (transient-align-variable-pitch t))
@@ -4123,7 +4125,7 @@ Configures Org's core behavior, display, source editing, and performance setting
 #+begin_src emacs-lisp
 (use-package org
   :ensure nil
-  :demand t
+  :defer t
   :preface
   ;; Prevent eager loading of legacy modules. Only org-habit is required.
   (defvar org-modules '(org-habit))
@@ -4372,12 +4374,12 @@ Configures the task overview display, sorting, and window behavior.
   ;; to a shrink-to-fit bottom drawer. `display-buffer-at-bottom` creates a standard
   ;; horizontal split that `org-fit-window-to-buffer` can successfully resize,
   ;; bypassing the rigid side-window locking that causes empty space artifacts.
-  ;; (add-to-list 'display-buffer-alist
-  ;;              '("\\*\\(?:Org \\)?Agenda Commands\\*\\|\\*Calendar\\*\\|\\*Org Export Dispatcher\\*"
-  ;;                (display-buffer-at-bottom)
-  ;;                (window-height . fit-window-to-buffer)
-  ;;                (window-parameters (no-delete-other-windows . t)
-  ;;                                   (mode-line-format . none))))
+  (add-to-list 'display-buffer-alist
+               '("\\*\\(?:Org \\)?Agenda Commands\\*\\|\\*Calendar\\*\\|\\*Org Export Dispatcher\\*"
+                 (display-buffer-at-bottom)
+                 (window-height . fit-window-to-buffer)
+                 (window-parameters (no-delete-other-windows . t)
+                                    (mode-line-format . none))))
   ;; Org-agenda aggressively resets the modeline during finalization.
   ;; Hook injected here to obey Domain-Driven encapsulation (migrated from Hide Modeline).
   (add-hook 'org-agenda-finalize-hook #'ar/enable-hide-modeline))
@@ -5565,15 +5567,16 @@ Provides a centralized, context-aware dashboard for inserting Org structure bloc
   (defun ar/org-insert-block (type &optional modifier region-text)
     "Insert an Org block of TYPE with optional MODIFIER.
 If REGION-TEXT is provided, wrap it inside the block."
-    (let* ((beg-str (if modifier
+    (let* ((origin (point))
+           (beg-str (if modifier
                         (format "#+begin_%s %s\n" type modifier)
                       (format "#+begin_%s\n" type)))
            (end-str (format "#+end_%s\n" type)))
       (if region-text
           (insert beg-str region-text "\n" end-str)
         (insert beg-str "\n" end-str)
-        (forward-line -1)
-        (end-of-line))))
+        (goto-char origin)
+        (forward-line 1))))
 
   (defun ar/org-insert-perl-tangled ()
     "Insert a Perl source block configured for tangled execution."
@@ -5673,10 +5676,10 @@ If REGION-TEXT is provided, wrap it inside the block."
       ("v" "verse"   ar/org-block-v-verse)]
      ["Head"
       ("i" "index"   ar/org-block-i-index)
-      ("A" "ASCII"   ar/org-block-A-ASCII)
-      ("I" "INCLUDE" ar/org-block-I-INCLUDE)
-      ("H" "HTML"    ar/org-block-H-HTML)
-      ("L" "LaTeX"   ar/org-block-L-LaTeX)]
+      ("A" "ASCII"   ar/org-block-A-ascii)
+      ("I" "INCLUDE" ar/org-block-I-include)
+      ("H" "HTML"    ar/org-block-H-html)
+      ("L" "LaTeX"   ar/org-block-L-latex)]
      ["Source"
       ("s" "src"        ar/org-block-s-src)
       ("e" "emacs-lisp" ar/org-block-e-emacs-lisp)
@@ -5697,7 +5700,6 @@ If REGION-TEXT is provided, wrap it inside the block."
 #+end_src
 
 
-
 ** DONE Org Block Wrap
 #+begin_src emacs-lisp
 (use-package org-block-wrap
@@ -5708,26 +5710,10 @@ If REGION-TEXT is provided, wrap it inside the block."
 ** TODO Keybindings
 Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motions, and the complete 25-package Denote ecosystem matrix.
 #+begin_src emacs-lisp
-;; (defun ar/org-babel-remove-result-one-or-many (&optional arg)
-;;   "Remove babel results. With ARG, remove all results in buffer."
-;;   (interactive "P")
-;;   (org-babel-remove-result-one-or-many arg))
-
-;; ;; Agenda Prefix (SPC o)
-;; (ar/global-leader
-;;   "o"   '(:ignore t :wk "org")
-;;   "o a" '(:ignore t :wk "agenda")
-;;   "o a a" '(org-agenda :wk "Agenda dashboard")
-;;   "o a m" '(org-tags-view :wk "Tags search")
-;;   "o a t" '(org-todo-list :wk "Global TODO list")
-;;   "o a v" '(consult-org-agenda :wk "Fuzzy heading jump")
-;;   "o a d" '((lambda () (interactive) (org-agenda nil "d")) :wk "Daily dashboard")
-;;   "o a w" '((lambda () (interactive) (org-agenda nil "w")) :wk "Weekly review")
-;;   "o a e" '((lambda () (interactive) (org-agenda nil "e")) :wk "Effort-based")
-;;   "o a A" '((lambda () (interactive) (org-agenda nil "A")) :wk "Accomplishments")
-;;   "o a p" '((lambda () (interactive) (org-agenda nil "p")) :wk "Project status")
-;;   "o c" '(org-capture :wk "Capture")
-;;   "o l" '(org-store-link :wk "Store link"))
+(defun ar/org-babel-remove-result-one-or-many (&optional arg)
+  "Remove babel results. With ARG, remove all results in buffer."
+  (interactive "P")
+  (org-babel-remove-result-one-or-many arg))
 
 ;; Notes / Denote Ecosystem (SPC n)
 (ar/global-leader
@@ -5837,9 +5823,83 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
 #+end_src
 
 
-
-
 * TODO Development Tools
+
+** DONE Eldoc
+Configures the core documentation engine with strict echo area limits, Emacs 31 Elisp enrichment, and help-at-point integration. LSP hover routing is governed by `lsp-eldoc-enable-hover` in the lsp-mode block, not here.
+#+begin_src emacs-lisp
+(use-package eldoc
+  :ensure nil
+  :custom
+  ;; Strict 2-line maximum in the echo area.
+  (eldoc-echo-area-use-multiline-p 2)
+  ;; Prefer the dedicated doc buffer for long docs over echo area truncation.
+  (eldoc-echo-area-prefer-doc-buffer 'maybe)
+  ;; Idle delay before triggering documentation lookup.
+  (eldoc-idle-delay 0.1)
+  :config
+  (global-eldoc-mode 1)
+  ;; Emacs 31: show keybinding hints for buttons/links via ElDoc.
+  ;; MUST use setopt to trigger the :set function that adds the hook.
+  (setopt eldoc-help-at-pt t)
+  ;; Emacs 31: cap elisp docstring length for echo area readability.
+  (when (boundp 'elisp-eldoc-docstring-length-limit)
+    (setq elisp-eldoc-docstring-length-limit 1000))
+  ;; Emacs 31: enrich Elisp Eldoc with function docstrings in the echo area.
+  ;; Only affects emacs-lisp-mode; LSP buffers use their own eldoc function.
+  (when (fboundp 'elisp-eldoc-funcall-with-docstring)
+    (add-hook 'emacs-lisp-mode-hook
+              (lambda ()
+                (add-hook 'eldoc-documentation-functions
+                          #'elisp-eldoc-funcall-with-docstring nil t))))
+  ;; Emacs 31: show only the first sentence of docstrings (default 'short).
+  (when (boundp 'elisp-eldoc-funcall-with-docstring-length)
+    (setq elisp-eldoc-funcall-with-docstring-length 'short)))
+
+;; ;; Eglot buffers: use eager composition for async LSP hover payloads.
+;; ;; DEAD CODE: architecture mandates lsp-mode, not eglot. Retained per policy.
+;; (add-hook 'eglot-managed-mode-hook
+;;           (lambda ()
+;;             (when (eglot-managed-p)
+;;               (setq-local eldoc-documentation-strategy
+;;                           #'eldoc-documentation-compose-eagerly))))
+#+end_src
+
+
+
+
+
+** DONE Xref
+Navigates to definitions, references, and symbols across the project via native xref with ripgrep search and Emacs 31 window routing.
+#+begin_src emacs-lisp
+(use-package xref
+  :ensure nil
+  :custom
+  ;; Route regex search backend to ripgrep.
+  (xref-search-program 'ripgrep)
+  ;; Display project-relative file paths in the tabulated list.
+  (xref-file-name-display 'project-relative)
+  :config
+  ;; Emacs 31: xref jumps now route through display-buffer with category
+  ;; `xref-jump`. Route to the most-recently-used window to prevent
+  ;; unexpected splits that conflict with Popper/side-window layout.
+  (add-to-list 'display-buffer-alist
+               '((category . xref-jump)
+                 (display-buffer-reuse-window
+                  display-buffer-use-some-window)
+                 (some-window . mru)))
+  ;; Force Evil Normal state in the Emacs 31 editable xref buffer.
+  (when (fboundp 'evil-set-initial-state)
+    (evil-set-initial-state 'xref-edit-mode 'normal)))
+
+;; lsp-ui-peek is enabled but intentionally NOT remapped over xref commands.
+;; consult-xref (set in Completion Framework) is the primary multi-result
+;; renderer. Peek remains available via M-x for occasional inline use.
+
+;; xref-mouse-mode (Emacs 31 C-<down-mouse-1>) is not adopted.
+;; Evil + Avy/EasyMotion provide superior keyboard-driven spatial navigation.
+#+end_src
+
 
 ** TODO Language Server Client
 Provides smart code completion, navigation, and analysis by connecting to external language tools.
@@ -5847,14 +5907,12 @@ Provides smart code completion, navigation, and analysis by connecting to extern
 (use-package lsp-mode
   :defer t
   :hook (prog-mode . lsp-deferred)
-  :init
-  ;; Inject Orderless fuzzy matching into the LSP completion category.
-  (setq completion-category-overrides
-        (append completion-category-overrides
-                '((lsp-capf (styles orderless basic)))))
   :custom
   (lsp-completion-provider :none)
   (lsp-idle-delay 0.3)
+  ;;(lsp-session-file (expand-file-name ".lsp-session" user-emacs-directory))
+  (lsp-keymap-prefix nil)
+  (lsp-enable-xref t)
   (lsp-log-io nil)
   (lsp-file-watch-threshold 4000)
   (lsp-enable-folding nil)
@@ -5865,14 +5923,13 @@ Provides smart code completion, navigation, and analysis by connecting to extern
   (lsp-lens-enable nil)
   (lsp-inlay-hint-enable nil)
   (lsp-enable-symbol-highlighting t)
-  (lsp-headerline-breadcrumb-enable t)
-  ;; Disables per-symbol error counting to prevent redisplay stuttering.
+  (lsp-headerline-breadcrumb-enable nil)
   (lsp-headerline-breadcrumb-enable-diagnostics nil)
-  (lsp-headerline-breadcrumb-icons-enable t)
+  ;;(lsp-headerline-breadcrumb-icons-enable t)
   ;; Activates signature help on trigger characters and server requests.
   (lsp-signature-auto-activate '(:on-trigger-char :on-server-request))
   (lsp-signature-render-documentation t)
-  (lsp-diagnostics-provider :flycheck)
+  ;;(lsp-diagnostics-provider :flycheck)
   (lsp-signature-doc-lines 2))
 #+end_src
 
@@ -5892,19 +5949,23 @@ Displays floating documentation, inline error margins, and code navigation overl
   (lsp-ui-doc-max-width 72)
   (lsp-ui-doc-header t)
   (lsp-ui-doc-footer t)
-  (lsp-ui-sideline-enable t)
+  (lsp-ui-sideline-enable nil)
   ;; Routes Flycheck/LSP errors directly to the sideline margin.
-  (lsp-ui-sideline-show-diagnostics t)
-  ;; Renders VS Code-style lightbulbs for quick fixes.
-  (lsp-ui-sideline-show-code-actions t)
-  ;; Disables sideline hover to prevent conflicts with lsp-ui-doc.
-  (lsp-ui-sideline-show-hover nil)
-  ;; Tightens the feedback loop for snappy sideline rendering.
-  (lsp-ui-sideline-delay 0.1)
+  ;; (lsp-ui-sideline-show-diagnostics nil)
+  ;; ;; Renders VS Code-style lightbulbs for quick fixes.
+  ;; (lsp-ui-sideline-show-code-actions t)
+  ;; ;; Disables sideline hover to prevent conflicts with lsp-ui-doc.
+  ;; (lsp-ui-sideline-show-hover nil)
+  ;; ;; Tightens the feedback loop for snappy sideline rendering.
+  ;; (lsp-ui-sideline-delay 0.1)
   ;; Enables inline multi-location dropdowns for xref navigation.
   (lsp-ui-peek-enable t)
   ;; Forces the peek overlay even for single definitions.
-  (lsp-ui-peek-always-show t))
+  (lsp-ui-peek-always-show t)
+  :config
+  (setq lsp-ui-sideline-actions-icon lsp-ui-sideline-actions-icon-default)
+
+  )
   ;; :custom-face
   ;; ;; Themes the childframe border to match the Tokyo Night palette.
   ;; (lsp-ui-doc-border ((t (:background "#292e42"))))
@@ -5924,9 +5985,9 @@ Upgrades workspace and document symbol navigation with live minibuffer previews.
              consult-lsp-file-symbols))
 
 ;; Remaps native xref apropos search to consult-lsp's live-preview engine.
-;; (general-define-key
-;;   :keymaps 'lsp-mode-map
-;;   [remap xref-find-apropos] #'consult-lsp-symbols)
+(general-define-key
+  :keymaps 'lsp-mode-map
+  [remap xref-find-apropos] #'consult-lsp-symbols)
 
 ;; ;; Routes local leader keybindings for LSP-scoped workspace and file searches.
 ;; (ar/local-leader
@@ -5951,20 +6012,23 @@ Displays workspace errors, document symbols, and call hierarchies in a tree side
   ;; Synchronizes the sidebar selection with the active buffer's LSP symbols.
   (setq lsp-treemacs-sync-mode 1))
 
-;; (ar/local-leader
-;;   :keymaps 'lsp-mode-map
-;;   "T"   '(:ignore t :wk "tree")
-;;   "T e" '(lsp-treemacs-errors-list :wk "Errors list")
-;;   "T s" '(lsp-treemacs-symbols :wk "Document symbols")
-;;   "T c" '(lsp-treemacs-call-hierarchy :wk "Call hierarchy")
-;;   "T t" '(lsp-treemacs-type-hierarchy :wk "Type hierarchy"))
+(ar/local-leader
+  :keymaps 'lsp-mode-map
+  "T"   '(:ignore t :wk "tree")
+  "T e" '(lsp-treemacs-errors-list :wk "Errors list")
+  "T s" '(lsp-treemacs-symbols :wk "Document symbols")
+  "T c" '(lsp-treemacs-call-hierarchy :wk "Call hierarchy")
+  "T t" '(lsp-treemacs-type-hierarchy :wk "Type hierarchy"))
 #+end_src
+
 ** TODO Flycheck
 Highlights syntax errors and warnings directly in the code buffer.
 #+begin_src emacs-lisp
 (use-package flycheck
-  :demand t
-  :hook (prog-mode . flycheck-mode)
+  :defer t
+  :hook ((after-init . global-flycheck-mode)
+         ;; Show diagnostics inline, next to the code (Error Lens style)
+         (after-init . global-flycheck-annotate-mode))
   :custom
   ;; Inherits the load path for the emacs-lisp checker to respect local dependencies.
   (flycheck-emacs-lisp-load-path 'inherit)
@@ -5992,8 +6056,10 @@ Highlights syntax errors and warnings directly in the code buffer.
   :config
   ;; Disables org-lint to prevent false positives in Denote/Org silos.
   (setq-default flycheck-disabled-checkers '(org-lint))
-  ;; CVE-2024-53920: Disables the emacs-lisp checker in non-project (untrusted) buffers
-  ;; to mitigate potential code execution vulnerabilities during macro expansion.
+  (setq flycheck-buffer-switch-check-intermediate-buffers t)
+  (setq flycheck-display-errors-delay 0.25)
+  (delq 'new-line flycheck-check-syntax-automatically)
+
   (eval '(setf (flycheck-checker-get 'emacs-lisp 'predicate)
                (lambda ()
                  (and (not (bound-and-true-p no-byte-compile))
@@ -6005,44 +6071,6 @@ Highlights syntax errors and warnings directly in the code buffer.
                  (side . bottom)
                  (window-height . 0.25)
                  (window-parameters (no-delete-other-windows . t)))))
-#+end_src
-
-** TODO Flycheck Posframe
-Routes diagnostic messages to a floating childframe popup with Corfu and Evil state inhibition.
-#+begin_src emacs-lisp
-;; (use-package flycheck-posframe
-;;   :defer t
-;;   :after flycheck
-;;   :hook (flycheck-mode . flycheck-posframe-mode)
-;;   :custom
-;;   ;; Unicode prefixes for visual severity identification.
-;;   (flycheck-posframe-warning-prefix "⚠ ")
-;;   (flycheck-posframe-info-prefix "ⓘ ")
-;;   (flycheck-posframe-error-prefix "⮾ ")
-;;   :custom-face
-;;   ;; Themes the childframe to match the Tokyo Night palette and lsp-ui-doc.
-;;   (flycheck-posframe-background-face ((t (:background "#24283b"))))
-;;   (flycheck-posframe-border-face ((t (:background "#292e42"))))
-;;   :config
-;;   ;; Hides the posframe immediately on the next keypress or user action.
-;;   (defun ar/flycheck-posframe-hide-h ()
-;;     (unless (flycheck-posframe-check-position)
-;;       (posframe-hide flycheck-posframe-buffer))
-;;     (remove-hook 'post-command-hook #'ar/flycheck-posframe-hide-h))
-
-;;   (define-advice flycheck-posframe-show-posframe (:around (fn &rest args) hide-on-next-command)
-;;     (cl-letf (((symbol-function 'posframe-show)
-;;                (lambda (&rest posframe-args)
-;;                  (add-hook 'post-command-hook #'ar/flycheck-posframe-hide-h)
-;;                  (apply posframe-show posframe-args))))
-;;       (apply fn args)))
-
-;;   ;; Inhibits popups when Corfu completion is active to prevent spatial collisions.
-;;   (add-hook 'flycheck-posframe-inhibit-functions
-;;             (lambda () (and (boundp 'corfu--index) (>= corfu--index 0))))
-;;   ;; Inhibits popups in Evil insert/replace states to prevent cursor displacement and input delay.
-;;   (add-hook 'flycheck-posframe-inhibit-functions #'evil-insert-state-p)
-;;   (add-hook 'flycheck-posframe-inhibit-functions #'evil-replace-state-p))
 #+end_src
 
 ** TODO Flycheck Keybindings
@@ -6072,50 +6100,6 @@ Upgrades buffer diagnostic navigation with live minibuffer previews and severity
 ;;   "c F" '(consult-flycheck :wk "Consult errors"))
 #+end_src
 
-** DONE Eldoc
-Configures the core documentation engine with strict 2-line echo area limits and Emacs 31 help-at-point integration.
-#+begin_src emacs-lisp
-(use-package eldoc
-  :ensure nil
-  :custom
-  ;; Strict 2-line maximum in the echo area.
-  (eldoc-echo-area-use-multiline-p 2)
-  ;; Prefer the dedicated doc buffer for long docs over echo area truncation.
-  (eldoc-echo-area-prefer-doc-buffer 'maybe)
-  ;; Idle delay before triggering documentation lookup.
-  (eldoc-idle-delay 0.1)
-  :config
-  (global-eldoc-mode 1)
-  ;; Emacs 31: show keybinding hints for buttons/links via ElDoc.
-  ;; MUST use setopt to trigger the :set function that adds the hook.
-  (setopt eldoc-help-at-pt t)
-  ;; Emacs 31: cap elisp docstring length for echo area readability.
-  (when (boundp 'elisp-eldoc-docstring-length-limit)
-    (setq elisp-eldoc-docstring-length-limit 1000)))
-  ;; ;; Eglot buffers: use eager composition for async LSP hover payloads.
-  ;; (add-hook 'eglot-managed-mode-hook
-  ;;           (lambda ()
-  ;;             (when (eglot-managed-p)
-  ;;               (setq-local eldoc-documentation-strategy
-  ;;                           #'eldoc-documentation-compose-eagerly))))
-#+end_src
-
-** DONE Xref
-Navigates to definitions, references, and symbols across the project.
-#+begin_src emacs-lisp
-(use-package xref
-  :ensure nil
-  :custom
-  ;; Route regex search backend to ripgrep.
-  (xref-search-program 'ripgrep)
-  ;; Display project-relative file paths in the tabulated list.
-  (xref-file-name-display 'project-relative)
-  :config
-  ;; Force Evil Normal state in the Emacs 31 editable xref buffer.
-  (when (fboundp 'evil-set-initial-state)
-    (evil-set-initial-state 'xref-edit-mode 'normal)))
-#+end_src
-
 ** TODO Minimap
 Provides a detachable, zoomed-out minimap sidebar with native diff-hl fringe synchronization.
 #+begin_src emacs-lisp
@@ -6142,102 +6126,6 @@ Provides a detachable, zoomed-out minimap sidebar with native diff-hl fringe syn
     (when (fboundp 'solaire-mode)
       (solaire-mode 1)))
   (add-hook 'demap-minimap-construct-hook #'ar/demap-integrate-ecosystem))
-#+end_src
-
-** DONE Flymake
-Native on-the-fly syntax checking and diagnostic aggregation with inline overlay rendering.
-#+begin_src emacs-lisp
-;; ;; Foundational diagnostic aggregator and LSP payload router.
-;; (use-package flymake
-;;   :ensure nil
-;;   :custom
-;;   ;; Disable native EOL to prevent spatial stacking collisions with flyover.
-;;   (flymake-show-diagnostics-at-end-of-line nil)
-;;   ;; Margin indicators for a modern IDE gutter look.
-;;   (flymake-indicator-type 'margins)
-;;   (flymake-margin-indicators-string '((error "●" flymake-error-fringe)
-;;                                       (warning "▲" flymake-warning-fringe)
-;;                                       (note "■" flymake-note-fringe)))
-;;   (flymake-suppress-zero-counters t)
-;;   (flymake-wrap-around t)
-;;   :config
-;;   ;; Force straight underlines post-theme-load to bypass custom-set-faces overrides.
-;;   ;; Upstream `defface` defaults to `wave` if supported; `set-face-attribute` locks in `line`.
-;;   (set-face-attribute 'flymake-error nil :underline '(:style line :color "#f7768e" :position bottom))
-;;   (set-face-attribute 'flymake-warning nil :underline '(:style line :color "#e0af68" :position bottom))
-;;   (set-face-attribute 'flymake-note nil :underline '(:style line :color "#7aa2f7" :position bottom))
-;;   ;; Fringe faces for the margin indicators.
-;;   (set-face-attribute 'flymake-error-fringe nil :foreground "#f7768e")
-;;   (set-face-attribute 'flymake-warning-fringe nil :foreground "#e0af68")
-;;   (set-face-attribute 'flymake-note-fringe nil :foreground "#7aa2f7")
-;;   (add-hook 'prog-mode-hook #'flymake-mode))
-
-;; ;; Aesthetic inline overlay engine for diagnostic messages.
-;; (use-package flyover
-;;   :defer t
-;;   :after flymake
-;;   :hook (flymake-mode . flyover-mode)
-;;   :custom
-;;   (flyover-checkers '(flymake))
-;;   (flyover-levels '(error warning info))
-;;   ;; Only reveal the inlay overlay when the cursor is placed on the error's line.
-;;   (flyover-display-mode 'show-only-on-same-line)
-;;   ;; Synchronize inline overlay icons with Flymake's margin indicators.
-;;   (flyover-error-icon "●")
-;;   (flyover-warning-icon "▲")
-;;   (flyover-info-icon "■")
-;;   :custom-face
-;;   ;; Explicit backgrounds bypass flyover's internal tinting engine for exact Tokyo Night colors.
-;;   (flyover-error ((t (:foreground "#f7768e" :background "#292e42" :height 0.9))))
-;;   (flyover-warning ((t (:foreground "#e0af68" :background "#292e42" :height 0.9))))
-;;   (flyover-info ((t (:foreground "#7aa2f7" :background "#292e42" :height 0.9)))))
-
-;; ;; Project-wide diagnostic search wrapper for consult-flymake.
-;; (defun consult-flymake-project ()
-;;   "Invoke consult-flymake across all project buffers."
-;;   (interactive)
-;;   (consult-flymake t))
-#+end_src
-
-** DONE Eval Overlay
-Routes code evaluation results to inline overlays, floating childframes, or bottom drawers based on output length.
-#+begin_src emacs-lisp
-(use-package eros
-  :defer t
-  :custom
-  (eros-eval-result-duration 'command)
-  (eros-eval-result-prefix "⇒ ")
-  (eros-overlays-use-font-lock nil))
-
-(use-package quickrun
-  :defer t
-  :commands (quickrun
-             quickrun-region
-             quickrun-replace-region)
-  :custom
-  (quickrun-focus-p nil)
-  (quickrun-timeout-seconds 15))
-
-;; (use-package eval-overlay
-;;   :ensure nil
-;;   :defer t
-;;   :after (posframe eros quickrun)
-;;   :commands (eval-overlay-buffer
-;;              eval-overlay-region
-;;              eval-overlay-line
-;;              eval-overlay-region-or-buffer
-;;              eval-overlay-region-and-replace
-;;              eval-overlay-dismiss)
-;;   :custom
-;;   ;; Routing thresholds for inline overlays, childframes, and bottom popups.
-;;   (eval-overlay-inline-max-lines 2)
-;;   (eval-overlay-inline-max-width 80)
-;;   (eval-overlay-posframe-max-lines 20)
-;;   (eval-overlay-posframe-auto-hide t)
-;;   (eval-overlay-posframe-timeout 30)
-;;   (eval-overlay-popup-height 0.3)
-;;   :config
-;;   (eval-overlay-mode 1))
 #+end_src
 
 ** DONE Dape
@@ -6423,8 +6311,6 @@ Automatically formats code using external tools when saving files.
   (apheleia-remote-algorithm 'cancel)
   (apheleia-hide-log-buffers t))
 #+end_src
-
-
 
 
 * DONE Contextual Sidebars
@@ -7196,6 +7082,35 @@ Routes centralized leader keybindings for opening sidebars, terminals, frames, a
 
 
 * TODO Window
+** Custom Functions
+#+begin_src emacs-lisp
+(defun window-toggle-split-direction ()
+  "Switch window split from horizontal to vertical, or vice versa."
+  (interactive)
+  (require 'windmove)
+  (let ((done))
+    (dolist (dirs '((right . down) (down . right)))
+      (unless done
+        (let* ((win (selected-window))
+               (nextdir (car dirs))
+               (neighbor-dir (cdr dirs))
+               (next-win (windmove-find-other-window nextdir win))
+               (neighbor1 (windmove-find-other-window neighbor-dir win))
+               (neighbor2 (if next-win (with-selected-window next-win
+                                          (windmove-find-other-window neighbor-dir next-win)))))
+          (setq done (and (eq neighbor1 neighbor2)
+                           (not (eq (minibufferp neighbor2)))))
+          (when done
+            (let* ((other-buf (window-buffer next-win)))
+              (delete-window next-win)
+              (if (eq nextdir 'right)
+                  (split-window-below)
+                (split-window-right))
+              (set-window-buffer (next-window) other-buf))))))))
+#+end_src
+
+
+
 ** TODO Winner
 #+begin_src emacs-lisp
 (use-package winner
@@ -7452,8 +7367,8 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
   "w ="         '(balance-windows :wk "Balance windows")
   "w u"         '(winner-undo :wk "Winner undo")
   "w r"         '(winner-redo :wk "Winner redo")
-  "w t"         '(toggle-window-split :wk "Toggle split")
-  "w _"         '(split-window-vertically-instead :wk "Split vertically instead")
-  "w |"         '(split-window-horizontally-instead :wk "Split horizontally instead"))
+  "w t"         '(toggle-window-split :wk "Toggle split"))
 #+end_src
+
+
 
