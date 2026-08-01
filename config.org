@@ -30,10 +30,6 @@ The =no-byte-compile: t= header directive stops Emacs from prematurely compiling
 ;; Redirect ELPA packages to a subdirectory to keep the root directory clean.
 (setq package-user-dir (expand-file-name "var/elpa/" user-emacs-directory))
 
-;; Force package.el to allow upgrading built-in packages (e.g., org, project)
-;; when newer versions are available on ELPA/MELPA.
-(setq package-install-upgrade-built-in t)
-
 (require 'package)
 
 (setq package-archives '(("gnu" . "https://elpa.gnu.org/packages/")
@@ -863,16 +859,16 @@ Saves buffer contents directly to disk on idle, focus loss, and window/buffer sw
 ** DONE Auto Tangle
 Automatically regenerates tangled output files when any Org buffer is saved.
 #+begin_src emacs-lisp
-(use-package org-auto-tangle
-  :defer t
-  :hook (org-mode . org-auto-tangle-mode)
-  :custom
-  ;; CRITICAL: Synchronous tangling prevents background Emacs process race conditions
-  ;; with Elpaca's async queue and Codeberg rate limits (early EOF git clone failures).
-  (org-auto-tangle-async nil)
-  ;; Default for ALL org buffers. Files without source blocks are unaffected.
-  ;; To opt out a specific file, add #+auto_tangle: nil to its header.
-  (org-auto-tangle-default t))
+;; (use-package org-auto-tangle
+;;   :defer t
+;;   :hook (org-mode . org-auto-tangle-mode)
+;;   :custom
+;;   ;; CRITICAL: Synchronous tangling prevents background Emacs process race conditions
+;;   ;; with Elpaca's async queue and Codeberg rate limits (early EOF git clone failures).
+;;   (org-auto-tangle-async nil)
+;;   ;; Default for ALL org buffers. Files without source blocks are unaffected.
+;;   ;; To opt out a specific file, add #+auto_tangle: nil to its header.
+;;   (org-auto-tangle-default t))
 #+end_src
 
 ** DONE Child Frame
@@ -978,7 +974,6 @@ Applies the Tokyo Night palette and integrates downstream UI enhancements. Synch
 #+end_src
 
 
-
 ** DONE Solaire Mode
 Swaps background faces to distinguish side-windows and popups. Deferred until the theme engine finalizes to prevent mapping race conditions.
 #+begin_src emacs-lisp
@@ -992,7 +987,6 @@ Swaps background faces to distinguish side-windows and popups. Deferred until th
   (add-to-list 'solaire-mode-remap-alist '(ghostel-default . solaire-default-face))
   (solaire-global-mode +1))
 #+end_src
-
 
 ** DONE Transient
 Foundational API for ephemeral keybinding menus. Strictly deferred to respect downstream evaluation wrappers and configured for variable-pitch grid alignment.
@@ -1992,10 +1986,11 @@ Renders hex, RGB, and named color previews via overlay stacking. Context-aware s
         (not (too-long-file-p)))))
 #+end_src
 
-** TODO Modeline
+** DONE Modeline
 Minimalist modeline engine featuring native Evil state tracking, LSP/VC diagnostics, and nerd-icons integration.
 #+begin_src emacs-lisp
 (use-package doom-modeline
+  :demand t
   :init
   (size-indication-mode -1)
   (setq-default mode-line-percent-position nil)
@@ -2029,7 +2024,7 @@ Minimalist modeline engine featuring native Evil state tracking, LSP/VC diagnost
   (doom-modeline-minor-modes nil))
 #+end_src
 
-** TODO Hide Modeline
+** DONE Hide Modeline
 Native redisplay concealment for terminal, agenda, and UI buffers. Replaces unmaintained dependencies with a zero-overhead buffer-local minor mode.
 #+begin_src emacs-lisp
 (defvar-local ar/saved-mode-line-format nil "Cached modeline format.")
@@ -2078,7 +2073,6 @@ Native redisplay concealment for terminal, agenda, and UI buffers. Replaces unma
                 org-agenda-finalize))
   (add-hook (intern (format "%s-hook" mode)) #'ar/enable-hide-modeline))
 #+end_src
-
 
 ** DONE Text Scaling
 Native Emacs 29+ face-remapping engine for global typography scaling. Prevents PGTK/Wayland frame geometry expansion.
@@ -2517,6 +2511,90 @@ Provides a centralized dashboard for Avy's spatial jumping and remote text mutat
   "y l" '(avy-goto-line :wk "Line")
   "y w" '(avy-goto-word-1 :wk "Word")
   "y s" '(avy-goto-symbol-1 :wk "Symbol"))
+#+end_src
+
+** DONE Jinx
+Checks spelling as you type and highlights words that need correction.
+#+begin_src emacs-lisp
+(use-package jinx
+  :init
+  (defvar ar/jinx-disabled-modes
+    '(prog-mode
+      conf-mode
+      emacs-lisp-mode
+      dired-mode
+      ibuffer-mode
+      neotree-mode
+      treemacs-mode
+      magit-status-mode
+      magit-log-mode
+      magit-diff-mode
+      magit-branch-mode
+      org-agenda-mode
+      org-src-mode
+      dashboard-mode
+      which-key-mode
+      help-mode
+      Info-mode
+      embark-collect-mode
+      ghostel-mode
+      vterm-mode
+      term-mode
+      pdf-view-mode)
+    "Modes in which Jinx should not activate.")
+  ;; Inline exclusions replacing the dict.txt file.
+  (defvar ar/jinx-personal-words
+    "emacs elisp use-package org-mode prog-mode conf-mode text-mode
+eglot eldoc flymake config flycheck env corfu vertico orderless consult embark denote treemacs dirvish magit evil avy anzu jinx
+tokyo night jetbrainsmono nerd font pgtk wayland ui
+tramp ssh json yaml toml lsp dap ast"
+    "Personal vocabulary for Jinx session words. Write entries in lowercase for broadest coverage.")
+  :custom
+  ;; Deterministic English regardless of system locale.
+  (jinx-languages "en")
+  :config
+  (setq jinx-exclude-regexps
+        `((emacs-lisp-mode "Package-Requires:.*$")
+          (org-mode ,(rx "\\" (+ alpha)))
+          (LaTeX-mode ,(rx "\\" (+ alpha)))
+          (t "[A-Z]+\\>"
+             "-+\\>"
+             "\\w*?[0-9]\\w*\\>"
+             "[a-z]+://\\S-+"
+             "<?[-+_.~a-zA-Z][-+_.~:a-zA-Z0-9]*@[-.a-zA-Z0-9]+>?"
+             "\\(?:Local Variables\\|End\\):\\s-*$"
+             "jinx-\\(?:languages\\|local-words\\):\\s-+.*$"
+             "[/~][a-zA-Z0-9._/-]+")))
+  
+  ;; Jinx's default `jinx-exclude-faces` for `org-mode` excludes code blocks,
+  ;; tags, and the `#+` keywords themselves. However, it misses the faces for
+  ;; the actual heading text (`org-level-*`) and the metadata values
+  ;; (`org-document-title`, `org-document-info`). We inject them here.
+  (setf (alist-get 'org-mode jinx-exclude-faces)
+        (append (alist-get 'org-mode jinx-exclude-faces)
+                '(org-level-1 org-level-2 org-level-3 org-level-4
+                  org-level-5 org-level-6 org-level-7 org-level-8
+                  org-document-title org-document-info
+                  org-outline org-priority)))
+
+  ;; Aborts activation in massive buffers to prevent main-thread freezing.
+  (define-advice jinx-mode (:before-while (&optional arg) guard-large-files)
+    (or (and arg (< (prefix-numeric-value arg) 1))
+        (not (too-long-file-p))))
+  ;; Enforces custom disabled modes (jinx-disabled-modes removed in v2.8).
+  (define-advice jinx--on (:before-while () guard-disabled-modes)
+    (not (apply #'derived-mode-p ar/jinx-disabled-modes)))
+  ;; Injects personal vocabulary into prose and markup buffers.
+  (dolist (mode '(org-mode
+                  LaTeX-mode
+                  markdown-mode
+                  gfm-mode
+                  text-mode))
+    (add-hook (intern (format "%s-hook" mode))
+              (lambda ()
+                (setq-local jinx-local-words ar/jinx-personal-words))))
+  ;; Activates global spell-checking directly per package.el load-order physics.
+  (global-jinx-mode 1))
 #+end_src
 
 ** DONE Helpful
@@ -5978,8 +6056,10 @@ Connects to external language servers for completion, navigation, diagnostics, a
   "T b" '(ar/lsp-breadcrumb-toggle :wk "Breadcrumb"))
 #+end_src
 
+
+
 ** TODO Language Server Visuals
-Displays floating documentation, inline error margins, and code navigation overlays.
+Renders floating documentation childframes, inline peek overlays, and code action indicators via the lsp-ui engine.
 #+begin_src emacs-lisp
 (use-package lsp-ui
   :defer t
@@ -5987,39 +6067,49 @@ Displays floating documentation, inline error margins, and code navigation overl
   :custom
   ;; Disables automatic cursor hover to prevent documentation noise.
   (lsp-ui-doc-show-with-cursor nil)
-  ;; Enables mouse hover for rapid documentation inspection.
+  ;; Disables automatic mouse hover; doc is toggled on command only.
   (lsp-ui-doc-show-with-mouse nil)
+  ;; Renders the doc childframe at the cursor position.
   (lsp-ui-doc-position 'at-point)
+  ;; Constrains the childframe to 8 lines and 72 columns.
   (lsp-ui-doc-max-height 8)
   (lsp-ui-doc-max-width 72)
+  ;; Shows the symbol header and footer in the doc childframe.
   (lsp-ui-doc-header t)
   (lsp-ui-doc-footer t)
+  ;; Sideline disabled: flycheck-annotate-mode provides inline diagnostics.
   (lsp-ui-sideline-enable nil)
-  ;; Routes Flycheck/LSP errors directly to the sideline margin.
-  ;; (lsp-ui-sideline-show-diagnostics nil)
-  ;; ;; Renders VS Code-style lightbulbs for quick fixes.
-  ;; (lsp-ui-sideline-show-code-actions t)
-  ;; ;; Disables sideline hover to prevent conflicts with lsp-ui-doc.
-  ;; (lsp-ui-sideline-show-hover nil)
-  ;; ;; Tightens the feedback loop for snappy sideline rendering.
-  ;; (lsp-ui-sideline-delay 0.1)
   ;; Enables inline multi-location dropdowns for xref navigation.
   (lsp-ui-peek-enable t)
   ;; Forces the peek overlay even for single definitions.
   (lsp-ui-peek-always-show t)
   :config
-  (setq lsp-ui-sideline-actions-icon lsp-ui-sideline-actions-icon-default)
+  ;; Dead code: sideline is disabled above; icon setting has no runtime effect.
+  (setq lsp-ui-sideline-actions-icon lsp-ui-sideline-actions-icon-default))
 
-  )
-  ;; :custom-face
-  ;; ;; Themes the childframe border to match the Tokyo Night palette.
-  ;; (lsp-ui-doc-border ((t (:background "#292e42"))))
-  ;; ;; Themes the childframe background to match the Tokyo Night palette.
-  ;; (lsp-ui-doc-background ((t (:background "#24283b")))))
+;; lsp-ui-doc-delay is NOT set. With both show-with-cursor and show-with-mouse
+;; disabled, the doc childframe is never triggered automatically. The delay
+;; variable governs an unreachable code path and has zero practical effect.
+
+;; Sideline variables remain commented: lsp-ui-sideline-enable is nil, so the
+;; sideline rendering pipeline is never entered. These are dead code by design.
+;; (lsp-ui-sideline-show-diagnostics nil)
+;; (lsp-ui-sideline-show-code-actions t)
+;; (lsp-ui-sideline-show-hover nil)
+;; (lsp-ui-sideline-delay 0.1)
+
+;; Childframe face customizations remain commented: doom-themes handles
+;; posframe/childframe border theming globally via the posframe subsection.
+;; :custom-face
+;; (lsp-ui-doc-border ((t (:background "#292e42"))))
+;; (lsp-ui-doc-background ((t (:background "#24283b"))))
 #+end_src
 
+
+
+
 ** TODO Consult LSP
-Upgrades workspace and document symbol navigation with live minibuffer previews.
+Upgrades workspace and document symbol navigation with live minibuffer previews and asynchronous filtering.
 #+begin_src emacs-lisp
 (use-package consult-lsp
   :defer t
@@ -6067,12 +6157,11 @@ Displays workspace errors, document symbols, and call hierarchies in a tree side
 #+end_src
 
 ** TODO Flycheck
-Highlights syntax errors and warnings directly in the code buffer.
+Highlights syntax errors and warnings directly in the code buffer with save-triggered diagnostics and inline Error Lens rendering.
 #+begin_src emacs-lisp
 (use-package flycheck
   :defer t
   :hook ((after-init . global-flycheck-mode)
-         ;; Show diagnostics inline, next to the code (Error Lens style)
          (after-init . global-flycheck-annotate-mode))
   :custom
   ;; Inherits the load path for the emacs-lisp checker to respect local dependencies.
@@ -6081,14 +6170,20 @@ Highlights syntax errors and warnings directly in the code buffer.
   (flycheck-indication-mode 'right-fringe)
   ;; Underlines only the exact erroneous symbol rather than the entire line.
   (flycheck-highlighting-mode 'symbols)
-  ;; Triggers syntax checks on save and idle, excluding newlines to prevent LSP flooding.
-  (flycheck-check-syntax-automatically '(save idle-change mode-enabled))
-  ;; Delays idle checks to prevent main-thread blocking during rapid typing.
-  (flycheck-idle-change-delay 1.0)
+  ;; Triggers syntax checks ONLY on save and mode activation.
+  ;; `idle-change` removed: prevents redisplay storms colliding with Corfu
+  ;; childframe compositing during active typing.
+  ;; (flycheck-check-syntax-automatically '(save idle-change mode-enabled))
+  (flycheck-check-syntax-automatically '(save mode-enabled))
+  ;; Irrelevant without `idle-change` trigger; retained for documentation.
+  ;; (flycheck-idle-change-delay 1.0)
   ;; Tightens the echo area feedback loop for snappy error display.
   (flycheck-display-errors-delay 0.25)
   ;; Refreshes syntax check state when briefly switching through intermediate buffers.
   (flycheck-buffer-switch-check-intermediate-buffers t)
+  ;; Flycheck 38: show only the diagnostic at point, not all errors in the buffer.
+  ;; Reduces overlay count from O(n) to O(1) per save-triggered check.
+  (flycheck-annotate-display-current-error-only t)
   :custom-face
   ;; Forces straight underlines to prevent PGTK/Wayland bezier curve redisplay stutter.
   (flycheck-error ((t (:underline (:style line :color "#f7768e")))))
@@ -6101,10 +6196,10 @@ Highlights syntax errors and warnings directly in the code buffer.
   :config
   ;; Disables org-lint to prevent false positives in Denote/Org silos.
   (setq-default flycheck-disabled-checkers '(org-lint))
-  (setq flycheck-buffer-switch-check-intermediate-buffers t)
-  (setq flycheck-display-errors-delay 0.25)
-  (delq 'new-line flycheck-check-syntax-automatically)
-
+  ;; Redundant: `new-line` was only relevant when `idle-change` was in the
+  ;; trigger list. With only `save` and `mode-enabled`, this is dead code.
+  ;; (delq 'new-line flycheck-check-syntax-automatically)
+  ;; Restricts the emacs-lisp checker to buffers inside a project.
   (eval '(setf (flycheck-checker-get 'emacs-lisp 'predicate)
                (lambda ()
                  (and (not (bound-and-true-p no-byte-compile))
@@ -6118,19 +6213,6 @@ Highlights syntax errors and warnings directly in the code buffer.
                  (window-parameters (no-delete-other-windows . t)))))
 #+end_src
 
-** TODO Flycheck Keybindings
-Routes centralized leader and Unimpaired keybindings for diagnostic navigation.
-#+begin_src emacs-lisp
-;; (general-define-key
-;;   :states '(normal visual motion)
-;;   "]e" #'flycheck-next-error
-;;   "[e" #'flycheck-previous-error)
-
-;; (ar/global-leader
-;;   "c e" '(flycheck-list-errors :wk "List errors")
-;;   "c F" '(consult-flycheck :wk "Consult errors"))
-#+end_src
-
 ** TODO Consult Flycheck
 Upgrades buffer diagnostic navigation with live minibuffer previews and severity narrowing.
 #+begin_src emacs-lisp
@@ -6138,11 +6220,6 @@ Upgrades buffer diagnostic navigation with live minibuffer previews and severity
   :defer t
   :after (consult flycheck)
   :commands (consult-flycheck))
-#+end_src
-
-#+begin_src emacs-lisp
-;; (ar/global-leader
-;;   "c F" '(consult-flycheck :wk "Consult errors"))
 #+end_src
 
 ** TODO Minimap
@@ -6352,7 +6429,6 @@ Automatically formats code using external tools when saving files.
   :defer t
   :hook (prog-mode . apheleia-mode)
   :custom
-  ;; Prevents main-thread hangs over TRAMP.
   (apheleia-remote-algorithm 'cancel)
   (apheleia-hide-log-buffers t))
 #+end_src

@@ -45,22 +45,29 @@
 
 - I need to optimize Development Tools section as a whole. I also need to comment out config lines that are not needed. I also need optimize lsp ecosystem and flycheck as much as possible. I also need you to determine if there are useful configuration options I can borrow from https://andreyor.st/posts/2023-09-09-migrating-from-lsp-mode-to-eglot/ and https://github.com/doomemacs/modules/blob/main/modules/tools/lsp/%2Blsp.el . Then explain everything back to me in detail. Search the web and think longer for these tasks. Make sure you have the latest information till July 30, 2026.
 
-1. Will the finalized eldoc subsection mess with lsp-ui-doc in any way, keeping mind that I only mean to use lsp-ui-doc using hover as the primary documentation source in lsp-mode? Furthermore, does the eldoc subsection require any further changes to integrate better with the  lsp-mode ecosystem. Search the web and think longer for these tasks. Then explain everything back to me. Then you have the GREEN LIGHT to rewrite the Eldoc subsection 
+1. Will the finalized eldoc subsection mess with lsp-ui-doc in any way, keeping mind that I only mean to use lsp-ui-doc using hover as the primary documentation source in lsp-mode? Furthermore, does the eldoc subsection require any further changes to integrate better with the lsp-mode ecosystem. Search the web and think longer for these tasks. Then explain everything back to me. Then you have the GREEN LIGHT to rewrite the Eldoc subsection
 
 2. Now lets work on the xref subsection. Similarly, does the xref subsection require any further changes other than the ones you mentioned to integrate better with the lsp-mode ecosystem? Search the web and think longer for these tasks. Then explain everything back to me. Then you have the GREEN LIGHT to rewrite the xref subsection. And then state what next subsection I want you to look at.
 
 3. Now lets work on the Language Server Client subsection. For Language Server Client subsection, I have the following observations:
-   - You need to further justify why 0.5 is better for lsp-idle-delay since lsp-mode documentation only mentions this value. It does not necessarily recommend it. 
+   - You need to further justify why 0.5 is better for lsp-idle-delay since lsp-mode documentation only mentions this value. It does not necessarily recommend it.
    - You need to further analyze whether lsp-signature related settings are correct or whether additional settings need to be applied for optimizations as well. Furthermore, I don't completely understand lsp signature actually does in prog-modes. Explain its purpose in simple words with respect to python buffers.
-  - You need to set lsp-enable-suggest-server-download to nil since I let direnv manage the lsp server clients
-  - Furthermore, I don't really know what lsp-auto-configure actually does when set to t, so you need to explain this variable to me as well.
-  
+
+- You need to set lsp-enable-suggest-server-download to nil since I let direnv manage the lsp server clients
+- Furthermore, I don't really know what lsp-auto-configure actually does when set to t, so you need to explain this variable to me as well.
+
 Other than what I mentioned so far, everything what you said for Subsection 3 ** TODO Language Server Client is correct and should be done according to the way you recommended. Search the web and think longer for these tasks. Then explain everything back to me. Then you have the GREEN LIGHT to rewrite the Language Server Client subsection. And then state what next subsection I want you to look at.
 
-4. For Language Server Visuals subsections, the following are my own opinions on the points you raised:
-  - For  lsp-ui-doc-delay you recommend setting this to 0.75 according to how Doom sets this and then you refer to the emacs-lsp-mode documentation to justify the use of this value, but the issue the document you point out to only sets the lsp-idle-delay, not lsp-ui-doc-delay. Furthermore, why would flickering be an issue at 0.2 since I only toggle the lsp-ui-doc on command or keybinding. It is not like like documentation hover is shown automatically when the cursor is in position. The naggy part that Doom emacs mentions is not a technical justification. So your recommendation to use 0.75 or any other value than the default does not have logical or mathematical ground to stand on. You should think carefully instead of falsely hallucinating your justifications. 
-  - Furtheremore, since I automatically disable lsp-ui-sideline why would it matter what the other lsp-ui-sideline variables should be?
-  - You need to explain to me why the following statement is true if lsp-auto-configure is set to t: "it prevents lsp-mode from double-enabling lsp-ui if lsp-auto-configure is t."
+4. Now lets work on the Language Server Visuals subsection. For Language Server Visuals subsection, the following are my own opinions on the points you raised:
+   - For lsp-ui-doc-delay you recommend setting this to 0.75 according to how Doom sets this and then you refer to the emacs-lsp-mode documentation to justify the use of this value, but the issue the document you point out to only sets the lsp-idle-delay, not lsp-ui-doc-delay. Furthermore, why would flickering be an issue at 0.2 since I only toggle the lsp-ui-doc on command or keybinding. It is not like like documentation hover is shown automatically when the cursor is in position. The naggy part that Doom emacs mentions is not a technical justification. So your recommendation to use 0.75 or any other value than the default does not have logical or mathematical ground to stand on. You should think carefully instead of falsely hallucinating your justifications.
+   - Furthermore, since I automatically disable lsp-ui-sideline why would it matter what the other lsp-ui-sideline variables should be?
+   - You need to explain to me why the following statement is true if lsp-auto-configure is set to t: "it prevents lsp-mode from double-enabling lsp-ui if lsp-auto-configure is t."
+
+Other than what I mentioned so far, everything what you said for Subsection 4 ** TODO Language Server Visuals is correct and should be done according to the way you recommended. Search the web and think longer for these tasks. Then explain everything back to me. Then you have the GREEN LIGHT to rewrite the Language Server Visuals subsection. And then state what next subsection I want you to look at.
+
+5. Now lets work on the Consult LSP subsection. For consult lsp subsection, since most of the subsection except the :commands part is correct, you have the GREEN LIGHT to rewrite this subsection and add the :commands part as you recommended. Search the web and think longer for these tasks. And then state what next subsection I want you to look at.
+
+6. Now lets work on the Flycheck subsection. For this subsection I have removed the duplicates myself. Otherwise, everything you pointed out is correct. But there is the issue that flycheck via its annotate mode displays errors as I type. Along with corfu completion, this make typing extremely laggy. I only want flycheck to display diagnostics via its annotate once I am in the next line or better yet, I want it only to display the diagnostics once I am save a prog-mode file. Seeing diagnostics as I type is not useful since it flags errors on code I have not finished writing. Search the web and think longer for these tasks. Then you have the GREEN LIGHT to rewrite the Flycheck subsection with the changes and corrections. And then state what next subsection I want you to look at.
 
 ---
 
