@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.36
+#+VERSION: 0.37
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -22,56 +22,45 @@ The =no-byte-compile: t= header directive stops Emacs from prematurely compiling
 
 ** DONE Package Management
 #+begin_src emacs-lisp
-;; Prefer newer versions of files when loading (e.g., .el over .elc if edited).
-;; This prevents Emacs from silently loading stale byte-compiled artifacts
-;; when you are actively debugging or modifying Elisp source files.
-(setq load-prefer-newer t)
+(defvar bootstrap-version)
+(let ((bootstrap-file
+       (expand-file-name
+        "straight/repos/straight.el/bootstrap.el"
+        (or (bound-and-true-p straight-base-dir)
+            user-emacs-directory)))
+      (bootstrap-version 7))
+  (unless (file-exists-p bootstrap-file)
+    (with-current-buffer
+        (url-retrieve-synchronously
+         "https://radian-software.github.io/straight.el/install.el"
+         'silent 'inhibit-cookies)
+      (goto-char (point-max))
+      (eval-print-last-sexp)))
+  (load bootstrap-file nil 'nomessage))
 
-;; Redirect ELPA packages to a subdirectory to keep the root directory clean.
-(setq package-user-dir (expand-file-name "var/elpa/" user-emacs-directory))
+(straight-use-package 'use-package)
+(straight-use-package 'esup)
+(straight-use-package 'bind-key)
 
-(require 'package)
-
-(setq package-archives '(("gnu" . "https://elpa.gnu.org/packages/")
-                         ("nongnu" . "https://elpa.nongnu.org/nongnu/")
-                         ("melpa" . "https://melpa.org/packages/")))
-
-(package-activate-all)
-
-;;(unless package-archive-contents
-;;  (package-refresh-contents))
-
-;; Bootstrap `no-littering` to manage Emacs file paths cleanly.
-;; This must happen before any other packages are loaded so they respect
-;; the XDG-like directory structure it enforces.
-(unless (package-installed-p 'no-littering)
-  (package-install 'no-littering))
-(require 'no-littering)
-
-;; Redirect the custom.el file (where Emacs saves UI customizations)
-;; to the no-littering etc/ directory to prevent it from polluting init.el.
-(setq custom-file (no-littering-expand-etc-file-name "custom.el"))
-(when (file-exists-p custom-file)
-  (load custom-file))
-
-;; Theme backup files (e.g., #file# or .~1~) to prevent them from cluttering
-;; the working directory, moving them to a centralized backup location.
-(no-littering-theme-backups)
-
-;; Local personal libraries (for custom .el files stored in ~/.config/emacs/lisp)
-(add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
-
-;; Bootstrap `use-package` for declarative, lazy-loading configuration.
-;; `eval-when-compile` ensures the macro is available during byte-compilation.
-(eval-when-compile (require 'use-package))
-(require 'bind-key)
-
-;; --- USE-PACKAGE CONFIGURATION ---
+(setq straight-use-package-by-default t)
 (setq use-package-verbose nil
       use-package-expand-minimally t
-      use-package-always-ensure t
       use-package-compute-statistics nil
       use-package-enable-imenu-support t)
+
+
+;; NO-LITTERING & CUSTOM FILE
+;; Synchronously load no-littering to preempt async package cache paths.
+(use-package no-littering
+  :demand t
+  :config
+  (setq custom-file (no-littering-expand-etc-file-name "custom.el"))
+  ;; Defer custom.el loading until Elpaca queues finish processing.
+  (add-hook 'after-init-hook (lambda () (load custom-file 'noerror)))
+  (no-littering-theme-backups))
+
+;; Register local personal libraries.
+(add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
 #+end_src
 
 ** DONE Custom Functions
@@ -275,7 +264,7 @@ Quality-of-life settings, safety guards, and core minor modes. Disables unused V
 Enables native sticky-key repetition for debugging and spatial commands while suppressing echo area noise.
 #+begin_src emacs-lisp
 (use-package repeat
-  :ensure nil
+  :straight (:type built-in)
   :hook (after-init . repeat-mode)
   :custom
   ;; Suppresses echo area hints to prevent collisions with Eldoc and Which-Key.
@@ -328,7 +317,7 @@ Enforces UTF-8 across all I/O boundaries. Excludes the selection coding system o
 Saves your cursor positions, recently opened files, and minibuffer history between sessions.
 #+begin_src emacs-lisp
 (use-package saveplace
-  :ensure nil
+  :straight (:type built-in)
   :custom
   ;; Prevents startup hangs from restoring point in offline/unmounted volumes.
   (save-place-forget-unreadable-files t)
@@ -336,7 +325,7 @@ Saves your cursor positions, recently opened files, and minibuffer history betwe
   (save-place-mode 1))
 
 (use-package recentf
-  :ensure nil
+  :straight (:type built-in)
   :init
   (setq recentf-max-saved-items 300
         recentf-exclude
@@ -379,7 +368,7 @@ Saves your cursor positions, recently opened files, and minibuffer history betwe
     (run-with-idle-timer 30 t #'ar/update-recentf-org-agenda-cache)))
 
 (use-package savehist
-  :ensure nil
+  :straight (:type built-in)
   :init
   (setq enable-recursive-minibuffers t
         history-length 1000
@@ -396,7 +385,7 @@ Saves your cursor positions, recently opened files, and minibuffer history betwe
 Configures core editing behaviors, whitespace management, and text navigation primitives.
 #+begin_src emacs-lisp
 (use-package simple
-  :ensure nil
+  :straight (:type built-in)
   :hook (text-mode . visual-line-mode)
   :init
   ;; Enables column number display in the modeline.
@@ -859,16 +848,16 @@ Saves buffer contents directly to disk on idle, focus loss, and window/buffer sw
 ** DONE Auto Tangle
 Automatically regenerates tangled output files when any Org buffer is saved.
 #+begin_src emacs-lisp
-;; (use-package org-auto-tangle
-;;   :defer t
-;;   :hook (org-mode . org-auto-tangle-mode)
-;;   :custom
-;;   ;; CRITICAL: Synchronous tangling prevents background Emacs process race conditions
-;;   ;; with Elpaca's async queue and Codeberg rate limits (early EOF git clone failures).
-;;   (org-auto-tangle-async nil)
-;;   ;; Default for ALL org buffers. Files without source blocks are unaffected.
-;;   ;; To opt out a specific file, add #+auto_tangle: nil to its header.
-;;   (org-auto-tangle-default t))
+(use-package org-auto-tangle
+  :defer t
+  :hook (org-mode . org-auto-tangle-mode)
+  :custom
+  ;; CRITICAL: Synchronous tangling prevents background Emacs process race conditions
+  ;; with Elpaca's async queue and Codeberg rate limits (early EOF git clone failures).
+  (org-auto-tangle-async nil)
+  ;; Default for ALL org buffers. Files without source blocks are unaffected.
+  ;; To opt out a specific file, add #+auto_tangle: nil to its header.
+  (org-auto-tangle-default t))
 #+end_src
 
 ** DONE Child Frame
@@ -1002,7 +991,7 @@ Foundational API for ephemeral keybinding menus. Strictly deferred to respect do
 Keystroke discovery UI overlay. Renders prefix bindings in the echo area with alphabetical sorting and optimized pagination.
 #+begin_src emacs-lisp
 (use-package which-key
-  :ensure nil 
+  :straight (:type built-in) 
   :hook (after-init . which-key-mode)
   :custom
   (which-key-idle-delay 1.0) ; Initial delay
@@ -1046,7 +1035,7 @@ Delegates operator ligatures to HarfBuzz via ligature.el and reserves Elisp subs
 Synchronizes buffers with external disk modifications via native OS file notifications. Suppresses echo-area logging and avoids interval polling to eliminate I/O overhead.
 #+begin_src emacs-lisp
 (use-package autorevert
-  :ensure nil
+  :straight (:type built-in)
   :custom
   (auto-revert-verbose nil)
   (auto-revert-avoid-polling t)
@@ -1059,6 +1048,7 @@ Synchronizes buffers with external disk modifications via native OS file notific
 Terminal emulation powered by =libghostty-vt=, rendering as a persistent bottom drawer with strict Evil integration and automatic TRAMP support.
 #+begin_src emacs-lisp
 (use-package ghostel
+  :straight (ghostel :host github :repo "dakra/ghostel")
   :defer t
   :commands (ghostel
              ghostel-project)
@@ -1112,31 +1102,25 @@ Terminal emulation powered by =libghostty-vt=, rendering as a persistent bottom 
 
 ;; Synchronizes the terminal cursor with Emacs point during Evil state transitions.
 (use-package evil-ghostel
-  ;; :vc (:url "https://github.com/dakra/ghostel"
-  ;;      :lisp-dir "extensions/evil-ghostel"
-  ;;      :rev :newest)
+  :straight (evil-ghostel :host github :repo "dakra/ghostel"
+                          :files ("extensions/evil-ghostel/*.el"))
   :after (ghostel evil)
   :hook (ghostel-mode . evil-ghostel-mode))
 
 ;; Routes Eshell visual commands to dedicated Ghostel buffers for proper TTY rendering.
 (use-package ghostel-eshell
-  :ensure nil
-  :after ghostel
+  :straight nil
   :hook (eshell-load . ghostel-eshell-visual-command-mode))
 
 ;; Replaces standard compilation buffers with live TTY-backed Ghostel sessions.
 (use-package ghostel-compile
-  :ensure nil
-  :after ghostel
-  :config
-  (ghostel-compile-global-mode 1))
+  :straight nil
+  :hook (after-init . ghostel-compile-global-mode))
 
 ;; Upgrades Comint and REPL output with libghostty-vt ANSI and OSC parsing fidelity.
 (use-package ghostel-comint
-  :ensure nil
-  :after ghostel
-  :config
-  (ghostel-comint-global-mode 1))
+  :straight nil
+  :hook (after-init . ghostel-comint-global-mode))
 #+end_src
 
 
@@ -1144,7 +1128,7 @@ Terminal emulation powered by =libghostty-vt=, rendering as a persistent bottom 
 Modifies word boundaries to recognize camelCase transitions. Globally enables native and Evil motions to traverse compound identifiers.
 #+begin_src emacs-lisp
 (use-package subword
-  :ensure nil
+  :straight(:type built-in)
   :config
   (global-subword-mode 1))
 #+end_src
@@ -1172,7 +1156,7 @@ Native pixel-precision viewport translation for hardware input and keyboard inte
 
 ;; Native pixel-precision engine (Emacs 29+).
 (use-package pixel-scroll
-  :ensure nil
+  :straight(:type built-in)
   :custom
   ;; Disables synthetic momentum to prevent Wayland/PGTK compositor feedback loops.
   (pixel-scroll-precision-use-momentum nil)
@@ -1187,7 +1171,7 @@ Native pixel-precision viewport translation for hardware input and keyboard inte
 Downloads language parsers that power code coloring and structural navigation.
 #+begin_src emacs-lisp
 (use-package treesit
-  :ensure nil
+  :straight(:type built-in)
   :if (treesit-available-p)
   :preface
   ;; Must precede :custom (load-order constraint).
@@ -1230,7 +1214,7 @@ Downloads language parsers that power code coloring and structural navigation.
 Native auto-pairing, O(1) prose formatting, and AST-aware re-indentation.
 #+begin_src emacs-lisp
 (use-package elec-pair
-  :ensure nil
+  :straight(:type built-in)
   :init
   ;; Conservative inhibition prevents pairing in unbalanced buffers and complex strings.
   (setq electric-pair-inhibit-predicate #'electric-pair-conservative-inhibit
@@ -1265,7 +1249,7 @@ Native auto-pairing, O(1) prose formatting, and AST-aware re-indentation.
 
 ;; Native electric indentation and "Electric Words" engine.
 (use-package electric
-  :ensure nil
+  :straight(:type built-in)
   :init
   ;; Force newline and backspace to trigger electric indentation.
   ;; ?\^? enables "Smart Backspace" (dedenting by full indentation level)
@@ -1368,7 +1352,7 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
 Native delimiter highlighting and Emacs 29+ overlay context rendering.
 #+begin_src emacs-lisp
 (use-package paren
-  :ensure nil
+  :straight(:type built-in)
   :custom
   ;; Delay before highlighting matching delimiters.
   (show-paren-delay 0.05)
@@ -1503,7 +1487,7 @@ Maps native Tree-sitter AST nodes to Evil operator-pending text objects and Unim
 Provides AST-aware structural manipulation via the Emacs 30 =treesit-thing= API. Refactoring operators are isolated within a Transient menu to prevent global keymap collisions.
 #+begin_src emacs-lisp
 (use-package evil-ts-obj
-  :vc (:url "https://github.com/dvzubarev/evil-ts-obj" :branch "master" :rev :newest)
+  :straight (evil-ts-obj :host github :repo "dvzubarev/evil-ts-obj")
   :defer t
   :after evil
   :hook ((prog-mode . ar/evil-ts-obj-maybe-enable)
@@ -1657,7 +1641,7 @@ Unified folding dispatcher routing to Tree-sitter, Outline, Hideshow, or Vimish 
 Folds code blocks in languages lacking Tree-sitter grammars using Emacs 31 native indicators.
 #+begin_src emacs-lisp
 (use-package hideshow
-  :ensure nil
+  :straight (:type built-in)
   :defer t
   :commands (hs-toggle-hiding
              hs-hide-block
@@ -1752,7 +1736,7 @@ Folds manually selected text regions with persistent storage across sessions.
 Restricts font-lock to mixed-indentation detection. Delegates trailing spaces and line limits to native display engines.
 #+begin_src emacs-lisp
 (use-package whitespace
-  :ensure nil
+  :straight (:type built-in)
   :defer t
   :hook ((prog-mode conf-mode) . whitespace-mode)
   :custom
@@ -1769,6 +1753,10 @@ Restricts font-lock to mixed-indentation detection. Delegates trailing spaces an
 Trims trailing whitespace only on lines you edit to keep version control diffs clean.
 #+begin_src emacs-lisp
 (use-package ws-butler
+  :straight (:host github
+             :repo "emacsmirror/nongnu_elpa"
+             :branch "elpa/ws-butler"
+             :local-repo "ws-butler")
   :defer t
   ;; Routes to the maintained NonGNU ELPA fork to prevent Emacs 29+ byte-compile failures.
   :hook (prog-mode . ws-butler-mode))
@@ -1880,7 +1868,7 @@ Provides O(1) line and region dragging. Automatically re-indents displaced lines
 Native C-level margin rendering for spatial orientation. Utilizes hybrid relative numbering for Vim motions and aborts on massive files.
 #+begin_src emacs-lisp
 (use-package display-line-numbers
-  :ensure nil
+  :straight (:type built-in)
   :defer t
   :hook ((prog-mode conf-mode yaml-mode LaTeX-mode tex-mode) . display-line-numbers-mode)
   :custom
@@ -1913,7 +1901,7 @@ Native C-level display primitive rendering vertical boundary at =fill-column=. C
 Native C-level display primitive rendering vertical window boundaries. Confined to right-only placement to eliminate horizontal redundancy.
 #+begin_src emacs-lisp
 (use-package frame
-  :ensure nil
+  :straight (:type built-in)
   :custom
   ;; Restricts rendering to vertical boundaries and enforces a 1px baseline.
   (window-divider-default-places 'right-only)
@@ -1931,7 +1919,7 @@ Native C-level display primitive rendering vertical window boundaries. Confined 
 Native C-level overlay rendering for active line tracking. Confines focus to the selected window and suspends rendering during Evil visual selections and excluded major modes.
 #+begin_src emacs-lisp
 (use-package hl-line
-  :ensure nil
+  :straight (:type built-in)
   :custom
   ;; Confines highlight strictly to the active window.
   (hl-line-sticky-flag nil)
@@ -2385,7 +2373,7 @@ Provides multiple cursor editing in Evil mode by wrapping the iedit lexical engi
 Finds text across files and allows direct editing of the search results to update the original files.
 #+begin_src emacs-lisp
 (use-package grep
-  :ensure nil
+  :straight (:type built-in)
   :commands (grep
              lgrep
              rgrep
@@ -2600,32 +2588,32 @@ tramp ssh json yaml toml lsp dap ast"
 ** DONE Helpful
 Shows rich documentation with source code, callers, and keybindings for any symbol.
 #+begin_src emacs-lisp
-(use-package helpful
-  :commands (helpful-callable
-             helpful-variable
-             helpful-key
-             helpful-command
-             helpful-at-point
-             helpful-function
-             helpful-symbol)
-  :bind
-  ([remap describe-command] . helpful-command)
-  ([remap describe-function] . helpful-callable)
-  ([remap describe-key] . helpful-key)
-  ([remap describe-symbol] . helpful-symbol)
-  ([remap describe-variable] . helpful-variable)
-  :custom
-  ;; Limits open helpful buffers; kills least-recently-used beyond this count.
-  (helpful-max-buffers 7)
-  ;; Makes apropos search all symbols, not just user-facing ones.
-  (apropos-do-all t))
+;; (use-package helpful
+;;   :commands (helpful-callable
+;;              helpful-variable
+;;              helpful-key
+;;              helpful-command
+;;              helpful-at-point
+;;              helpful-function
+;;              helpful-symbol)
+;;   :bind
+;;   ([remap describe-command] . helpful-command)
+;;   ([remap describe-function] . helpful-callable)
+;;   ([remap describe-key] . helpful-key)
+;;   ([remap describe-symbol] . helpful-symbol)
+;;   ([remap describe-variable] . helpful-variable)
+;;   :custom
+;;   ;; Limits open helpful buffers; kills least-recently-used beyond this count.
+;;   (helpful-max-buffers 7)
+;;   ;; Makes apropos search all symbols, not just user-facing ones.
+;;   (apropos-do-all t))
 #+end_src
 
 ** DONE Ediff
 Compares and merges two or three versions of a file side by side with interactive difference navigation.
 #+begin_src emacs-lisp
 (use-package ediff
-  :ensure nil
+  :straight (:type built-in)
   :commands (ediff
              ediff-files
              ediff-buffers
@@ -2734,7 +2722,7 @@ Compares and merges two or three versions of a file side by side with interactiv
 Extracts system =manpath= directories to guarantee native Emacs =woman= can locate modern Arch Linux manuals without external dependencies.
 #+begin_src emacs-lisp
 (use-package woman
-  :ensure nil
+  :straight (:type built-in)
   :commands (woman)
   :config
   ;; Extract system manpath to guarantee `woman` locates modern Arch Linux manuals.
@@ -2752,7 +2740,7 @@ Extracts system =manpath= directories to guarantee native Emacs =woman= can loca
 Provides a visual directory editor and file manager for navigating the filesystem, copying, moving, and deleting files.
 #+begin_src emacs-lisp
 (use-package dired
-  :ensure nil
+  :straight (:type built-in)
   :defer t
   :hook (dired-mode . hl-line-mode)
   :custom
@@ -2796,7 +2784,7 @@ Provides a visual directory editor and file manager for navigating the filesyste
 Transforms the native directory editor into a modern, visual file manager with live previews, sidebars, and integrated version control overlays.
 #+begin_src emacs-lisp
 (use-package dirvish
-  :vc (:url "https://github.com/latiagertrutis/dirvish" :branch "main" :rev :newest)
+  :straight (:host github :repo "latiagertrutis/dirvish")
   :defer t
   :custom
   ;; Route cache to no-littering var directory to prevent ~/.cache pollution.
@@ -2962,7 +2950,7 @@ Transforms the native directory editor into a modern, visual file manager with l
 Provides advanced file omitting, OS-integration, and extended commands for the native directory editor.
 #+begin_src emacs-lisp
 (use-package dired-x
-  :ensure nil
+  :straight (:type built-in)
   :defer t
   :hook (dired-mode . dired-omit-mode)
   :custom
@@ -3000,7 +2988,7 @@ Adds modern syntax highlighting and colorization to directory listings.
 Allows direct editing of the directory buffer like a standard text file to rename or move files in bulk.
 #+begin_src emacs-lisp
 (use-package wdired
-  :ensure nil
+  :straight (:type built-in)
   :defer t
   :after dired
   :custom
@@ -3108,7 +3096,7 @@ Provides a unified workspace engine for navigating, compiling, and managing code
 Identifies repository boundaries, manages ignore patterns, and routes project-scoped searches into the completion framework.
 #+begin_src emacs-lisp
 (use-package project
-  :ensure nil
+  ;;:straight (:type built-in)
   :custom
   ;; Route known projects list to the no-littering etc directory.
   (project-list-file (no-littering-expand-etc-file-name "projects.el"))
@@ -3311,7 +3299,7 @@ Provides a centralized dashboard and automated cleanup engine for viewing, filte
 Displays all open buffers in a filterable, sortable dashboard with project and workspace awareness.
 #+begin_src emacs-lisp
 (use-package ibuffer
-  :ensure nil
+  :straight (:type built-in)
   :defer t
   :bind ([remap list-buffers] . ibuffer)
   :init
@@ -3385,7 +3373,7 @@ Groups all open buffers by their active project roots while respecting workspace
 ;; projection-ibuffer is bundled inside the `projection` monorepo.
 ;; It dynamically generates ibuffer filter groups based on project.el roots.
 (use-package projection-ibuffer
-  :ensure nil 
+  :straight nil
   :after projection
   :commands
   ibuffer-projection-set-filter-groups
@@ -3460,7 +3448,7 @@ Provides strict buffer isolation per workflow context using a headless native ta
 Serves as the foundational workspace container, configured headlessly to provide structural boundaries without rendering visual UI chrome.
 #+begin_src emacs-lisp
 (use-package tab-bar
-  :ensure nil
+  :straight (:type built-in)
   :custom
   ;; Hide UI chrome to maintain a minimalist aesthetic while preserving structural boundaries.
   (tab-bar-show nil)
@@ -3681,7 +3669,7 @@ Renders completion candidates in a vertical, interactive dropdown list.
 Provides directory navigation commands for the minibuffer.
 #+begin_src emacs-lisp
 (use-package vertico-directory
-  :ensure nil
+  :straight nil
   :after vertico
   :bind (:map vertico-map
               ("RET"   . vertico-directory-enter)
@@ -3694,7 +3682,7 @@ Provides directory navigation commands for the minibuffer.
 Enables rapid candidate selection via Avy-style shortcuts.
 #+begin_src emacs-lisp
 (use-package vertico-quick
-  :ensure nil
+  :straight nil
   :after vertico
   :bind (:map vertico-map
               ("M-q" . vertico-quick-jump)
@@ -3706,7 +3694,7 @@ Enables rapid candidate selection via Avy-style shortcuts.
 Saves and replays minibuffer completion sessions.
 #+begin_src emacs-lisp
 (use-package vertico-repeat
-  :ensure nil
+  :straight nil
   :after vertico
   :init
   ;; Registers the save hook immediately via autoloads to capture all sessions.
@@ -3721,7 +3709,7 @@ Saves and replays minibuffer completion sessions.
 Customizes completion dropdown layouts and applies visual highlighting to candidates based on the active command.
 #+begin_src emacs-lisp
 (use-package vertico-multiform
-  :ensure nil
+  :straight nil
   :after vertico
   :config
   ;; Guarantees the `dired-directory` face is registered before minibuffer rendering.
@@ -3897,7 +3885,7 @@ Provides context-aware action menus for minibuffer candidates and buffer targets
 
 #+begin_src emacs-lisp
 (use-package embark-org
-  :ensure nil
+  :straight nil
   :after (embark org))
 #+end_src
 
@@ -3988,7 +3976,7 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
 Configures native Emacs completion styles and indentation triggers.
 #+begin_src emacs-lisp
 (use-package emacs
-  :ensure nil
+  :straight (:type built-in)
   :no-require t
   :custom
   ;; Triggers completion-at-point if the line is already indented.
@@ -4049,7 +4037,7 @@ Provides dynamic abbreviation expansion from open buffers.
        (< (buffer-size other-buffer) ar/dabbrev-buffer-scanning-size-limit)))
 
 (use-package dabbrev
-  :ensure nil
+  :straight (:type built-in)
   :bind (;; Swaps M-/ and C-M-/ for in-buffer completion routing.
          ("M-/" . dabbrev-completion)
          ("C-M-/" . dabbrev-expand))
@@ -4201,10 +4189,9 @@ Routes global Org-mode settings to the newly created folders.
 #+end_src
 
 ** DONE Core Configuration
-Configures Org's core behavior, display, source editing, and performance settings.
+Configures Org core behavior, display, source editing, and performance settings.
 #+begin_src emacs-lisp
 (use-package org
-  :ensure nil
   :defer t
   :preface
   ;; Prevent eager loading of legacy modules. Only org-habit is required.
@@ -4404,7 +4391,7 @@ Defines the lifecycle of actionable items and groups them by physical or digital
 Configures the task overview display, sorting, and window behavior.
 #+begin_src emacs-lisp
 (use-package org-agenda
-  :ensure nil
+  :straight nil
   :defer t
   :after org
   :custom
@@ -4824,7 +4811,7 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
 Renders habit consistency graphs in the daily agenda with configurable history, future span, and custom completion glyphs.
 #+begin_src emacs-lisp
 (use-package org-habit
-  :ensure nil
+  :straight nil
   :defer t
   :after org
   :custom
@@ -5040,7 +5027,7 @@ Tabulated-list interface for decluttered viewing, regex/keyword filtering, and e
 Consolidates fragmented notes by merging file contents or active regions while automatically rewiring the backlink graph.
 #+begin_src emacs-lisp
 (use-package denote-merge
-  :vc (:url "https://github.com/protesilaos/denote-merge" :branch "main" :rev :newest)
+  :straight (denote-merge :host github :repo "protesilaos/denote-merge")
   :defer t
   :after denote
   :commands (denote-merge-file
@@ -5063,7 +5050,7 @@ Consolidates fragmented notes by merging file contents or active regions while a
 Switches the active Denote directory context globally, persisting the choice across sessions and isolating keyword completions per silo.
 #+begin_src emacs-lisp
 (use-package denote-solo
-  :vc (:url "https://github.com/pavlo/denote-solo" :branch "main" :rev :newest)
+  :straight (:host github :repo "pavlo/denote-solo")
   :after denote
   :custom
   ;; Dynamically map existing Denote silos from the Dynamic Directory Structure.
@@ -5102,8 +5089,8 @@ Schedules and tracks periodic note reviews using a dedicated chronological dashb
 Provides summary statistics, random walks, structural maintenance, and network visualization for Denote collections.
 #+begin_src emacs-lisp
 (use-package denote-explore
+  :straight (:host github :repo "pprevos/denote-explore")
   :defer t
-  :vc (:url "https://github.com/pprevos/denote-explore" :branch "main" :rev :newest)
   :after (denote denote-regexp)
   :commands (denote-explore-count-notes
              denote-explore-count-keywords
@@ -5534,7 +5521,7 @@ Spawns a new Denote note via org-capture with front-matter handled by denote-org
 Wires all template groups into org-capture, routes the UI to a dedicated bottom drawer, and saves buffers on successful capture.
 #+begin_src emacs-lisp
 (use-package org-capture
-  :ensure nil
+  :straight nil
   :defer t
   :after org
   :custom
@@ -5779,11 +5766,10 @@ If REGION-TEXT is provided, wrap it inside the block."
       ("<" "insert <"     self-insert-command)]]))
 #+end_src
 
-
 ** DONE Org Block Wrap
 #+begin_src emacs-lisp
 (use-package org-block-wrap
-  :vc (:url "https://gitlab.com/vegasharmon/org-block-wrap" :rev :newest)
+  :straight (org-block-wrap :host gitlab :repo "vegasharmon/org-block-wrap")
   :hook (org-mode . org-block-wrap-mode))
 #+end_src
 
@@ -5904,12 +5890,11 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
 
 
 * TODO Development Tools
-
 ** DONE Eldoc
 Configures the core documentation engine with strict echo area limits, Emacs 31 Elisp enrichment, and help-at-point integration. LSP hover routing is governed by `lsp-eldoc-enable-hover` in the lsp-mode block, not here.
 #+begin_src emacs-lisp
 (use-package eldoc
-  :ensure nil
+  ;;:straight (:type built-in)
   :custom
   ;; Strict 2-line maximum in the echo area.
   (eldoc-echo-area-use-multiline-p 2)
@@ -5937,15 +5922,11 @@ Configures the core documentation engine with strict echo area limits, Emacs 31 
     (setq elisp-eldoc-funcall-with-docstring-length 'short)))
 #+end_src
 
-
-
-
-
 ** DONE Xref
 Navigates to definitions, references, and symbols across the project via native xref with ripgrep search and Emacs 31 window routing.
 #+begin_src emacs-lisp
 (use-package xref
-  :ensure nil
+  ;;:straight (:type built-in)
   :custom
   ;; Route regex search backend to ripgrep.
   (xref-search-program 'ripgrep)
@@ -5982,7 +5963,7 @@ Connects to external language servers for completion, navigation, diagnostics, a
   ;; Route completion through native CAPF → corfu pipeline.
   (lsp-completion-provider :none)
   ;; 0.5 balances responsiveness against main-thread GC pressure.
-  (lsp-idle-delay 0.5)
+  (lsp-idle-delay 0.2)
   ;; Route session persistence to no-littering var directory.
   (lsp-session-file (no-littering-expand-var-file-name "lsp/session.el"))
   (lsp-keymap-prefix nil)
@@ -6009,10 +5990,10 @@ Connects to external language servers for completion, navigation, diagnostics, a
   ;; Signature help: activate on trigger chars and server requests only.
   (lsp-signature-auto-activate '(:on-trigger-char :on-server-request))
   (lsp-signature-render-documentation t)
-  ;; (lsp-signature-doc-lines 2)
   (lsp-signature-doc-lines 2)
+  ;;(lsp-auto-configure nil)
   ;; Route diagnostics explicitly to flycheck (negative constraint bans flymake).
-  (lsp-diagnostics-provider :flycheck)
+  ;;(lsp-diagnostics-provider :flycheck)
   ;; Prevent echo-area hover duplication with lsp-ui-doc childframe.
   (lsp-eldoc-enable-hover nil)
   ;; Server lifecycle: do not keep workspaces alive after last buffer is killed.
@@ -6055,7 +6036,6 @@ Connects to external language servers for completion, navigation, diagnostics, a
   "T"   '(:ignore t :wk "toggle")
   "T b" '(ar/lsp-breadcrumb-toggle :wk "Breadcrumb"))
 #+end_src
-
 
 
 ** TODO Language Server Visuals
@@ -6104,7 +6084,6 @@ Renders floating documentation childframes, inline peek overlays, and code actio
 ;; (lsp-ui-doc-border ((t (:background "#292e42"))))
 ;; (lsp-ui-doc-background ((t (:background "#24283b"))))
 #+end_src
-
 
 
 
@@ -6173,33 +6152,21 @@ Highlights syntax errors and warnings directly in the code buffer with save-trig
   ;; Triggers syntax checks ONLY on save and mode activation.
   ;; `idle-change` removed: prevents redisplay storms colliding with Corfu
   ;; childframe compositing during active typing.
-  ;; (flycheck-check-syntax-automatically '(save idle-change mode-enabled))
   (flycheck-check-syntax-automatically '(save mode-enabled))
-  ;; Irrelevant without `idle-change` trigger; retained for documentation.
-  ;; (flycheck-idle-change-delay 1.0)
-  ;; Tightens the echo area feedback loop for snappy error display.
   (flycheck-display-errors-delay 0.25)
-  ;; Refreshes syntax check state when briefly switching through intermediate buffers.
   (flycheck-buffer-switch-check-intermediate-buffers t)
-  ;; Flycheck 38: show only the diagnostic at point, not all errors in the buffer.
-  ;; Reduces overlay count from O(n) to O(1) per save-triggered check.
   (flycheck-annotate-display-current-error-only t)
   :custom-face
   ;; Forces straight underlines to prevent PGTK/Wayland bezier curve redisplay stutter.
   (flycheck-error ((t (:underline (:style line :color "#f7768e")))))
   (flycheck-warning ((t (:underline (:style line :color "#e0af68")))))
   (flycheck-info ((t (:underline (:style line :color "#7aa2f7")))))
-  ;; Themes the fringe indicators to match the Tokyo Night text underlines.
   (flycheck-fringe-error ((t (:foreground "#f7768e"))))
   (flycheck-fringe-warning ((t (:foreground "#e0af68"))))
   (flycheck-fringe-info ((t (:foreground "#7aa2f7"))))
   :config
   ;; Disables org-lint to prevent false positives in Denote/Org silos.
   (setq-default flycheck-disabled-checkers '(org-lint))
-  ;; Redundant: `new-line` was only relevant when `idle-change` was in the
-  ;; trigger list. With only `save` and `mode-enabled`, this is dead code.
-  ;; (delq 'new-line flycheck-check-syntax-automatically)
-  ;; Restricts the emacs-lisp checker to buffers inside a project.
   (eval '(setf (flycheck-checker-get 'emacs-lisp 'predicate)
                (lambda ()
                  (and (not (bound-and-true-p no-byte-compile))
@@ -6231,24 +6198,39 @@ Provides a detachable, zoomed-out minimap sidebar with native diff-hl fringe syn
   :custom
   (demap-minimap-window-side 'right)
   (demap-minimap-window-width 15)
+  ;; Refuse to track buffers exceeding the too-long-file-p threshold.
+  ;; Prevents a second full-buffer indirect clone from doubling redisplay
+  ;; cost in massive files (>500KB / >1000 lines).
+  (demap-track-window-mode-update-p-func
+   (lambda ()
+     (and (demap-track-window-mode-update-p-func-default)
+          (not (too-long-file-p)))))
   :custom-face
   ;; Align minimap typography with the global JetBrains Mono baseline.
   (demap-minimap-font-face ((t (:family "JetBrains Mono" :height 25))))
   ;; Inherit theme faces for automatic doom-themes and solaire-mode synergy.
+  ;; Note: demap-visible-region-face and demap-current-line-face defaults
+  ;; already inherit from region and hl-line respectively; these are
+  ;; re-declared for explicit documentation parity.
   (demap-visible-region-face ((t (:inherit region :extend t))))
   (demap-visible-region-inactive-face ((t (:inherit mode-line-inactive :extend t))))
   (demap-current-line-face ((t (:inherit hl-line :extend t))))
   (demap-current-line-inactive-face ((t (:inherit shadow :extend t))))
   :config
-
+  ;; Ecosystem integration: enable diff-hl fringe markers and solaire-mode
+  ;; background swapping inside the minimap indirect buffer.
+  ;; Wrapped in ignore-errors to prevent a single package failure from
+  ;; aborting the entire demap-minimap-construct-hook chain.
   (defun ar/demap-integrate-ecosystem ()
     "Enable `diff-hl-mode' and `solaire-mode' in demap minimap buffers."
-    (when (fboundp 'diff-hl-mode)
-      (diff-hl-mode 1))
-    (when (fboundp 'solaire-mode)
-      (solaire-mode 1)))
+    (ignore-errors
+      (when (fboundp 'diff-hl-mode)
+        (diff-hl-mode 1))
+      (when (fboundp 'solaire-mode)
+        (solaire-mode 1))))
   (add-hook 'demap-minimap-construct-hook #'ar/demap-integrate-ecosystem))
 #+end_src
+
 
 ** DONE Dape
 Provides native debugging with inline variable hints, persistent breakpoints, and remote debugging support.
@@ -7043,26 +7025,11 @@ Routes all Markdown editing, viewing, table, and structure commands through the 
 Configures Python editing, LSP server routing, workspace settings, formatting, and debug adapter integration.
 #+begin_src emacs-lisp
 (use-package python
-  :ensure nil
+  :straight (:type built-in)
   :custom
   (python-shell-completion-native-enable nil)
   (python-shell-interpreter "python3")
   (python-indent-offset 4))
-
-;; (with-eval-after-load 'eglot
-;;   (add-to-list 'eglot-server-programs
-;;                `((python-mode python-ts-mode)
-;;                  . ,(eglot-alternatives
-;;                      '(("pyrefly" "lsp")
-;;                        ("ty" "server"))))))
-
-;; --- Workspace Configuration ---
-;; (setq eglot-workspace-configuration
-;;       (plist-put eglot-workspace-configuration :python
-;;                  '(:pythonPath "python3"
-;;                    :analysis (:typeCheckingMode "basic"
-;;                               :autoImportCompletions t
-;;                               :useLibraryCodeForTypes t))))
 
 ;; --- Formatting (Apheleia) ---
 ;; Explicitly map both modes; apheleia-mode-alist does not traverse derived-mode-p.
@@ -7070,38 +7037,6 @@ Configures Python editing, LSP server routing, workspace settings, formatting, a
   (setf (alist-get 'python-mode apheleia-mode-alist) '(ruff-isort ruff))
   (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(ruff-isort ruff)))
 
-;; ;; --- Diagnostics (Flymake) ---
-;; ;; `flymake-ruff` is the official Astral-recommended backend.
-;; ;; Hooked into `eglot-managed-mode-hook` to prevent double-hooking and ensure
-;; ;; proper initialization after Eglot injects its own backend.
-;; (use-package flymake-ruff
-;;   :defer t
-;;   :hook (eglot-managed-mode . flymake-ruff-load)
-;;   :config
-;;   ;; Filter overlapping diagnostic notes emitted by LSP servers (ty/pyrefly)
-;;   ;; to prevent echo-area and Flymake UI clutter.
-;;   (defun ar/filter-eglot-python-notes (diags)
-;;     "Drop LSP diagnostic notes in Python buffers to prevent overlap with Ruff."
-;;     (if (derived-mode-p 'python-base-mode)
-;;         (list (seq-remove (lambda (d)
-;;                             (eq (flymake-diagnostic-type d) 'eglot-note))
-;;                           (car diags)))
-;;       diags))
-;;   (advice-add 'eglot--report-to-flymake :filter-args #'ar/filter-eglot-python-notes)
-;;   ;; Bind M-RET in diagnostic buffers for instant Astral rule lookup.
-;;   (with-eval-after-load 'flymake
-;;     (define-key flymake-diagnostics-buffer-mode-map (kbd "M-RET") #'flymake-ruff-goto-doc)
-;;     (define-key flymake-project-diagnostics-mode-map (kbd "M-RET") #'flymake-ruff-goto-doc)))
-
-;; ;; --- Region Formatting (Lazy Ruff) ---
-;; ;; Formats only marked regions or Org src blocks via shell commands,
-;; ;; complementing Apheleia's whole-file async formatting.
-;; (use-package lazy-ruff
-;;   :defer t
-;;   :hook (python-base-mode . lazy-ruff-mode)
-;;   :config
-;;   ;; Extend language whitelist for literate programming workflows.
-;;   (add-to-list 'lazy-ruff-org-src-languages "jupyter-python"))
 
 #+end_src
 
@@ -7230,13 +7165,11 @@ Routes centralized leader keybindings for opening sidebars, terminals, frames, a
               (set-window-buffer (next-window) other-buf))))))))
 #+end_src
 
-
-
 ** TODO Winner
 #+begin_src emacs-lisp
 (use-package winner
   :defer t
-  :ensure nil
+  :straight (:type built-in)
   :commands (winner-undo winner-redo)
   :hook (after-init . winner-mode)
   :init (setq winner-boring-buffers '("*Completions*"
