@@ -69,6 +69,29 @@ Other than what I mentioned so far, everything what you said for Subsection 4 **
 
 6. Now lets work on the Flycheck subsection. For this subsection I have removed the duplicates myself. Otherwise, everything you pointed out is correct. But there is the issue that flycheck via its annotate mode displays errors as I type. Along with corfu completion, this make typing extremely laggy. I only want flycheck to display diagnostics via its annotate once I am in the next line or better yet, I want it only to display the diagnostics once I am save a prog-mode file. Seeing diagnostics as I type is not useful since it flags errors on code I have not finished writing. Search the web and think longer for these tasks. Then you have the GREEN LIGHT to rewrite the Flycheck subsection with the changes and corrections. And then state what next subsection I want you to look at.
 
+7. Ingest v0.38 of the attached config.org.txt file as the current source-of-truth file for my emacs configuration. So far with this emacs configuration, I get the following warning for _Messages_ special buffer and any elisp file I open:
+   - Unable to calculate the languageId for buffer ‘org-eldoc.el’. Take a look at ‘lsp-language-id-configuration’. The ‘major-mode’ is emacs-lisp-mode
+   - Warning (lsp-mode): Unable to calculate the languageId for buffer ‘org-eldoc.el’. Take a look at ‘lsp-language-id-configuration’. The ‘major-mode’ is emacs-lisp-mode
+
+I also get the following error when I open an elisp file: Error running timer: (wrong-type-argument stringp nil) Search the web and think longer these tasks and explain to me in detail why I am getting these warnings and errors.
+
+8. the link for centaur emacs you provided no longer uses lsp-mode and instead uses eglot. Furthermore, why would you still stubbornly recommended your stupid approach 2 which would still throw the same error since you are in fact calling prog-mode directly to your custom ar/lsp-maybe-enable which calls unnecessary checks for language-id when lsp-deferred can natively do that. Despite arguing me with on the facts, first check your own solutions for accuracy. The following solution using lsp-deferred
+
+```el
+:hook ((prog-mode . (lambda ()
+                      (unless (derived-mode-p
+                               'emacs-lisp-mode 'lisp-mode
+                               'makefile-mode 'snippet-mode
+                               'ron-mode)
+                        (lsp-deferred))))
+       ((markdown-mode yaml-mode yaml-ts-mode) . lsp-deferred))
+
+```
+
+is far supperior to either the 1st approach which is inefficient and the second approach which still calls prog-modes and its derivatives to lsp-deferred. If you would done proper research and not waste my arguing with me because of stubborness, you would know that you cannot ever use either of lsp-mode or eglot in emacs-lisp-mode or lisp-mode because emacs itself is built around handling everything for these 2 modes on its own without the need for external language servers. makefile-mode, snippet-mode and ron-mode on the other hand do not need a language server because despite being a derived-mode-p of prog-mode it does not need or have to rely on lsp server clients. Fucking verify everything before you write and give the technical reasoning to why you could not figure these out for yourself given that was your task instead of me doing the work for you. As I just read your thinking process, you had already decided that my conclusion that `emacs-lisp-mode has nothing to do with prog-mode was incorrect` without actually verifying and analyzing with data about what I meant in that statement. Acknowledge your mistakes instead of blindly hallucinating the reasoning for your arguments.
+
+9. Now carefully analyze the attached org-eldoc.el file which I got from the now out of date and unmaintained org-contrib package from https://git.sr.ht/~bzg/org-contrib/tree?__goaway_challenge=meta-refresh&__goaway_id=d9c43a897d0334ffcd6aed254203ccd6&__goaway_referer=https%3A%2F%2Fgit.sr.ht%2F~bzg%2Forg-contrib Carefully analyze this configuration and update it so that it is more robust, efficient and follows standard emacs 31 practices. Search the web and think longer for these tasks and explain how to plan to change this file org-eldoc.el which I will add to my lisp folder in my emacs directory. Make sure to have the latest information till July 31, 2026. Verify everything you write with linked sources and make sure you understand how emacs actually works. Keep in mind that org-mode buffers never have access to the underlying prog-mode buffer or the corresponding lsp-server. For example, python source code block in an org buffer has no access to the python buffer itself, meaning org-babel never has access to python's prog-mode buffer, so eldoc, which depends on the corresponding lsp server in python , needs to have access to the underlying language server protocol to be any use to org-babel itself. The only exception where eldoc does not need to rely on the underlying lsp server is emacs-lisp-mode and lisp-mode itself which we have established so far. You must retain all the naming conventions from the org-eldoc.el file I attached. You cannot and you must not use function names, file names like ar-org-eldoc.el anywhere in the file or in its name. And I don't plan to use lsp-org either, so there should not be any code regarding lsp-org whatsoever.
+
 ---
 
 ---

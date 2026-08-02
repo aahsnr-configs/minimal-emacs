@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.37
+#+VERSION: 0.38
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -48,9 +48,6 @@ The =no-byte-compile: t= header directive stops Emacs from prematurely compiling
       use-package-compute-statistics nil
       use-package-enable-imenu-support t)
 
-
-;; NO-LITTERING & CUSTOM FILE
-;; Synchronously load no-littering to preempt async package cache paths.
 (use-package no-littering
   :demand t
   :config
@@ -962,7 +959,6 @@ Applies the Tokyo Night palette and integrates downstream UI enhancements. Synch
 
 #+end_src
 
-
 ** DONE Solaire Mode
 Swaps background faces to distinguish side-windows and popups. Deferred until the theme engine finalizes to prevent mapping race conditions.
 #+begin_src emacs-lisp
@@ -1043,7 +1039,6 @@ Synchronizes buffers with external disk modifications via native OS file notific
   (global-auto-revert-mode 1))
 #+end_src
 
-
 ** DONE Ghostel
 Terminal emulation powered by =libghostty-vt=, rendering as a persistent bottom drawer with strict Evil integration and automatic TRAMP support.
 #+begin_src emacs-lisp
@@ -1122,7 +1117,6 @@ Terminal emulation powered by =libghostty-vt=, rendering as a persistent bottom 
   :straight nil
   :hook (after-init . ghostel-comint-global-mode))
 #+end_src
-
 
 ** DONE Subword
 Modifies word boundaries to recognize camelCase transitions. Globally enables native and Evil motions to traverse compound identifiers.
@@ -1533,7 +1527,6 @@ Provides AST-aware structural manipulation via the Emacs 30 =treesit-thing= API.
         ("<" "Barf" evil-ts-obj-barf :transient t)
         ("<escape>" "" transient-quit-one :format " ")]])))
 #+end_src
-
 
 ** DONE Treesit Navigate Thing
 Exposes the Emacs 30 =treesit-thing= API via Unimpaired bracket motions. Provides O(1) C-level AST sibling traversal natively.
@@ -5627,6 +5620,24 @@ Configures Org structure templates for rapid block insertion and implements a de
   (advice-add #'org-babel-do-load-languages :override #'ignore))
 #+end_src
 
+** DONE Evil Org
+#+begin_src emacs-lisp
+(use-package evil-org
+  :after org
+  :hook (org-mode . (lambda () evil-org-mode))
+  :config
+  (require 'evil-org-agenda)
+  (evil-org-agenda-set-keys))
+#+end_src
+
+** DONE Org Eldoc
+Displays breadcrumbs for headlines, header arguments for source blocks, and bridges native Emacs Lisp ElDoc inside source blocks.
+#+begin_src emacs-lisp
+(use-package org-eldoc
+  :straight nil
+  :after org)
+#+end_src
+
 ** DONE Transient Template System
 Provides a centralized, context-aware dashboard for inserting Org structure blocks via a dedicated Transient menu.
 #+begin_src emacs-lisp
@@ -5958,49 +5969,41 @@ Connects to external language servers for completion, navigation, diagnostics, a
 #+begin_src emacs-lisp
 (use-package lsp-mode
   :defer t
-  :hook (prog-mode . lsp-deferred)
+  :hook ((prog-mode . (lambda ()
+                      (unless (derived-mode-p
+                               'emacs-lisp-mode 'lisp-mode
+                               'makefile-mode 'snippet-mode
+                               'ron-mode)
+                        (lsp-deferred))))
+         ((markdown-mode yaml-mode yaml-ts-mode) . lsp-deferred))
   :custom
-  ;; Route completion through native CAPF → corfu pipeline.
   (lsp-completion-provider :none)
-  ;; 0.5 balances responsiveness against main-thread GC pressure.
   (lsp-idle-delay 0.2)
-  ;; Route session persistence to no-littering var directory.
   (lsp-session-file (no-littering-expand-var-file-name "lsp/session.el"))
   (lsp-keymap-prefix nil)
   (lsp-enable-xref t)
   (lsp-log-io nil)
-  ;; Raise file watcher threshold for large monorepos.
   (lsp-file-watch-threshold 4000)
-  ;; Disable features superseded by dedicated packages.
   (lsp-enable-folding nil)
+  (lsp-enable-indentation nil)
   (lsp-enable-on-type-formatting nil)
   (lsp-enable-text-document-color nil)
   (lsp-enable-links nil)
+  (lsp-enable-dap-auto-configure nil) 
   (lsp-format-buffer-on-save nil)
   (lsp-lens-enable nil)
   (lsp-inlay-hint-enable nil)
-  ;; Tree-sitter handles syntax coloring; this handles semantic symbol tracking.
   (lsp-enable-symbol-highlighting t)
-  ;; Disable LSP semantic tokens to prevent double-rendering with Tree-sitter.
   (lsp-semantic-tokens-enable nil)
-  ;; Breadcrumb disabled by default
   (lsp-headerline-breadcrumb-enable nil)
   (lsp-headerline-breadcrumb-enable-diagnostics nil)
-  ;; (lsp-headerline-breadcrumb-icons-enable t)
-  ;; Signature help: activate on trigger chars and server requests only.
   (lsp-signature-auto-activate '(:on-trigger-char :on-server-request))
   (lsp-signature-render-documentation t)
   (lsp-signature-doc-lines 2)
-  ;;(lsp-auto-configure nil)
-  ;; Route diagnostics explicitly to flycheck (negative constraint bans flymake).
-  ;;(lsp-diagnostics-provider :flycheck)
-  ;; Prevent echo-area hover duplication with lsp-ui-doc childframe.
+  (lsp-diagnostics-provider :flycheck)
   (lsp-eldoc-enable-hover nil)
-  ;; Server lifecycle: do not keep workspaces alive after last buffer is killed.
   (lsp-keep-workspace-alive nil)
-  ;; Suppress server download prompts; direnv manages LSP server binaries.
   (lsp-enable-suggest-server-download nil)
-  ;; doom-modeline renders its own LSP section.
   (lsp-modeline-code-actions-enable nil)
   (lsp-modeline-diagnostics-enable nil)
   (lsp-modeline-workspace-status-enable nil)
@@ -6037,7 +6040,6 @@ Connects to external language servers for completion, navigation, diagnostics, a
   "T b" '(ar/lsp-breadcrumb-toggle :wk "Breadcrumb"))
 #+end_src
 
-
 ** TODO Language Server Visuals
 Renders floating documentation childframes, inline peek overlays, and code action indicators via the lsp-ui engine.
 #+begin_src emacs-lisp
@@ -6045,47 +6047,17 @@ Renders floating documentation childframes, inline peek overlays, and code actio
   :defer t
   :hook (lsp-mode . lsp-ui-mode)
   :custom
-  ;; Disables automatic cursor hover to prevent documentation noise.
   (lsp-ui-doc-show-with-cursor nil)
-  ;; Disables automatic mouse hover; doc is toggled on command only.
   (lsp-ui-doc-show-with-mouse nil)
-  ;; Renders the doc childframe at the cursor position.
   (lsp-ui-doc-position 'at-point)
-  ;; Constrains the childframe to 8 lines and 72 columns.
   (lsp-ui-doc-max-height 8)
   (lsp-ui-doc-max-width 72)
-  ;; Shows the symbol header and footer in the doc childframe.
   (lsp-ui-doc-header t)
   (lsp-ui-doc-footer t)
-  ;; Sideline disabled: flycheck-annotate-mode provides inline diagnostics.
   (lsp-ui-sideline-enable nil)
-  ;; Enables inline multi-location dropdowns for xref navigation.
   (lsp-ui-peek-enable t)
-  ;; Forces the peek overlay even for single definitions.
-  (lsp-ui-peek-always-show t)
-  :config
-  ;; Dead code: sideline is disabled above; icon setting has no runtime effect.
-  (setq lsp-ui-sideline-actions-icon lsp-ui-sideline-actions-icon-default))
-
-;; lsp-ui-doc-delay is NOT set. With both show-with-cursor and show-with-mouse
-;; disabled, the doc childframe is never triggered automatically. The delay
-;; variable governs an unreachable code path and has zero practical effect.
-
-;; Sideline variables remain commented: lsp-ui-sideline-enable is nil, so the
-;; sideline rendering pipeline is never entered. These are dead code by design.
-;; (lsp-ui-sideline-show-diagnostics nil)
-;; (lsp-ui-sideline-show-code-actions t)
-;; (lsp-ui-sideline-show-hover nil)
-;; (lsp-ui-sideline-delay 0.1)
-
-;; Childframe face customizations remain commented: doom-themes handles
-;; posframe/childframe border theming globally via the posframe subsection.
-;; :custom-face
-;; (lsp-ui-doc-border ((t (:background "#292e42"))))
-;; (lsp-ui-doc-background ((t (:background "#24283b"))))
+  (lsp-ui-peek-always-show t))
 #+end_src
-
-
 
 ** TODO Consult LSP
 Upgrades workspace and document symbol navigation with live minibuffer previews and asynchronous filtering.
@@ -6230,7 +6202,6 @@ Provides a detachable, zoomed-out minimap sidebar with native diff-hl fringe syn
         (solaire-mode 1))))
   (add-hook 'demap-minimap-construct-hook #'ar/demap-integrate-ecosystem))
 #+end_src
-
 
 ** DONE Dape
 Provides native debugging with inline variable hints, persistent breakpoints, and remote debugging support.
@@ -6413,6 +6384,159 @@ Automatically formats code using external tools when saving files.
   :custom
   (apheleia-remote-algorithm 'cancel)
   (apheleia-hide-log-buffers t))
+#+end_src
+
+** DONE Transient Menu
+Provides a centralized dashboard for code actions, navigation, diagnostics, folding, and documentation lookup.
+#+begin_src emacs-lisp
+(with-eval-after-load 'transient
+  (defun ar/devtools-title ()
+    (concat
+     (if (fboundp 'nerd-icons-faicon)
+         (nerd-icons-faicon "nf-fa-laptop_code" :face 'transient-heading :v-adjust 0.02)
+       "")
+     (propertize " Development Tools" 'face 'transient-heading)))
+
+  (transient-define-prefix ar/toggles-devtools ()
+    "Development Tools Dashboard"
+    [:description ar/devtools-title
+     ["Actions"
+      ("a" "Code Action" lsp-execute-code-action)
+      ("r" "Rename Symb" lsp-rename)
+      ("f" "Frmt Buf" apheleia-format-buffer)
+      ("i" "Org Imports" lsp-organize-imports)
+      ("h" "Toggle Hint" lsp-inlay-hints-mode :transient t)
+      ("S" "Sem Tokens" lsp-semantic-tokens-mode :transient t)
+      ("R" "Reconn LSP" lsp-workspace-restart)]
+     ["Navigate"
+      ("d" "Define" lsp-find-definition)
+      ("D" "Refer" lsp-find-references)
+      ("t" "Type Def" lsp-find-type-definition)
+      ("I" "Implem" lsp-find-implementation)
+      ("A" "Apropos" xref-find-apropos)
+      ("." "Go Back" xref-go-back)
+      ("p" "Peek Def" lsp-ui-peek-find-definitions)
+      ("P" "Peek Ref" lsp-ui-peek-find-references)
+      ("c" "Call Hierarchy" lsp-treemacs-call-hierarchy)
+      ("T" "Type Hierarchy" lsp-treemacs-type-hierarchy)]
+     ["Search"
+      ("s" "Work Symb" consult-lsp-symbols)
+      ("S" "File Symb" consult-lsp-file-symbols)
+      ("o" "Outline" consult-outline)
+      ("m" "Imenu" consult-imenu)
+      ("M" "Imenu Multi" consult-imenu-multi)
+      ("l" "Search Line" consult-line)]
+     ["Diagn"
+      ("n" "Next Err" flycheck-next-error :transient t)
+      ("p" "Prev Err" flycheck-previous-error :transient t)
+      ("e" "Buf Err" flycheck-list-errors)
+      ("E" "Proj Err" lsp-treemacs-errors-list)
+      ("!" "Check" flycheck-buffer :transient t)]
+     ["Folding"
+      ("TAB" "Toggle" ar/fold-toggle :transient t)
+      ("O" "Open All" ar/fold-open-all :transient t)
+      ("C" "Close All" ar/fold-close-all :transient t)
+      ("v" "Vim Toggle" vimish-fold-toggle :transient t)]
+     ["Docs"
+      ("h" "Desc Thing" lsp-describe-thing-at-point)
+      ("K" "Echo Doc" eldoc)
+      ("?" "Info Man" consult-info)
+      ("M" "Man Page" woman)
+      ("<escape>" "" transient-quit-one :format " ")]]))
+#+end_src
+
+** TODO Keybinds
+Routes centralized leader keybindings for code analysis, multi-cursor editing, and debugging operations.
+#+begin_src emacs-lisp
+(ar/global-leader
+  "c"   '(:ignore t :wk "code")
+  "c ." '(ar/toggles-devtools :wk "Dev dashboard")
+  "c a" '(lsp-execute-code-action :wk "Code actions (lightbulb)")
+  "c i" '(lsp-organize-imports :wk "Organize imports")
+  "c x" '(lsp-workspace-commands :wk "Execute server command")
+  "c r" '(lsp-rename :wk "Rename symbol")
+  "c f" '(apheleia-format-buffer :wk "Format buffer (async)")
+  "c s" '(ar/ast-refactor-transient :wk "Structure refactor")
+  "c e" '(consult-flycheck :wk "Search errors (buffer)")
+  "c E" '(consult-lsp-diagnostics :wk "Search errors (project)")
+  "c B" '(flycheck-list-errors :wk "Buffer diagnostics")
+  "c P" '(lsp-treemacs-errors-list :wk "Project diagnostics panel")
+  "c !" '(flycheck-buffer :wk "Force recheck")
+  "c o" '(flycheck-select-checker :wk "Change checker")
+  "c D" '(lsp-find-references :wk "Find all references")
+  "c A" '(consult-lsp-symbols :wk "Apropos")
+  "c h" '(lsp-treemacs-call-hierarchy :wk "Call hierarchy")
+  "c t" '(lsp-treemacs-type-hierarchy :wk "Type hierarchy")
+  
+  "c p" '(:ignore t :wk "peek")
+  "c p d" '(lsp-ui-peek-find-definitions :wk "Peek definition")
+  "c p r" '(lsp-ui-peek-find-references :wk "Peek references")
+  "c p h" '(lsp-ui-peek--hide :wk "Hide peek")
+  
+  "c g" '(:ignore t :wk "goto")
+  "c g d" '(lsp-find-definition :wk "Definition")
+  "c g D" '(lsp-find-declaration :wk "Declaration")
+  "c g t" '(lsp-find-type-definition :wk "Type Definition")
+  "c g i" '(lsp-find-implementation :wk "Implementation")
+  "c m" '(lsp-describe-thing-at-point :wk "Inspect moniker")
+  "c M" '(lsp-ui-doc-glance :wk "Copy moniker")
+  "c H" '(lsp-inlay-hints-mode :wk "Toggle inlay hints")
+  "c T" '(lsp-semantic-tokens-mode :wk "Toggle semantic tokens"))
+
+;; Multi-Cursor (evil-multiedit)
+(ar/global-leader
+  "c v"   '(:ignore t :wk "multi-cursor")
+  "c v v" '(evil-multiedit-match-symbol-and-next :wk "Make cursor here")
+  "c v a" '(evil-multiedit-match-all :wk "Make all cursors")
+  "c v q" '(evil-multiedit-abort :wk "Undo all cursors")
+  "c v r" '(evil-multiedit-toggle-or-restrict-region :wk "Restrict region")
+  "c v I" '(evil-multiedit-match-symbol-and-prev :wk "Cursors in selection (beg)")
+  "c v A" '(evil-multiedit-match-symbol-and-next :wk "Cursors in selection (end)"))
+
+(general-define-key
+ :states 'visual
+ "C-S-<down>" #'evil-multiedit-match-symbol-and-next
+ "C-S-<up>"   #'evil-multiedit-match-symbol-and-prev)
+
+;; Debug Adapter Protocol (dape)
+(ar/global-leader
+  "d"   '(:ignore t :wk "debug")
+  "d d" '(ar/toggles-dape :wk "Debug menu")
+  "d S" '(dape :wk "Start debugging")
+  "d P" '(projection-dape :wk "Debug project")
+  "d b" '(dape-breakpoint-toggle :wk "Toggle breakpoint")
+  "d n" '(dape-next :wk "Next")
+  "d s" '(dape-step-in :wk "Step in")
+  "d o" '(dape-step-out :wk "Step out")
+  "d c" '(dape-continue :wk "Continue")
+  "d q" '(dape-quit :wk "Quit debugger")
+  "d k" '(dape-kill :wk "Kill debugger")
+  "d r" '(dape-restart :wk "Restart")
+  "d w" '(dape-watch-dwim :wk "Watch")
+  "d p" '(dape-pause :wk "Pause")
+  "d u" '(dape-until :wk "Run until point")
+  "d R" '(dape-restart-frame :wk "Restart frame")
+  "d e" '(dape-evaluate-expression :wk "Evaluate expression")
+  "d B" '(dape-breakpoint-remove-all :wk "Clear all breakpoints")
+  "d l" '(dape-breakpoint-log :wk "Log breakpoint")
+  "d h" '(dape-breakpoint-hits :wk "Hit condition")
+  "d C" '(dape-breakpoint-expression :wk "Condition/Expression")
+  "d I" '(dape-info- :wk "Toggle info panels")
+  "d T" '(dape-select-thread :wk "Select thread")
+  "d F" '(dape-select-stack :wk "Select stack frame")
+  "d m" '(dape-repl :wk "REPL")
+  "d M" '(dape-memory :wk "Memory. editor")
+  "d A" '(dape-disassemble :wk "Disassemble"))
+
+(general-define-key
+ :states 'motion
+ "] e" #'flycheck-next-error
+ "[ e" #'flycheck-previous-error)
+
+(general-define-key
+ :states 'normal
+ "K" #'lsp-describe-thing-at-point
+ "F2" #'lsp-rename)
 #+end_src
 
 
@@ -7184,7 +7308,6 @@ Routes centralized leader keybindings for opening sidebars, terminals, frames, a
                                       "*esh command on file*")))
 #+end_src
 
-
 ** TODO Popper
 Routes ephemeral buffers to dedicated bottom drawers or echo-area popups, strictly isolating transient UIs from standard window cycling.
 #+begin_src emacs-lisp
@@ -7423,6 +7546,4 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
   "w r"         '(winner-redo :wk "Winner redo")
   "w t"         '(toggle-window-split :wk "Toggle split"))
 #+end_src
-
-
 
