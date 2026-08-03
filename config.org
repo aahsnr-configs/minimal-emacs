@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.38
+#+VERSION: 0.37
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -892,7 +892,7 @@ Foundational glyph substitution and icon API. Eagerly loaded to prevent void-fun
 (use-package nerd-icons
   :demand t
   :custom
-  (nerd-icons-font-family "Symbols Nerd Font Mono")
+  (nerd-icons-font-family "JetBrainsMono Nerd Font")
   (nerd-icons-color-icons t))
 #+end_src
 
@@ -2727,6 +2727,166 @@ Extracts system =manpath= directories to guarantee native Emacs =woman= can loca
     (when path (setq woman-manpath path))))
 #+end_src
 
+** DONE Xref
+Navigates to definitions, references, and symbols across the project via native xref with ripgrep search and Emacs 31 window routing.
+#+begin_src emacs-lisp
+(use-package xref
+  ;;:straight (:type built-in)
+  :custom
+  ;; Route regex search backend to ripgrep.
+  (xref-search-program 'ripgrep)
+  ;; Display project-relative file paths in the tabulated list.
+  (xref-file-name-display 'project-relative)
+  :config
+  ;; Emacs 31: xref jumps now route through display-buffer with category
+  ;; `xref-jump`. Route to the most-recently-used window to prevent
+  ;; unexpected splits that conflict with Popper/side-window layout.
+  (add-to-list 'display-buffer-alist
+               '((category . xref-jump)
+                 (display-buffer-reuse-window
+                  display-buffer-use-some-window)
+                 (some-window . mru)))
+  ;; Force Evil Normal state in the Emacs 31 editable xref buffer.
+  (when (fboundp 'evil-set-initial-state)
+    (evil-set-initial-state 'xref-edit-mode 'normal)))
+
+;; lsp-ui-peek is enabled but intentionally NOT remapped over xref commands.
+;; consult-xref (set in Completion Framework) is the primary multi-result
+;; renderer. Peek remains available via M-x for occasional inline use.
+
+;; xref-mouse-mode (Emacs 31 C-<down-mouse-1>) is not adopted.
+;; Evil + Avy/EasyMotion provide superior keyboard-driven spatial navigation.
+#+end_src
+
+
+
+* TODO Version Control
+** TODO Magit: The Git Porcelain
+#+begin_src emacs-lisp
+(use-package magit
+  :defer t
+  :custom
+  ;; Display settings
+  (magit-display-buffer-function #'magit-display-buffer-fullframe-status-v1)
+  (magit-bury-buffer-function #'magit-restore-window-configuration)
+
+  ;; Performance
+  (magit-refresh-status-buffer t)
+  (magit-refresh-verbose nil)
+  (magit-git-executable "git")
+
+  ;; Behavior
+  (magit-save-repository-buffers 'dontask)
+  (magit-commit-ask-to-stage 'stage)
+  (magit-commit-show-diff t)
+  (magit-revision-show-gravatars nil)
+
+  ;; Diff settings
+  (magit-diff-refine-hunk 'all)
+  (magit-diff-paint-whitespace t)
+  (magit-diff-highlight-trailing t)
+
+  :config
+  ;; Enable gravatars if desired (requires imagemagick)
+  (when (and (display-graphic-p)
+             (image-type-available-p 'imagemagick))
+    (setq magit-revision-show-gravatars '("^Author:     " . "^Commit:     "))))
+#+end_src
+
+** TODO Forge
+#+begin_src emacs-lisp
+(use-package forge
+  :after magit
+  :defer t
+  :init
+  (setq forge-add-default-bindings nil))
+#+end_src
+
+** TODO Diff-hl
+#+begin_src emacs-lisp
+(use-package diff-hl
+  :hook ((after-init . global-diff-hl-mode)
+         (dired-mode . diff-hl-dired-mode))
+  :hook (magit-post-refresh . diff-hl-magit-post-refresh)
+  :init
+  ;; Doom Emacs aesthetic: Thin vertical bars instead of blocks
+  ;; We define custom bitmaps to match Doom's 'ui/vc-gutter' look
+  (define-fringe-bitmap 'my-diff-hl-bmp-insert [224] nil nil '(center repeated))
+  (define-fringe-bitmap 'my-diff-hl-bmp-modify [224] nil nil '(center repeated))
+  (define-fringe-bitmap 'my-diff-hl-bmp-delete [128 192 224 240] nil nil 'bottom)
+
+  :custom
+  (diff-hl-draw-borders nil)
+  (diff-hl-flydiff-delay 0.1) ;; Update immediately while typing
+
+  :config
+  (diff-hl-flydiff-mode 1)
+
+  ;; Force the custom thin bitmaps defined in :init
+  (setq diff-hl-fringe-bmp-function
+        (lambda (type pos)
+          (cond
+           ((eq type 'delete) 'my-diff-hl-bmp-delete)
+           ((eq type 'insert) 'my-diff-hl-bmp-insert)
+           ((eq type 'change) 'my-diff-hl-bmp-modify)
+           (t 'my-diff-hl-bmp-insert))))
+
+  ;; Clean Tokyo Night colors (Foreground only, no ugly background blocks)
+  (custom-set-faces
+   '(diff-hl-insert ((t (:foreground "#9ece6a" :background unspecified))))
+   '(diff-hl-change ((t (:foreground "#e0af68" :background unspecified))))
+   '(diff-hl-delete ((t (:foreground "#f7768e" :background unspecified))))))
+#+end_src
+
+** TODO Git-Timemachine
+Provides interactive navigation through the Git history of the current buffer.
+#+begin_src emacs-lisp
+(use-package git-timemachine
+  :defer t
+  :commands (git-timemachine git-timemachine-toggle)
+  :init
+  ;; CRITICAL FIX: Only configure native-comp if it's actually available
+  (when (and (fboundp 'native-comp-available-p)
+             (native-comp-available-p))
+    (with-eval-after-load 'comp
+      (when (boundp 'native-comp-deferred-compilation-deny-list)
+        (add-to-list 'native-comp-deferred-compilation-deny-list "git-timemachine"))))
+  :custom
+  (git-timemachine-abbreviation-length 7)
+  (git-timemachine-show-minibuffer-details t)
+  :config
+  (defun ar/git-timemachine-setup ()
+    "Disable interfering modes when entering git-timemachine."
+    (when (bound-and-true-p diff-hl-mode)
+      (diff-hl-mode -1)
+      (setq-local ar/diff-hl-was-active t))
+    (when (bound-and-true-p lsp-mode)
+      (lsp-disconnect)
+      (setq-local ar/lsp-was-active t))
+    (when (bound-and-true-p flycheck-mode)
+      (flycheck-mode -1)
+      (setq-local ar/flycheck-was-active t))
+    (read-only-mode 1))
+
+  (defun ar/git-timemachine-teardown ()
+    "Re-enable modes when exiting git-timemachine."
+    (when (bound-and-true-p ar/diff-hl-was-active)
+      (diff-hl-mode 1)
+      (kill-local-variable 'ar/diff-hl-was-active))
+    (when (bound-and-true-p ar/lsp-was-active)
+      (lsp-mode 1)
+      (kill-local-variable 'ar/lsp-was-active))
+    (when (bound-and-true-p ar/flycheck-was-active)
+      (flycheck-mode 1)
+      (kill-local-variable 'ar/flycheck-was-active))
+    (read-only-mode -1))
+
+  (add-hook 'git-timemachine-mode-hook #'ar/git-timemachine-setup)
+  (add-hook 'git-timemachine-mode-exit-hook #'ar/git-timemachine-teardown))
+#+end_src
+
+
+
 
 * DONE Workflow Management
 ** DONE Dired
@@ -3055,10 +3215,36 @@ Provides a persistent file and project explorer sidebar for navigating directory
     (treemacs-git-commit-diff-mode 1))
   ;; Hide gitignored files. Must be called AFTER `treemacs-git-mode` is enabled
   ;; to satisfy the upstream dependency chain.
-  (treemacs-hide-gitignored-files-mode 1))
+  (treemacs-hide-gitignored-files-mode 1)
+  ;; Fallback: Auto-add current project or directory if Treemacs workspace is empty.
+  ;; Prevents the "empty tree" bug when treemacs-project-follow-mode encounters
+  ;; a buffer outside a recognized project.el root (e.g., *scratch*, standalone files).
+  (defun ar/treemacs-ensure-workspace (&rest _)
+    "Add current project or directory to Treemacs if workspace is empty."
+    (when-let* ((ws (treemacs-current-workspace)))
+      (when (null (treemacs-workspace->projects ws))
+        (let* ((root (or (when-let* ((proj (project-current)))
+                           (project-root proj))
+                         default-directory))
+               (name (file-name-nondirectory (directory-file-name root))))
+          (treemacs-add-project root (or name "root"))))))
+  (advice-add #'treemacs-select-window :after #'ar/treemacs-ensure-workspace)
+
+  ;; Reject remote, unreadable, or non-existent paths to prevent
+  ;; `treemacs-project-follow-mode` from injecting ghost projects
+  ;; that crash async filewatch/git sentinels with `arrayp, nil`.
+  (defun ar/treemacs--reject-ghost-projects (path &optional _name)
+    "Return nil if PATH is remote, unreadable, or non-existent."
+    (not (or (file-remote-p path)
+             (not (file-readable-p path))
+             (not (file-directory-p path)))))
+  (advice-add #'treemacs-add-project :before-while #'ar/treemacs--reject-ghost-projects)
+
+  )
 
 (use-package treemacs-nerd-icons
   :defer t
+  :after treemacs
   :config
   (treemacs-nerd-icons-config))
 
@@ -3070,16 +3256,22 @@ Provides a persistent file and project explorer sidebar for navigating directory
   :defer t
   :after (treemacs evil))
 
-(general-define-key
- :states 'treemacs
- :keymaps 'evil-treemacs-state-map
- "RET"      #'treemacs-RET-action
- "[return]" #'treemacs-RET-action
- "TAB"      #'treemacs-TAB-action
- "[tab]"    #'treemacs-TAB-action
- "o v"      #'treemacs-visit-node-horizontal-split
- "o s"      #'treemacs-visit-node-vertical-split
- "q"        #'treemacs-quit)
+;; Treemacs Evil Keybindings
+;; Wrapped in `with-eval-after-load` to prevent void-variable crashes on startup,
+;; as `evil-treemacs-state-map` does not exist until `treemacs-evil` is loaded.
+;; Strictly satisfies the protocol rule that general.el definitions must sit
+;; entirely OUTSIDE any use-package block.
+(with-eval-after-load 'treemacs-evil
+  (general-define-key
+   :states 'treemacs
+   :keymaps 'evil-treemacs-state-map
+   "RET"      #'treemacs-RET-action
+   "[return]" #'treemacs-RET-action
+   "TAB"      #'treemacs-TAB-action
+   "[tab]"    #'treemacs-TAB-action
+   "o v"      #'treemacs-visit-node-horizontal-split
+   "o s"      #'treemacs-visit-node-vertical-split
+   "q"        #'treemacs-quit))
 #+end_src
 
 ** DONE Project Management
@@ -3637,20 +3829,14 @@ Renders completion candidates in a vertical, interactive dropdown list.
 (use-package vertico
   :defer t
   :init
-  ;; Prevents cursor wandering behind the read-only prompt text.
   (setq minibuffer-prompt-properties
         '(read-only t cursor-intangible t face minibuffer-prompt))
   (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
-  ;; Displays depth indicator for nested recursive minibuffers.
   (minibuffer-depth-indicate-mode 1)
-  ;; Activates the core Vertico engine immediately via autoloads.
   (vertico-mode 1)
   :custom
-  ;; Reserves exactly 10 lines of vertical space for the dropdown.
-  (vertico-count 10)
-  ;; Disables dynamic resizing to prevent UI jumping.
+  (vertico-count 12)
   (vertico-resize nil)
-  ;; Allows cycling from the bottom of the list back to the top.
   (vertico-cycle t)
   :bind (:map vertico-map
               ;; Group navigation via arrow keys.
@@ -4185,6 +4371,7 @@ Routes global Org-mode settings to the newly created folders.
 Configures Org core behavior, display, source editing, and performance settings.
 #+begin_src emacs-lisp
 (use-package org
+  ;;:straight (:type built-in)
   :defer t
   :preface
   ;; Prevent eager loading of legacy modules. Only org-habit is required.
@@ -5933,37 +6120,6 @@ Configures the core documentation engine with strict echo area limits, Emacs 31 
     (setq elisp-eldoc-funcall-with-docstring-length 'short)))
 #+end_src
 
-** DONE Xref
-Navigates to definitions, references, and symbols across the project via native xref with ripgrep search and Emacs 31 window routing.
-#+begin_src emacs-lisp
-(use-package xref
-  ;;:straight (:type built-in)
-  :custom
-  ;; Route regex search backend to ripgrep.
-  (xref-search-program 'ripgrep)
-  ;; Display project-relative file paths in the tabulated list.
-  (xref-file-name-display 'project-relative)
-  :config
-  ;; Emacs 31: xref jumps now route through display-buffer with category
-  ;; `xref-jump`. Route to the most-recently-used window to prevent
-  ;; unexpected splits that conflict with Popper/side-window layout.
-  (add-to-list 'display-buffer-alist
-               '((category . xref-jump)
-                 (display-buffer-reuse-window
-                  display-buffer-use-some-window)
-                 (some-window . mru)))
-  ;; Force Evil Normal state in the Emacs 31 editable xref buffer.
-  (when (fboundp 'evil-set-initial-state)
-    (evil-set-initial-state 'xref-edit-mode 'normal)))
-
-;; lsp-ui-peek is enabled but intentionally NOT remapped over xref commands.
-;; consult-xref (set in Completion Framework) is the primary multi-result
-;; renderer. Peek remains available via M-x for occasional inline use.
-
-;; xref-mouse-mode (Emacs 31 C-<down-mouse-1>) is not adopted.
-;; Evil + Avy/EasyMotion provide superior keyboard-driven spatial navigation.
-#+end_src
-
 ** TODO Language Server Client
 Connects to external language servers for completion, navigation, diagnostics, and analysis across programming buffers.
 #+begin_src emacs-lisp
@@ -6595,131 +6751,6 @@ Injects bibliography abstracts and formatted references into the universal sidec
 #+end_src
 
 
-
-* TODO Version Control
-** TODO Magit: The Git Porcelain
-#+begin_src emacs-lisp
-(use-package magit
-  :defer t
-  :custom
-  ;; Display settings
-  (magit-display-buffer-function #'magit-display-buffer-fullframe-status-v1)
-  (magit-bury-buffer-function #'magit-restore-window-configuration)
-
-  ;; Performance
-  (magit-refresh-status-buffer t)
-  (magit-refresh-verbose nil)
-  (magit-git-executable "git")
-
-  ;; Behavior
-  (magit-save-repository-buffers 'dontask)
-  (magit-commit-ask-to-stage 'stage)
-  (magit-commit-show-diff t)
-  (magit-revision-show-gravatars nil)
-
-  ;; Diff settings
-  (magit-diff-refine-hunk 'all)
-  (magit-diff-paint-whitespace t)
-  (magit-diff-highlight-trailing t)
-
-  :config
-  ;; Enable gravatars if desired (requires imagemagick)
-  (when (and (display-graphic-p)
-             (image-type-available-p 'imagemagick))
-    (setq magit-revision-show-gravatars '("^Author:     " . "^Commit:     "))))
-#+end_src
-
-** TODO Forge
-#+begin_src emacs-lisp
-(use-package forge
-  :after magit
-  :defer t
-  :init
-  (setq forge-add-default-bindings nil))
-#+end_src
-
-** TODO Diff-hl
-#+begin_src emacs-lisp
-(use-package diff-hl
-  :hook ((after-init . global-diff-hl-mode)
-         (dired-mode . diff-hl-dired-mode))
-  :hook (magit-post-refresh . diff-hl-magit-post-refresh)
-  :init
-  ;; Doom Emacs aesthetic: Thin vertical bars instead of blocks
-  ;; We define custom bitmaps to match Doom's 'ui/vc-gutter' look
-  (define-fringe-bitmap 'my-diff-hl-bmp-insert [224] nil nil '(center repeated))
-  (define-fringe-bitmap 'my-diff-hl-bmp-modify [224] nil nil '(center repeated))
-  (define-fringe-bitmap 'my-diff-hl-bmp-delete [128 192 224 240] nil nil 'bottom)
-
-  :custom
-  (diff-hl-draw-borders nil)
-  (diff-hl-flydiff-delay 0.1) ;; Update immediately while typing
-
-  :config
-  (diff-hl-flydiff-mode 1)
-
-  ;; Force the custom thin bitmaps defined in :init
-  (setq diff-hl-fringe-bmp-function
-        (lambda (type pos)
-          (cond
-           ((eq type 'delete) 'my-diff-hl-bmp-delete)
-           ((eq type 'insert) 'my-diff-hl-bmp-insert)
-           ((eq type 'change) 'my-diff-hl-bmp-modify)
-           (t 'my-diff-hl-bmp-insert))))
-
-  ;; Clean Tokyo Night colors (Foreground only, no ugly background blocks)
-  (custom-set-faces
-   '(diff-hl-insert ((t (:foreground "#9ece6a" :background unspecified))))
-   '(diff-hl-change ((t (:foreground "#e0af68" :background unspecified))))
-   '(diff-hl-delete ((t (:foreground "#f7768e" :background unspecified))))))
-#+end_src
-
-** TODO Git-Timemachine
-Provides interactive navigation through the Git history of the current buffer.
-#+begin_src emacs-lisp
-(use-package git-timemachine
-  :defer t
-  :commands (git-timemachine git-timemachine-toggle)
-  :init
-  ;; CRITICAL FIX: Only configure native-comp if it's actually available
-  (when (and (fboundp 'native-comp-available-p)
-             (native-comp-available-p))
-    (with-eval-after-load 'comp
-      (when (boundp 'native-comp-deferred-compilation-deny-list)
-        (add-to-list 'native-comp-deferred-compilation-deny-list "git-timemachine"))))
-  :custom
-  (git-timemachine-abbreviation-length 7)
-  (git-timemachine-show-minibuffer-details t)
-  :config
-  (defun ar/git-timemachine-setup ()
-    "Disable interfering modes when entering git-timemachine."
-    (when (bound-and-true-p diff-hl-mode)
-      (diff-hl-mode -1)
-      (setq-local ar/diff-hl-was-active t))
-    (when (bound-and-true-p lsp-mode)
-      (lsp-disconnect)
-      (setq-local ar/lsp-was-active t))
-    (when (bound-and-true-p flycheck-mode)
-      (flycheck-mode -1)
-      (setq-local ar/flycheck-was-active t))
-    (read-only-mode 1))
-
-  (defun ar/git-timemachine-teardown ()
-    "Re-enable modes when exiting git-timemachine."
-    (when (bound-and-true-p ar/diff-hl-was-active)
-      (diff-hl-mode 1)
-      (kill-local-variable 'ar/diff-hl-was-active))
-    (when (bound-and-true-p ar/lsp-was-active)
-      (lsp-mode 1)
-      (kill-local-variable 'ar/lsp-was-active))
-    (when (bound-and-true-p ar/flycheck-was-active)
-      (flycheck-mode 1)
-      (kill-local-variable 'ar/flycheck-was-active))
-    (read-only-mode -1))
-
-  (add-hook 'git-timemachine-mode-hook #'ar/git-timemachine-setup)
-  (add-hook 'git-timemachine-mode-exit-hook #'ar/git-timemachine-teardown))
-#+end_src
 
 
 * DONE Highlight TODOs

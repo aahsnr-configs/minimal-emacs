@@ -4,7 +4,7 @@
 
 ;; Author: Łukasz Gruner <lukasz@gruner.lu>
 ;; Maintainer: Łukasz Gruner <lukasz@gruner.lu>
-;; Version: 11
+;; Version: 12
 ;; Package-Requires: ((emacs "28.1") (org "9.6"))
 ;; Keywords: eldoc, outline, breadcrumb, org, babel, minibuffer
 
@@ -27,9 +27,10 @@
 
 ;; Provides zero-overhead ElDoc support for Org mode buffers.
 ;; Displays breadcrumbs for headlines, header arguments for source blocks,
-;; link/URL tooltips, bridges native Emacs Lisp ElDoc inside Emacs Lisp
-;; source blocks, and supports legacy language-specific eldoc packages.
-;; Non-Lisp/Legacy source blocks gracefully yield to prevent async LSP hangs.
+;; link/URL tooltips, contextual AST metadata (timestamps, footnotes, citations),
+;; bridges native Emacs Lisp ElDoc inside Emacs Lisp source blocks, and supports
+;; legacy language-specific eldoc packages. Non-Lisp/Legacy source blocks
+;; gracefully yield to prevent async LSP hangs.
 
 ;;; Code:
 
@@ -79,7 +80,7 @@ Memoized at load time to prevent GC pressure during active typing.")
 
 (defun org-eldoc-get-breadcrumb (el)
   "Return breadcrumb if EL is a headline, or nil."
-  (when (eq (org-element-type el) 'headline)
+  (when (and el (eq (org-element-type el) 'headline))
     (let ((begin (org-element-property :begin el)))
       (when (and begin
                  (>= (line-end-position) begin)
@@ -98,7 +99,7 @@ Memoized at load time to prevent GC pressure during active typing.")
 Return nil when not on src line.
 Recognizes both #+begin_src and #+end_src lines via robust AST math
 that safely handles completely empty source blocks."
-  (when (eq (org-element-type el) 'src-block)
+  (when (and el (eq (org-element-type el) 'src-block))
     (let* ((post-aff (org-element-property :post-affiliated el))
            (end (org-element-property :end el))
            (post-blank (or (org-element-property :post-blank el) 0))
@@ -147,7 +148,7 @@ backend yields a result."
 (defun org-eldoc-get-src-lang (el)
   "Return value of lang for EL if point is strictly inside the block body.
 Returns nil otherwise. Utilizes O(1) AST boundary properties."
-  (when (eq (org-element-type el) 'src-block)
+  (when (and el (eq (org-element-type el) 'src-block))
     (let ((cb (line-beginning-position))
           (ce (line-end-position))
           (contents-begin (org-element-property :contents-begin el))
@@ -159,6 +160,80 @@ Returns nil otherwise. Utilizes O(1) AST boundary properties."
                  (<= ce contents-end))
         (org-element-property :language el)))))
 
+;; --- Contextual AST Enhancements ---
+
+(defun org-eldoc--get-timestamp-info (el)
+  "Return relative time string for timestamp element EL."
+  (when (and el (eq (org-element-type el) 'timestamp))
+    (let ((raw (org-element-property :raw-value el)))
+      (when raw
+        (condition-case nil
+            (let* ((time (org-time-string-to-time raw))
+                   (diff (time-subtract time (current-time)))
+                   (days (floor (time-to-number-of-days diff))))
+              (cond
+               ((= days 0) "Today")
+               ((= days 1) "Tomorrow")
+               ((= days -1) "Yesterday")
+               ((> days 1) (format "In %d days" days))
+               ((< days -1) (format "%d days ago" (- days)))
+               (t raw)))
+          (error raw))))))
+
+(defun org-eldoc--get-footnote-info (el)
+  "Return first sentence of footnote definition for reference EL."
+  (when (and el (eq (org-element-type el) 'footnote-reference))
+    (let ((label (org-element-property :label el)))
+      (when label
+        (condition-case nil
+            (save-excursion
+              (org-footnote-goto-definition label)
+              (forward-line 1)
+              (let ((start (point))
+                    (end (save-excursion (forward-sentence) (point))))
+                (format "Footnote %s: %s" label (string-trim (buffer-substring-no-properties start end)))))
+          (error nil))))))
+
+(defun org-eldoc--get-citation-info (el)
+  "Return citation preview for citation-reference element EL."
+  (when (and el (eq (org-element-type el) 'citation-reference))
+    (let ((key (org-element-property :key el)))
+      (when key
+        (if (fboundp 'citar-get-entry)
+            (let ((entry (citar-get-entry key)))
+              (if entry
+                  (format "Cite: %s - %s" key (or (citar-get-value "title" entry) "No title"))
+                (format "Cite: %s" key)))
+          (format "Cite: %s" key))))))
+
+(defun org-eldoc--get-table-info (el)
+  "Return table name for table-cell element EL."
+  (when (and el (eq (org-element-type el) 'table-cell))
+    (let* ((row (org-element-property :parent el))
+           (table (when row (org-element-property :parent row))))
+      (when (and table (eq (org-element-type table) 'table))
+        (let ((tbl-name (org-element-property :name table)))
+          (if tbl-name
+              (format "Table: %s" tbl-name)
+            "Table cell"))))))
+
+(defun org-eldoc--get-property-info (el)
+  "Return property key and value for node-property EL."
+  (when (and el (eq (org-element-type el) 'node-property))
+    (let ((key (org-element-property :key el))
+          (value (org-element-property :value el)))
+      (when key
+        (format "Property: %s = %s" key (or value ""))))))
+
+(defun org-eldoc--get-boundary-info ()
+  "Return 'Top of file' or 'Bottom of file' if at buffer boundaries."
+  (cond
+   ((bobp) "Top of file")
+   ((eobp) "Bottom of file")
+   (t nil)))
+
+;; --- Legacy Language Declarations ---
+
 (declare-function c-eldoc-print-current-symbol-info "c-eldoc" ())
 (declare-function css-eldoc-function "css-eldoc" ())
 (declare-function php-eldoc-function "php-eldoc" ())
@@ -168,7 +243,7 @@ Returns nil otherwise. Utilizes O(1) AST boundary properties."
   "Return breadcrumbs when on a headline, args for src block header-line.
 Calls native Elisp documentation functions when inside an elisp src body.
 Calls legacy eldoc packages for C, CSS, PHP, and Go.
-Displays link/URL tooltips as a fallback.
+Displays link/URL tooltips and contextual AST metadata as fallbacks.
 Yields gracefully for LSP-backed languages to prevent async hangs.
 Executes a single AST pass using `cached-only' to guarantee zero overhead."
   (let* ((callback (car args))
@@ -180,10 +255,19 @@ Executes a single AST pass using `cached-only' to guarantee zero overhead."
      ;; 2. Source block header line (#+begin_src / #+end_src)
      (org-eldoc-get-src-header el)
 
-     ;; 3. Link / help-echo fallback (Doom Emacs parity)
+     ;; 3. Contextual AST Enhancements (Timestamps, Footnotes, Citations, Tables, Properties)
+     (when el
+       (pcase (org-element-type el)
+         ('timestamp (org-eldoc--get-timestamp-info el))
+         ('footnote-reference (org-eldoc--get-footnote-info el))
+         ('citation-reference (org-eldoc--get-citation-info el))
+         ('table-cell (org-eldoc--get-table-info el))
+         ('node-property (org-eldoc--get-property-info el))))
+
+     ;; 4. Link / help-echo fallback (Doom Emacs parity)
      (org-eldoc-get-link-info)
 
-     ;; 4. Inside source block body
+     ;; 5. Inside source block body
      (let* ((raw-lang (org-eldoc-get-src-lang el))
             (lang (or (cdr (assoc-string raw-lang org-eldoc--lang-aliases t))
                       raw-lang)))
@@ -224,7 +308,10 @@ Executes a single AST pass using `cached-only' to guarantee zero overhead."
              (go-eldoc--documentation-function)))
 
           ;; Yield for all other languages (Python, Shell, Rust, Plantuml, etc.)
-          (t nil)))))))
+          (t nil))))
+
+     ;; 6. Top/Bottom file boundaries (Lowest priority)
+     (org-eldoc--get-boundary-info))))
 
 ;;;###autoload
 (defun org-eldoc-load ()
