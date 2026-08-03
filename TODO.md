@@ -22,5 +22,7 @@
 - [ ] `Important`: For both Completion Framework and Development Tools sections, use doom emacs keybindings whereever possible.
 - [ ] `Important`: Determine all the related packages that are integrated together in the whole emacs config.
 - [x] `Urgent`: Update project-state.md file with the following additions: 1. Keep track of TODO, NOTE, etc. keywords in the source code block itself; 2. Keep track of all the NOTE keywords anywhere they appear. 3. Also keep track of tasks that still needs to be done from the Remaining Work section near the end of file. This section just contains checkboxes. 4. Also keep track of questions from the Questions sections near end of file. 5. Keep track of TODO, NOTE, etc. keywords in areas other than org headers and org source code blocks, in other words, in general org text
-- [s] `Important`: add denote-explore package
+- [x] `Important`: add denote-explore package
 - [ ] `Important`: need flycheck to show errors only when I finish typing a line. I don't want diagnostics as I type
+- [ ] `Important`: make symbol highlighting faster in for lsp-mode
+- [ ] `Important`: Delegate ruff to flycheck instead of an lsp server. Make ty/pyrefly the sole lsp client for lsp-mode. But keep in mind that all the diagnostics must still be show
