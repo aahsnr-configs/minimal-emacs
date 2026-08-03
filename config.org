@@ -931,10 +931,8 @@ Applies the Tokyo Night palette and integrates downstream UI enhancements. Synch
 (use-package doom-themes
   :demand t
   :custom
-  ;; Global settings (defaults)
-  (doom-themes-enable-bold t)   ; if nil, bold is universally disabled
-  (doom-themes-enable-italic t) ; if nil, italics is universally disabled
-  ;; for treemacs users
+  (doom-themes-enable-bold t)
+  (doom-themes-enable-italic t)
   (doom-themes-treemacs-theme "doom-atom") ; use "doom-colors" for less minimal icon theme
   :config
   ;; CRITICAL: Patch the face alist BEFORE the theme engine evaluates it.
@@ -945,11 +943,7 @@ Applies the Tokyo Night palette and integrates downstream UI enhancements. Synch
   (load-theme 'doom-tokyo-night t)
   ;; Enable flashing mode-line on errors
   (doom-themes-visual-bell-config)
-  ;; Enable custom neotree theme (nerd-icons must be installed!)
-  (doom-themes-neotree-config)
-  ;; or for treemacs users
   (doom-themes-treemacs-config)
-  ;; Corrects (and improves) org-mode's native fontification.
   (doom-themes-org-config))
 
 ;; (use-package batppuccin
@@ -3156,122 +3150,105 @@ Provides a persistent file and project explorer sidebar for navigating directory
 #+begin_src emacs-lisp
 (use-package treemacs
   :defer t
+  :init
+  (setq treemacs-follow-after-init t
+        treemacs-is-never-other-window t
+        treemacs-sorting 'alphabetic-case-insensitive-asc
+        treemacs-persist-file (no-littering-expand-var-file-name "treemacs/persist")
+        treemacs-last-error-persist-file (no-littering-expand-var-file-name "treemacs/persist-error"))
   :custom-face
-  ;; Match the childframe border to the posframe border for visual consistency.
   (cfrs-border-color ((t (:inherit posframe-border))))
-  ;; Make the root node stand out with a bold, constant-like face.
   (treemacs-root-face ((t (:inherit font-lock-constant-face :height 1.1 :weight bold))))
-  :custom
-  (treemacs-width 33)
-  (treemacs-position 'left)
-  ;; Prevent Treemacs from being selected by `other-window` (C-x o).
-  (treemacs-is-never-other-window t)
-  ;; Protect the sidebar from being destroyed by `delete-other-windows`.
-  (treemacs-no-delete-other-windows t)
-  (treemacs-space-between-root-nodes t)
-  ;; Silent background operations to prevent echo-area spam.
-  (treemacs-silent-refresh t)
-  (treemacs-silent-filewatch t)
-  ;; Delay before the sidebar follows the cursor to the current file.
-  (treemacs-file-follow-delay 0.2)
-  (treemacs-show-cursor nil)
-  ;; Case-insensitive sorting for logical visual grouping of mixed-case files.
-  (treemacs-sorting 'alphabetic-case-insensitive-asc)
-  ;; Always show dotfiles for DevOps and backend workflows.
-  (treemacs-show-hidden-files t)
-  ;; Directories to collapse/ignore during cleanup to prevent UI lag.
-  (treemacs-litter-directories '("/node_modules"
-                                 "/.venv"
-                                 "/.direnv"
-                                 "/.cask"
-                                 "/__pycache__"))
-  ;; Route session persistence to the no-littering var directory.
-  (treemacs-persist-file (no-littering-expand-var-file-name "treemacs/persist"))
-  (treemacs-last-error-persist-file (no-littering-expand-var-file-name "treemacs/persist-error"))
   :config
-  ;; Automatically follow the currently visited file and project root in the tree.
-  (treemacs-follow-mode 1)
-  (treemacs-project-follow-mode 1)
-  ;; Watch the filesystem for external changes (e.g., git checkouts, file creation).
-  (treemacs-filewatch-mode 1)
-  ;; Show a visual indicator in the fringe for the currently selected node.
-  (treemacs-fringe-indicator-mode 'always)
-  ;; Visual depth lines.
-  (treemacs-indent-guide-mode 1)
-  ;; Git integration configuration (Doom/Upstream pcase fallback).
-  ;; Deferred mode requires Python to parse git status asynchronously.
-  ;; If Python is missing, fall back to simple (synchronous) mode.
-  (pcase (cons (not (null (executable-find "git")))
-               (not (null treemacs-python-executable)))
-    (`(t . t)
-     (treemacs-git-mode 'deferred)
-     (setq treemacs-collapse-dirs 3))
-    (`(t . _)
-     (treemacs-git-mode 'simple)
-     (setq treemacs-collapse-dirs 0)))
-  ;; Git commit diff relies on an async Python script (`treemacs--git-commit-diff.py`),
-  ;; NOT native git commands. It must be guarded by the Python executable check.
-  (when treemacs-python-executable
-    (treemacs-git-commit-diff-mode 1))
-  ;; Hide gitignored files. Must be called AFTER `treemacs-git-mode` is enabled
-  ;; to satisfy the upstream dependency chain.
-  (treemacs-hide-gitignored-files-mode 1)
-  ;; Fallback: Auto-add current project or directory if Treemacs workspace is empty.
-  ;; Prevents the "empty tree" bug when treemacs-project-follow-mode encounters
-  ;; a buffer outside a recognized project.el root (e.g., *scratch*, standalone files).
-  (defun ar/treemacs-ensure-workspace (&rest _)
-    "Add current project or directory to Treemacs if workspace is empty."
-    (when-let* ((ws (treemacs-current-workspace)))
-      (when (null (treemacs-workspace->projects ws))
-        (let* ((root (or (when-let* ((proj (project-current)))
-                           (project-root proj))
-                         default-directory))
-               (name (file-name-nondirectory (directory-file-name root))))
-          (treemacs-add-project root (or name "root"))))))
-  (advice-add #'treemacs-select-window :after #'ar/treemacs-ensure-workspace)
+  (progn
+    (setq treemacs-buffer-name-function            #'treemacs-default-buffer-name
+          treemacs-buffer-name-prefix              " *Treemacs-Buffer-"
+          treemacs-collapse-dirs                   (if treemacs-python-executable 3 0)
+          treemacs-deferred-git-apply-delay        0.5
+          treemacs-directory-name-transformer      #'identity
+          treemacs-display-in-side-window          t
+          treemacs-eldoc-display                   'simple
+          treemacs-file-event-delay                2000
+          treemacs-file-extension-regex            treemacs-last-period-regex-value
+          treemacs-file-follow-delay               0.2
+          treemacs-file-name-transformer           #'identity
+          treemacs-follow-after-init               t
+          treemacs-expand-after-init               t
+          treemacs-find-workspace-method           'find-for-file-or-pick-first
+          treemacs-git-command-pipe                ""
+          treemacs-goto-tag-strategy               'refetch-index
+          treemacs-header-scroll-indicators        '(nil . "^^^^^^")
+          treemacs-hide-dot-git-directory          t
+          treemacs-hide-dot-jj-directory           t
+          treemacs-indentation                     2
+          treemacs-indentation-string              " "
+          treemacs-is-never-other-window           nil
+          treemacs-max-git-entries                 5000
+          treemacs-missing-project-action          'ask
+          treemacs-move-files-by-mouse-dragging    t
+          treemacs-move-forward-on-expand          nil
+          treemacs-no-png-images                   nil
+          treemacs-no-delete-other-windows         t
+          treemacs-project-follow-cleanup          nil
+          treemacs-persist-file                    (expand-file-name ".cache/treemacs-persist" user-emacs-directory)
+          treemacs-position                        'left
+          treemacs-read-string-input               'from-child-frame
+          treemacs-recenter-distance               0.1
+          treemacs-recenter-after-file-follow      nil
+          treemacs-recenter-after-tag-follow       nil
+          treemacs-recenter-after-project-jump     'always
+          treemacs-recenter-after-project-expand   'on-distance
+          treemacs-litter-directories              '("/node_modules" "/.venv" "/.cask" "/.direnv")
+          treemacs-project-follow-into-home        nil
+          treemacs-show-cursor                     nil
+          treemacs-show-hidden-files               t
+          treemacs-silent-filewatch                nil
+          treemacs-silent-refresh                  nil
+          treemacs-select-when-already-in-treemacs 'move-back
+          treemacs-space-between-root-nodes        t
+          treemacs-tag-follow-cleanup              t
+          treemacs-tag-follow-delay                1.5
+          treemacs-text-scale                      nil
+          treemacs-user-mode-line-format           nil
+          treemacs-user-header-line-format         nil
+          treemacs-wide-toggle-width               70
+          treemacs-width                           35
+          treemacs-width-increment                 1
+          treemacs-width-is-initially-locked       t
+          treemacs-workspace-switch-cleanup        nil)
 
-  ;; Reject remote, unreadable, or non-existent paths to prevent
-  ;; `treemacs-project-follow-mode` from injecting ghost projects
-  ;; that crash async filewatch/git sentinels with `arrayp, nil`.
-  (defun ar/treemacs--reject-ghost-projects (path &optional _name)
-    "Return nil if PATH is remote, unreadable, or non-existent."
-    (not (or (file-remote-p path)
-             (not (file-readable-p path))
-             (not (file-directory-p path)))))
-  (advice-add #'treemacs-add-project :before-while #'ar/treemacs--reject-ghost-projects)
+    ;; The default width and height of the icons is 22 pixels. If you are
+    ;; using a Hi-DPI display, uncomment this to double the icon size.
+    ;;(treemacs-resize-icons 44)
 
+    (treemacs-follow-mode t)
+    (treemacs-filewatch-mode t)
+    (treemacs-fringe-indicator-mode 'always)
+    (when treemacs-python-executable
+      (treemacs-git-commit-diff-mode t))
+
+    (pcase (cons (not (null (executable-find "git")))
+                 (not (null treemacs-python-executable)))
+      (`(t . t)
+       (treemacs-git-mode 'deferred))
+      (`(t . _)
+       (treemacs-git-mode 'simple)))
+
+    (treemacs-hide-gitignored-files-mode nil))
   )
 
 (use-package treemacs-nerd-icons
-  :defer t
   :after treemacs
   :config
   (treemacs-nerd-icons-config))
 
 (use-package treemacs-magit
-  :defer t
   :after (treemacs magit))
 
 (use-package treemacs-evil
-  :defer t
   :after (treemacs evil))
 
-;; Treemacs Evil Keybindings
-;; Wrapped in `with-eval-after-load` to prevent void-variable crashes on startup,
-;; as `evil-treemacs-state-map` does not exist until `treemacs-evil` is loaded.
-;; Strictly satisfies the protocol rule that general.el definitions must sit
-;; entirely OUTSIDE any use-package block.
-(with-eval-after-load 'treemacs-evil
-  (general-define-key
-   :states 'treemacs
-   :keymaps 'evil-treemacs-state-map
-   "RET"      #'treemacs-RET-action
-   "[return]" #'treemacs-RET-action
-   "TAB"      #'treemacs-TAB-action
-   "[tab]"    #'treemacs-TAB-action
-   "o v"      #'treemacs-visit-node-horizontal-split
-   "o s"      #'treemacs-visit-node-vertical-split
-   "q"        #'treemacs-quit))
+(treemacs-start-on-boot)
 #+end_src
 
 ** DONE Project Management
@@ -6230,14 +6207,6 @@ Upgrades workspace and document symbol navigation with live minibuffer previews 
 (general-define-key
   :keymaps 'lsp-mode-map
   [remap xref-find-apropos] #'consult-lsp-symbols)
-
-;; ;; Routes local leader keybindings for LSP-scoped workspace and file searches.
-;; (ar/local-leader
-;;   :keymaps 'lsp-mode-map
-;;   "s S" '(consult-lsp-symbols :wk "Workspace symbols")
-;;   "s s" '(consult-lsp-file-symbols :wk "File symbols")
-;;   "s D" '(consult-lsp-diagnostics :wk "Workspace diagnostics")
-;;   "s d" '(consult-lsp-file-diagnostics :wk "File diagnostics"))
 #+end_src
 
 ** TODO LSP Treemacs
@@ -6264,6 +6233,7 @@ Displays workspace errors, document symbols, and call hierarchies in a tree side
 #+end_src
 
 ** TODO Flycheck
+p
 Highlights syntax errors and warnings directly in the code buffer with save-triggered diagnostics and inline Error Lens rendering.
 #+begin_src emacs-lisp
 (use-package flycheck
