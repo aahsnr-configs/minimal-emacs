@@ -925,6 +925,7 @@ Configures global typography, baseline monospaced faces, fontset fallback regist
 (setq font-lock-maximum-decoration t)
 #+end_src
 
+
 ** DONE Doom Themes
 Applies the Tokyo Night palette and integrates downstream UI enhancements. Synchronously loaded to prevent initial frame Flash of Unstyled Content (FOUC).
 #+begin_src emacs-lisp
@@ -941,17 +942,22 @@ Applies the Tokyo Night palette and integrates downstream UI enhancements. Synch
     (setcdr (assoc 'gnus-group-news-low-empty doom-themes-base-faces)
             '(:inherit 'gnus-group-mail-1-empty :weight 'normal)))
   (load-theme 'doom-tokyo-night t)
+  ;; Force straight underlines for Flycheck (replacing upstream 'wave)
+  ;; using the high-priority 'user theme to survive theme switches.
+  (custom-theme-set-faces
+   'user
+   '(flycheck-error ((t (:underline (:style line :color "#f7768e")))))
+   '(flycheck-warning ((t (:underline (:style line :color "#e0af68")))))
+   '(flycheck-info ((t (:underline (:style line :color "#7aa2f7")))))
+   '(flycheck-fringe-error ((t (:foreground "#f7768e"))))
+   '(flycheck-fringe-warning ((t (:foreground "#e0af68"))))
+   '(flycheck-fringe-info ((t (:foreground "#7aa2f7")))))
   ;; Enable flashing mode-line on errors
   (doom-themes-visual-bell-config)
   (doom-themes-treemacs-config)
   (doom-themes-org-config))
-
-;; (use-package batppuccin
-;;   :vc (:url "https://github.com/bbatsov/batppuccin-emacs" :rev :newest)
-;;   :config
-;;   (load-theme 'batppuccin-mocha t))
-
 #+end_src
+
 
 ** DONE Solaire Mode
 Swaps background faces to distinguish side-windows and popups. Deferred until the theme engine finalizes to prevent mapping race conditions.
@@ -992,7 +998,7 @@ Keystroke discovery UI overlay. Renders prefix bindings in the echo area with al
   (which-key-sort-uppercase-first nil) ; Case-insensitive sort
   (which-key-add-column-padding 1) ; Column padding
   (which-key-max-description-length 30) ; Truncate descriptions
-  (which-key-min-display-lines 6) ; Minimum height
+  ;;(which-key-min-display-lines 6) ; Minimum height
   (which-key-allow-multiple-replacements t) ; Multiple replacements
   (which-key-show-operator-state-maps t)) ; Operator-pending maps
 #+end_src
@@ -1012,13 +1018,13 @@ Delegates operator ligatures to HarfBuzz via ligature.el and reserves Elisp subs
 ;;   (global-ligature-mode t))
 
 ;; ;; Establishes the baseline alist for keywords lacking native OpenType ligatures.
-;; (setq-default prettify-symbols-alist '(("lambda" . ?λ)))
+(setq-default prettify-symbols-alist '(("lambda" . ?λ)))
 
 ;; ;; Reveals raw text when the cursor touches the symbol boundary for precise editing.
-;; (setq prettify-symbols-unprettify-at-point 'right-edge)
+(setq prettify-symbols-unprettify-at-point 'right-edge)
 
-;; ;; Activates globally across prog-mode, text-mode, and conf-mode derivatives.
-;; (global-prettify-symbols-mode 1)
+;; Activates globally across prog-mode, text-mode, and conf-mode derivatives.
+(global-prettify-symbols-mode 1)
 #+end_src
 
 ** DONE Autorevert
@@ -3156,97 +3162,43 @@ Provides a persistent file and project explorer sidebar for navigating directory
         treemacs-sorting 'alphabetic-case-insensitive-asc
         treemacs-persist-file (no-littering-expand-var-file-name "treemacs/persist")
         treemacs-last-error-persist-file (no-littering-expand-var-file-name "treemacs/persist-error"))
-  :custom-face
-  (cfrs-border-color ((t (:inherit posframe-border))))
-  (treemacs-root-face ((t (:inherit font-lock-constant-face :height 1.0 :weight bold))))
   :config
-  (progn
-    (setq treemacs-buffer-name-function            #'treemacs-default-buffer-name
-          treemacs-buffer-name-prefix              " *Treemacs-Buffer-"
-          treemacs-collapse-dirs                   (if treemacs-python-executable 3 0)
-          treemacs-deferred-git-apply-delay        0.5
-          treemacs-directory-name-transformer      #'identity
-          treemacs-display-in-side-window          t
-          treemacs-eldoc-display                   'simple
-          treemacs-file-event-delay                2000
-          treemacs-file-extension-regex            treemacs-last-period-regex-value
-          treemacs-file-follow-delay               0.2
-          treemacs-file-name-transformer           #'identity
-          treemacs-follow-after-init               t
-          treemacs-expand-after-init               t
-          treemacs-find-workspace-method           'find-for-file-or-pick-first
-          treemacs-git-command-pipe                ""
-          treemacs-goto-tag-strategy               'refetch-index
-          treemacs-header-scroll-indicators        '(nil . "^^^^^^")
-          treemacs-hide-dot-git-directory          t
-          treemacs-hide-dot-jj-directory           t
-          treemacs-indentation                     2
-          treemacs-indentation-string              " "
-          treemacs-is-never-other-window           nil
-          treemacs-max-git-entries                 5000
-          treemacs-missing-project-action          'ask
-          treemacs-move-files-by-mouse-dragging    t
-          treemacs-move-forward-on-expand          nil
-          treemacs-no-png-images                   nil
-          treemacs-no-delete-other-windows         t
-          treemacs-project-follow-cleanup          nil
-          treemacs-persist-file                    (expand-file-name ".cache/treemacs-persist" user-emacs-directory)
-          treemacs-position                        'left
-          treemacs-read-string-input               'from-child-frame
-          treemacs-recenter-distance               0.1
-          treemacs-recenter-after-file-follow      nil
-          treemacs-recenter-after-tag-follow       nil
-          treemacs-recenter-after-project-jump     'always
-          treemacs-recenter-after-project-expand   'on-distance
-          treemacs-litter-directories              '("/node_modules" "/.venv" "/.cask" "/.direnv")
-          treemacs-project-follow-into-home        nil
-          treemacs-show-cursor                     nil
-          treemacs-show-hidden-files               t
-          treemacs-silent-filewatch                nil
-          treemacs-silent-refresh                  nil
-          treemacs-select-when-already-in-treemacs 'move-back
-          treemacs-space-between-root-nodes        t
-          treemacs-tag-follow-cleanup              t
-          treemacs-tag-follow-delay                1.5
-          treemacs-text-scale                      nil
-          treemacs-user-mode-line-format           nil
-          treemacs-user-header-line-format         nil
-          treemacs-wide-toggle-width               70
-          treemacs-width                           32
-          treemacs-width-increment                 1
-          treemacs-width-is-initially-locked       t
-          treemacs-workspace-switch-cleanup        nil)
+  ;; Disable follow mode; it is too disruptive/jarring for a default.
+  (treemacs-follow-mode -1)
 
-    ;; The default width and height of the icons is 22 pixels. If you are
-    ;; using a Hi-DPI display, uncomment this to double the icon size.
-    ;;(treemacs-resize-icons 44)
+  ;; Declarative git integration and directory collapsing (Doom Emacs paradigm).
+  (defcustom ar/treemacs-git-mode 'simple
+    "Type of git integration for `treemacs-git-mode'.
+simple   Highlight only files.
+extended Highlight both files and directories (requires python).
+deferred Same as extended, but asynchronous.
+nil      No git-based highlighting."
+    :type '(choice (const :tag "Only highlight files" simple)
+                   (const :tag "Highlight files and directories" extended)
+                   (const :tag "Same as extended, but async" deferred)
+                   (const :tag "Disabled" nil))
+    :group 'treemacs)
 
-    (treemacs-follow-mode -1)
-    (treemacs-filewatch-mode t)
-    ;;(treemacs-fringe-indicator-mode 'always)
-    (when treemacs-python-executable
-      (treemacs-git-commit-diff-mode t))
-
-    (pcase (cons (not (null (executable-find "git")))
-                 (not (null treemacs-python-executable)))
-      (`(t . t)
-       (treemacs-git-mode 'deferred))
-      (`(t . _)
-       (treemacs-git-mode 'simple)))
-
-    (treemacs-hide-gitignored-files-mode nil))
-  )
+  (when ar/treemacs-git-mode
+    ;; Fallback to 'simple if python3 is missing for extended/deferred modes.
+    (when (and (memq ar/treemacs-git-mode '(deferred extended))
+               (not treemacs-python-executable)
+               (not (executable-find "python3")))
+      (setq ar/treemacs-git-mode 'simple))
+    (treemacs-git-mode ar/treemacs-git-mode)
+    (setq treemacs-collapse-dirs
+          (if (memq ar/treemacs-git-mode '(extended deferred))
+              3
+            0))))
 
 (use-package treemacs-nerd-icons
   :after treemacs
   :config
   (treemacs-nerd-icons-config))
 
-(use-package treemacs-magit
-  :after (treemacs magit))
+(use-package treemacs-magit :after (treemacs magit))
 
-(use-package treemacs-evil
-  :after (treemacs evil))
+(use-package treemacs-evil :after (treemacs evil))
 #+end_src
 
 ** DONE Project Management
@@ -3810,8 +3762,8 @@ Renders completion candidates in a vertical, interactive dropdown list.
   (minibuffer-depth-indicate-mode 1)
   (vertico-mode 1)
   :custom
-  (vertico-count 12)
-  (vertico-resize nil)
+  (vertico-count 10)
+  (vertico-resize t)
   (vertico-cycle t)
   :bind (:map vertico-map
               ;; Group navigation via arrow keys.
@@ -4060,8 +4012,8 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
   (corfu-preselect 'prompt)
   (corfu-on-exact-match nil)
   ;; Delays auto-completion to prevent GC stutter with Orderless.
-  (corfu-auto-delay 0.2)
-  (corfu-auto-prefix 3)
+  (corfu-auto-delay 0.1)
+  (corfu-auto-prefix 2)
   (global-corfu-modes '((not erc-mode
                              eshell-mode
                              circe-mode
@@ -6100,6 +6052,10 @@ Connects to external language servers for completion, navigation, diagnostics, a
 #+begin_src emacs-lisp
 (use-package lsp-mode
   :defer t
+  :bind (:map lsp-mode-map
+              ("M-h"   . lsp-ui-doc-glance)
+              ("C-c p d" . lsp-ui-peek-find-definitions)
+              ("C-c p r" . lsp-ui-peek-find-references))
   :hook ((prog-mode . (lambda ()
                       (unless (derived-mode-p
                                'emacs-lisp-mode 'lisp-mode
@@ -6231,42 +6187,45 @@ Displays workspace errors, document symbols, and call hierarchies in a tree side
 #+end_src
 
 ** TODO Flycheck
-p
 Highlights syntax errors and warnings directly in the code buffer with save-triggered diagnostics and inline Error Lens rendering.
 #+begin_src emacs-lisp
 (use-package flycheck
   :defer t
-  :hook ((after-init . global-flycheck-mode)
-         (after-init . global-flycheck-annotate-mode))
+  :hook ((prog-mode yaml-mode markdown-mode) . flycheck-mode)
+  :bind (:map flycheck-mode-map
+         ("C-c ! a" . flycheck-annotate-mode))
   :custom
-  ;; Inherits the load path for the emacs-lisp checker to respect local dependencies.
   (flycheck-emacs-lisp-load-path 'inherit)
   ;; Routes diagnostic indicators to the right fringe for a modern IDE gutter.
-  (flycheck-indication-mode 'right-fringe)
-  ;; Underlines only the exact erroneous symbol rather than the entire line.
+  (flycheck-indication-mode 'left-fringe)
   (flycheck-highlighting-mode 'symbols)
-  ;; Triggers syntax checks ONLY on save and mode activation.
-  ;; `idle-change` removed: prevents redisplay storms colliding with Corfu
-  ;; childframe compositing during active typing.
+  ;; Events triggering automatic syntax checks. Order matches upstream `defcustom`:
+  ;; `save` checks immediately after the buffer is saved; `mode-enabled` checks
+  ;; immediately when `flycheck-mode` is non-nil. `idle-change` and `new-line`
+  ;; are excluded to prevent redisplay storms during active typing.
   (flycheck-check-syntax-automatically '(save mode-enabled))
   (flycheck-display-errors-delay 0.25)
-  (flycheck-buffer-switch-check-intermediate-buffers t)
-  (flycheck-annotate-display-current-error-only t)
-  :custom-face
-  ;; Forces straight underlines to prevent PGTK/Wayland bezier curve redisplay stutter.
-  (flycheck-error ((t (:underline (:style line :color "#f7768e")))))
-  (flycheck-warning ((t (:underline (:style line :color "#e0af68")))))
-  (flycheck-info ((t (:underline (:style line :color "#7aa2f7")))))
-  (flycheck-fringe-error ((t (:foreground "#f7768e"))))
-  (flycheck-fringe-warning ((t (:foreground "#e0af68"))))
-  (flycheck-fringe-info ((t (:foreground "#7aa2f7"))))
+  (flycheck-buffer-switch-check-intermediate-buffers nil)
+  (flycheck-standard-error-navigation nil)
+  (flycheck-checker-error-threshold 500)
+  (flycheck-annotate-other-lines-style nil)
+  ;; TRAMP/remote syntax checking disabled per user directive.
+  ;; (flycheck-check-syntax-automatically-remote '(save mode-enabled))
   :config
   ;; Disables org-lint to prevent false positives in Denote/Org silos.
   (setq-default flycheck-disabled-checkers '(org-lint))
+  ;; Hardened Emacs-Lisp predicate: lints project.el roots AND standalone personal configs.
   (eval '(setf (flycheck-checker-get 'emacs-lisp 'predicate)
                (lambda ()
                  (and (not (bound-and-true-p no-byte-compile))
-                      (project-current)))) t)
+                      (or (project-current)
+                          (and (buffer-file-name)
+                               (file-in-directory-p (buffer-file-name) user-emacs-directory)))))) t)
+  ;; Main-Thread Protection: aborts activation in massive buffers (>500KB / >10k lines)
+  ;; to prevent redisplay stutter and main-thread freezing.
+  (define-advice flycheck-mode (:before-while (&optional arg) guard-large-files)
+    (or (and arg (< (prefix-numeric-value arg) 1))
+        (not (too-long-file-p))))
   ;; Prevents the *Flycheck errors* buffer from stealing input focus when popped.
   (add-to-list 'display-buffer-alist
                '("\\*Flycheck error messages\\*\\|\\*Flycheck errors\\*"
@@ -6591,12 +6550,7 @@ Routes centralized leader keybindings for code analysis, multi-cursor editing, a
   "c A" '(consult-lsp-symbols :wk "Apropos")
   "c h" '(lsp-treemacs-call-hierarchy :wk "Call hierarchy")
   "c t" '(lsp-treemacs-type-hierarchy :wk "Type hierarchy")
-  
-  "c p" '(:ignore t :wk "peek")
-  "c p d" '(lsp-ui-peek-find-definitions :wk "Peek definition")
-  "c p r" '(lsp-ui-peek-find-references :wk "Peek references")
-  "c p h" '(lsp-ui-peek--hide :wk "Hide peek")
-  
+   
   "c g" '(:ignore t :wk "goto")
   "c g d" '(lsp-find-definition :wk "Definition")
   "c g D" '(lsp-find-declaration :wk "Declaration")
@@ -7159,8 +7113,6 @@ Configures Python editing, LSP server routing, workspace settings, formatting, a
 (with-eval-after-load 'apheleia
   (setf (alist-get 'python-mode apheleia-mode-alist) '(ruff-isort ruff))
   (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(ruff-isort ruff)))
-
-
 #+end_src
 
 
