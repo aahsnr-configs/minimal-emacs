@@ -1018,13 +1018,13 @@ Delegates operator ligatures to HarfBuzz via ligature.el and reserves Elisp subs
 ;;   (global-ligature-mode t))
 
 ;; ;; Establishes the baseline alist for keywords lacking native OpenType ligatures.
-(setq-default prettify-symbols-alist '(("lambda" . ?λ)))
+;; (setq-default prettify-symbols-alist '(("lambda" . ?λ)))
 
 ;; ;; Reveals raw text when the cursor touches the symbol boundary for precise editing.
-(setq prettify-symbols-unprettify-at-point 'right-edge)
+;; (setq prettify-symbols-unprettify-at-point 'right-edge)
 
-;; Activates globally across prog-mode, text-mode, and conf-mode derivatives.
-(global-prettify-symbols-mode 1)
+;; ;; Activates globally across prog-mode, text-mode, and conf-mode derivatives.
+;; (global-prettify-symbols-mode 1)
 #+end_src
 
 ** DONE Autorevert
@@ -2759,7 +2759,6 @@ Navigates to definitions, references, and symbols across the project via native 
 ;; Evil + Avy/EasyMotion provide superior keyboard-driven spatial navigation.
 #+end_src
 
-
 ** DONE Eldoc
 Configures the core documentation engine with strict echo area limits, Emacs 31 Elisp enrichment, and help-at-point integration.
 #+begin_src emacs-lisp
@@ -2919,7 +2918,93 @@ Provides interactive navigation through the Git history of the current buffer.
   (add-hook 'git-timemachine-mode-exit-hook #'ar/git-timemachine-teardown))
 #+end_src
 
+** TODO Magit Custom Functions
+#+begin_src emacs-lisp
+(defun ar/magit-stage-all ()
+  "Stage all changes in the project (equivalent to 'git add .')."
+  (interactive)
+  (magit-run-git "add" ".")
+  (message "Staged all changes."))
+#+end_src
 
+** TODO Transient Menu
+#+begin_src emacs-lisp
+(with-eval-after-load 'transient
+  ;; 1. Define Title Generator
+  (defun ar/vc-menu-title ()
+    (concat
+     (if (fboundp 'nerd-icons-octicon)
+         (nerd-icons-octicon "nf-oct-git_branch" :face 'nerd-icons-green :v-adjust 0.02)
+       "")
+     (propertize " Version Control" 'face 'transient-heading)))
+
+  ;; 2. Define the Menu
+  (transient-define-prefix ar/toggles-vc-menu ()
+    "Version Control Dashboard"
+    [:description ar/vc-menu-title
+
+     ;; Group 1: Core Magit Actions
+     ["Magit Core"
+      ("s" "Status" magit-status)
+      ("a" "Stage All" ar/magit-stage-all)
+      ("c" "Commit" magit-commit)
+      ("p" "Push" magit-push-current-to-pushremote)
+      ("P" "Pull" magit-pull-from-upstream)
+      ("f" "Fetch" magit-fetch)
+      ("F" "Fetch All" magit-fetch-all)]
+
+     ;; Group 2: Branching & History
+     ["Branch & Log"
+      ("b" "Branches" magit-branch)
+      ("B" "Checkout" magit-checkout)
+      ("m" "Merge" magit-merge)
+      ("r" "Rebase" magit-rebase)
+      ("l" "File Log" magit-log-buffer-file)
+      ("L" "Branch Log" magit-log-current)]
+
+     ;; Group 3: Diffs & Staging
+     ["Diff & Stage"
+      ("d" "Diff Unstaged" magit-diff-unstaged)
+      ("D" "Diff Staged" magit-diff-staged)
+      ("S" "Stage File" magit-stage-files :transient t)
+      ("u" "Unstage File" magit-unstage-files :transient t)
+      ("U" "Unstage All" magit-unstage-all :transient t)]
+
+     ;; Group 4: Advanced Operations
+     ["Advanced"
+      ("z" "Stash" magit-stash)
+      ("Z" "Pop Stash" magit-stash-pop)
+      ("x" "Reset" magit-reset)
+      ("!" "Run Cmd" magit-run)
+      ("R" "Refresh" magit-refresh :transient t)
+      ("?" "Dispatch" magit-dispatch)
+      ("<escape>" "" transient-quit-one :format " ")]]))
+#+end_src
+
+** DONE General Keybindings
+#+begin_src emacs-lisp
+;; Git operations (SPC g)
+(ar/global-leader
+  "g" '(:ignore t :wk "git")
+  "g s" '(magit-status :wk "Status")
+  "g c" '(magit-commit :wk "Commit")
+  "g C" '(magit-commit-amend :wk "Commit amend")
+  "g p" '(magit-push-current-to-pushremote :wk "Push")
+  "g P" '(magit-pull-from-upstream :wk "Pull")
+  "g b" '(magit-branch :wk "Branches")
+  "g l" '(magit-log-buffer-file :wk "Log current file")
+  "g L" '(magit-log-current :wk "Log current branch")
+  "g f" '(magit-fetch :wk "Fetch")
+  "g h" '(ar/toggles-vc-menu :wk "VC transient menu")
+  "g m" '(magit-merge :wk "Merge")
+  "g r" '(magit-rebase :wk "Rebase")
+  "g t" '(git-timemachine-toggle :wk "Timemachine")
+  "g n" '(diff-hl-next-hunk :wk "Next hunk")
+  "g N" '(diff-hl-previous-hunk :wk "Previous hunk")
+  "g S" '(diff-hl-stage-current-hunk :wk "Stage hunk")
+  "g R" '(diff-hl-revert-hunk :wk "Revert hunk")
+  "g H" '(diff-hl-show-hunk :wk "Preview hunk"))
+#+end_src
 
 
 * DONE Workflow Management
@@ -6710,7 +6795,6 @@ Routes global search commands and local navigation for the TODO ecosystem.
 #+end_src
 
 
-
 * DONE Markdown Mode
 Native tree-sitter Markdown editing and viewing via Emacs 31's built-in engine. Provides structure-aware coloring, hidden markup rendering, inline images, table editing, code block context, and outline folding without any external packages.
 
@@ -6884,25 +6968,42 @@ Routes all Markdown editing, viewing, table, and structure commands through the 
  "o a" '(outline-show-all :wk "Show all"))
 #+end_src
 
-
 * Languages
 ** TODO Python
-Configures Python editing, LSP server routing, workspace settings, formatting, and debug adapter integration.
+Configures Python editing, dual LSP server routing, workspace settings, formatting, and debug adapter integration.
 #+begin_src emacs-lisp
 (use-package python
   :straight (:type built-in)
   :custom
   (python-shell-completion-native-enable nil)
-  (python-shell-interpreter "python3")
-  (python-indent-offset 4))
+  (python-indent-guess-indent-offset-verbose nil)
+  (python-indent-offset 4)
+  :config
+  ;; Upgrades to IPython if present; `--simple-prompt` prevents ANSI corruption in `comint`.
+  (when (executable-find "ipython")
+    (setq python-shell-interpreter "ipython"
+          python-shell-interpreter-args "-i --simple-prompt --no-color-info")))
 
-;; --- Formatting (Apheleia) ---
-;; Explicitly map both modes; apheleia-mode-alist does not traverse derived-mode-p.
+;; Maps `ruff-isort` and `ruff` formatters; `apheleia-mode-alist` ignores `derived-mode-p`.
 (with-eval-after-load 'apheleia
   (setf (alist-get 'python-mode apheleia-mode-alist) '(ruff-isort ruff))
   (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(ruff-isort ruff)))
-#+end_src
 
+(with-eval-after-load 'lsp-mode
+  ;; Registers Pyrefly as the primary type-checker; lambda defers path resolution for `envrc`.
+  (lsp-register-client
+   (make-lsp-client
+    :new-connection (lsp-stdio-connection
+                     (lambda ()
+                       (let ((bin (executable-find "pyrefly")))
+                         (unless bin
+                           (user-error "pyrefly not found in current direnv environment"))
+                         (list bin "lsp" "-j" "4"))))
+    :activation-fn (lsp-activate-on "python")
+    :priority 1
+    :add-on? nil
+    :server-id 'pyrefly)))
+#+end_src
 
 
 * Misc Keybinds
