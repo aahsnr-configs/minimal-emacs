@@ -1,18 +1,19 @@
 document:
-  title: "Unified AI Operational Protocol & Project State Checkpoint (v56: The Package.el Migration Rejection & straight.el Restoration)"
-  version: 56
-  date: "August 02, 2026"
+  title: "Unified AI Operational Protocol & Project State Checkpoint (v57: Flycheck/LSP-UI Hardening & Comprehension Mandate)"
+  version: 57
+  date: "August 03, 2026"
   description: >
     Persistent memory anchor, behavioral boundary, and project tracker for the AI. Merges the
     system prompt protocol (rules, persona, formatting) with the project state (progress,
     architecture, checklists) to survive context-window truncation. All AI interactions must
     strictly adhere to the constraints and state defined herein.
-    v56: REJECTED THE THIRD IDE PIVOT. Reverted to straight.el as the canonical package manager
-    after evaluating ecosystem fragmentation and GitHub orphan handling limitations. Restored
-    straight.el bootstrap, `:straight` keywords, and `straight-use-package-by-default`. Excised
-    `use-package-always-ensure` and `package-quickstart` mandates. Finalized Jinx inline
-    exclusions, Ediff transient menu, Woman manpath extraction, and org-agenda-finalize hook wiring.
-    v55: THE THIRD IDE PIVOT (REJECTED). Attempted migration from straight.el to native Emacs 31 package.el + package-vc.el.
+    v57: FLYCHECK & LSP-UI HARDENING. Refactored Flycheck for scoped prog-mode activation, 
+    save-triggered diagnostics, and Flycheck 38 on-demand Error Lens. Simplified Treemacs 
+    to Doom's declarative git-mode paradigm. Routed LSP documentation to lsp-ui-doc-glance 
+    and migrated peek commands to native :bind blocks. Added strict language comprehension 
+    mandate. Synced with config.org v0.38.
+    v56: REJECTED THE THIRD IDE PIVOT. Reverted to straight.el as the canonical package manager.
+    v55: THE THIRD IDE PIVOT (REJECTED). Attempted migration to native Emacs 31 package.el.
     v54: THE SECOND IDE PIVOT. Migrated from eglot to lsp-mode/lsp-ui ecosystem.
     v53: Hardened load-order physics across Dirvish, Vertico-Multiform, and Evil.
     v52: finalized the migration from Elpaca to straight.el.
@@ -39,7 +40,10 @@ sections:
         - Ingest all files completely.
         - Acknowledge the current version and date from this file.
         - Scan `config.org.txt` and identify the exact next subsection lacking the `DONE` keyword.
-        - 'Output exactly: "I have ingested the source-of-truth files and the unified protocol. I acknowledge the strict formatting rules, the negative constraints, and the current project state (Version 56). The next pending subsection is [Subsection Name]. I am locked in and will write zero code until you give the signal."'
+        - 'Output exactly: "I have ingested the source-of-truth files and the unified protocol. I acknowledge the strict formatting rules, the negative constraints, and the current project state (Version 57). The next pending subsection is [Subsection Name]. I am locked in and will write zero code until you give the signal."'
+    strict_comprehension_mandate: >
+      Make sure you absolutely understand all the instructions in this prompt exactly as I have said.
+      There should not be any mistake in language comprehension.
     strict_greenlight_protocol:
       state: "READ-ONLY planning state by default."
       rule: "Only generate, rewrite, or output Elisp/Org-mode code if the user's prompt contains the exact phrase `GREEN LIGHT`."
@@ -101,9 +105,9 @@ sections:
     project_metadata:
       title: "Emacs Configuration Project"
       author: "Ahsanur Rahman"
-      config_version: "0.37"
+      config_version: "0.38"
       target_build: "emacs-pretest (PGTK) on Arch Linux (v31.0.90), compiled with --with-native-compilation=aot and --with-pgtk."
-      note: "Per-release change notes for config.org v0.16–v0.37 are folded into the unified changelog in Section 5 (architectural_decisions / version_history) to avoid tracking the same facts twice."
+      note: "Per-release change notes for config.org v0.16–v0.38 are folded into the unified changelog in Section 5 (architectural_decisions / version_history) to avoid tracking the same facts twice."
     editor_behaviour_paradigm:
       summary: >
         In v31 the IDE stack is strictly `lsp-mode` + `lsp-ui` + Emacs 31 native core.
@@ -307,7 +311,7 @@ sections:
   - id: 5
     title: "Version History, Edge Cases & Overall Progress"
     description: >
-      Single unified changelog spanning document versions v15–v56.
+      Single unified changelog spanning document versions v15–v57.
     architectural_decisions:
       v15: "IDE Stack Consolidation (committed to lsp-mode — later reversed, see v25). Workspace Management: selected bufferlo."
       v18: "Package Management Migration: officially transitioned to Elpaca v0.12; deprecated :pin and :vc."
@@ -363,7 +367,7 @@ sections:
       v54: >
         THE SECOND IDE PIVOT: Migrated from eglot to lsp-mode/lsp-ui ecosystem. Replaced
         flymake/flyover with flycheck/lsp-ui-sideline. Replaced eldoc-childframe with lsp-ui-doc.
-        Replaced breadcrumb with lsp-headerline-breadcrumb-mode. Implemented dual LSP server
+        Replace d breadcrumb with lsp-headerline-breadcrumb-mode. Implemented dual LSP server
         architecture for Python (ty/pyrefly + ruff). Excised flymake-ruff and lazy-ruff.
         Mandated LSP_USE_PLISTS=true in early-init.el for JSON-RPC performance.
       v55: >
@@ -379,6 +383,14 @@ sections:
         `package-quickstart` mandates. Documented straight.el vs package.el divergence
         explicitly via the companion integration YAML. Finalized Jinx inline exclusions,
         Ediff transient menu, Woman manpath extraction, and org-agenda-finalize hook wiring.
+      v57: >
+        Flycheck Performance & Error Lens Hardening, Treemacs Doom Parity, and LSP-UI Glance Routing.
+        Refactored Flycheck to use scoped `prog-mode` hooks, save-triggered diagnostics, and Flycheck 38
+        `flycheck-annotate-other-lines-style` for on-demand Error Lens. Migrated Flycheck face overrides
+        to `doom-themes` `custom-theme-set-faces` using the high-priority 'user theme. Simplified Treemacs
+        to Doom's declarative git-mode paradigm. Routed LSP documentation to `lsp-ui-doc-glance` (M-h)
+        and migrated peek commands to native `:bind` blocks. Added strict language comprehension mandate
+        to AI protocol. Synced with config.org v0.38.
     edge_cases_and_deferred_issues:
       - "Dirvish multi-frame flicker: patched via define-advice on dirvish-pre-redisplay-h."
       - "Emacs 31 unreleased APIs (e.g. grep-edit-mode) must be wrapped in defensive runtime guards."
@@ -400,20 +412,22 @@ sections:
       - "[v46] Jupyter/Python paradigm shift deferred. Denote 4.x signature parity: injected the 5th `%s` placeholder."
       - "[v48] eglot-confirm-server-edits has a known type-error bug (#80549) when customized via M-x customize in Emacs 31.0.50."
       - "[v49] ide-features.md divergence: it still recommends eldoc-box; the project explicitly uses the local fork lisp/eldoc-childframe.el instead."
-      - "[v51] Dape upstream hallucinations caught and corrected: `dape-breakpoint-condition` and `dape-breakpoint-disable` do not exist in upstream dape.el (condition is handled via `dape-breakpoint-expression`, disable is handled via the breakpoints info buffer). `dape-timeout` was renamed to `dape-request-timeout`. `dape-history-use-dash-form` was refactored to `dape-history-add` with the `'shell-like` symbol. `dape-select-stack-frame` was renamed to `dape-select-stack`. `dape-memory-read` was renamed to `dape-memory`. Manual `evil-set-initial-state` loops for dape buffers were excised in favor of `evil-collection`'s native dape module."
-      - "[v52] Elpaca to straight.el Migration: Excised dead `elpaca-process-queues` code from `reload-init-file`. Replaced `elpaca-after-init-hook` with `after-init-hook` in Dape breakpoint loading. Corrected load-order physics comments in `undo-fu-session`, `buffer-terminator`, and `hl-todo`."
-      - "[v53] indent-bars Tree-sitter query crash: Python grammar uses `argument_list`, not `arguments`. Corrected in `indent-bars-treesit-wrap`."
+      - "[v51] Dape upstream hallucinations caught and corrected: `dape-breakpoint-condition` and `dape-breakpoint-disable` do not exist in upstream dape.el. `dape-timeout` was renamed to `dape-request-timeout`. `dape-history-use-dash-form` was refactored to `dape-history-add`. `dape-select-stack-frame` was renamed to `dape-select-stack`. `dape-memory-read` was renamed to `dape-memory`."
+      - "[v52] Elpaca to straight.el Migration: Excised dead `elpaca-process-queues` code. Replaced `elpaca-after-init-hook` with `after-init-hook`."
+      - "[v53] indent-bars Tree-sitter query crash: Python grammar uses `argument_list`, not `arguments`."
       - "[v53] vertico-multiform Invalid face reference: `dired-directory` face unregistered during `find-file`. Fixed via `(require 'dired)` in `:config`."
-      - "[v53] dirvish void-function crash: `dirvish-dired-noselect-a` evaluated in `:init` before package load. Excised; `dirvish-override-dired-mode` handles it safely in `:config`."
+      - "[v53] dirvish void-function crash: `dirvish-dired-noselect-a` evaluated in `:init` before package load. Excised."
       - "[v53] Consult preview I/O overhead: User explicitly disabled previews for `consult-buffer` and `consult-recent-file` via `:preview-key nil`."
-      - "[v54] lsp-mode plist deserialization: `LSP_USE_PLISTS=true` must be set via `setenv` in early-init.el before byte-compilation to prevent hash-table GC pressure."
-      - "[v54] Python dual-server architecture: ty/pyrefly acts as primary, ruff as add-on (`:add-on? t`) for linting/formatting. Eliminates need for external flymake/lazy-ruff wrappers."
-      - "[v54] lsp-mode completion category overrides: Must inject `(lsp-capf (styles orderless basic))` into `completion-category-overrides` to preserve Orderless fuzzy matching."
-      - "[v55] package-quickstart desync: if `package-selected-packages` drifts from installed packages, `M-x package-quickstart-refresh` must be run manually."
-      - "[v55] package-vc.el first-run blocking: `package-vc-install` can block the main thread on the very first startup while cloning large repositories; first boot must not be headless."
-      - "[v56] Package.el Migration Rejection: The v55 migration to native package.el + package-vc.el was reverted. straight.el bootstrap, `:straight` keywords, and `straight-use-package-by-default` restored. `package-quickstart` remains commented out in early-init.el."
-      - "[v56] Markdown Mode Commented Out: The entire `markdown-ts-mode` implementation block is commented out in config.org despite headers being marked DONE. Deferred pending upstream tree-sitter grammar stability or user review."
-      - "[v56] Helpful Package Commented Out: The `helpful` package block is commented out in config.org. Integration with main development tools remains pending."
+      - "[v54] lsp-mode plist deserialization: `LSP_USE_PLISTS=true` must be set via `setenv` in early-init.el."
+      - "[v54] Python dual-server architecture: ty/pyrefly acts as primary, ruff as add-on (`:add-on? t`)."
+      - "[v54] lsp-mode completion category overrides: Must inject `(lsp-capf (styles orderless basic))` into `completion-category-overrides`."
+      - "[v55] package-quickstart desync: if `package-selected-packages` drifts, `M-x package-quickstart-refresh` must be run manually."
+      - "[v55] package-vc.el first-run blocking: `package-vc-install` can block the main thread on the very first startup."
+      - "[v56] Package.el Migration Rejection: Reverted to straight.el. `package-quickstart` remains commented out."
+      - "[v56] Markdown Mode Commented Out: The entire `markdown-ts-mode` implementation block is commented out in config.org."
+      - "[v56] Helpful Package Commented Out: The `helpful` package block is commented out in config.org."
+      - "[v57] Flycheck Error Lens Hallucination: `flycheck-annotate-display-current-error-only` does not exist in Flycheck 38. Replaced with `flycheck-annotate-other-lines-style nil`."
+      - "[v57] Flycheck TRAMP variable: `flycheck-check-syntax-automatically-remote` commented out per user directive to disable TRAMP support in Dev Tools."
     overall_progress:
       finalized:
         - "Core Emacs (13 subsections); Vim Emulation (12 subsections); General Keybindings (centralized leader routing)."
@@ -430,11 +444,11 @@ sections:
         - "Package Management: straight.el restoration and package.el migration rejection."
         - "Lexical Validation: Jinx inline exclusions, Ediff transient menu, Woman manpath extraction."
         - "Org Agenda Finalization: org-agenda-finalize hook wired to hide-modeline."
+        - "Flycheck & Treemacs Optimization: Scoped prog-mode hooks, Flycheck 38 on-demand Error Lens, Doom-parity Treemacs git-mode, and high-priority 'user theme face overrides."
       in_progress:
         - "Org Mode & Second Brain: Keybindings subsection retains TODO pending user review."
-        - "Development Tools: Minimap (demap) subsection retains TODO."
+        - "Development Tools: Flycheck, Consult Flycheck, Minimap (demap), LSP-mode, LSP-ui, Consult LSP, LSP Treemacs, and Keybinds subsections retain TODO in config.org headers despite heavy refactoring."
         - "Languages: Python subsection retains TODO (requires rewrite for dual LSP servers)."
-        - "IDE Migration: Rewriting config.org subsections to replace eglot/flymake/eldoc-childframe with lsp-mode/lsp-ui/flycheck/lsp-ui-doc (Headers remain TODO)."
         - "Markdown Mode: Implementation temporarily commented out in config.org pending upstream stability review."
       untouched:
         - "Version Control: Magit, Forge, Diff-hl, Git-Timemachine retain TODO."
