@@ -1,7 +1,7 @@
 #+TITLE: Emacs Configuration
 #+AUTHOR: Ahsanur Rahman
 #+DESCRIPTION: Personal Minimal Emacs Configuration
-#+VERSION: 0.39
+#+VERSION: 0.40
 #+STARTUP: overview
 #+PROPERTY: header-args:emacs-lisp :tangle ./init.el
 
@@ -2527,7 +2527,7 @@ Checks spelling as you type and highlights words that need correction.
   ;; Inline exclusions replacing the dict.txt file.
   (defvar ar/jinx-personal-words
     "emacs elisp use-package org-mode prog-mode conf-mode text-mode
-eglot eldoc flymake minibuffer config flycheck env corfu vertico orderless consult embark denote treemacs dirvish magit evil avy anzu jinx
+eglot eldoc flymake minibuffer minimap config flycheck env corfu vertico orderless consult embark denote treemacs dirvish magit evil avy anzu jinx
 tokyo night jetbrainsmono nerd font pgtk wayland ui
 tramp ssh json yaml toml lsp dap ast"
     "Personal vocabulary for Jinx session words. Write entries in lowercase for broadest coverage.")
@@ -6117,12 +6117,6 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
     (interactive)
     (lsp-headerline-breadcrumb-mode
      (if lsp-headerline-breadcrumb-mode -1 1))))
-
-;; Breadcrumb toggle bound to local leader for on-demand activation.
-(ar/local-leader
-  :keymaps 'lsp-mode-map
-  "T"   '(:ignore t :wk "toggle")
-  "T b" '(ar/lsp-breadcrumb-toggle :wk "Breadcrumb"))
 #+end_src
 
 #+begin_src emacs-lisp
@@ -6146,11 +6140,7 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
 #+begin_src emacs-lisp
 (use-package consult-lsp
   :defer t
-  :after (consult lsp-mode)
-  :commands (consult-lsp-diagnostics
-             consult-lsp-file-diagnostics
-             consult-lsp-symbols
-             consult-lsp-file-symbols))
+  :after (consult lsp-mode))
 
 ;; Remaps native xref apropos search to consult-lsp's live-preview engine.
 (general-define-key
@@ -6162,21 +6152,8 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
 (use-package lsp-treemacs
   :defer t
   :after (lsp-mode treemacs)
-  :commands (lsp-treemacs-errors-list
-             lsp-treemacs-symbols
-             lsp-treemacs-call-hierarchy
-             lsp-treemacs-type-hierarchy)
   :config
-  ;; Synchronizes the sidebar selection with the active buffer's LSP symbols.
   (setq lsp-treemacs-sync-mode 1))
-
-(ar/local-leader
-  :keymaps 'lsp-mode-map
-  "T"   '(:ignore t :wk "tree")
-  "T e" '(lsp-treemacs-errors-list :wk "Errors list")
-  "T s" '(lsp-treemacs-symbols :wk "Document symbols")
-  "T c" '(lsp-treemacs-call-hierarchy :wk "Call hierarchy")
-  "T t" '(lsp-treemacs-type-hierarchy :wk "Type hierarchy"))
 #+end_src
 
 ** TODO Code Diagnostics
@@ -6282,29 +6259,6 @@ Provides native debugging with inline variable hints, persistent breakpoints, an
 #+begin_src emacs-lisp
 (use-package dape
   :defer t
-  :commands (dape
-             dape-quit
-             dape-restart
-             dape-next
-             dape-step-in
-             dape-step-out
-             dape-continue
-             dape-pause
-             dape-breakpoint-toggle
-             dape-breakpoint-remove-all
-             dape-breakpoint-log
-             dape-breakpoint-expression
-             dape-breakpoint-hits
-             dape-evaluate-expression
-             dape-watch-dwim
-             dape-info
-             dape-repl
-             dape-memory
-             dape-disassemble
-             dape-select-thread
-             dape-select-stack
-             dape-until
-             dape-restart-frame)
   :custom
   ;; Unbind the default C-x C-a prefix; we use general.el leader bindings.
   (dape-key-prefix nil)
@@ -6394,52 +6348,7 @@ Provides native debugging with inline variable hints, persistent breakpoints, an
                  (display-buffer-in-side-window)
                  (side . bottom)
                  (window-height . 0.25)
-                 (window-parameters (no-delete-other-windows . t))))
-
-  ;; Transient Dashboard (Replacing dap-hydra)
-  (with-eval-after-load 'transient
-    (defun ar/dape-title ()
-      (concat
-       (if (fboundp 'nerd-icons-codicon)
-           (nerd-icons-codicon "nf-cod-debug" :face 'transient-heading :v-adjust 0.02)
-         "")
-       (propertize " Debug" 'face 'transient-heading)))
-
-    (transient-define-prefix ar/toggles-dape ()
-      "Debugger"
-      [:description ar/dape-title
-		    ["Session"
-		     ("S" "start" dape :transient t)
-		     ("P" "project" projection-dape :transient t)
-		     ("q" "quit" dape-quit)
-		     ("k" "kill" dape-kill)
-		     ("r" "restart" dape-restart :transient t)
-		     ("R" "restart frame" dape-restart-frame :transient t)]
-		    ["Navigation"
-		     ("n" "next" dape-next :transient t)
-		     ("s" "step in" dape-step-in :transient t)
-		     ("o" "step out" dape-step-out :transient t)
-		     ("c" "continue" dape-continue :transient t)
-		     ("p" "pause" dape-pause :transient t)
-		     ("u" "until" dape-until :transient t)]
-		    ["Breakpoints"
-		     ("b" "toggle" dape-breakpoint-toggle :transient t)
-		     ("B" "clear all" dape-breakpoint-remove-all :transient t)
-		     ("l" "log" dape-breakpoint-log :transient t)
-		     ("h" "hits" dape-breakpoint-hits :transient t)
-		     ("C" "condition" dape-breakpoint-expression :transient t)]
-		    ["Evaluation"
-		     ("e" "eval" dape-evaluate-expression :transient t)
-		     ("w" "watch" dape-watch-dwim :transient t)]
-		    ["Info Panels"
-		     ("i" "info" dape-info :transient t)
-		     ("t" "threads" dape-select-thread :transient t)
-		     ("F" "stack" dape-select-stack :transient t)
-		     ("m" "repl" dape-repl :transient t)
-		     ("M" "memory" dape-memory :transient t)
-		     ("A" "disasm" dape-disassemble :transient t)]
-		    ["Exit"
-		     ("<escape>" "" transient-quit-one :format " ")]])))
+                 (window-parameters (no-delete-other-windows . t)))))
 #+end_src
 
 ** DONE Direnv
@@ -6911,76 +6820,6 @@ Tunes the read-only view for comfortable long-form reading with hidden markup, i
     (if (derived-mode-p 'markdown-ts-mode)
         (markdown-ts-view-mode)
       (user-error "Not a Markdown buffer"))))
-#+end_src
-
-** DONE Appearance
-Applies the Tokyo Night color palette to all Markdown structural elements for visual consistency with the rest of the editor.
-#+begin_src emacs-lisp
-;; (with-eval-after-load 'markdown-ts-mode
-;;   (custom-set-faces
-;;    ;; Headings: distinct color per level with proportional height scaling.
-;;    '(markdown-ts-heading-1 ((t (:foreground "#7aa2f7" :weight bold :height 1.4))))
-;;    '(markdown-ts-heading-2 ((t (:foreground "#e0af68" :weight bold :height 1.3))))
-;;    '(markdown-ts-heading-3 ((t (:foreground "#9ece6a" :weight bold :height 1.2))))
-;;    '(markdown-ts-heading-4 ((t (:foreground "#1abc9c" :weight bold :height 1.1))))
-;;    '(markdown-ts-heading-5 ((t (:foreground "#bb9af7" :weight bold :height 1.05))))
-;;    '(markdown-ts-heading-6 ((t (:foreground "#ff9e64" :weight bold :height 1.0))))
-;;    '(markdown-ts-setext-heading ((t (:inherit markdown-ts-heading-1))))
-;;    ;; Delimiters: recessive gray for #, brackets, fence markers.
-;;    '(markdown-ts-delimiter ((t (:foreground "#565f89" :slant normal :weight normal))))
-;;    ;; Inline emphasis.
-;;    '(markdown-ts-emphasis ((t (:foreground "#bb9af7" :slant italic))))
-;;    '(markdown-ts-bold ((t (:foreground "#e0af68" :weight bold))))
-;;    '(markdown-ts-strikethrough ((t (:foreground "#f7768e" :strike-through t))))
-;;    ;; Code spans and blocks.
-;;    '(markdown-ts-code-span ((t (:foreground "#7dcfff" :background "#24283b"))))
-;;    '(markdown-ts-code-block ((t (:background "#24283b" :extend t))))
-;;    '(markdown-ts-code-block-markup-hidden ((t (:background "#24283b" :extend t))))
-;;    '(markdown-ts-indented-code-block ((t (:foreground "#7dcfff" :background "#24283b"))))
-;;    '(markdown-ts-language-keyword ((t (:foreground "#ff9e64" :weight bold))))
-;;    ;; Block elements.
-;;    '(markdown-ts-block-quote ((t (:foreground "#565f89" :slant italic))))
-;;    '(markdown-ts-thematic-break ((t (:foreground "#292e42" :extend t))))
-;;    ;; Links.
-;;    '(markdown-ts-link ((t (:foreground "#7aa2f7" :underline t))))
-;;    '(markdown-ts-link-destination ((t (:foreground "#9ece6a"))))
-;;    ;; Tables.
-;;    '(markdown-ts-table ((t (:background "#24283b" :extend t))))
-;;    '(markdown-ts-table-header ((t (:foreground "#7aa2f7" :weight bold))))
-;;    '(markdown-ts-table-cell ((t (:foreground "#c0caf5"))))
-;;    '(markdown-ts-table-delimiter-cell ((t (:foreground "#565f89"))))
-;;    ;; Lists and task checkboxes.
-;;    '(markdown-ts-list-marker ((t (:foreground "#565f89"))))
-;;    '(markdown-ts-task-unchecked ((t (:foreground "#7aa2f7"))))
-;;    '(markdown-ts-task-checked ((t (:foreground "#9ece6a"))))
-;;    ;; HTML, entities, and LaTeX.
-;;    '(markdown-ts-html-tag ((t (:foreground "#f7768e"))))
-;;    '(markdown-ts-html-block ((t (:foreground "#f7768e"))))
-;;    '(markdown-ts-entity-reference ((t (:foreground "#7dcfff"))))
-;;    '(markdown-ts-numeric-character-reference ((t (:foreground "#7dcfff"))))
-;;    '(markdown-ts-latex ((t (:foreground "#e0af68"))))
-;;    ;; Hard line breaks.
-;;    '(markdown-ts-hard-line-break-backslash ((t (:foreground "#565f89" :underline t))))
-;;    '(markdown-ts-hard-line-break-space ((t (:background "#292e42"))))
-;;    ;; Active context overlays (code block / table under cursor).
-;;    '(markdown-ts-in-code-block ((t (:background "#292e42" :extend t))))
-;;    '(markdown-ts-in-table ((t (:background "#292e42" :extend t))))))
-#+end_src
-
-
-** DONE Language Server
-Connects the Marksman language server for completion, diagnostics, rename, and cross-reference navigation in Markdown buffers.
-#+begin_src emacs-lisp
-
-#+end_src
-
-** DONE Auto Formatting
-Routes Markdown buffers through Prettier for consistent formatting on save via the async Apheleia engine.
-#+begin_src emacs-lisp
-(with-eval-after-load 'apheleia
-  ;; Explicit mapping; apheleia uses provided-mode-derived-p which
-  ;; should inherit from markdown-mode, but this is defensive.
-  (setf (alist-get 'markdown-ts-mode apheleia-mode-alist) '(prettier)))
 #+end_src
 
 ** DONE Keybindings
