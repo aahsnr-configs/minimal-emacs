@@ -4244,6 +4244,7 @@ Wraps and merges completion-at-point functions for global and local pipelines.
             (lambda () (add-hook 'completion-at-point-functions #'cape-file nil t)))
   (advice-add #'lsp-completion-at-point :around #'cape-wrap-noninterruptible)
   (advice-add #'lsp-completion-at-point :around #'cape-wrap-nonexclusive)
+  (advice-add #'lsp-completion-at-point :around #'cape-wrap-noninterruptible)
   (advice-add #'comint-completion-at-point :around #'cape-wrap-nonexclusive) 
   (advice-add #'pcomplete-completions-at-point :around #'cape-wrap-nonexclusive))
 #+end_src
@@ -6153,6 +6154,7 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
   (lsp-keymap-prefix nil)
   (lsp-enable-xref t)
   (lsp-log-io nil)
+  (lsp-auto-guess-root t)
   (lsp-file-watch-threshold 4000)
   (lsp-enable-folding nil)
   (lsp-enable-indentation nil)
@@ -6607,6 +6609,58 @@ Routes centralized leader keybindings for code analysis, multi-cursor editing, a
 #+end_src
 
 
+* TODO Snippet Engine
+** TODO Yasnippet
+#+begin_src emacs-lisp
+(defvar my/snippets-directory (expand-file-name "snippets" user-emacs-directory)
+  "Directory for personal yasnippet snippets.")
+
+(unless (file-directory-p my/snippets-directory)
+  (make-directory my/snippets-directory t))
+
+(use-package yasnippet
+  :defer t
+  :hook (elpaca-after-init . yas-global-mode)
+  ;;:hook (prog-mode text-mode LaTeX-mode org-mode) . yas-minor-mode)
+  :custom
+  ;;(yas-prompt-functions '(yas-completing-prompt))
+  (yas-also-auto-indent-first-line t)  ; Indent first line of snippet
+  (yas-also-indent-empty-lines t)
+  (yas-snippet-revival nil)  ; Setting this to t causes issues with undo
+  (yas-wrap-around-region nil) ; Do not wrap region when expanding snippets
+  :config
+  (add-to-list 'yas-snippet-dirs my/snippets-directory)
+  (defun ar/yas-reload-snippets-on-save ()
+    "Reload all snippets if a snippet file is being saved."
+    (when (string-prefix-p my/snippets-directory (buffer-file-name))
+      (yas-reload-all)
+      (message "Yasnippet collection reloaded.")))
+
+  (add-hook 'after-save-hook #'ar/yas-reload-snippets-on-save))
+
+(use-package yasnippet-snippets
+  :after yasnippet
+  :config
+  (yas-reload-all))
+
+(use-package consult-yasnippet
+  :after (consult yasnippet)
+  :config
+  (consult-customize consult-yasnippet :preview-key 'any))
+
+(use-package yasnippet-capf
+  :after cape
+  :config
+  (add-to-list 'completion-at-point-functions #'yasnippet-capf))
+#+end_src
+
+** TODO YATemplate
+#+begin_src emacs-lisp
+
+#+end_src
+
+
+
 * DONE Contextual Sidebars
 Persistent side windows displaying dynamic metadata, backlinks, and bibliography context for the active buffer.
 
@@ -6968,6 +7022,7 @@ Routes all Markdown editing, viewing, table, and structure commands through the 
  "o a" '(outline-show-all :wk "Show all"))
 #+end_src
 
+
 * Languages
 ** TODO Python
 Configures Python editing, dual LSP server routing, workspace settings, formatting, and debug adapter integration.
@@ -6989,8 +7044,10 @@ Configures Python editing, dual LSP server routing, workspace settings, formatti
   (setf (alist-get 'python-mode apheleia-mode-alist) '(ruff-isort ruff))
   (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(ruff-isort ruff)))
 
+;; --- LSP Server Routing (Pyrefly + Ruff) ---
 (with-eval-after-load 'lsp-mode
-  ;; Registers Pyrefly as the primary type-checker; lambda defers path resolution for `envrc`.
+  ;; Registers Pyrefly as the primary type-checker and navigation server.
+  ;; Lambda wrapper defers `executable-find` to guarantee `envrc` path resolution.
   (lsp-register-client
    (make-lsp-client
     :new-connection (lsp-stdio-connection
@@ -7002,7 +7059,14 @@ Configures Python editing, dual LSP server routing, workspace settings, formatti
     :activation-fn (lsp-activate-on "python")
     :priority 1
     :add-on? nil
-    :server-id 'pyrefly)))
+    :server-id 'pyrefly))
+
+  (define-advice lsp--send-did-save-p (:around (fn &rest args) force-pyrefly-save)
+    "Force didSave for pyrefly despite missing save in TextDocumentSyncOptions."
+    (or (apply fn args)
+        (when-let* ((workspace (or (car args) lsp--cur-workspace))
+                    (client (lsp--workspace-client workspace)))
+          (eq (lsp--client-server-id client) 'pyrefly)))))
 #+end_src
 
 

@@ -26,3 +26,4 @@
 - [x] `Important`: need flycheck to show errors only when I finish typing a line. I don't want diagnostics as I type
 - [x] `Important`: make symbol highlighting faster in for lsp-mode
 - [ ] `Important`: Delegate ruff to flycheck instead of an lsp server. Make ty/pyrefly the sole lsp client for lsp-mode. But keep in mind that all the diagnostics must still be show
+- [ ] `Important`: currently disabling flycheck from running automatically fixed input delay between selection of completion candidate and printing the candidate to the buffer. But even if flycheck-annotate mode is disabled and flycheck syntax checking runs automatically, the input delay still exists. See if switching to flymake with lsp-mode fixes the input delay. Switching to flymake did not help. Currently, lsp-mode causes both flymake and flycheck to display diagnostics automatically as you type but only for the 1st time buffer is open.
