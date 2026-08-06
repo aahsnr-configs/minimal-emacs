@@ -7044,29 +7044,29 @@ Configures Python editing, dual LSP server routing, workspace settings, formatti
   (setf (alist-get 'python-mode apheleia-mode-alist) '(ruff-isort ruff))
   (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(ruff-isort ruff)))
 
-;; --- LSP Server Routing (Pyrefly + Ruff) ---
-(with-eval-after-load 'lsp-mode
-  ;; Registers Pyrefly as the primary type-checker and navigation server.
-  ;; Lambda wrapper defers `executable-find` to guarantee `envrc` path resolution.
-  (lsp-register-client
-   (make-lsp-client
-    :new-connection (lsp-stdio-connection
-                     (lambda ()
-                       (let ((bin (executable-find "pyrefly")))
-                         (unless bin
-                           (user-error "pyrefly not found in current direnv environment"))
-                         (list bin "lsp" "-j" "4"))))
-    :activation-fn (lsp-activate-on "python")
-    :priority 1
-    :add-on? nil
-    :server-id 'pyrefly))
+;; ;; --- LSP Server Routing (Pyrefly + Ruff) ---
+;; (with-eval-after-load 'lsp-mode
+;;   ;; Registers Pyrefly as the primary type-checker and navigation server.
+;;   ;; Lambda wrapper defers `executable-find` to guarantee `envrc` path resolution.
+;;   (lsp-register-client
+;;    (make-lsp-client
+;;     :new-connection (lsp-stdio-connection
+;;                      (lambda ()
+;;                        (let ((bin (executable-find "pyrefly")))
+;;                          (unless bin
+;;                            (user-error "pyrefly not found in current direnv environment"))
+;;                          (list bin "lsp" "-j" "4"))))
+;;     :activation-fn (lsp-activate-on "python")
+;;     :priority 1
+;;     :add-on? nil
+;;     :server-id 'pyrefly))
 
-  (define-advice lsp--send-did-save-p (:around (fn &rest args) force-pyrefly-save)
-    "Force didSave for pyrefly despite missing save in TextDocumentSyncOptions."
-    (or (apply fn args)
-        (when-let* ((workspace (or (car args) lsp--cur-workspace))
-                    (client (lsp--workspace-client workspace)))
-          (eq (lsp--client-server-id client) 'pyrefly)))))
+;;   (define-advice lsp--send-did-save-p (:around (fn &rest args) force-pyrefly-save)
+;;     "Force didSave for pyrefly despite missing save in TextDocumentSyncOptions."
+;;     (or (apply fn args)
+;;         (when-let* ((workspace (or (car args) lsp--cur-workspace))
+;;                     (client (lsp--workspace-client workspace)))
+;;           (eq (lsp--client-server-id client) 'pyrefly)))))
 #+end_src
 
 
