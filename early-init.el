@@ -48,6 +48,15 @@
   ;;(setq package-quickstart t)
 
   (setq package-enable-at-startup nil)
+
+
+  ;; ====================
+  ;; STRAIGHT.EL LOCKFILE PROFILE
+  ;; ====================
+  ;; Define a custom lockfile profile to centralize package version pinning.
+  ;; This must be set before the straight.el bootstrap snippet in init.el.
+  (setq straight-profiles
+        '((nil . "packages-lock.el")))
   ;; ====================
   ;; NATIVE COMPILATION
   ;; ====================

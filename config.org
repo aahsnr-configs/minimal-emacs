@@ -922,7 +922,7 @@ Configures global typography, baseline monospaced faces, fontset fallback regist
 ;; Vertically centers org-modern badges (TODO, tags, priorities) against text baseline.
 ;;(setq-default line-spacing '(1 . 1))
 ;;(setq-default line-spacing 0.02)
-(setq-default line-spacing '(0.02 . 0.02))
+
 ;; Maximizes syntax highlighting decoration across all programming buffers.
 (setq font-lock-maximum-decoration t)
 #+end_src
