@@ -25,7 +25,6 @@ org-roam.db
 .org-id-locations
 transient/
 .cache/
-straight/
 .obsidian/
 notes.md/.obsidia/
 perspective-state
