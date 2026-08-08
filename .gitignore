@@ -33,13 +33,13 @@ tmp/
 rechecking-qwen-output.md
 
 # 1. Ignore all contents inside the straight/ directory (repos, builds, etc.)
-straight/*
+straight/
 
-# 2. Un-ignore the versions directory so Git is forced to traverse into it
-!straight/versions/
-
-# 3. Ignore all contents inside the versions directory (stray backups, etc.)
-straight/versions/*
-
-# 4. Un-ignore ONLY your specific lockfile
-!straight/versions/packages-lock.el
+# # 2. Un-ignore the versions directory so Git is forced to traverse into it
+# !straight/versions/
+#
+# # 3. Ignore all contents inside the versions directory (stray backups, etc.)
+# straight/versions/*
+#
+# # 4. Un-ignore ONLY your specific lockfile
+# !straight/versions/packages-lock.el
