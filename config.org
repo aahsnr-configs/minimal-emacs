@@ -22,38 +22,82 @@ The =no-byte-compile: t= header directive stops Emacs from prematurely compiling
 
 ** DONE Package Management
 #+begin_src emacs-lisp
-(defvar bootstrap-version)
-(let ((bootstrap-file
-       (expand-file-name
-        "straight/repos/straight.el/bootstrap.el"
-        (or (bound-and-true-p straight-base-dir)
-            user-emacs-directory)))
-      (bootstrap-version 7))
-  (unless (file-exists-p bootstrap-file)
-    (with-current-buffer
-        (url-retrieve-synchronously
-         "https://radian-software.github.io/straight.el/install.el"
-         'silent 'inhibit-cookies)
-      (goto-char (point-max))
-      (eval-print-last-sexp)))
-  (load bootstrap-file nil 'nomessage))
+;; Prefer newer source files over stale byte-compiled artifacts.
+(setq load-prefer-newer t)
 
-(straight-use-package 'use-package)
-(straight-use-package 'esup)
-(straight-use-package 'bind-key)
+;; Ensure use-package macro availability during byte-compilation.
+(eval-when-compile (require 'use-package))
+(require 'bind-key)
 
-(setq straight-use-package-by-default t)
+;; ELPACA BOOTSTRAP
+(defvar elpaca-installer-version 0.12)
+;; Redirect Elpaca root to var/elpaca/ (no-littering paradigm).
+(defvar elpaca-directory (expand-file-name "var/elpaca/" user-emacs-directory))
+(defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
+(defvar elpaca-sources-directory (expand-file-name "sources/" elpaca-directory))
+(defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
+                              :ref nil :depth 1 :inherit ignore
+                              :files (:defaults "elpaca-test.el" (:exclude "extensions"))
+                              :build (:not elpaca-activate)))
+(let* ((repo  (expand-file-name "elpaca/" elpaca-sources-directory))
+       (build (expand-file-name "elpaca/" elpaca-builds-directory))
+       (order (cdr elpaca-order))
+       (default-directory repo))
+  (add-to-list 'load-path (if (file-exists-p build) build repo))
+  (unless (file-exists-p repo)
+    (make-directory repo t)
+    (when (<= emacs-major-version 28) (require 'subr-x))
+    (condition-case-unless-debug err
+        (if-let* ((buffer (pop-to-buffer-same-window "*elpaca-bootstrap*"))
+                  ((zerop (apply #'call-process `("git" nil ,buffer t "clone"
+                                                  ,@(when-let* ((depth (plist-get order :depth)))
+                                                      (list (format "--depth=%d" depth) "--no-single-branch"))
+                                                  ,(plist-get order :repo) ,repo))))
+                  ((zerop (call-process "git" nil buffer t "checkout"
+                                        (or (plist-get order :ref) "--"))))
+                  (emacs (concat invocation-directory invocation-name))
+                  ((zerop (call-process emacs nil buffer nil "-Q" "-L" "." "--batch"
+                                        "--eval" "(byte-recompile-directory \".\" 0 'force)")))
+                  ((require 'elpaca))
+                  ((elpaca-generate-autoloads "elpaca" repo)))
+            (progn (message "%s" (buffer-string)) (kill-buffer buffer))
+          (error "%s" (with-current-buffer buffer (buffer-string))))
+      ((error) (warn "%s" err) (delete-directory repo 'recursive))))
+  (unless (require 'elpaca-autoloads nil t)
+    (require 'elpaca)
+    (elpaca-generate-autoloads "elpaca" repo)
+    (let ((load-source-file-function nil)) (load "./elpaca-autoloads"))))
+;; Exception: Internal bootstrap hook must remain `after-init-hook`.
+(add-hook 'after-init-hook #'elpaca-process-queues)
+(elpaca `(,@elpaca-order))
+
+;; Use Package Integration
+(elpaca elpaca-use-package
+  (elpaca-use-package-mode)
+  (setq elpaca-use-package-by-default t))
+
+;; Block init reading until elpaca-use-package advice is applied.
+(elpaca-wait)
+
+;; Force Elpaca to use SSH to bypass Codeberg HTTPS rate limits
+(setq elpaca-recipe-defaults '(:protocol ssh))
+
+;; Use Package Configuration
 (setq use-package-verbose nil
+      use-package-always-ensure t
       use-package-expand-minimally t
       use-package-compute-statistics nil
       use-package-enable-imenu-support t)
 
+;; NO-LITTERING & CUSTOM FILE
+;; Synchronously load no-littering to preempt async package cache paths.
 (use-package no-littering
+  :ensure (:wait t)
   :demand t
   :config
   (setq custom-file (no-littering-expand-etc-file-name "custom.el"))
   ;; Defer custom.el loading until Elpaca queues finish processing.
-  (add-hook 'after-init-hook (lambda () (load custom-file 'noerror)))
+  (add-hook 'elpaca-after-init-hook (lambda () (load custom-file 'noerror)))
   (no-littering-theme-backups))
 
 ;; Register local personal libraries.
@@ -262,7 +306,7 @@ Enables native sticky-key repetition for debugging and spatial commands while su
 #+begin_src emacs-lisp
 (use-package repeat
   :straight (:type built-in)
-  :hook (after-init . repeat-mode)
+  :hook (elpaca-after-init . repeat-mode)
   :custom
   ;; Suppresses echo area hints to prevent collisions with Eldoc and Which-Key.
   (repeat-echo-function #'ignore))
@@ -276,7 +320,7 @@ Manages garbage collection via =gcmh= idle timers. Elevates the GC threshold dur
   ;; Disabled on experimental MPS Incremental GC (igc) builds.
   ;; gcmh targets the legacy stop-the-world GC and conflicts with igc.
   :unless (fboundp 'igc-info)
-  :hook (after-init . gcmh-mode)
+  :hook (elpaca-after-init . gcmh-mode)
   :init
   (setq gcmh-idle-delay 'auto
         gcmh-auto-idle-delay-factor 10
@@ -988,7 +1032,7 @@ Keystroke discovery UI overlay. Renders prefix bindings in the echo area with al
 #+begin_src emacs-lisp
 (use-package which-key
   :straight (:type built-in) 
-  :hook (after-init . which-key-mode)
+  :hook (elpaca-after-init . which-key-mode)
   :custom
   (which-key-idle-delay 1.0) ; Initial delay
   (which-key-idle-secondary-delay 0.05) ; Secondary delay
@@ -1110,12 +1154,12 @@ Terminal emulation powered by =libghostty-vt=, rendering as a persistent bottom 
 ;; Replaces standard compilation buffers with live TTY-backed Ghostel sessions.
 (use-package ghostel-compile
   :straight nil
-  :hook (after-init . ghostel-compile-global-mode))
+  :hook (elpaca-after-init . ghostel-compile-global-mode))
 
 ;; Upgrades Comint and REPL output with libghostty-vt ANSI and OSC parsing fidelity.
 (use-package ghostel-comint
   :straight nil
-  :hook (after-init . ghostel-comint-global-mode))
+  :hook (elpaca-after-init . ghostel-comint-global-mode))
 #+end_src
 
 ** DONE Subword
@@ -2732,7 +2776,7 @@ Extracts system =manpath= directories to guarantee native Emacs =woman= can loca
 Navigates to definitions, references, and symbols across the project via native xref with ripgrep search and Emacs 31 window routing.
 #+begin_src emacs-lisp
 (use-package xref
-  ;;:straight (:type built-in)
+  :straight (:type built-in)
   :custom
   ;; Route regex search backend to ripgrep.
   (xref-search-program 'ripgrep)
@@ -2763,7 +2807,7 @@ Navigates to definitions, references, and symbols across the project via native 
 Configures the core documentation engine with strict echo area limits, Emacs 31 Elisp enrichment, and help-at-point integration.
 #+begin_src emacs-lisp
 (use-package eldoc
-  ;;:straight (:type built-in)
+  :straight (:type built-in)
   :custom
   ;; Strict 2-line maximum in the echo area.
   (eldoc-echo-area-use-multiline-p 2)
@@ -2838,7 +2882,7 @@ Configures the core documentation engine with strict echo area limits, Emacs 31 
 ** TODO Diff-hl
 #+begin_src emacs-lisp
 (use-package diff-hl
-  :hook ((after-init . global-diff-hl-mode)
+  :hook ((elpaca-after-init . global-diff-hl-mode)
          (dired-mode . diff-hl-dired-mode))
   :hook (magit-post-refresh . diff-hl-magit-post-refresh)
   :init
@@ -3327,7 +3371,7 @@ Provides a unified workspace engine for navigating, compiling, and managing code
 Identifies repository boundaries, manages ignore patterns, and routes project-scoped searches into the completion framework.
 #+begin_src emacs-lisp
 (use-package project
-  ;;:straight (:type built-in)
+  :straight (:type built-in)
   :custom
   ;; Route known projects list to the no-littering etc directory.
   (project-list-file (no-littering-expand-etc-file-name "projects.el"))
@@ -4418,7 +4462,7 @@ Routes global Org-mode settings to the newly created folders.
 Configures Org core behavior, display, source editing, and performance settings.
 #+begin_src emacs-lisp
 (use-package org
-  ;;:straight (:type built-in)
+  :straight (:type built-in)
   :defer t
   :preface
   ;; Prevent eager loading of legacy modules. Only org-habit is required.
@@ -6385,7 +6429,7 @@ Provides native debugging with inline variable hints, persistent breakpoints, an
   :config
   ;; Breakpoint persistence: save on quit, load on startup.
   (add-hook 'kill-emacs-hook #'dape-breakpoint-save)
-  (add-hook 'after-init-hook #'dape-breakpoint-load)
+  (add-hook 'elpaca-after-init-hook #'dape-breakpoint-load)
 
   ;; Enable mouse-based breakpoint manipulation (click fringe to toggle).
   (dape-breakpoint-global-mode 1)
@@ -6442,7 +6486,7 @@ Provides native debugging with inline variable hints, persistent breakpoints, an
 Per-directory environment variable isolation for project-specific sub-processes and language servers.
 #+begin_src emacs-lisp
 (use-package envrc
-  :hook (after-init . envrc-global-mode))
+  :hook (elpaca-after-init . envrc-global-mode))
 #+end_src
 
 ** DONE Code Formatting
@@ -7183,7 +7227,7 @@ Routes centralized leader keybindings for opening sidebars, terminals, frames, a
                (neighbor2 (if next-win (with-selected-window next-win
                                           (windmove-find-other-window neighbor-dir next-win)))))
           (setq done (and (eq neighbor1 neighbor2)
-                           (not (eq (minibufferp neighbor2)))))
+                           (not (minibufferp neighbor2))))
           (when done
             (let* ((other-buf (window-buffer next-win)))
               (delete-window next-win)
@@ -7199,7 +7243,7 @@ Routes centralized leader keybindings for opening sidebars, terminals, frames, a
   :defer t
   :straight (:type built-in)
   :commands (winner-undo winner-redo)
-  :hook (after-init . winner-mode)
+  :hook (elpaca-after-init . winner-mode)
   :init (setq winner-boring-buffers '("*Completions*"
                                       "*Compile-Log*"
                                       "*inferior-lisp*"
@@ -7220,7 +7264,7 @@ Routes ephemeral buffers to dedicated bottom drawers or echo-area popups, strict
   :custom
   (popper-group-function #'popper-group-by-directory)
   (popper-echo-dispatch-actions t)
-  :hook (after-init . popper-echo-mode)
+  :hook (elpaca-after-init . popper-echo-mode)
   :init
   (setq popper-mode-line ""
         popper-reference-buffers
