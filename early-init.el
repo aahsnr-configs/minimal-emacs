@@ -57,6 +57,8 @@
   ;; This must be set before the straight.el bootstrap snippet in init.el.
   (setq straight-profiles
         '((nil . "packages-lock.el")))
+
+  (setq straight-vc-git-default-clone-depth 'full)
   ;; ====================
   ;; NATIVE COMPILATION
   ;; ====================
