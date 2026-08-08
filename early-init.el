@@ -51,14 +51,11 @@
 
 
   ;; ====================
-  ;; STRAIGHT.EL LOCKFILE PROFILE
+  ;; ELPACA LOCKFILE PROFILE
   ;; ====================
   ;; Define a custom lockfile profile to centralize package version pinning.
   ;; This must be set before the straight.el bootstrap snippet in init.el.
-  (setq straight-profiles
-        '((nil . "packages-lock.el")))
-
-  (setq straight-vc-git-default-clone-depth 'full)
+  ;;(setq elpaca-lock-file (expand-file-name "elpaca.lock" user-emacs-directory))
   ;; ====================
   ;; NATIVE COMPILATION
   ;; ====================

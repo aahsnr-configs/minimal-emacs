@@ -10,7 +10,7 @@
                                   "*-pkg.el"))
                        :source "MELPA" :id ace-window :type git :protocol https
                        :inherit t :depth treeless :ref
-                       "77115afc1b0b9f633084cf7479c767988106c196"))
+                       "3fe3534c75b0205c55d6c8a42e321467879dbdec"))
  (anzu :source "elpaca-menu-lock-file" :recipe
        (:package "anzu" :fetcher github :repo "emacsorphanage/anzu" :files
                  ("*.el" "*.el.in" "dir" "*.info" "*.texi" "*.texinfo" "doc/dir"
