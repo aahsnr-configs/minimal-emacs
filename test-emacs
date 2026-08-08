@@ -1,0 +1,6 @@
+#!/bin/bash
+rm -rf var/ etc/ init.el straight/ eln-cache
+emacs --batch --eval "(require 'org)" --eval '(org-babel-tangle-file "~/.config/emacs/config.org")'
+killall emacs
+killall emacs
+emacs --daemon
