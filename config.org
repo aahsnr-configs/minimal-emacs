@@ -1148,17 +1148,17 @@ Terminal emulation powered by =libghostty-vt=, rendering as a persistent bottom 
 
 ;; Routes Eshell visual commands to dedicated Ghostel buffers for proper TTY rendering.
 (use-package ghostel-eshell
-  :straight nil
+  :ensure nil
   :hook (eshell-load . ghostel-eshell-visual-command-mode))
 
 ;; Replaces standard compilation buffers with live TTY-backed Ghostel sessions.
 (use-package ghostel-compile
-  :straight nil
+  :ensure nil
   :hook (elpaca-after-init . ghostel-compile-global-mode))
 
 ;; Upgrades Comint and REPL output with libghostty-vt ANSI and OSC parsing fidelity.
 (use-package ghostel-comint
-  :straight nil
+  :ensure nil
   :hook (elpaca-after-init . ghostel-comint-global-mode))
 #+end_src
 
@@ -1166,7 +1166,7 @@ Terminal emulation powered by =libghostty-vt=, rendering as a persistent bottom 
 Modifies word boundaries to recognize camelCase transitions. Globally enables native and Evil motions to traverse compound identifiers.
 #+begin_src emacs-lisp
 (use-package subword
-  :straight(:type built-in)
+  :ensure nil
   :config
   (global-subword-mode 1))
 #+end_src
@@ -1194,7 +1194,7 @@ Native pixel-precision viewport translation for hardware input and keyboard inte
 
 ;; Native pixel-precision engine (Emacs 29+).
 (use-package pixel-scroll
-  :straight(:type built-in)
+  :ensure nil
   :custom
   ;; Disables synthetic momentum to prevent Wayland/PGTK compositor feedback loops.
   (pixel-scroll-precision-use-momentum nil)
@@ -1209,7 +1209,7 @@ Native pixel-precision viewport translation for hardware input and keyboard inte
 Downloads language parsers that power code coloring and structural navigation.
 #+begin_src emacs-lisp
 (use-package treesit
-  :straight(:type built-in)
+  :ensure nil
   :if (treesit-available-p)
   :preface
   ;; Must precede :custom (load-order constraint).
@@ -1252,7 +1252,7 @@ Downloads language parsers that power code coloring and structural navigation.
 Native auto-pairing, O(1) prose formatting, and AST-aware re-indentation.
 #+begin_src emacs-lisp
 (use-package elec-pair
-  :straight(:type built-in)
+  :ensure nil
   :init
   ;; Conservative inhibition prevents pairing in unbalanced buffers and complex strings.
   (setq electric-pair-inhibit-predicate #'electric-pair-conservative-inhibit
@@ -1287,7 +1287,7 @@ Native auto-pairing, O(1) prose formatting, and AST-aware re-indentation.
 
 ;; Native electric indentation and "Electric Words" engine.
 (use-package electric
-  :straight(:type built-in)
+  :ensure nil
   :init
   ;; Force newline and backspace to trigger electric indentation.
   ;; ?\^? enables "Smart Backspace" (dedenting by full indentation level)
@@ -1390,7 +1390,7 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
 Native delimiter highlighting and Emacs 29+ overlay context rendering.
 #+begin_src emacs-lisp
 (use-package paren
-  :straight(:type built-in)
+  :ensure nil
   :custom
   ;; Delay before highlighting matching delimiters.
   (show-paren-delay 0.05)
@@ -3648,7 +3648,7 @@ Groups all open buffers by their active project roots while respecting workspace
 ;; projection-ibuffer is bundled inside the `projection` monorepo.
 ;; It dynamically generates ibuffer filter groups based on project.el roots.
 (use-package projection-ibuffer
-  :straight nil
+  :ensure nil
   :after projection
   :commands
   ibuffer-projection-set-filter-groups
@@ -3938,7 +3938,7 @@ Renders completion candidates in a vertical, interactive dropdown list.
 Provides directory navigation commands for the minibuffer.
 #+begin_src emacs-lisp
 (use-package vertico-directory
-  :straight nil
+  :ensure nil
   :after vertico
   :bind (:map vertico-map
               ("RET"   . vertico-directory-enter)
@@ -3951,7 +3951,7 @@ Provides directory navigation commands for the minibuffer.
 Enables rapid candidate selection via Avy-style shortcuts.
 #+begin_src emacs-lisp
 (use-package vertico-quick
-  :straight nil
+  :ensure nil
   :after vertico
   :bind (:map vertico-map
               ("M-q" . vertico-quick-jump)
@@ -3963,7 +3963,7 @@ Enables rapid candidate selection via Avy-style shortcuts.
 Saves and replays minibuffer completion sessions.
 #+begin_src emacs-lisp
 (use-package vertico-repeat
-  :straight nil
+  :ensure nil
   :after vertico
   :init
   ;; Registers the save hook immediately via autoloads to capture all sessions.
@@ -3978,7 +3978,7 @@ Saves and replays minibuffer completion sessions.
 Customizes completion dropdown layouts and applies visual highlighting to candidates based on the active command.
 #+begin_src emacs-lisp
 (use-package vertico-multiform
-  :straight nil
+  :ensure nil
   :after vertico
   :config
   ;; Guarantees the `dired-directory` face is registered before minibuffer rendering.
@@ -4154,7 +4154,7 @@ Provides context-aware action menus for minibuffer candidates and buffer targets
 
 #+begin_src emacs-lisp
 (use-package embark-org
-  :straight nil
+  :ensure nil
   :after (embark org))
 #+end_src
 
@@ -4662,7 +4662,7 @@ Defines the lifecycle of actionable items and groups them by physical or digital
 Configures the task overview display, sorting, and window behavior.
 #+begin_src emacs-lisp
 (use-package org-agenda
-  :straight nil
+  :ensure nil
   :defer t
   :after org
   :custom
@@ -5082,7 +5082,7 @@ Defines named agenda views for daily planning, weekly review, effort-based selec
 Renders habit consistency graphs in the daily agenda with configurable history, future span, and custom completion glyphs.
 #+begin_src emacs-lisp
 (use-package org-habit
-  :straight nil
+  :ensure nil
   :defer t
   :after org
   :custom
@@ -5792,7 +5792,7 @@ Spawns a new Denote note via org-capture with front-matter handled by denote-org
 Wires all template groups into org-capture, routes the UI to a dedicated bottom drawer, and saves buffers on successful capture.
 #+begin_src emacs-lisp
 (use-package org-capture
-  :straight nil
+  :ensure nil
   :defer t
   :after org
   :custom
@@ -5912,7 +5912,7 @@ Configures Org structure templates for rapid block insertion and implements a de
 Displays breadcrumbs for headlines, header arguments for source blocks, and bridges native Emacs Lisp ElDoc inside source blocks.
 #+begin_src emacs-lisp
 (use-package org-eldoc
-  :straight nil
+  :ensure nil
   :after org)
 #+end_src
 
