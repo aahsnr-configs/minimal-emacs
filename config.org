@@ -3097,7 +3097,6 @@ Provides a visual directory editor and file manager for navigating the filesyste
 Transforms the native directory editor into a modern, visual file manager with live previews, sidebars, and integrated version control overlays.
 #+begin_src emacs-lisp
 (use-package dirvish
-  :ensure (:host github :repo "latiagertrutis/dirvish")
   :defer t
   :custom
   ;; Route cache to no-littering var directory to prevent ~/.cache pollution.
@@ -4162,17 +4161,17 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
   :init
   (global-corfu-mode)
   :custom
-  (corfu-cycle t)
+  ;;(corfu-cycle t)
   (corfu-auto t)
   (corfu-quit-at-boundary 'separator)
   (corfu-quit-no-match 'separator)
-  (corfu-count 5)
+  ;;(corfu-count 5)
   (corfu-max-width 120)
   ;; Preselects the prompt to prevent accidental candidate commits.
   (corfu-preselect 'prompt)
   (corfu-on-exact-match nil)
   ;; Delays auto-completion to prevent GC stutter with Orderless.
-  (corfu-auto-delay 0.1)
+  (corfu-auto-delay 0.24)
   (corfu-auto-prefix 2)
   (global-corfu-modes '((not erc-mode
                              eshell-mode
@@ -4210,13 +4209,13 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
   (add-hook 'before-save-hook #'corfu-quit))
 
 ;; ;; Bundled extensions isolated for load-order safety.
-;; (use-package corfu-history
-;;   :ensure nil
-;;   :after corfu
-;;   :config
-;;   (corfu-history-mode 1)
-;;   (with-eval-after-load 'savehist
-;;     (add-to-list 'savehist-additional-variables 'corfu-history)))
+(use-package corfu-history
+  :ensure nil
+  :after corfu
+  :config
+  (corfu-history-mode 1)
+  (with-eval-after-load 'savehist
+    (add-to-list 'savehist-additional-variables 'corfu-history)))
 
 ;; (use-package corfu-popupinfo
 ;;   :ensure nil
@@ -5895,9 +5894,11 @@ Configures Org structure templates for rapid block insertion and implements a de
   (advice-add #'org-babel-do-load-languages :override #'ignore))
 #+end_src
 
-** DONE Evil Org
+** TODO Evil Org
+TODO: Add evil org config from doom emacs
 #+begin_src emacs-lisp
 (use-package evil-org
+  :ensure (:host github :repo "doomelpa/evil-org-mode")
   :after org
   :hook (org-mode . (lambda () evil-org-mode))
   :config
@@ -5908,9 +5909,9 @@ Configures Org structure templates for rapid block insertion and implements a de
 ** DONE Org Eldoc
 Displays breadcrumbs for headlines, header arguments for source blocks, and bridges native Emacs Lisp ElDoc inside source blocks.
 #+begin_src emacs-lisp
-(use-package org-eldoc
-  :ensure nil
-  :after org)
+;; (use-package org-eldoc
+;;   :ensure nil
+;;   :after org)
 #+end_src
 
 ** DONE Transient Template System
@@ -6744,17 +6745,6 @@ Injects Denote backlinks into the universal sidecar, mimicking the org-roam buff
   (add-to-list 'universal-sidecar-sections 'denote-sections-backlinks-section t))
 #+end_src
 
-** DONE Denote Citar Sections
-Injects bibliography abstracts and formatted references into the universal sidecar for literature notes.
-#+begin_src emacs-lisp
-(use-package denote-citar-sections
-  :defer t
-  :after (universal-sidecar denote citar)
-  :config
-  ;; Append bibliography sections for literature notes (abstract first, then reference).
-  (add-to-list 'universal-sidecar-sections 'denote-citar-sections-abstract-section t)
-  (add-to-list 'universal-sidecar-sections 'denote-citar-sections-reference-section t))
-#+end_src
 
 
 
@@ -7061,6 +7051,20 @@ Routes all Markdown editing, viewing, table, and structure commands through the 
  "o u" '(outline-up-heading :wk "Up heading")
  "o c" '(markdown-ts-outline-cycle :wk "Cycle fold")
  "o a" '(outline-show-all :wk "Show all"))
+#+end_src
+
+
+* TODO LaTeX Writing Environment
+** DONE Denote Citar Sections
+Injects bibliography abstracts and formatted references into the universal sidecar for literature notes.
+#+begin_src emacs-lisp
+;; (use-package denote-citar-sections
+;;   :defer t
+;;   :after (universal-sidecar denote citar)
+;;   :config
+;;   ;; Append bibliography sections for literature notes (abstract first, then reference).
+;;   (add-to-list 'universal-sidecar-sections 'denote-citar-sections-abstract-section t)
+;;   (add-to-list 'universal-sidecar-sections 'denote-citar-sections-reference-section t))
 #+end_src
 
 

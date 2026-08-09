@@ -1,741 +1,771 @@
 document:
-  title: "Elpaca Package Manager & `use-package` Integration: Architecture, Asynchronous Physics, and Queue-Order Execution (v1)"
+  title: "Elpaca & use-package: A Self-Contained Technical Reference"
   description: >
-    This document provides a canonical, unified breakdown of the Elpaca package manager
-    (progfolio/elpaca) and its integration with the `use-package` macro (v2.4.5+, bundled with
-    Emacs 30.2, min. Elpaca requirement Emacs >= 27.1). It details Elpaca's asynchronous,
-    git-based, queue-driven installation model, its `use-package` keyword integration (which
-    reuses and overrides the native `:ensure` keyword rather than adding a new one), and
-    queue-order load dependencies. This is a direct architectural counterpart to a companion
-    document covering straight.el; wherever the two package managers diverge, that divergence
-    is called out explicitly, because it is the single most common source of migration bugs.
-    All definitions are derived from the official Elpaca manual (`progfolio/elpaca`, `doc/manual.md`),
-    `elpaca.el` and `extensions/elpaca-use-package.el` source, the official GNU Emacs
-    `use-package` User Manual, the upstream `use-package` source (jwiegley/use-package), and
-    the Elpaca GitHub wiki's "Migrating to Elpaca" page, cross-checked against Emacs 30.2 core.
-    Verified current as of August 2026.
+    A standalone reference to the Elpaca elisp package manager (progfolio/elpaca) and its
+    integration with the `use-package` configuration macro. Covers Elpaca's asynchronous,
+    git-based, queue-driven installation model; the full recipe/menu/order vocabulary; the
+    `elpaca-use-package-mode` integration layer and exactly how it changes `use-package`'s
+    behavior; the interactive package-management UI; and the practical timing pitfalls that
+    fall out of Elpaca's async design. Verified directly against Elpaca's `doc/manual.md`,
+    `elpaca.el`, `extensions/elpaca-use-package.el`, and the `use-package-core.el`/
+    `use-package-ensure.el` sources bundled with current Emacs, current as of August 2026.
   sections:
     - id: 1
-      title: Core Philosophy
+      title: Overview
       points:
         - >
-          Elpaca is an asynchronous, git-based elisp package manager that replaces `package.el`
-          entirely. Packages are cloned as git (or `tar`/`file`-type) repositories rather than
-          downloaded as archive tarballs. Package state is defined by the init-file's `elpaca`
-          declarations plus an optional lock file (`elpaca-write-lock-file` /
-          `elpaca-lock-file`), with no other persistent data. Like straight.el, Elpaca has no
-          native cooperation with `package.el`; users must set `package-enable-at-startup` to
-          `nil` and remove any `(package-activate-all)` calls.
+          Elpaca is an asynchronous, git-based elisp package manager. It finds, installs,
+          updates, and removes third-party Emacs packages, and is a full replacement for the
+          built-in `package.el` — it does not use or cooperate with `package.el` at all.
         - >
-          `use-package` is not a package manager. Its primary purpose is to organize package
-          configuration declaratively, eliminate repetitive boilerplate, and enable lazy-loading
-          (autoloading) to keep Emacs startup times low. This is unchanged from any other backend.
+          Requirements: Emacs >= 27.1, and `git` on `PATH` (no specific minimum git version is
+          documented, but a reasonably current git is assumed).
         - >
-          CRITICAL DIVERGENCE FROM SYNCHRONOUS PACKAGE MANAGERS (e.g. straight.el): Elpaca
-          installs packages asynchronously and in parallel, via a queue system. Registering a
-          package with the `elpaca` macro (or the `:ensure` `use-package` keyword, once
-          `elpaca-use-package-mode` is enabled) does NOT clone/build/activate that package
-          in-line before control returns to the next form in the init file. It instead pushes an
-          "order" onto the current queue and returns immediately; the queue's orders are
-          processed after Emacs finishes reading the init file (Elpaca hooks
-          `elpaca-process-queues` onto `after-init-hook` by default). Standard synchronous,
-          top-to-bottom load-order assumptions therefore do NOT apply by default: a package
-          declared on one line is not guaranteed to be installed, let alone required, by the
-          time the next line of your init file runs. The two escape hatches from this are the
-          `:wait` recipe keyword (splits the current queue and blocks on it immediately) and the
-          standalone `(elpaca-wait)` call (blocks until everything queued so far has finished
-          processing) — both discussed in Section 2. There is no equivalent of straight.el's
-          `straight-check-for-modifications` rebuild-detection machinery, because Elpaca's build
-          pipeline runs its own dependency/build graph per queue rather than scanning the
-          filesystem for modifications at every startup.
-      files:
-        - path: "~/.config/emacs/early-init.el"
-          note: >
-            `package-enable-at-startup` MUST be `nil` here, before `package.el` gets a chance to
-            run, exactly as with any other non-`package.el` manager. On Windows, either ensure
-            the user can create symlinks or enable `elpaca-no-symlink-mode`.
-        - path: "~/.config/emacs/init.el"
-          note: >
-            The Elpaca installer block (bootstrapping `elpaca-directory`,
-            `elpaca-builds-directory`, `elpaca-sources-directory`, and the `elpaca-order` for
-            Elpaca itself) must be the very first Elpaca-related code in this file, before any
-            other call to `elpaca`, `use-package`, or Elpaca functions. It clones Elpaca via
-            `git clone`/`git checkout` in a child buffer, byte-recompiles it, requires it, and
-            generates its autoloads; `(add-hook 'after-init-hook #'elpaca-process-queues)` is
-            registered as part of this same block so that the very first queue drains once init
-            reading completes.
+          The defining architectural fact about Elpaca, and the one everything else in this
+          document follows from: package installation is asynchronous and queue-based.
+          Declaring a package does not clone/build/activate it before control returns to the
+          rest of your init file — it queues the work and returns immediately. Elpaca processes
+          its queues only after Emacs finishes reading the init file (by default, via a hook on
+          `after-init-hook`). Section 3 covers exactly what this means in practice.
+        - >
+          `use-package` is a separate macro (bundled with current Emacs; see Section 8) for
+          organizing package configuration declaratively — binding keys, deferring loads,
+          setting `defcustom`s, and so on. It is not itself a package manager. Elpaca integrates
+          with it via an optional extension, `elpaca-use-package`, covered in Section 8.
     - id: 2
-      title: The Asynchronous Queue-Processing Timeline
-      description: >
-        Because Elpaca is queue-based, this "timeline" is not a single linear pass through the
-        init file the way straight.el's is. Reading the init file only POPULATES queues; nothing
-        in a given queue actually clones, builds, or (critically) evaluates a `use-package`
-        BODY until that queue is processed — which, absent `:wait` or `(elpaca-wait)`, does not
-        happen until after the entire init file has been read.
-      phases:
-        - name: "Phase 0: Bootstrap (Synchronous, unconditionally so)"
-          items:
-            - event: "early-init.el"
-              description: >
-                `package-enable-at-startup` set to `nil` to prevent `package.el` interference.
-            - event: "The Installer Block"
-              description: >
-                Checks for an existing local Elpaca checkout under `elpaca-directory`
-                (`user-emacs-directory/elpaca/`); if absent, clones
-                `https://github.com/progfolio/elpaca.git`, checks out the pinned `:ref` (`nil`
-                by default, i.e. the repository's default branch tip, unless overridden),
-                byte-recompiles it in a synchronous subprocess, and generates its own autoloads.
-                This bootstrap step is the one part of Elpaca's entire lifecycle that is always
-                synchronous — every other queue is async by design.
-        - name: "Phase 1: Order Registration, Recipe Resolution, and Queueing (Inline, during init read)"
-          description: >
-            This phase happens once per `elpaca` call (or per `:ensure` keyword under
-            `elpaca-use-package-mode`), and it returns to the next init-file form almost
-            immediately — it does NOT wait for cloning or building to finish.
-          items:
-            - event: "Recipe/Order Resolution"
-              description: >
-                If only a package symbol was given, Elpaca looks it up via `elpaca-menu-functions`
-                (checked in order: MELPA, Org, Org-contrib, GNU ELPA Mirror, NonGNU ELPA, by
-                default). If a partial or full recipe plist was given, it is merged with any
-                inherited defaults per the precedence order:
-                `elpaca-recipe-functions` > declared recipe > `elpaca-order-functions` >
-                `elpaca-menu-functions`.
-            - event: "Queueing"
-              description: >
-                The order is pushed onto Elpaca's current queue. This is the first action Elpaca
-                takes for a given declaration — nothing about the package's git state is touched
-                yet.
-            - event: "Clone (deferred, asynchronous, parallelized)"
-              description: >
-                When the queue is later processed, if the local repository is not already present
-                under `elpaca-sources-directory`, it is cloned (respecting `:depth`,
-                `:protocol`, `:remotes`, and the ref specified by `:branch`/`:tag`/`:ref`, or by
-                the lock file if one is active). Multiple packages' clones proceed in parallel
-                rather than one-at-a-time.
-            - event: "Build (deferred, asynchronous)"
-              description: >
-                Elpaca's default build steps (`elpaca-default-build-steps`) get the source files
-                on disk, byte-compile the package's elisp, generate/link autoloads (per
-                `:autoloads`), and build documentation. `:build` can customize, reorder, or
-                disable these steps via its `:after`/`:before`/`:first`/`:last`/`:sub`/`:not`
-                substitution DSL, or be set to `nil` to skip building entirely. There is no
-                filesystem-watcher/`find`-based modification-detection layer analogous to
-                straight.el's `straight-check-for-modifications`; Elpaca does not re-scan
-                already-built packages for local edits on every startup by default.
-            - event: "Activation (adding load-path, loading autoloads — NOT full `require`)"
-              description: >
-                Once built, Elpaca activates the package: adds its build directory to
-                `load-path` and loads its autoloads file. This makes autoloaded commands/
-                functions callable, but it does NOT `require` the package's features.
-                `defcustom`, `defvar`, and `defun` forms inside the package's main file are NOT
-                yet evaluated. This is the load-bearing fact for Section 5's case study, and it
-                is functionally identical in spirit to straight.el's own "installing activates
-                autoloads but does not require features" behavior — the two managers agree here
-                even though one is sync and the other is async.
-            - event: "BODY Evaluation (queue-order-dependent, NOT init-file-order-dependent)"
-              description: >
-                Only after activation does Elpaca evaluate the *BODY* forms passed to the
-                `elpaca` macro — and, critically, under `elpaca-use-package-mode`, THE ENTIRE
-                `use-package` FORM (minus the now-consumed `:ensure` recipe) becomes that BODY.
-                `(use-package example :ensure t :init (foo) :config (bar))` expands to
-                `(elpaca example (use-package example :init (foo) :config (bar)))`. This means
-                the whole `use-package` declaration — including its own internal `:init`/`:config`
-                keyword pipeline — does not run until Elpaca decides to process that specific
-                order's queue. Declaration BODY forms within a single `elpaca`/`use-package` call
-                are still evaluated synchronously and in declared order relative to each other;
-                it is the timing of the whole declaration relative to OTHER top-level forms in
-                the init file that becomes non-deterministic without `:wait`/`elpaca-wait`.
-        - name: "Phase 1.5: Queue Draining — `:wait`, `elpaca-wait`, and `after-init-hook`"
-          description: >
-            Because Phase 1's queueing defers real work, Elpaca provides explicit synchronization
-            points. This phase has no counterpart in straight.el's model, because straight.el
-            never needs to be told to "catch up."
-          items:
-            - event: "`:wait` recipe keyword"
-              description: >
-                `(elpaca (general :wait t))` — or, under `use-package`, `:ensure (:wait t)` —
-                splits the current queue and immediately begins processing every order queued so
-                far, blocking until it finishes, before evaluating anything past that point. This
-                is the standard idiom for packages needed at top-level during init reading itself
-                (e.g. `general.el`, which registers its own `use-package` keyword, or a package
-                that supplies an `elpaca-menu-functions` entry).
-            - event: "`(elpaca-wait)`"
-              description: >
-                A standalone, widely used call (documented via the `:wait` mechanism it is built
-                on, and ubiquitous in real-world Elpaca configs) that blocks until every order
-                queued up to that point has finished processing, without itself queueing a new
-                package. Configs commonly sprinkle `(elpaca-wait)` after a batch of related
-                `use-package` forms to create explicit synchronization checkpoints, functioning
-                as Elpaca's rough equivalent of the "everything above this line is now installed
-                and required" guarantee that straight.el gives for free after every single form.
-            - event: "`after-init-hook` / `elpaca-after-init-hook`"
-              description: >
-                By default, `elpaca-process-queues` runs on `after-init-hook`, so any queue not
-                already drained via `:wait`/`elpaca-wait` finishes there. Configuration that
-                itself relies on `after-init-hook` or `emacs-startup-hook` (loading `custom-file`,
-                starting a server, etc.) must instead be attached to `elpaca-after-init-hook`,
-                which Elpaca runs only once ALL queued packages have finished activating —
-                otherwise such code races against package installation.
-        - name: "Phase 2: use-package's Own Keyword Pipeline (per form, once its queue is processed)"
-          description: >
-            Independent of Elpaca, `use-package-core.el` defines a fixed evaluation order via
-            the `use-package-keywords` defcustom. Its BASE order — as literally defined in
-            `use-package-core.el`, with NEITHER `:ensure` NOR `:pin` present — runs: `:disabled
-            :load-path :requires :defines :functions :preface :if :when :unless :no-require
-            :catch :after :custom :custom-face :bind :bind* :bind-keymap :bind-keymap*
-            :interpreter :mode :magic :magic-fallback :hook :commands :autoload :init :defer
-            :demand :load :config`. `:ensure` and `:pin` are added SEPARATELY, at the moment
-            `use-package-ensure.el` loads (which happens by default whenever `use-package` is
-            required), via two back-to-back `(add-to-list 'use-package-keywords ...)` calls.
-            Because `add-to-list` PREPENDS by default, and `:pin` is added first followed by
-            `:ensure`, the net effect is that `:ensure` becomes the very FIRST keyword processed
-            of all of them — firing even before `:load-path` — with `:pin` immediately behind it.
-            Under `elpaca-use-package-mode`, firing `:ensure` means "queue this order and defer
-            the REST of the macro's expansion (including `:init` and `:config`) into that order's
-            BODY," not "clone and build inline, then keep going," as it would under straight.el's
-            added `:straight` keyword. Separately, `elpaca-use-package-mode` ALSO repositions and
-            reinterprets the built-in `:vc` keyword while active — see the dedicated `:vc` item
-            below and Section 6, which corrects the straight.el companion document's "don't mix
-            `:vc` with your package manager" guidance for Elpaca's case specifically. `:load`
-            still sits directly before `:config`, near the very end of the pipeline — this is
-            where the actual `(require 'foo)` happens for non-deferred packages, and it still
-            creates a gap between "package files exist and autoloads are active" and "the
-            package's real symbols exist," exactly as under straight.el, just nested one level
-            deeper inside an async queue instead of a synchronous top-level pass.
-          items:
-            - event: ":disabled Check"
-              description: >
-                Checked by the macro itself via `(unless (memq :disabled args) ...)`, entirely
-                outside and prior to the `use-package-keywords` pipeline. `(use-package foo
-                :disabled nil)` is still disabled; only the keyword's presence matters. Identical
-                under every backend.
-            - event: ":ensure (Elpaca's integration point — an OVERRIDDEN keyword, not a new one)"
-              description: >
-                Elpaca does not add a `:straight`-style third-party keyword for its primary
-                mechanism. Instead, the global minor mode `elpaca-use-package-mode` (defined via
-                `define-minor-mode :global t` in `extensions/elpaca-use-package.el`) uses
-                `(advice-add #'use-package-handler/:ensure :override #'elpaca-use-package--handler)`
-                and the equivalent for `use-package-normalize/:ensure` to swap the native
-                `:ensure` keyword's implementation wholesale, in a way that is fully reversible —
-                turning the mode back off calls `advice-remove` on both. `:ensure t` queues an
-                order for a package matching the declared feature name; `:ensure some-other-name`
-                (a bare symbol) installs under that different ID instead of the feature name;
-                `:ensure (recipe...)` supplies a custom recipe (a bare plist, with NAME
-                automatically prepended as the ID if the plist starts with a keyword rather than
-                an explicit ID); `:ensure nil` opts the declaration out of Elpaca's handling
-                entirely for that one form. This can be made implicit for every declaration by
-                setting `use-package-always-ensure` to non-nil — the SAME variable `package.el`
-                and straight.el each also recognize, not a separate Elpaca-only variable. (An
-                older variable, `elpaca-use-package-by-default`, is now a formally obsolete alias
-                of `use-package-always-ensure`, deprecated 2024-02-08, precisely so that configs
-                do not need an Elpaca-specific knob.) For backward compatibility with configs
-                migrating from straight.el, `elpaca-use-package.el` ALSO — separately, and
-                unconditionally, via plain `defalias` and `add-to-list` calls made once at
-                load-time rather than being gated by the minor mode — registers `:straight` and
-                `:elpaca` as deprecated aliases for the same handler/normalizer functions. Because
-                this registration happens outside the mode toggle, `:straight`/`:elpaca` remain
-                usable (with a deprecation warning) even if `elpaca-use-package-mode` is later
-                turned off, unlike `:ensure`/`:vc` handling, which IS mode-gated. Current configs
-                should use `:ensure`, not `:straight`/`:elpaca`.
-            - event: ":vc (also intercepted and reinterpreted while `elpaca-use-package-mode` is active)"
-              description: >
-                This is the single biggest point of divergence from the straight.el companion
-                document's guidance, and it is easy to get backwards. `elpaca-use-package-mode`
-                ALSO advises `use-package-handler/:vc` and `use-package-normalize/:vc` (again via
-                `advice-add :override`, reversible the same way), and repositions `:vc` — via
-                `use-package-list-insert` — to fire immediately before `:ensure` while the mode is
-                active (it is moved back to sit before `:no-require`, roughly where Emacs 30's
-                built-in `package-vc.el` originally registered it, when the mode is switched off).
-                In practice: a `:vc` spec written for Emacs's native `package-vc.el` is
-                automatically converted into an Elpaca recipe and wrapped in an `elpaca` order —
-                UNLESS the same declaration also includes `:ensure nil`, in which case `:vc`
-                handling is skipped and the declaration is left unmanaged. The conversion only
-                maps a subset of `package-vc.el`'s spec keys to Elpaca recipe keys (`:url` →
-                `:repo`, `:branch` → `:branch`, `:main-file` → `:main`, `:lisp-dir` → `:files`);
-                any other `package-vc.el` spec key is silently dropped rather than erroring, so an
-                exotic `:vc` spec may lose fidelity when auto-converted. See Section 6 for the
-                full correction of this point relative to straight.el's guidance.
-            - event: ":preface"
-              description: >
-                Evaluated before conditionals (after `:disabled`, and — once the order's queue is
-                processed — after `:ensure` has finished queueing/deferring). Runs at both
-                byte-compile time and load time; must stay side-effect-free.
-            - event: ":if / :when / :unless"
-              description: >
-                Gates whether the *rest* of the declaration loads, by wrapping the remainder in
-                `(when PRED ...)`. Same mechanism regardless of backend.
-            - event: ":custom / :custom-face"
-              description: >
-                Expands to `customize-set-variable` calls. Because these sit well before `:init`
-                and `:load`/`:config` in the base keyword order, they still run before the package
-                is actually required — same behavior as under any other backend, once the
-                surrounding declaration's queue has been processed.
-            - event: "Autoload Triggers (:hook, :bind, :mode, :commands)"
-              description: >
-                Register autoloads/deferred triggers in Emacs; they do not force the package to
-                load immediately. This layer is entirely a `use-package` feature, orthogonal to
-                which package manager is installing the package underneath — and orthogonal to
-                Elpaca's OWN, separate layer of deferral (the queue itself).
-            - event: ":init"
-              description: >
-                Evaluated before `:load`/`:config`, i.e. before the real `(require 'foo)` happens
-                — same as under any backend. WARNING: by the time `:init` runs, Elpaca has
-                already cloned/built/autoload-activated the package (the BODY containing this
-                `use-package` form only began evaluating because the order's build finished). It
-                is tempting to assume the package is fully "ready" for this reason. It is not —
-                its `defcustom`/`defvar`/`defun` forms have not been evaluated yet, for the exact
-                same reason as under straight.el: use-package's own internal `:load` position, not
-                anything about Elpaca's async model. Referencing package-specific variables in
-                `:init` still typically raises a `void-variable` error.
-            - event: ":load / (implicit require)"
-              description: >
-                This is where `use-package` actually loads the package for non-deferred
-                declarations (or where deferred declarations get their autoload-triggered load
-                later). This is the true "boundary" inside a single declaration's own pipeline —
-                distinct from, and nested inside, the coarser boundary Elpaca's queue system
-                already applies to the whole declaration.
-            - event: ":config"
-              description: >
-                Evaluated after the package has fully loaded (i.e., after the `:load` step, or
-                after a deferred autoload trigger fires and pulls the package in). This is the
-                bulletproof phase for modifying a package's internal `defcustom` lists, altering
-                keymaps, advising functions, and activating global minor modes — identical
-                guidance to any other backend, and for the same underlying reason.
+      title: Installation
+      points:
+        - subtopic: "early-init.el"
+          detail: >
+            Disable `package.el` before it has a chance to run, since Elpaca replaces it
+            entirely:
+          code: |
+            (setq package-enable-at-startup nil)
+          note: >
+            Also remove any remaining `package.el`-related calls from your init file, such as
+            `(package-activate-all)`.
+        - subtopic: "Windows symlinks"
+          detail: >
+            Windows users must be able to create symlinks, or enable `elpaca-no-symlink-mode`:
+          code: |
+            ;; Uncomment for systems which cannot create symlinks:
+            ;; (elpaca-no-symlink-mode)
+        - subtopic: "The installer block"
+          detail: >
+            The following block must appear in `init.el` before any other Elpaca function or
+            macro call. It clones Elpaca into `elpaca-directory` (`user-emacs-directory/elpaca/`
+            by default) if not already present, byte-compiles it, requires it, generates its
+            autoloads, and registers `elpaca-process-queues` on `after-init-hook` so the first
+            queue drains once Emacs finishes reading the init file.
+          code: |
+            (defvar elpaca-installer-version 0.12)
+            (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
+            (defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
+            (defvar elpaca-sources-directory (expand-file-name "sources/" elpaca-directory))
+            (defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
+                                          :ref nil :depth 1 :inherit ignore
+                                          :files (:defaults "elpaca-test.el" (:exclude "extensions"))
+                                          :build (:not elpaca-activate)))
+            (let* ((repo  (expand-file-name "elpaca/" elpaca-sources-directory))
+                   (build (expand-file-name "elpaca/" elpaca-builds-directory))
+                   (order (cdr elpaca-order))
+                   (default-directory repo))
+              (add-to-list 'load-path (if (file-exists-p build) build repo))
+              (unless (file-exists-p repo)
+                (make-directory repo t)
+                (when (<= emacs-major-version 28) (require 'subr-x))
+                (condition-case-unless-debug err
+                    (if-let* ((buffer (pop-to-buffer-same-window "*elpaca-bootstrap*"))
+                              ((zerop (apply #'call-process `("git" nil ,buffer t "clone"
+                                                              ,@(when-let* ((depth (plist-get order :depth)))
+                                                                  (list (format "--depth=%d" depth) "--no-single-branch"))
+                                                              ,(plist-get order :repo) ,repo))))
+                              ((zerop (call-process "git" nil buffer t "checkout"
+                                                    (or (plist-get order :ref) "--"))))
+                              (emacs (concat invocation-directory invocation-name))
+                              ((zerop (call-process emacs nil buffer nil "-Q" "-L" "." "--batch"
+                                                    "--eval" "(byte-recompile-directory \".\" 0 'force)")))
+                              ((require 'elpaca))
+                              ((elpaca-generate-autoloads "elpaca" repo)))
+                        (progn (message "%s" (buffer-string)) (kill-buffer buffer))
+                      (error "%s" (with-current-buffer buffer (buffer-string))))
+                  ((error) (warn "%s" err) (delete-directory repo 'recursive))))
+              (unless (require 'elpaca-autoloads nil t)
+                (require 'elpaca)
+                (elpaca-generate-autoloads "elpaca" repo)
+                (let ((load-source-file-function nil)) (load "./elpaca-autoloads"))))
+            (add-hook 'after-init-hook #'elpaca-process-queues)
+            (elpaca `(,@elpaca-order))
     - id: 3
-      title: Anatomy of an Elpaca Recipe
-      keywords:
-        - name: ":type"
-          description: >
-            Symbol identifying the package type; Elpaca looks up a matching entry in
-            `elpaca-types` to load the relevant backend. Default supported types are `git`
-            (local/remote git repositories), `tar` (tarball archives), and `file` (local files/
-            directories). Different types interpret the remaining recipe keywords differently or
-            ignore some altogether.
-        - name: ":host / :fetcher"
-          description: >
-            Repository hosting service, e.g. `:host github` (or the `:fetcher` alias). Strings
-            are inserted into the resulting URI verbatim, e.g. `:host "www.example.com"`.
-        - name: ":repo"
-          description: >
-            `USER/REPO` when paired with `:host`; a bare local path or full remote URL otherwise.
-            A cons cell `(REMOTE . LOCAL)` renames the on-disk local repository directory.
-        - name: ":branch / :tag / :ref"
-          description: >
-            Git branch, tag, or specific ref/commit to check out when installing. Applies to
-            `:type git` packages.
-        - name: ":remotes"
-          description: >
-            Configures additional git remotes beyond the default (the first remote's ref is what
-            gets checked out on clone). A bare string renames the default remote (e.g. to
-            "upstream"); a list of `("NAME" [PROPS])` specs adds further remotes, such as a
-            personal fork, each of which may override inherited recipe keywords like `:host`/
-            `:repo` individually.
-        - name: ":protocol / :depth"
-          description: >
-            `:protocol` is `https` or `ssh`. `:depth` controls clone depth/performance:
-            `treeless` or `blobless` (git partial-clone modes), an integer for a shallow clone
-            truncated to that many commits, or `nil` for a full clone.
-        - name: ":files"
-          description: >
-            Files linked from the package's source directory into its build directory. Elements
-            are the symbol `:defaults` (expands to `elpaca-default-files-directive`), glob-
-            matching strings, or an `(:exclude ...)` list to omit specific files. Roughly
-            analogous in purpose to straight.el's `:files` DSL, though the directive syntax and
-            defaults differ.
-        - name: ":main"
-          description: >
-            The package's main elisp file. Declaring this can speed up dependency resolution;
-            setting it to `nil` skips dependency checking for that package entirely.
-        - name: ":inherit"
-          description: >
-            When non-nil, merges in properties resolved via `elpaca-order-functions` and/or
-            `elpaca-menu-functions` (the value may also name a specific menu symbol or list of
-            menu symbols, scoping inheritance to just that/those menus for this one recipe).
-            `:inherit nil` opts a declaration out of menu-supplied defaults entirely — useful
-            when you want to guarantee only the properties you wrote yourself apply.
-        - name: ":autoloads"
-          description: >
-            Name of the package's autoload file. `nil` disables autoload generation/loading for
-            the package entirely; `t` uses the default (`PACKAGE-NAME-autoloads.el`); a string is
-            resolved relative to the package's build directory (e.g. `"org-loaddefs.el"`).
-        - name: ":build"
-          description: >
-            An ordered list of build steps, or `nil` to disable building entirely. Individual
-            steps can be inserted/removed/substituted relative to Elpaca's default pipeline
-            (`elpaca-default-build-steps`) using `:after`/`:before`/`:first`/`:last`/`:sub`/
-            `:not` substitution rules, each naming a `TARGET` function and `SUBSTITUTIONS`.
-        - name: ":pin"
-          description: >
-            When non-nil, EXCLUDES the package from bulk update commands (`elpaca-fetch-all` /
-            `elpaca-merge-all`). This is a MEANINGFUL, actively used recipe keyword under Elpaca
-            — unlike straight.el, which has no dedicated "exclude from bulk update" keyword at
-            all and instead relies on updating packages individually. Do not confuse this
-            recipe-level `:pin` with the separate, package.el-oriented `:pin` `use-package`
-            keyword described in Section 6, which remains meaningless under Elpaca.
-        - name: ":vars"
-          description: >
-            A list of bindings established via `let*` around the package's build steps. Because
-            build steps run asynchronously, wrapping an `elpaca` declaration in an ordinary
-            `let*` form will NOT keep those bindings in scope by the time each step actually
-            executes — `:vars` exists specifically to work around that async timing gap; it has
-            no real analogue in straight.el's synchronous model, where an enclosing `let*` works
-            fine.
-        - name: ":version"
-          description: >
-            A function accepting the current Elpaca struct and returning a version string
-            understood by `version-to-list`, for packages that don't expose one conventionally
-            (e.g. build systems like AUCTeX that determine their version at build time).
-        - name: ":wait"
-          description: >
-            When non-nil, splits the current queue and processes every order queued so far
-            immediately, blocking further init-file evaluation until it finishes. See Section 2,
-            Phase 1.5. THIS is Elpaca's direct analogue to the synchronization straight.el gives
-            for free on every single form — straight.el has no equivalent keyword because there
-            is nothing to wait FOR in a synchronous model.
-      note: >
-        Recipe inheritance precedence, highest to lowest: `elpaca-recipe-functions` > declared
-        recipe > `elpaca-order-functions` > `elpaca-menu-functions`. `elpaca-info` will display a
-        package's fully-resolved, inheritance-merged recipe, which is the most reliable way to
-        confirm what Elpaca actually intends to do with a given declaration.
-    - id: 4
-      title: "Detailed `use-package` Keyword Breakdown (Elpaca-specific)"
-      keywords:
-        - name: ":ensure"
-          subtitle: Queueing, Clone, Build, and Autoload Activation (Asynchronous, Deferred)
-          details:
-            - label: Mechanism
-              text: >
-                Once `elpaca-use-package-mode` is enabled, Elpaca overrides `use-package`'s
-                existing `:ensure` handler/normalizer functions via `defalias`, rather than
-                registering a brand-new keyword. `:ensure t` queues an order for the declared
-                package name; `:ensure (recipe...)` customizes the source; `:ensure nil` opts a
-                single declaration OUT of Elpaca handling entirely (evaluated immediately,
-                un-deferred by the queue system — useful for configuring built-in Emacs features
-                via the `emacs` pseudo-feature).
-            - label: Global default
-              text: >
-                Set `use-package-always-ensure` to a non-nil value to make every `use-package`
-                form implicitly behave as though `:ensure t` were given, without writing it out.
-                This is the SAME variable `package.el` and straight.el each also recognize —
-                there is no Elpaca-specific equivalent variable to reach for (the historical
-                `elpaca-use-package-by-default` is a formally obsolete alias of this variable,
-                deprecated 2024-02-08). This is the mirror image of straight.el's guidance, which
-                explicitly tells users to REMOVE `use-package-always-ensure` on migration; under
-                Elpaca, that removal should be reverted.
-        - name: ":init"
-          subtitle: Pre-Load Execution (The "Unconditional" Trap — still present, still a trap)
-          details:
-            - label: Purpose
-              text: >
-                Sets up state the package's own load sequence might read, or defines hooks/
-                variables that must exist before the package initializes.
-            - label: Constraint
-              text: >
-                By the time `:init` runs, Elpaca has already cloned/built/autoload-activated the
-                package — this use-package form's BODY only began evaluating because that
-                order's queue finished processing. But the package's actual functions and
-                variables (from its `defcustom`/`defvar`/`defun` forms) generally don't exist
-                yet, because the real `(require ...)` happens later, at `use-package`'s own
-                `:load` position, which is INSIDE the same already-deferred BODY. Referencing
-                them in `:init` typically still raises a `void-function` or `void-variable`
-                error — a subtler trap under Elpaca than under straight.el, because the
-                package-manager-level deferral (queue → BODY) and the use-package-level
-                deferral (`:init` before `:load`) are stacked on top of each other, and it is
-                easy to fix the outer one (with `:wait`) while forgetting the inner one is still
-                there.
-        - name: ":config"
-          subtitle: Post-Load Execution (The Safe Zone — still present)
-          details:
-            - label: Purpose
-              text: >
-                The safe place to call the package's functions, modify its keymaps, advise its
-                internals, and activate its global minor modes.
-            - label: Best Practice
-              text: >
-                Keep `:init` forms minimal and put as much as possible into `:config`, exactly as
-                under any other backend — the reasoning is `use-package`'s own keyword order, not
-                anything specific to being sync or async.
-    - id: 5
-      title: "Case Study: The `evil-snipe` `defcustom` List Modification"
-      problem:
-        description: >
-          In an `evil-snipe` configuration, a list of UI modes must be appended to
-          `evil-snipe-disabled-modes` to prevent the package from hijacking native keybindings
-          in read-only or UI-heavy buffers.
-      analysis:
-        - approach: "Why `:init` Fails (even after Elpaca's queue has finished processing this package)"
-          explanation: >
-            This is the point most migrators get wrong in the opposite direction from
-            straight.el: they assume that because Elpaca is asynchronous, adding `:wait` or an
-            `(elpaca-wait)` checkpoint before referencing `evil-snipe-disabled-modes` fully
-            "solves" the timing problem. It solves ONE layer of deferral (Elpaca's queue) but
-            not the other (`use-package`'s own internal keyword order), which is completely
-            unaffected by `:wait`:
-          steps:
-            - >
-              Suppose the declaration uses `:ensure (:wait t)` (or is preceded by
-              `(elpaca-wait)`), so by the time the NEXT form in the init file runs, `evil-snipe`
-              has definitely been cloned, built, and autoload-activated — Elpaca's own part of
-              the job is fully done, synchronously, from the init file's point of view.
-            - >
-              But within THIS declaration's own BODY (the deferred `use-package` form Elpaca
-              hands off to once the order finishes), `use-package`'s `:load` step — the point at
-              which `(require 'evil-snipe)` actually happens and `evil-snipe.el`'s top-level
-              `defcustom` forms actually run — still sits near the END of `use-package-keywords`,
-              right before `:config`, i.e. AFTER `:init`. `:wait` blocks the OUTER queue; it does
-              not reorder the INNER `use-package-keywords` pipeline.
-            - "So at `:init` time, `evil-snipe-disabled-modes` is still unbound, exactly as under straight.el."
-            - "Calling `add-to-list` on an unbound symbol signals a `void-variable` error, aborting the `:init` block, just as it would under any backend."
-            - >
-              Pre-declaring the variable via `defvar` in `:preface` trades this for a subtler
-              issue: since `defvar` never overwrites an already-bound variable, your custom list
-              locks in permanently before `evil-snipe.el`'s own `defcustom` can establish its
-              upstream default.
-        - approach: "Why `:config` is Bulletproof"
-          explanation: >
-            Placing the `dolist` at the very beginning of `:config` guarantees this sequence,
-            regardless of package manager — and regardless of whether Elpaca's outer queue
-            deferral has been collapsed with `:wait`/`elpaca-wait` or left fully async:
-          steps:
-            - "`use-package`'s `:load` step runs first: `(require 'evil-snipe)` evaluates, and its `defcustom` registers the upstream default list."
-            - "Your modification runs: the `dolist` executes, safely appending your custom modes to the already-populated upstream list."
-            - "The mode activates: `(evil-snipe-mode 1)` executes only after your modification."
-    - id: 6
-      title: Obsolete / Superseded / Repurposed / Inapplicable Paradigms Under Elpaca
-      points:
-        - keyword: ":ensure / use-package-always-ensure"
-          claim: >
-            Because straight.el's migration guidance says to remove `:ensure` and
-            `use-package-always-ensure`, the same advice must apply to Elpaca.
-          correction: >
-            The OPPOSITE is true, and this is the single most consequential difference from the
-            straight.el companion document. Elpaca's officially documented and supported
-            mechanism IS the native `:ensure` keyword and the native `use-package-always-ensure`
-            variable — Elpaca deliberately overrides the existing package.el-oriented handler
-            rather than introducing a parallel `:elpaca`-branded keyword/variable pair the way
-            straight.el introduced `:straight`/`straight-use-package-by-default`. A config
-            migrating FROM straight.el TO Elpaca that dutifully removed `:ensure`/
-            `use-package-always-ensure` per straight.el's own guidance will need to ADD THEM
-            BACK. `:straight` and bare `:elpaca` are retained only as deprecated, warning-emitting
-            compatibility aliases for `:ensure` — they are not the current interface.
-        - keyword: ":pin (use-package keyword, from use-package-ensure.el)"
-          claim: "`:pin` still means something useful under Elpaca, e.g. archive pinning."
-          correction: >
-            Meaningless in practice, for the same reason as under straight.el: `:pin` (added to
-            `use-package-keywords` by `use-package-ensure.el` for `package.el` archive-pinning)
-            has nothing to pin, because Elpaca-managed packages are never installed from a
-            `package.el` archive in the first place. HOWEVER — unlike straight.el — Elpaca DOES
-            repurpose a keyword spelled `:pin` at the RECIPE level (see Section 3) to mean
-            "exclude this package from `elpaca-fetch-all`/`elpaca-merge-all`." These are two
-            different `:pin`s in two different namespaces (`use-package` keyword vs. Elpaca
-            recipe plist key) that happen to share a name; do not conflate them.
-        - keyword: ":vc"
-          claim: >
-            Since straight.el's `use-package` integration leaves `:vc` untouched — so that
-            combining `:vc` with straight.el silently invokes `package-vc.el`'s own separate
-            install path and risks double-management — the same must be true of Elpaca, and the
-            same "don't mix them" guidance must apply.
-          correction: >
-            FALSE for Elpaca specifically — this is the opposite of the straight.el behavior, and
-            it is the single most consequential correction in this section. Verified directly
-            against `extensions/elpaca-use-package.el`: while `elpaca-use-package-mode` is
-            active, it advises BOTH `use-package-handler/:vc` and `use-package-normalize/:vc` (not
-            just `:ensure`), and repositions `:vc` to fire immediately before `:ensure`. A `:vc`
-            spec written in native `package-vc.el` style is therefore AUTOMATICALLY CONVERTED into
-            an Elpaca recipe and installed via Elpaca's own queue — it is not left to run through
-            `package-vc.el` unmanaged, and there is no double-management risk of the kind
-            straight.el users face. The real caveat under Elpaca is narrower and different in
-            kind: the conversion only understands a handful of `package-vc.el` spec keys (`:url`,
-            `:branch`, `:main-file`, `:lisp-dir`); any other spec key you were relying on is
-            silently dropped rather than erroring or warning, so a `:vc` spec that leans on
-            less-common `package-vc.el` options may install "successfully" but incompletely.
-            Adding `:ensure nil` to a `:vc` declaration is the explicit opt-out if you want the
-            spec left for `package-vc.el` to handle unmanaged, mirroring how `:ensure nil` opts
-            any declaration out of Elpaca entirely.
-        - keyword: "package-quickstart"
-          claim: "package-quickstart is obsolete."
-          correction: >
-            Category error, same as under straight.el. `package-quickstart` is a `package.el`
-            feature and remains fully valid in vanilla Emacs configurations that still use
-            `package.el`. It is simply INAPPLICABLE under Elpaca, because Elpaca users set
-            `package-enable-at-startup nil` and never invoke `package.el`'s activation path that
-            `package-quickstart` accelerates.
-        - keyword: "Elpaca is 'just straight.el but async'"
-          claim: "The two managers are interchangeable drop-ins for each other, modulo sync/async."
-          correction: >
-            Overstated. Beyond the sync/async split, they differ in: HOW they integrate with
-            `use-package` (overriding the existing `:ensure` handler vs. registering an entirely
-            new `:straight` keyword — this is the source of Section 6's `:ensure`/
-            `use-package-always-ensure` reversal above); default menu/recipe-source priority
-            order (MELPA/Org/Org-contrib/GNU-ELPA-Mirror/NonGNU-ELPA vs. straight.el's
-            MELPA/GNU-ELPA-mirror/Emacsmirror); the total absence of `package.el` support in
-            straight.el by design (Elpaca is similarly non-cooperative with `package.el`, though
-            documentation for each project frames this slightly differently); the queue/BODY-
-            deferral model with `:wait`/`elpaca-wait` synchronization points (no equivalent exists
-            in straight.el, because nothing needs to be waited for); the lock-file model
-            (`elpaca-write-lock-file` writing a lock file consumed via `elpaca-lock-file` +
-            `elpaca-menu-lock-file`, vs. `straight-freeze-versions` writing
-            `straight/versions/<profile>.el` with multi-profile support via `straight-profiles`);
-            and the update-command model (Elpaca's live `manual.md` documents THREE distinct
-            command pairs — `elpaca-fetch`/`elpaca-fetch-all` (fetch only), `elpaca-merge`/
-            `elpaca-merge-all` (merge already-fetched changes), and a separate
-            `elpaca-update`/`elpaca-update-all` explicitly documented as "an alias for pull" —
-            with the manual itself recommending fetch-then-review-then-merge over the update/pull
-            shortcut, vs. `straight-pull-package`/`straight-pull-all` followed by a separate
-            `straight-freeze-versions` step). Treat this document and its straight.el
-            companion as two distinct references, not one document with a find-and-replace
-            applied.
-    - id: 7
-      title: "Ecosystem Tooling: Keeping Elpaca Packages Up To Date (including topgrade)"
+      title: "The Asynchronous Model: Queues, Orders, and BODY Timing"
       description: >
-        This section exists because it is a very common practical question and a very common
-        source of surprise: general-purpose "upgrade everything" tools do not understand
-        Elpaca's per-package git checkouts by default, and Elpaca's own async model adds a
-        wrinkle straight.el's users don't have to think about even when scripting updates.
+        This is the section to read carefully before writing anything nontrivial with Elpaca.
+        Almost every surprising behavior traces back to the fact that Elpaca defers work past
+        the point where your init file finishes being read.
       points:
-        - topic: "Interactive, in-Emacs update workflow (canonical)"
+        - subtopic: "Orders"
           detail: >
-            `M-x elpaca-fetch` (single package) or `M-x elpaca-fetch-all` (every registered
-            package) fetches upstream changes WITHOUT merging them. `M-x elpaca-merge` /
-            `elpaca-merge-all` then merges ALREADY-FETCHED changes into each package's local
-            checkout. A third, distinct command pair, `M-x elpaca-update` / `elpaca-update-all`,
-            is documented directly in Elpaca's manual as "an alias for 'pull'" — i.e. fetch and
-            merge combined into one step, for a single package or all of them respectively; it is
-            NOT a prefix-argument variant of `elpaca-merge`, but its own separate command. The
-            Elpaca manual explicitly recommends the fetch-then-review-then-merge workflow over
-            reaching for `elpaca-update(-all)` directly, so changes can be inspected before being
-            applied — the same underlying caution straight.el's `straight-pull-*` commands carry,
-            just split across two explicit steps (plus a shortcut third) instead of one.
-            `M-x elpaca-write-lock-file` writes a lock file
-            capturing exact installed revisions; setting `elpaca-lock-file` to that file's path
-            (with `elpaca-menu-lock-file` placed first in `elpaca-menu-functions`) makes future
-            installs reproduce those exact versions. `M-x elpaca-rebuild` rebuilds a package from
-            its current checkout without touching git state, and `M-x elpaca-delete` removes a
-            package Elpaca no longer needs.
-        - topic: "Command-line / batch equivalent"
+            An order is, at minimum, a symbol naming a package (looked up via Elpaca's menus —
+            see Section 5) — `(elpaca example)`. It can also be a partial or full recipe plist:
+            `(elpaca (example :host gitlab))` or `(elpaca (example :host gitlab :repo
+            "user/example" :inherit nil))`.
+        - subtopic: "The `elpaca` macro"
           detail: >
-            The same operations can be run headlessly by loading the real init file (so every
-            `elpaca`/`:ensure` order actually gets queued) and then calling the equivalent
-            functions — but because those functions are themselves async, the batch script must
-            explicitly block on `(elpaca-wait)` (or otherwise ensure `elpaca-process-queues` has
-            fully drained) before proceeding to write a lock file, or the script may exit, or the
-            lock file may get written, before fetch/merge has actually finished. A representative
-            invocation: `emacs --batch -l ~/.emacs.d/early-init.el -l ~/.emacs.d/init.el --eval
-            "(progn (elpaca-fetch-all) (elpaca-wait) (elpaca-merge-all) (elpaca-wait)
-            (elpaca-write-lock-file \"~/.emacs.d/elpaca.lock\"))"`. This asynchronicity-aware
-            blocking step is the building block for any external automation, including topgrade,
-            and it has no counterpart in the straight.el companion document's batch example,
-            which needed no equivalent blocking because straight.el's operations are already
-            synchronous. `(elpaca-update-all)` (still followed by `(elpaca-wait)`) can be
-            substituted for the fetch/wait/merge/wait pair as a faster, one-step "pull everything"
-            shortcut for unattended automation, at the cost of the review opportunity the
-            fetch-then-merge split otherwise gives you — the same fetch-vs-pull trade-off the
-            manual itself flags for interactive use applies equally to scripted use.
-        - topic: "topgrade: no native Elpaca step exists"
+            `(elpaca ORDER &rest BODY)` installs ORDER and evaluates BODY once ORDER's queue has
+            finished processing. This is the fundamental installation primitive; `use-package`'s
+            `:ensure` keyword (Section 8) expands into a call to this macro.
+          code: |
+            (elpaca example) ;; recipe looked up in `elpaca-menu-functions'
+            (elpaca example (message "Messaged after the order's queue has processed."))
+            (elpaca (example :host github :repo "user/example"))
+        - subtopic: "Queues process after init-file reading finishes, not inline"
           detail: >
-            As of the current topgrade-rs releases (the actively maintained fork of the original,
-            now-archived r-darwish/topgrade), topgrade has no dedicated Elpaca update step. Its
-            built-in "Emacs" step is oriented around `package.el` and does not know about
-            `elpaca-sources-directory`/`elpaca-builds-directory`. No `[elpaca]`-equivalent config
-            section, nor any Elpaca-aware git-repo detection, appears in the maintained fork's
-            config schema or issue tracker as of August 2026.
-        - topic: "topgrade: the Doom Emacs exception does NOT extend to Elpaca"
+            Elpaca queues orders as it encounters them, and only starts processing a queue once
+            it is explicitly told to (by default, via `after-init-hook`, or explicitly via
+            `:wait`/`elpaca-wait`/`elpaca-process-queues`; see below). Consider Elpaca's own
+            illustrative example:
+          code: |
+            (elpaca package-a (message "First")) ; Queue First
+            (message "Second") ; Second messaged
+            (elpaca package-b (message "Third")) ; Queue Third
+            (elpaca-process-queues) ; Process queue: First messaged, Third messaged.
+          note: >
+            "Second" is messaged BEFORE "First" and "Third" — because the `message` calls inside
+            each `elpaca` form are BODY forms, deferred until that order's queue is processed,
+            while the bare `(message "Second")` between them runs immediately as ordinary elisp.
+        - subtopic: "Within one declaration's BODY, evaluation is synchronous and in order"
           detail: >
-            topgrade DOES have a dedicated `[doom]` config section and explicitly detects Doom
-            Emacs to run `doom upgrade` instead of its generic Emacs step, because Doom is itself
-            built on straight.el internally. This exception is straight.el-specific, not
-            "any third-party-package-manager-based framework"-generic: it does NOT extend to
-            Elpaca-based configurations or frameworks, even ones that structurally resemble Doom
-            (e.g. curated, opinionated Elpaca-based starter configs). If your Emacs setup uses
-            Elpaca — Doom-adjacent or fully standalone — none of topgrade's Doom-detection logic
-            applies to you, and you need one of the two options below.
-        - topic: "Recommended: a topgrade custom command"
+            Multiple forms inside a single `elpaca` declaration's BODY run synchronously, in the
+            order written — it is only the RELATIONSHIP between separate top-level forms in your
+            init file that becomes non-deterministic without explicit synchronization:
+          code: |
+            (elpaca package-a (message "First") (message "Second"))  ; Queue First, Second
+            (elpaca package-b (message "Third"))  ; Queue Third
+            (elpaca-process-queues) ; Process queue: First, Second, then Third messaged.
+        - subtopic: "`:wait` recipe keyword"
           detail: >
-            Add a custom step to `topgrade.toml` (current schema: `[commands]`, or
-            `[pre_commands]`/`[post_commands]` if you want it to run before/after everything else)
-            that loads the init file in batch mode and calls the fetch/wait/merge/wait sequence
-            above, then disable topgrade's own package.el-oriented Emacs step so it doesn't run
-            redundantly:
-          example_config: |
-            [commands]
-            "Emacs packages (Elpaca)" = "emacs --batch -l ~/.emacs.d/early-init.el -l ~/.emacs.d/init.el --eval \"(progn (elpaca-fetch-all) (elpaca-wait) (elpaca-merge-all) (elpaca-wait))\""
+            When non-nil, `:wait` splits the current queue and immediately begins processing
+            everything queued so far, blocking further init-file evaluation until it finishes.
+            This is the standard idiom for a package you need available at top level during init
+            reading itself — for example, a package that supplies its own Elpaca menu, or a
+            keybinding library like `general.el` that adds its own `use-package` keyword and so
+            must be installed before later `use-package` forms can reference that keyword:
+          code: |
+            (elpaca (melpulls :host github :repo "progfolio/melpulls" :wait t)
+              (add-to-list 'elpaca-menu-functions #'melpulls)
+              (elpaca-update-menus #'melpulls))
+            ;; The next declaration is implicitly queued into a NEW queue.
+            (elpaca menu-item-available-in-melpulls)
+        - subtopic: "`elpaca-wait`"
+          detail: >
+            A standalone command that blocks until every order queued up to that point has
+            finished processing, without itself queueing a new package. It is the direct,
+            top-level equivalent of what `:wait t` does for a single recipe, and is the usual
+            tool for creating an explicit "everything above this line is now installed" barrier
+            partway through an init file, or in a batch/headless script (see Section 9).
+        - subtopic: "`elpaca-after-init-hook`"
+          detail: >
+            Configuration that itself depends on `after-init-hook` or `emacs-startup-hook` — for
+            example, loading a `custom-file` — should instead be attached to
+            `elpaca-after-init-hook`, which Elpaca runs only once every queued package has
+            finished activating. Attaching such code to the ordinary `after-init-hook` risks it
+            running before package installation has actually completed.
+          code: |
+            (setq custom-file (expand-file-name "customs.el" user-emacs-directory))
+            (add-hook 'elpaca-after-init-hook (lambda () (load custom-file 'noerror)))
+    - id: 4
+      title: Recipes
+      description: >
+        A recipe is the metadata Elpaca needs to build and install a package: a list of the
+        form `(ID . PROPS)`, where ID is a symbol uniquely identifying the package and PROPS is
+        a plist of recipe keywords.
+      subsections:
+        - name: Package Types
+          detail: >
+            The `:type` keyword names the kind of package being installed; Elpaca looks up a
+            matching entry in `elpaca-types` to load the relevant backend if needed. The default
+            supported types are `git` (local or remote git repositories), `tar` (tarball
+            archives), and `file` (local files/directories). Different types may interpret the
+            remaining recipe keywords differently, or ignore some of them entirely.
+        - name: "General Recipe Keywords (apply to all package types)"
+          keywords:
+            - name: ":autoloads"
+              detail: >
+                Name of the package's autoload file. `nil` disables autoload generation/loading
+                entirely for the package. `t` uses the default, `PACKAGE-NAME-autoloads.el`. A
+                string is resolved relative to the package's build directory, e.g.
+                `"org-loaddefs.el"`.
+            - name: ":build"
+              detail: >
+                A list of build steps, executed in order. `nil` disables all build steps. A
+                typical elisp build recipe: (1) get source files on disk, (2) byte-compile and
+                generate autoloads, (3) build/install documentation, (4) activate the package
+                (add to `load-path`, load autoloads). `elpaca-default-build-steps` holds the
+                default step list. Individual steps can be substituted via rules of the form
+                `(TYPE TARGET SUBSTITUTIONS...)`, where TYPE is one of:
+              build_substitution_types:
+                - ":after — places SUBSTITUTIONS after TARGET"
+                - ":before — places SUBSTITUTIONS before TARGET"
+                - ":first — places TARGET and SUBSTITUTIONS at the beginning of the list"
+                - ":last — places TARGET and SUBSTITUTIONS at the end of the list"
+                - ":sub — replaces TARGET with SUBSTITUTIONS"
+                - ":not — removes TARGET and SUBSTITUTIONS"
+              code: |
+                (example :build nil) ;; Disable all build steps
+                (example :build (:after fn1 fn1.5)) ;; Insert fn1.5 after fn1
+                (example :build (:before fn1 fn0)) ;; Insert fn0 before fn1
+                (example :build (:sub fn1 subbed)) ;; Substitute fn1 with subbed
+                (example :build (:not fn1 fn2)) ;; Remove fn1 and fn2
+                ;; A list of rules is applied in order, each to the previous rule's result:
+                (example :build ((:after fn1 fn1.5) (:before fn1 fn0) (:sub fn1 subbed) (:not fn1 fn2)))
+            - name: ":files"
+              detail: >
+                The files linked from the package's source directory into its build directory.
+                Each element is either the symbol `:defaults` (expands to
+                `elpaca-default-files-directive`), a glob-matching string naming files/folders,
+                or a list starting with `:exclude` whose remaining elements are NOT linked.
+              code: |
+                (example :files (:defaults "extensions/*")) ;; Link everything in extensions/
+                (example :files (:defaults (:exclude "*.c"))) ;; Exclude .c files
+            - name: ":inherit"
+              detail: >
+                When non-nil, merges in PROPS resolved via `elpaca-order-functions` and
+                (depending on the value) `elpaca-menu-functions`. With `:inherit nil`, a
+                declaration gets exactly the recipe you wrote and nothing more — for example,
+                `(elpaca-recipe '(doct :inherit nil))` returns just `(:source nil :package "doct"
+                :id doct :inherit nil)`. With `:inherit t`, Elpaca fills in everything the
+                relevant menu (e.g. MELPA) knows: host, repo, `:files`, etc. The value may also
+                be a specific menu symbol (or list of menu symbols), scoping inheritance to just
+                that menu — e.g. `(elpaca-recipe '(dracula-theme :inherit
+                elpaca-menu-nongnu-elpa))` pulls the recipe from the NonGNU ELPA menu
+                specifically rather than checking menus in the default order.
+            - name: ":main"
+              detail: >
+                Name of the package's main elisp file. Providing it can speed up dependency
+                resolution during cloning; `:main nil` skips dependency checking for that package
+                entirely.
+              code: |
+                (example :main "example.el")
+                (example :main nil)
+            - name: ":pin"
+              detail: >
+                When non-nil, excludes the package from bulk update commands
+                (`elpaca-fetch-all`, `elpaca-merge-all`, `elpaca-update-all`).
+              code: |
+                (example :pin t)
+            - name: ":vars"
+              detail: >
+                A list of bindings established via `let*` around a package's build steps. The
+                current Elpaca struct and current build step are bound to `elpaca` and
+                `elpaca-build-step` within the form. Note that wrapping an `elpaca` DECLARATION
+                itself in an ordinary `let*` will NOT keep those bindings in scope by the time
+                each build step actually runs, because build steps execute asynchronously —
+                `:vars` exists specifically to provide bindings that remain valid across that
+                asynchronous boundary.
+              code: |
+                (elpaca (example :vars ((some-dynamic-var t))))
+            - name: ":version"
+              detail: >
+                A function accepting the current Elpaca struct as its sole argument and
+                returning a version string understood by `version-to-list`, for packages that
+                don't expose a version conventionally.
+              code: |
+                (elpaca (example :version (lambda (_) "1.0.0")))
+            - name: ":wait"
+              detail: "See Section 3 for full discussion; when non-nil, processes all queued orders immediately before continuing."
+              code: |
+                (elpaca (general :wait t))
+        - name: "Repository Recipe Keywords (apply to `:type git` packages)"
+          keywords:
+            - name: ":branch"
+              detail: "The repository branch to check out when installing."
+              code: '(example :host github :repo "user/example" :branch "main")'
+            - name: ":depth"
+              detail: "The repository's clone history depth."
+              code: |
+                (example :depth treeless) ;; https://git-scm.com/docs/partial-clone
+                (example :depth blobless) ;; https://git-scm.com/docs/partial-clone
+                (example :depth 1) ;; Shallow clone, history truncated to 1 commit
+                (example :depth nil) ;; Full repository clone
+            - name: ":host | :fetcher"
+              detail: >
+                A symbol or string naming the repository's hosting service. Strings are inserted
+                into the resulting URI verbatim.
+              code: |
+                (example :host github)
+                (example :fetcher gitlab)
+                (example :host "www.example.com")
+            - name: ":protocol"
+              detail: "The clone protocol: the symbol `https` or `ssh`."
+            - name: ":ref"
+              detail: "The git ref to check out when installing — e.g. a specific commit."
+              code: '(example :host github :repo "user/example" :ref "a76ca0a")'
+            - name: ":remotes"
+              detail: >
+                Configures repository remotes. A string renames the default remote (e.g. to
+                "upstream"). A list of `("NAME" [PROPS])` specs adds further remotes, such as a
+                personal fork; PROPS may override inherited recipe keywords for that remote. The
+                FIRST remote given has its ref checked out on clone.
+              code: |
+                (example :remotes "upstream")
+                (example :host github :repo "upstream/example"
+                         :remotes ("fork" :repo "fork/zenburn-emacs"))
+                (example :host github :repo "upstream/example"
+                         :remotes (("fork" :repo "fork/zenburn-emacs")
+                                   ("other" :host gitlab :repo "other/zenburn-emacs")))
+            - name: ":repo"
+              detail: >
+                `USER/REPO` when paired with `:host`; otherwise a local filesystem path or a
+                full remote URL. A cons cell `(REMOTE . LOCAL)` renames the local repository
+                directory.
+              code: |
+                (example :host github :repo "user/example") ;; downloaded from github
+                (local :repo "~/repos/local/") ;; built from local filesystem
+                (remote :repo "https://foo.example/example.git") ;; remote clone
+                (remote :repo ("https://foo.example/example.git" . "local-name"))
+            - name: ":tag"
+              detail: "The tag to check out when installing."
+              code: '(example :host github :repo "user/example" :tag "v1.0")'
+        - name: "Recipe Inheritance Precedence"
+          detail: >
+            Highest to lowest: `elpaca-recipe-functions` > declared recipe > `elpaca-order-functions`
+            > `elpaca-menu-functions`. `M-x elpaca-info` shows a package's fully resolved,
+            inheritance-merged recipe, and is the most reliable way to confirm what Elpaca
+            actually intends to do for a given declaration.
+        - name: "elpaca-recipe-functions and elpaca-order-functions"
+          detail: >
+            Both are abnormal hooks run via `run-hook-with-args-until-success`.
+            `elpaca-recipe-functions` runs just before installing a package; each function
+            receives the current RECIPE and may return nil or a plist to merge in — useful for
+            forcing certain keyword values regardless of what recipe inheritance would otherwise
+            produce. `elpaca-order-functions` runs earlier, before `elpaca-menu-functions` are
+            consulted; each function receives the current ORDER and may return nil or a plist —
+            useful for setting default order properties, such as disabling inheritance globally.
+          code: |
+            ;; elpaca-recipe-functions: force a keyword value on every recipe
+            (let ((elpaca-recipe-functions '((lambda (_) (list :cheese 'extra)))))
+              (elpaca-recipe 'burger))
+            ;; => (:source nil :package "burger" :id burger :type git :protocol https
+            ;;     :inherit t :depth treeless :cheese extra)
 
-            [misc]
-            disable = ["emacs"]
-        - topic: "Not recommended as primary method: pointing topgrade's [git] repos glob at elpaca-sources-directory/*"
-          detail: >
-            topgrade's `[git]` section does support a `repos` list with glob patterns (e.g.
-            `repos = ["~/.emacs.d/elpaca/repos/elpaca/sources/*"]`), which would make topgrade's
-            generic git-pull step walk into every package checkout and run a plain `git pull`.
-            This is tempting but risky for the same reason it is under straight.el: Elpaca-managed
-            repositories may be checked out at a specific `:ref`/`:tag`/detached commit rather
-            than tracking a local branch. A blind `git pull` against a detached HEAD has no
-            upstream branch to pull from and will typically fail outright — and in cases where it
-            does succeed, it can leave the repo diverged from what its recipe (or lock file)
-            specifies on the next Emacs startup, forcing a manual `git` fixup or
-            `M-x elpaca-rebuild`. The batch fetch/merge approach above is preferred because Elpaca
-            itself resolves the correct target ref per package (recipe branch/tag/ref, fork
-            remote, lock-file pin) rather than treating every repo identically.
-    - id: 8
-      title: Verification Notes
+            ;; elpaca-order-functions: change a default for every order
+            (let ((elpaca-order-functions '((lambda (_) '(:inherit nil)))))
+              (elpaca-recipe 'burger))
+            ;; => (:source nil :package "burger" :id burger :inherit nil)
+    - id: 5
+      title: Menus
+      description: >
+        A menu is a function returning an alist of the form `((ID . DATA)...)`. DATA is a plist
+        that must contain `:recipe` (a package recipe) and `:source` (a string naming the menu);
+        it may also carry `:url`, `:description`, and `:date`, which Elpaca's UI displays when
+        present. The menu function must accept a REQUEST argument: the symbol `index` (return
+        the alist) or `update` (refresh the menu's alist).
+      code: |
+        (defun elpaca-menu-minimal (request_)
+          "A minimal menu example.
+        Ignore REQUEST, as this is a static, curated list of packages."
+          '((example :source "EXAMPLE" :recipe (example :host github :repo "user/example"))
+            (two :source "EXAMPLE" :recipe (two :host gitlab :repo "user/two"))))
       points:
         - >
-          Primary Source: Official GNU Emacs `use-package` User Manual (v2.4.5, bundled with
-          Emacs 30.2), and `jwiegley/use-package` upstream, both files fetched and read directly
-          rather than summarized from memory: `use-package-core.el` (confirming the literal base
-          `use-package-keywords` defcustom contains neither `:ensure` nor `:pin`), and
-          `use-package-ensure.el` (confirming `:ensure`/`:pin` are prepended to that list via
-          `add-to-list` at load time — `:pin` first, then `:ensure`, so `:ensure` ends up firing
-          before every other keyword including `:load-path` — and that this file, and therefore
-          this prepending, is loaded by default whenever `use-package` itself is required).
-        - "Primary Source: `progfolio/elpaca`, `doc/manual.md` (current `master` branch, fetched live), covering the Installer block, Recipes (package types; general and repository-scoped recipe keywords including `:wait`, `:pin`, `:build`, `:vars`, `:inherit`), Menus, Orders, Queues, Lock Files, and the `use-package Integration` section documenting `:ensure`/`elpaca-use-package-mode` directly."
-        - "Primary Source: `extensions/elpaca-use-package.el` source, confirming the `defalias`-based override of `use-package-handler/:ensure`/`use-package-normalize/:ensure`, the deprecated `:straight`/`:elpaca` compatibility aliases, and `elpaca-use-package-by-default` as an obsolete alias of `use-package-always-ensure` (deprecated 2024-02-08)."
+          `elpaca-menu-functions` contains menu functions for the following sources by default,
+          checked in order until one returns the requested item or the list is exhausted: MELPA,
+          Org, Org-contrib, GNU ELPA Mirror, and NonGNU ELPA.
         - >
-          `(elpaca-wait)` as a standalone top-level call is extremely well attested across
-          real-world Elpaca configurations and the project's own issue tracker (e.g. issue #261,
-          referencing "the existing usage of elpaca-wait by calling it at the top-level of init
-          files"), and is the mechanism the documented `:wait` recipe keyword is built on. It is
-          treated here as a confirmed, load-bearing part of Elpaca's public API, though it is not
-          given its own dedicated numbered subsection in the current `manual.md` prose the way
-          `:wait` is — readers should be aware the manual documents it primarily through the
-          recipe-keyword form.
+          `M-x elpaca-update-menus` fetches the latest recipes from a menu source and overwrites
+          that menu's item cache.
         - >
-          The three-way split between `elpaca-fetch`/`elpaca-fetch-all`, `elpaca-merge`/
-          `elpaca-merge-all`, and `elpaca-update`/`elpaca-update-all` (documented as the "pull"
-          alias) was confirmed against the live `doc/manual.md` Quick Start table, fetched
-          directly rather than relied on from memory. An EARLIER, superseded state of the project
-          (a 2023 commit renaming `elpaca-update(-all)` to `elpaca-merge(-all)`, with pull
-          available only via a prefix argument on merge) was also found during research; the
-          CURRENT, live manual no longer matches that older commit's description and instead
-          documents `elpaca-update`/`elpaca-update-all` as its own restored, separate command
-          pair, which is what this document follows. This is flagged explicitly because it is
-          exactly the kind of drift a document "verified current as of" a given date needs to
-          resolve in favor of the most recently fetched source, not the most authoritative-looking
-          older one.
+          Menus let a package author or curator offer users a ready-made list of recipes — for
+          example, `melpulls` (a third-party Elpaca menu) exposes pending, not-yet-merged MELPA
+          packages.
+    - id: 6
+      title: Lock Files
+      description: >
+        A lock file is a collection of recipes pinned to the exact versions of currently
+        installed packages, letting you reproduce a specific Emacs configuration's package
+        state elsewhere or later.
+      points:
         - >
-          `extensions/elpaca-use-package.el` was fetched directly (not relied on from an earlier,
-          partial excerpt) to confirm the exact mechanism of Elpaca's `use-package` integration:
-          `elpaca-use-package-mode` is a global minor mode that toggles `advice-add`/
-          `advice-remove` of `:override` advice on `use-package-handler/:ensure`,
-          `use-package-normalize/:ensure`, `use-package-handler/:vc`, and
-          `use-package-normalize/:vc` together, and repositions `:vc` relative to `:ensure` via
-          `use-package-list-insert` as part of that same toggle. The `:straight`/`:elpaca`
-          compatibility aliases, by contrast, are registered via unconditional, top-level
-          `defalias`/`add-to-list` forms in the same file, outside the minor-mode toggle. An
-          earlier draft of this document mischaracterized the `:ensure` override as a bare
-          `defalias` and stated that `:vc` was left untouched by Elpaca's integration; both points
-          are corrected here against this primary source.
+          `M-x elpaca-write-lock-file` writes a lock file to disk.
         - >
-          topgrade findings confirmed against: the archived `r-darwish/topgrade` issue tracker's
-          historical package-manager-support requests; the current `topgrade-rs/topgrade` README,
-          `config.example.toml`, and open issue tracker (including an open, unresolved "Request a
-          new step" issue thread dated July 2026, with no Elpaca-specific step filed or merged as
-          of this writing); and the `[doom]`-section/`Emacs::is_doom()` behavior, which was
-          confirmed to be straight.el-specific rather than generically third-party-package-
-          manager-aware.
+          Setting the `elpaca-lock-file` variable to that file's path causes Elpaca to use those
+          pinned versions when installing packages — provided `elpaca-menu-lock-file` is the
+          FIRST menu in `elpaca-menu-functions`, so it takes precedence over MELPA/GNU ELPA/etc.
+          during recipe resolution.
+    - id: 7
+      title: "Interactive Package Management (UI)"
+      description: >
+        Elpaca provides a full UI, built on modes derived from `elpaca-ui-mode`. Its two main
+        entry points are `M-x elpaca-manager` (browse/search/act on registered packages) and
+        `M-x elpaca-log` (view the processing log, optionally filtered).
+      quick_start_table:
+        - operation: "Finding Packages"
+          ui_keys: "g m (or M-x elpaca-manager)"
+          command: "elpaca-info"
+        - operation: "Trying Packages (current session only)"
+          ui_keys: "i x"
+          command: "elpaca-try"
+        - operation: "Fetching Package Updates"
+          ui_keys: "f x"
+          command: "elpaca-fetch or elpaca-fetch-all"
+        - operation: "Merging Updates"
+          ui_keys: "m x"
+          command: "elpaca-merge or elpaca-merge-all"
+        - operation: "Updating Packages (alias for 'pull')"
+          ui_keys: "p x"
+          command: "elpaca-update or elpaca-update-all"
+        - operation: "Rebuilding Packages"
+          ui_keys: "r x"
+          command: "elpaca-rebuild"
+        - operation: "Deleting Packages"
+          ui_keys: "d x"
+          command: "elpaca-delete"
+        - operation: "View Package Logs"
+          ui_keys: "g l"
+          command: "elpaca-log"
+        - operation: "Visit Package Source Directory"
+          ui_keys: "v"
+          command: "elpaca-visit"
+        - operation: "Visit Package Build Directory"
+          ui_keys: "C-u v"
+          command: "C-u M-x elpaca-visit"
+        - operation: "Browse Package Website"
+          ui_keys: "b"
+          command: "elpaca-browse"
+      points:
         - >
-          Emacs 31 Context: Emacs 31 entered its feature-freeze/branch-cut phase near June 2026.
-          Public release previews confirm no structural changes to `use-package`'s keyword ordering
-          or macro expansion logic since the 30.2 baseline, so none of the above is expected to
-          shift with Emacs 31. Elpaca's own stated minimum requirement remains Emacs >= 27.1.
+          "Update" is explicitly documented as an alias for "pull" (fetch + merge in one step).
+          It is encouraged to fetch, review the changes, and THEN merge, rather than reaching
+          straight for update/pull — the same caution any "pull everything blindly" workflow
+          deserves.
+        - >
+          Packages installed via the interactive/UI commands above (e.g. `elpaca-try`) are
+          session-only — they are NOT loaded on subsequent Emacs restarts. To install and load a
+          package persistently across restarts, declare it via the `elpaca` macro (or
+          `use-package ... :ensure`, Section 8) in your init file, after the installer block.
+        - >
+          Interactively re-evaluating an `elpaca` declaration re-processes that order, which can
+          be used to change a package's recipe before rebuilding it. Rebuilding does NOT reload
+          the package into the running Emacs session — restart Emacs after a successful rebuild
+          to actually pick up the changes.
+      ui_mode_keybindings:
+        - {
+            key: "!",
+            command: "elpaca-ui-send-input",
+            description: "Send input string to current process",
+          }
+        - {
+            key: "+",
+            command: "elpaca-ui-show-hidden-rows",
+            description: "Append rows up to N times elpaca-ui-row-limit",
+          }
+        - {
+            key: "RET",
+            command: "elpaca-ui-info",
+            description: "Show info for current package",
+          }
+        - {
+            key: "b",
+            command: "elpaca-ui-browse-package",
+            description: "Browse current package's URL via browse-url",
+          }
+        - {
+            key: "d",
+            command: "elpaca-ui-mark-delete",
+            description: "Mark package at point for elpaca-delete",
+          }
+        - {
+            key: "f",
+            command: "elpaca-ui-mark-fetch",
+            description: "Mark package at point for elpaca-fetch",
+          }
+        - {
+            key: "g a",
+            command: "elpaca-ui-search-marked",
+            description: "Search for #unique #marked",
+          }
+        - {
+            key: "g i",
+            command: "elpaca-ui-search-installed",
+            description: "Search for #unique #installed",
+          }
+        - {
+            key: "g l",
+            command: "elpaca-log",
+            description: "Display elpaca-log-buffer filtered by query",
+          }
+        - {
+            key: "g m",
+            command: "elpaca-manager",
+            description: "Display Elpaca's package management UI",
+          }
+        - {
+            key: "g o",
+            command: "elpaca-ui-search-orphaned",
+            description: "Search for #unique #orphan",
+          }
+        - {
+            key: "g r",
+            command: "elpaca-ui-search-refresh",
+            description: "Rerun the current search for buffer",
+          }
+        - {
+            key: "g t",
+            command: "elpaca-ui-search-tried",
+            description: "Search for #unique #installed !#declared",
+          }
+        - {
+            key: "i",
+            command: "elpaca-ui-mark-try",
+            description: "Mark package at point for elpaca-try",
+          }
+        - {
+            key: "m",
+            command: "elpaca-ui-mark-merge",
+            description: "Mark package at point for elpaca-merge",
+          }
+        - {
+            key: "p",
+            command: "elpaca-ui-mark-pull",
+            description: "Mark package at point for elpaca-pull",
+          }
+        - {
+            key: "r",
+            command: "elpaca-ui-mark-rebuild",
+            description: "Mark package at point for elpaca-rebuild",
+          }
+        - {
+            key: "s",
+            command: "elpaca-ui-search",
+            description: "Filter current buffer by query; prompts if query is nil",
+          }
+        - {
+            key: "u",
+            command: "elpaca-ui-unmark",
+            description: "Unmark current package or packages in active region",
+          }
+        - {
+            key: "v",
+            command: "elpaca-ui-visit",
+            description: "Visit current package's source or build directory",
+          }
+        - {
+            key: "x",
+            command: "elpaca-ui-execute-marks",
+            description: "Execute each mark in elpaca-ui-marked-packages",
+          }
+      searching:
+        detail: >
+          `elpaca-ui-search` (bound to `s`) prompts for a search query in the minibuffer;
+          altering the query live-updates the table. `C-u s` populates the minibuffer with the
+          current query for editing. An empty query resets to `elpaca-ui-default-query`. Queries
+          are regular expressions checked against each row.
+        column_delimiting: >
+          The pipe character `|` restricts a text search to a specific column — e.g. `3 |`
+          searches only the first column for "3"; `||| 3` searches only the fourth column.
+        search_tags: >
+          `#tagname` filters by a named search tag (from `elpaca-ui-search-tags`) — e.g.
+          `#random` shows 10 random entries. Tags accepting arguments take them in parentheses:
+          `#(random 20)` shows 20 random entries. Custom tags can be added by pushing a
+          `(NAME . FILTER)` cons onto `elpaca-ui-search-tags`, where FILTER is a function
+          accepting (and returning) a list of `tabulated-list-entries`.
+    - id: 8
+      title: "use-package Integration"
+      description: >
+        `use-package` is bundled directly with current Emacs (development of the macro itself
+        now happens as part of Emacs core rather than in a separate package repository — the
+        former standalone `jwiegley/use-package` repository was archived on GitHub on August 23,
+        2025). The version currently shipped by Emacs 30.2 and by the Emacs 31 pretest builds is
+        2.4.6 (GNU ELPA's own package page lists 2.4.6, dated 2024-08-20, as the current release,
+        superseding 2.4.5 and 2.4.4). Elpaca's optional integration extension, `elpaca-use-package`,
+        adds Elpaca support to `use-package`'s `:ensure` keyword.
+      subsections:
+        - name: "Enabling the integration"
+          code: |
+            (elpaca elpaca-use-package
+              ;; Enable Elpaca support for use-package's :ensure keyword.
+              (elpaca-use-package-mode))
+          note: >
+            `elpaca-use-package-mode` is a global minor mode. Because it is itself installed via
+            Elpaca, and its effect needs to be active before subsequent `use-package` forms rely
+            on `:ensure`, this declaration typically needs no explicit `:wait` — it runs early —
+            but any package used AT THE TOP LEVEL of the init file (not merely inside a later
+            `use-package` `:config` body) still needs its own `:wait`, as described in Section 3.
+        - name: "The `:ensure` keyword, once the mode is enabled"
+          detail: >
+            `use-package example :ensure t` expands to a call to the `elpaca` macro (Section 3),
+            wrapping the rest of the `use-package` form as that order's BODY:
+          code: |
+            (use-package example :ensure t)
+            ;; Expands to:
+            (elpaca example (use-package example))
+          detail_continued: >
+            `:ensure` accepts several forms:
+          ensure_values:
+            - "`t` (or bare presence): install a package matching the use-package NAME."
+            - >
+              a bare symbol: install under that different ID rather than the declared NAME —
+              useful when the feature a package provides is named differently from how it is
+              listed in package menus.
+            - >
+              a recipe plist: supply a custom recipe. If the ID is omitted and the plist starts
+              directly with a keyword, the use-package NAME is automatically prepended as the ID.
+            - "`nil`: opt this one declaration OUT of Elpaca handling entirely — see below."
+          code_recipe_example: |
+            (use-package example :ensure (:host host :repo "user/repo"))
+            ;; Expands to:
+            (elpaca (example :host host :repo "user/repo")
+              (use-package example))
+          global_default: >
+            Setting `use-package-always-ensure` to a non-nil value makes every `use-package` form
+            behave as though `:ensure t` were given, without writing it out on each declaration.
+            An older variable, `elpaca-use-package-by-default`, is a formally obsolete alias of
+            `use-package-always-ensure` (deprecated 2024-02-08) — current configurations should
+            set `use-package-always-ensure` directly.
+        - name: "`:ensure nil` — opting a declaration out entirely"
+          detail: >
+            Useful for configuring built-in Emacs functionality via the `emacs` pseudo-feature.
+            Forms declared this way are evaluated IMMEDIATELY, not deferred through Elpaca's
+            queue system:
+          code: |
+            (use-package emacs :ensure nil :config (setq ring-bell-function #'ignore))
+        - name: "Blocking on a package needed at the top level"
+          detail: >
+            The `:wait` recipe keyword (Section 3) works the same way inside `:ensure`. This is
+            the standard pattern for a package — such as a keybinding library that adds its own
+            `use-package` keyword — that later `use-package` forms in the same init file need to
+            already be available:
+          code: |
+            (use-package general :ensure (:wait t) :demand t)
+            ;; use-package declarations beyond this point may use the `:general' use-package keyword.
+        - name: "Legacy `:straight` / `:elpaca` compatibility keywords"
+          detail: >
+            For configurations carried over from a different package manager's integration,
+            `:straight` and `:elpaca` are also recognized as aliases for `:ensure`, using the
+            same underlying handling. Using them emits a deprecation warning; current
+            configurations should use `:ensure` directly.
+        - name: "How the integration actually changes `use-package`'s behavior"
+          detail: >
+            `elpaca-use-package-mode` is a global minor mode. Enabling it installs `:override`
+            advice on `use-package`'s existing `:ensure` handler and normalizer functions,
+            replacing their behavior with Elpaca's own (queue-based) implementation rather than
+            `use-package`'s default `package.el`-based one; disabling the mode removes that
+            advice and restores the previous behavior. The mode ALSO advises `use-package`'s
+            `:vc` handler and normalizer in the same way: a `:vc` spec (in the same style Emacs's
+            built-in `package-vc.el` understands — `:url`, `:branch`, `:main-file`, `:lisp-dir`)
+            is automatically converted into an Elpaca recipe and installed through Elpaca's own
+            queue, UNLESS the same declaration also specifies `:ensure nil`, in which case `:vc`
+            handling is skipped for that declaration. Only a subset of `package-vc.el`'s spec
+            keys have an Elpaca equivalent (`:url`→`:repo`, `:branch`→`:branch`,
+            `:main-file`→`:main`, `:lisp-dir`→`:files`); any other spec key is silently ignored
+            rather than raising an error, so a `:vc` spec relying on less-common options may
+            install without those options taking effect. While the mode is active, `:vc` is
+            positioned to fire immediately before `:ensure` in `use-package`'s keyword-processing
+            order (and moved back to its ordinary position when the mode is disabled).
+        - name: "Where `:ensure` sits in use-package's own keyword pipeline"
+          detail: >
+            `use-package` processes a fixed, ordered list of keywords per declaration, held in
+            the `use-package-keywords` variable. As literally defined, that list does not include
+            `:ensure` or `:pin` at all — its base order runs: `:disabled :load-path :requires
+            :defines :functions :preface :if :when :unless :no-require :catch :after :custom
+            :custom-face :bind :bind* :bind-keymap :bind-keymap* :interpreter :mode :magic
+            :magic-fallback :hook :commands :autoload :init :defer :demand :load :config`.
+            `:ensure` and `:pin` are added separately and automatically the moment `use-package`
+            itself is loaded (this support is on by default): `:pin` is prepended to the front of
+            that list first, then `:ensure` is prepended after it — so `:ensure` ends up as the
+            very FIRST keyword processed of any declaration, firing even before `:load-path`.
+            `:load` still sits near the very end of the pipeline, directly before `:config` — this
+            is where the actual `(require 'foo)` happens for a non-deferred package, and it is
+            what creates the gap discussed next.
+        - name: "The `:init` vs `:config` timing pitfall"
+          detail: >
+            Because `:ensure` fires first and `:load`/`:config` fire last, a `use-package`
+            declaration under Elpaca has TWO layers of deferral stacked on top of each other,
+            and it is easy to fix one while forgetting the other:
+          layers:
+            - layer: "Outer layer — Elpaca's queue"
+              explanation: >
+                `:ensure` queues the whole rest of the declaration (as the `elpaca` order's
+                BODY) and returns immediately. Nothing about this declaration runs synchronously
+                relative to the REST of your init file unless you add `:wait` (or a preceding
+                `(elpaca-wait)`).
+            - layer: "Inner layer — use-package's own :init-before-:load ordering"
+              explanation: >
+                Even once the outer queue has processed and this declaration's BODY (the
+                deferred `use-package` form) finally runs, `use-package`'s OWN keyword pipeline
+                still applies within it: `:init` still fires before `:load`/`:config`. Adding
+                `:wait` collapses the OUTER layer — it does nothing to reorder the INNER one.
+          example: >
+            Suppose a package's `defcustom` needs to be appended to before that package's
+            minor mode is activated — for instance, adding entries to a disabled-modes list
+            before turning the mode on. Doing this in `:init`, even with `:wait (:wait t)` on
+            the declaration, still fails: at `:init` time, the package's own `defcustom` forms
+            have not run yet (that happens at `:load`, which is still positioned after `:init`
+            inside the now-unblocked BODY), so the variable is unbound and `add-to-list` signals
+            a `void-variable` error. Pre-declaring the variable via `defvar` in `:preface` avoids
+            the error but backfires differently: since `defvar` never overwrites an
+            already-bound variable, your value locks in permanently before the package's own
+            `defcustom` can ever establish its own default.
+          fix: >
+            Do the modification in `:config` instead. By the time `:config` runs, `use-package`'s
+            own `:load` step has already executed `(require ...)`, so the package's `defcustom`
+            has already registered its default value; appending to it in `:config` is then safe
+            regardless of whether the declaration's OUTER Elpaca-queue deferral was collapsed
+            with `:wait` or left fully asynchronous. `:config` is the generally safe place for
+            any modification of a package's internals: `defcustom` lists, keymaps, advice, and
+            activating global minor modes.
+    - id: 9
+      title: "Practical Patterns"
+      points:
+        - subtopic: "Headless / batch scripting"
+          detail: >
+            Because fetch, merge, and update operations (Section 7) are themselves asynchronous,
+            a batch script must explicitly block on `(elpaca-wait)` before relying on their
+            results — otherwise the script may proceed, or even exit, before the operation has
+            actually finished. A representative pattern for scripted maintenance:
+          code: |
+            emacs --batch -l ~/.emacs.d/early-init.el -l ~/.emacs.d/init.el --eval \
+              "(progn (elpaca-fetch-all) (elpaca-wait) (elpaca-merge-all) (elpaca-wait) \
+                      (elpaca-write-lock-file \"~/.emacs.d/elpaca.lock\"))"
+          note: >
+            `(elpaca-update-all)` followed by `(elpaca-wait)` can substitute for the
+            fetch/wait/merge/wait pair as a faster, one-step "pull everything" shortcut, at the
+            cost of the review opportunity that fetching-then-merging otherwise gives you.
+        - subtopic: "Recommended update workflow"
+          detail: >
+            Fetch first (`elpaca-fetch`/`elpaca-fetch-all`), review what changed, then merge
+            (`elpaca-merge`/`elpaca-merge-all`) — rather than reaching directly for
+            `elpaca-update`/`elpaca-update-all`, which fetches and merges in one step without a
+            review point in between.
+        - subtopic: "Keep `:init` minimal"
+          detail: >
+            As a general habit — independent of any specific bug — push as much configuration
+            as possible into `:config` rather than `:init`. `:config` runs after the package has
+            actually loaded and its own defaults are established, which sidesteps the entire
+            class of pitfall described in Section 8.
+        - subtopic: "Use `elpaca-info` to check what will actually be installed"
+          detail: >
+            When recipe inheritance, menu resolution, and any `elpaca-recipe-functions`/
+            `elpaca-order-functions` are all in play, the fully-resolved recipe Elpaca will
+            actually use can differ from what you wrote. `M-x elpaca-info` shows that resolved
+            recipe directly, rather than requiring you to trace inheritance by hand.
+    - id: 10
+      title: Sources
+      points:
+        - "Elpaca `doc/manual.md`, fetched directly from the `progfolio/elpaca` repository (current `master` branch)."
+        - '`elpaca.el` (current version 0.2.0, `Package-Requires: ((emacs "27.1"))`), fetched directly.'
+        - "`extensions/elpaca-use-package.el`, fetched directly, for the exact `:ensure`/`:vc` advice mechanism and the `:straight`/`:elpaca` alias registration."
+        - >
+          `use-package-core.el` and `use-package-ensure.el`, read from the archived
+          `jwiegley/use-package` GitHub mirror for the base `use-package-keywords` order and the
+          `:ensure`/`:pin` keyword-registration mechanism (development of `use-package` itself
+          now happens in Emacs core; the former standalone repository is archived and read-only
+          as of August 23, 2025). Note: that archived mirror's own internal version string
+          (`use-package-version`) still reads "2.4.4," which is stale relative to what Emacs
+          actually ships — GNU ELPA's package page lists 2.4.6 (2024-08-20) as current, and that
+          is the version this document treats as authoritative for what Emacs 30.2/31 bundle.
+          The base keyword list itself is not expected to have changed across these patch
+          versions, but readers relying on exact keyword-list contents should confirm against
+          their own running Emacs's `use-package-keywords` value.
+        - "Current stable Emacs release is 30.2 (August 2025); Emacs 31 was in pretest (31.0.91, July 2026) with no official release date announced as of this writing."
+      note: "Verified current as of August 2026."
