@@ -1,23 +1,74 @@
+# ====================
+# COMPILED ARTIFACTS & BACKUPS
+# ====================
+*.elc
+*~
+\#*\#
+.\#*
+auto-save-list/
+
+# ====================
+# TANGLED OUTPUT & TEMP FILES
+# ====================
+# Regenerated from config.org
+init.el
+init.elc
+
+# AI/Chat upload artifacts and temporary markdown
+config.org.txt
+early-init.el.txt
+emacs-diff.md
+rechecking-qwen-output.md
+tmp/
+
+# ====================
+# NO-LITTERING: var/ (Machine-local state, caches, histories)
+# ====================
+# CRITICAL: We use `var/*` instead of `var/` to force Git to traverse 
+# the directory and evaluate the negation (`!`) rules below.
+var/*
+
+# Un-ignore the specific session persistence files you want tracked in Git.
+!var/recentf-save.el
+!var/savehist.el
+!var/save-place.el
+
+# ====================
+# NO-LITTERING: etc/ (Configuration, templates, explicit definitions)
+# ====================
+etc/*
+
+# Un-ignore specific configuration files defined in your config.org.
+!etc/custom.el
+!etc/projects.el
+
+# ====================
+# ELPACA PACKAGE MANAGER
+# ====================
+# Elpaca root is redirected to var/elpaca/ in your config.
+# Because `var/*` is ignored above, the entire var/elpaca/ tree 
+# (sources/, builds/, cache/) is automatically and safely ignored.
+# 
+# Your `elpaca.eld` lockfile lives in the root directory 
+# (~/.config/emacs/elpaca.eld) and is tracked by default.
+
+# Legacy straight.el artifacts (safe to delete once fully migrated)
+straight/
+
+# ====================
+# MISCELLANEOUS EMACS STATE & CACHES
+# ====================
 elpa/
 dape-breakpoints
 dirvis/
 eln-cache/
-elpaca/
 recentf
-var/
-etc/
 perspective-state
 places
-init.el
-init.elc
 history
 tabsession.el
-auto-save-list/
-undo-fu-session/
 tramp
 projects
-config.org.txt
-early-init.el.txt
 package-quickstart*
 persp-auto-save
 projectile-bookmarks.eld
@@ -27,19 +78,3 @@ transient/
 .cache/
 .obsidian/
 notes.md/.obsidia/
-perspective-state
-emacs-diff.md
-tmp/
-rechecking-qwen-output.md
-
-# 1. Ignore all contents inside the straight/ directory (repos, builds, etc.)
-straight/
-
-# # 2. Un-ignore the versions directory so Git is forced to traverse into it
-# !straight/versions/
-#
-# # 3. Ignore all contents inside the versions directory (stray backups, etc.)
-# straight/versions/*
-#
-# # 4. Un-ignore ONLY your specific lockfile
-# !straight/versions/packages-lock.el
