@@ -6954,7 +6954,7 @@ Connects Emacs to external language servers for smart code navigation, error che
   :custom
   (eglot-autoshutdown t)
   ;; Native Emacs 31 Tree-sitter renderer (zero-latency). Use 'gfm-view-mode for external regex-based nested code parity.
-  (eglot-documentation-renderer 'markdown-ts-view-mode)
+  ;;(eglot-documentation-renderer 'markdown-ts-view-mode)
   ;;(eglot-documentation-renderer 'gfm-view-mode)
   (eglot-ignored-server-capabilities '(:documentFormattingProvider
                                        :documentOnTypeFormattingProvider
@@ -7054,17 +7054,6 @@ Connects Emacs to external language servers for smart code navigation, error che
                    (message "Copied moniker: %s" identifier))
                (message "No moniker found to copy.")))))))))
 
-(use-package eglot-booster
-  :ensure (:host github :repo "jdtsmith/eglot-booster")
-  :after eglot
-  :init
-  (setq eglot-booster-io-only
-        (and (> emacs-major-version 29)
-             (not (functionp 'json-rpc-connection))))
-  :config
-  ;; Guard against missing Rust binary to prevent startup warnings.
-  (when (executable-find "emacs-lsp-booster")
-    (eglot-booster-mode)))
 
 ;;(use-package org-src-context
 ;;  :ensure nil
@@ -8538,7 +8527,6 @@ Configures Python editing, LSP server routing, workspace settings, formatting, a
   :config
   ;; Extend language whitelist for literate programming workflows.
   (add-to-list 'lazy-ruff-org-src-languages "jupyter-python"))
-
 #+end_src
 
 ** TODO TypeScript & JavaScript

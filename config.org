@@ -6191,7 +6191,7 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
          ((LaTeX-mode markdown-ts-mode yaml-mode yaml-ts-mode) . lsp-deferred))
   :custom
   (lsp-completion-provider :none)
-  (lsp-idle-delay 0.1)
+  (lsp-idle-delay 0.25)
   (lsp-session-file (no-littering-expand-var-file-name "lsp/session.el"))
   (lsp-keymap-prefix nil)
   (lsp-enable-xref t)
@@ -6207,11 +6207,11 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
   (lsp-format-buffer-on-save nil)
   (lsp-lens-enable nil)
   (lsp-inlay-hint-enable nil)
-  (lsp-enable-symbol-highlighting t)
+  (lsp-enable-symbol-highlighting nil)
   (lsp-semantic-tokens-enable nil)
   (lsp-headerline-breadcrumb-enable nil)
   (lsp-headerline-breadcrumb-enable-diagnostics nil)
-  (lsp-signature-auto-activate '(:on-trigger-char :on-server-request))
+  ;; (lsp-signature-auto-activate '(:on-trigger-char :on-server-request))
   (lsp-signature-render-documentation t)
   (lsp-signature-doc-lines 2)
   (lsp-diagnostics-provider :flycheck)
@@ -7079,7 +7079,6 @@ Configures Python editing, dual LSP server routing, workspace settings, formatti
   (python-indent-guess-indent-offset-verbose nil)
   (python-indent-offset 4)
   :config
-  ;; Upgrades to IPython if present; `--simple-prompt` prevents ANSI corruption in `comint`.
   (when (executable-find "ipython")
     (setq python-shell-interpreter "ipython"
           python-shell-interpreter-args "-i --simple-prompt --no-color-info")))
