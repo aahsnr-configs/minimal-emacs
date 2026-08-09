@@ -6749,12 +6749,13 @@ Injects Denote backlinks into the universal sidecar, mimicking the org-roam buff
 
 
 
-* DONE Highlight TODOs
-** DONE hl-todo
+* TODO Highlight TODOs
+** TODO hl-todo
 Highlights and navigates TODO keywords across buffers with integrated flycheck diagnostics.
+TODO: Adapt doom emacs hl-todo config
 #+begin_src emacs-lisp
 (use-package hl-todo
-  :defer t
+  :hook (elpaca-after-init . global-hl-line-mode)
   :bind (:map hl-todo-mode-map
               ("C-c n" . hl-todo-next)
               ("C-c p" . hl-todo-previous)
@@ -6781,7 +6782,6 @@ Highlights and navigates TODO keywords across buffers with integrated flycheck d
      ("DEBUG"      . "#e0af68")
      ("STUB"       . "#e0af68")))
   :config
-  (global-hl-todo-mode 1)
   ;; Safe registration of consult preview hooks.
   (with-eval-after-load 'consult
     (when (boundp 'consult-preview-allowed-hooks)
