@@ -1,2 +1,2 @@
 ;;; -*- coding: utf-8; mode: lisp-data -*-
-nil
+(("/home/ahsan/.config/emacs/config.org" . 1226))
