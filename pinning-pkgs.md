@@ -136,9 +136,9 @@
 | `projection-multi-embark`(correct)  | `898c6fc2e8333fa72431f433414e5aad74455e54` |
 | `solaire-mode`(correct)             | `1bd0134194e48c8fe4089e9d505517935b2b15e3` |
 | `treemacs-nerd-icons`(correct)      | `0c5ddcb978da639f01ddb023febc40fc755171e5` |
-| `undo-fu`                           | `5684ef2aef5f60176472916b21869cf221e018cc` |
-| `undo-fu-session`                   | `92d733a5b162a70c572fac17b9f9e872426df547` |
-| `vimish-fold`                       | `f71f374d28a83e5f15612fa64aac1b2e78be2dcd` |
+| `undo-fu`(correct)                  | `5684ef2aef5f60176472916b21869cf221e018cc` |
+| `undo-fu-session`                   | `db5e165439c95bf36f3e48d0c87d3879cabb18f0` |
+| `vimish-fold`(correct)              | `f71f374d28a83e5f15612fa64aac1b2e78be2dcd` |
 | `yasnippet-capf`                    | `f53c42a996b86fc95b96bdc2deeb58581f48c666` |
 
 ### Source-repo-only (explicit `:straight` recipes; no ELPA channel)
