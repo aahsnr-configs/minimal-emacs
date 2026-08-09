@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+SOURCES_DIR="$HOME/.config/emacs/var/elpaca/sources"
+
+if [[ ! -d "$SOURCES_DIR" ]]; then
+  echo "Error: Directory not found: $SOURCES_DIR" >&2
+  exit 1
+fi
+
+cd "$SOURCES_DIR" || {
+  echo "Error: Cannot access $SOURCES_DIR" >&2
+  exit 1
+}
+
+shopt -s nullglob
+packages=(*/)
+shopt -u nullglob
+
+if [[ ${#packages[@]} -eq 0 ]]; then
+  echo "No packages found in $SOURCES_DIR"
+  exit 0
+fi
+
+printf "\n%-35s %s\n" "PACKAGE" "COMMIT HASH (HEAD)"
+printf "%-35s %s\n" "-----------------------------------" "----------------------------------------"
+
+for d in "${packages[@]}"; do
+  pkg="${d%/}"
+  if git -C "$d" rev-parse --git-dir >/dev/null 2>&1; then
+    hash=$(git -C "$d" rev-parse HEAD 2>/dev/null)
+    if [[ -n "$hash" ]]; then
+      printf "%-35s %s\n" "$pkg" "$hash"
+    else
+      printf "%-35s %s\n" "$pkg" "[ERROR: HEAD unparsable]"
+    fi
+  else
+    printf "%-35s %s\n" "$pkg" "[NOT A GIT REPO]"
+  fi
+done
+printf "\n"
