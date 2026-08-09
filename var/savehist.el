@@ -5,7 +5,7 @@
 (setq vertico-repeat-history '((ar/find-file-in-emacs-config "~/.config/emacs/" "config.org") (find-file "~/.config/emacs/etc/" "elpaca.eld") (ar/find-file-in-emacs-config "~/.config/emacs/etc/" "elpaca.eld") (ar/find-file-in-emacs-config "~/.config/emacs/config.org")))
 (setq file-name-history '("~/.config/emacs/config.org" "~/.config/emacs/etc/elpaca.eld" "~/.config/emacs/config.org"))
 (setq extended-command-history '("ghostel-download-module"))
-(setq evil-ex-history '("q"))
+(setq evil-ex-history '("w" "q"))
 (setq evil-jumps-history 'nil)
 (setq search-ring 'nil)
 (setq regexp-search-ring 'nil)

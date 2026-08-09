@@ -13,80 +13,79 @@
 | `xref`* / `yasnippet` / `markdown-ts-mode`*                                                    | GNU ELPA (core) | 1.7.0 / 0.14.3 / built-in Emacs 31             |
 |                                                                                                |                 |                                                |
 
-### GNU ELPA Packages — Strict Single-Row Matrix with Full 40-Char SHAs
+# GNU ELPA 1st Priority
 
-You are entirely correct. While the GNU ELPA web interface displays semantic version numbers, the canonical `archive-contents` index file (which `straight.el` and `package.el` parse) explicitly embeds the **exact 40-character SHA-1 Git commit hash** used to build each release tarball from the upstream repositories.
+| Package Name       | Full 40-Char SHA-1 Commit Hash             |
+| :----------------- | :----------------------------------------- |
+| `ace-window`       | `3fe3534c75b0205c55d6c8a42e321467879dbdec` |
+| `avy`              | `933d1f36cca0f71e4acb5fac707e9ae26c536264` |
+| `bufferlo`         | `1ab597c021ee33511fdaad942cc6dd5ac064f6ba` |
+| `cape`             | `5a3aa3058eb47bd10ae72c8919921e3fb40952a5` |
+| `colorful-mode`    | `02882e760759067fa241e44f61818c0e00c49c0c` |
+| `consult`          | `3ddec5493bce5445f099537be50b7a4f79c68321` |
+| `consult-denote`   | `0fbd723e7f4d824902b0a4b712b92c66a1eaf97e` |
+| `corfu`            | `f6306d8c5ba540e75c208c8069b3b677de48a183` |
+| `dape`             | `dcbdffc68a3c89bbb89956161edde9f0fe062e64` |
+| `denote`           | `9fd6692a32a99e236c377f12f114b77a91417ac2` |
+| `denote-journal`   | `374224ad2b3162c1fa92bb9ecdb61f157a781c4b` |
+| `denote-menu`      | `9bf3bed5e0f59621a98169bbbd4b359d3a039b22` |
+| `denote-org`       | `b6b788db84fbf0c918bce6b3ce65508dd651bb4c` |
+| `denote-review`    | `4fe3bac06249f28119f7aeef91fc03df3b042589` |
+| `denote-sequence`  | `841cf148a56a6c62fb483d5529a45c689b04049e` |
+| `denote-silo`      | `41985759d29d4a673055a0d0bd08e2ada88cffe8` |
+| `diff-hl`          | `91fcd4fa42fef895a754e80c4435ae6314be7822` |
+| `eldoc`            | `b85d9048f4a32c7c50894e991423d021d9f95317` |
+| `embark`           | `350ca86924c5027e80875943fba7b912a71e5791` |
+| `embark-consult`   | `350ca86924c5027e80875943fba7b912a71e5791` |
+| `expreg`           | `d3ac3703e3e0aa66dc1ac6f8110b1862206beb20` |
+| `gcmh`             | `0089f9c3a6d4e9a310d0791cf6fa8f35642ecfd9` |
+| `indent-bars`      | `36620c5f3fba2ba8f23d7ef947e0d1d09e412bf5` |
+| `jinx`             | `270866399c959a583caec0115d7dbc069f01ff29` |
+| `marginalia`       | `feb66c02bbd88dba867cdd92b94fe24279ed578a` |
+| `orderless`        | `cebe19e3cf0f30604d1ed1bfaa74fff21a4e89a5` |
+| `org`              | `c75ffe4a43355bc76807d9aa711834b33f724fca` |
+| `org-modern`       | `8775389d085a4ebdf77856b8f86ab4d9679fc55e` |
+| `org-transclusion` | `feda2f03db0b86bbcf109dbf729a1eee43dedbb3` |
+| `popper`           | `d83b894ee7a9daf7c8e9b864c23d08f1b23d78f6` |
+| `posframe`         | `74c8c56131ed866db47ae4191364b72dd4852456` |
+| `project`          | `094e2e56923647fe85d51b37f4150044c4d30d99` |
+| `transient`        | `0ec75dcce235f5ab3d39a02b878e6aaa78159b22` |
+| `vertico`          | `be96000c2b0b3501723291b3721ceba12f784dcd` |
+| `xref`             | `cef848fe5f355ca34abc176739d0ace835b12eed` |
+| `yasnippet`        | `dd570a6b22364212fff9769cbf4376bdbd7a63c5` |
 
-I have programmatically parsed the live GNU ELPA `archive-contents` index to extract the precise, mathematically verified 40-character SHAs for every package in your configuration that resolves to the GNU ELPA channel. These are the exact hashes `straight.el` will write to your `packages-lock.el` file when pulling from the `emacs-straight/gnu-elpa-mirror` recipe repository.
+# MELPA Stable — 1st priority (release-cadence pins)
 
-| Package Name                | Full 40-Char SHA-1 Commit Hash             |
-| :-------------------------- | :----------------------------------------- |
-| `ace-window`(updated)       | `3fe3534c75b0205c55d6c8a42e321467879dbdec` |
-| `avy`(updated)              | `933d1f36cca0f71e4acb5fac707e9ae26c536264` |
-| `bufferlo`(updated)         | `1ab597c021ee33511fdaad942cc6dd5ac064f6ba` |
-| `cape`(correct)             | `5a3aa3058eb47bd10ae72c8919921e3fb40952a5` |
-| `colorful-mode`(updated)    | `02882e760759067fa241e44f61818c0e00c49c0c` |
-| `consult`(correct)          | `3ddec5493bce5445f099537be50b7a4f79c68321` |
-| `consult-denote`(correct)   | `0fbd723e7f4d824902b0a4b712b92c66a1eaf97e` |
-| `corfu`(correct)            | `f6306d8c5ba540e75c208c8069b3b677de48a183` |
-| `dape`(correct)             | `dcbdffc68a3c89bbb89956161edde9f0fe062e64` |
-| `denote`(correct)           | `9fd6692a32a99e236c377f12f114b77a91417ac2` |
-| `denote-journal`(correct)   | `374224ad2b3162c1fa92bb9ecdb61f157a781c4b` |
-| `denote-menu`(updated)      | `9bf3bed5e0f59621a98169bbbd4b359d3a039b22` |
-| `denote-org`(correct)       | `b6b788db84fbf0c918bce6b3ce65508dd651bb4c` |
-| `denote-review`(correct)    | `4fe3bac06249f28119f7aeef91fc03df3b042589` |
-| `denote-sequence`(correct)  | `841cf148a56a6c62fb483d5529a45c689b04049e` |
-| `denote-silo`(correct)      | `41985759d29d4a673055a0d0bd08e2ada88cffe8` |
-| `diff-hl`(updated)          | `91fcd4fa42fef895a754e80c4435ae6314be7822` |
-| `eldoc`(built-in)           | `b85d9048f4a32c7c50894e991423d021d9f95317` |
-| `embark`(updated)           | `350ca86924c5027e80875943fba7b912a71e5791` |
-| `embark-consult`(updated)   | `350ca86924c5027e80875943fba7b912a71e5791` |
-| `expreg`(correct)           | `d3ac3703e3e0aa66dc1ac6f8110b1862206beb20` |
-| `gcmh`(correct)             | `0089f9c3a6d4e9a310d0791cf6fa8f35642ecfd9` |
-| `indent-bars`(updated)      | `36620c5f3fba2ba8f23d7ef947e0d1d09e412bf5` |
-| `jinx`(correct)             | `270866399c959a583caec0115d7dbc069f01ff29` |
-| `marginalia`(correct)       | `feb66c02bbd88dba867cdd92b94fe24279ed578a` |
-| `orderless`(correct)        | `cebe19e3cf0f30604d1ed1bfaa74fff21a4e89a5` |
-| `org`(built-in)             | `c75ffe4a43355bc76807d9aa711834b33f724fca` |
-| `org-modern`(correct)       | `8775389d085a4ebdf77856b8f86ab4d9679fc55e` |
-| `org-transclusion`(correct) | `feda2f03db0b86bbcf109dbf729a1eee43dedbb3` |
-| `popper`(correct)           | `d83b894ee7a9daf7c8e9b864c23d08f1b23d78f6` |
-| `posframe`(correct)         | `74c8c56131ed866db47ae4191364b72dd4852456` |
-| `project`(built-in)         | `094e2e56923647fe85d51b37f4150044c4d30d99` |
-| `transient` (correct)       | `0ec75dcce235f5ab3d39a02b878e6aaa78159b22` |
-| `vertico` (correct)         | `be96000c2b0b3501723291b3721ceba12f784dcd` |
-| `xref (built-in)`           | `cef848fe5f355ca34abc176739d0ace835b12eed` |
-| `yasnippet`(correct)        | `dd570a6b22364212fff9769cbf4376bdbd7a63c5` |
-
-
-### Architectural Note on Core Packages
-
-Packages like `org`, `project`, `xref`, `eldoc`, and `use-package` are built into Emacs 31 core. However, because your `config.org` comments out the `:straight (:type built-in)` directive for these packages, `straight.el` treats them as externally managed. It will pull them from the `emacs-straight/gnu-elpa-mirror` repository using the exact 40-character SHAs listed above, overriding the Emacs core versions with the latest GNU ELPA releases.
-
-These SHAs are the exact values `M-x straight-freeze-versions` will write to your `packages-lock.el` file, guaranteeing a 100% reproducible environment across any machine.
-
-\* `:straight (:type built-in)` commented out in `config.org` → treated as straight-managed per your rule. _Footnote G:_ GNU ELPA publishes signed release tarballs (versions), not SHAs; straight.el clones these from `emacs-straight/gnu-elpa-mirror`, and the exact mirror SHA is materialized in the lockfile by the pinning workflow below.
-
-### MELPA Stable — 1st priority (release-cadence pins)
-
-| Package                                                  | Channel      | Version @ commit                                                                           |
-| -------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------ |
-| `lsp-mode`                                               | MELPA Stable | 10.0.0 @ `913a6c`                                                                          |
-| `evil`                                                   | MELPA Stable | 1.14.2 @ `162a94`                                                                          |
-| `magit`                                                  | MELPA Stable | 4.7.0 @ `67f203`                                                                           |
-| `flycheck`                                               | MELPA Stable | 38.3 @ `4414c1`                                                                            |
-| `treemacs`                                               | MELPA Stable | 3.2 @ `55079b`                                                                             |
-| `doom-themes` / `doom-modeline`                          | MELPA Stable | 2.3.0 @ `d79a41` / 4.2.1 @ `2f6112`                                                        |
-| `forge` / `helpful`                                      | MELPA Stable | 0.6.8 @ `29f45d` / 0.21 @ `ced07f`                                                         |
-| `anzu` / `evil-anzu`                                     | MELPA Stable | 0.67 @ `be0151` / 0.3 @ `64cc08`                                                           |
-| `apheleia`                                               | MELPA Stable | 4.5.0 @ `b5d120a419816f9d6b3d0e45f0951dd3d6a10b77` (full SHA from stable archive-contents) |
-| `buffer-terminator`                                      | MELPA Stable | 1.2.5 @ `0f31cbbb1a8368f08b486525f419dc3d059f05df` (full SHA)                              |
-| `no-littering` / `rainbow-delimiters` / `super-save`     | MELPA Stable | 1.9.0 @ `c949f3` / 2.1.5 @ `791968` / 0.5.0 @ `c7bcc9`                                     |
-| `yasnippet-snippets` / `consult-dir` / `org-auto-tangle` | MELPA Stable | 1.1 @ `6fafad` / 0.1 @ `08f543` / 0.7.0 @ `b4e7ab`                                         |
-| `nerd-icons` / `move-text` / `sudo-edit`                 | MELPA Stable | 0.1.0 @ `619a03` / 2.0.10 @ `c47727` / 0.1.1 @ `a7ae17`                                    |
-| `dtrt-indent` / `iedit` / `esup`                         | MELPA Stable | 1.28 @ `8402da` / 0.9.9.9.9 @ `699e17` / 0.7.1 @ `49e05d`                                  |
-| `ibuffer-vc` / `org-super-agenda`                        | MELPA Stable | 0.12 @ `1388d2` / 1.3 @ `0d7851`                                                           |
-| `envrc` / `universal-sidecar`                            | MELPA Stable | 0.12 @ `2316e0` / 1.9.2 @ `3b6bd9`                                                         |
+| Package              | Full 40-Char SHA1 Commit Hash              |
+| :------------------- | :----------------------------------------- |
+| `lsp-mode`           | `913a6c07f163205cb568bc68d7dfe677dbc358ab` |
+| `evil`               | `729d9a58b387704011a115c9200614e32da3cefc` |
+| `magit`              | `67f203853e74e926e2c99f60ed508840714f7ced` |
+| `flycheck`           | `4414c198f1efe1015c7523119c7c29f152f7243d` |
+| `treemacs`           | `2ab5a3c89fa01bbbd99de9b8986908b2bc5a7b49` |
+| `doom-themes`        | `a9b7144a4b6fe03be144b1610e0a6840e2b24d41` |
+| `doom-modeline`      | `2d6828870bce42c3de6feebe1e70d9edc46515a6` |
+| `forge`              | `29f45d8f247079a1d8d2247efdacb5b50a3b1e51` |
+| `helpful`            | `03756fa6ad4dcca5e0920622b1ee3f70abfc4e39` |
+| `evil-anzu`          | `7309650425797420944075c9c1556c7c1ff960b3` |
+| `apheleia`           | `b5d120a419816f9d6b3d0e45f0951dd3d6a10b77` |
+| `buffer-terminator`  | `0f31cbbb1a8368f08b486525f419dc3d059f05df` |
+| `no-littering`       | `c949f327f417734005203769673e6f925877fa88` |
+| `rainbow-delimiters` | `f40ece58df8b2f0fb6c8576b527755a552a5e763` |
+| `super-save`         | `dae7cfe4bba83904d1567e14cbbd7ed141ab37a1` |
+| `yasnippet-snippets` | `606ee926df6839243098de6d71332a697518cb86` |
+| `consult-dir`        | `1497b46d6f48da2d884296a1297e5ace1e050eb5` |
+| `org-auto-tangle`    | `b4e7abc019179df473ecddf0af80561ddad8fc58` |
+| `nerd-icons`         | `1e75075e323dedaf9f2fd5837082c60a2d0dfae3` |
+| `move-text`          | `142890cfb46d9c374113b4b49021a4202033147b` |
+| `sudo-edit`          | `74eb1e6986461baed9a9269566ff838530b4379b` |
+| `dtrt-indent`        | `8402da6bcc288709366e0b589fa79e744e877788` |
+| `iedit`              | `14161daa295332a49dda92b97c00d62efd38acfe` |
+| `esup`               | `49e05d4f96adfbf71e608a78d23bbf148a8a7fc0` |
+| `ibuffer-vc`         | `bcdbbc0ea1b3368850fa71e853bb0806b993e8f0` |
+| `org-super-agenda`   | `fb20ad9c8a9705aa05d40751682beae2d094e0fe` |
+| `envrc`              | `77e9dec1563bc204cc9e086cd8a7d3622196224c` |
+| `universal-sidecar`  | `3b6bd928f7adb840e62a63dd5bf1236ece912b13` |
 
 ### MELPA — 1st priority (snapshot pins; not on GNU ELPA nor MELPA Stable)
 
@@ -146,33 +145,33 @@ Doom Emacs recently restructured its repositories, splitting the core engine int
 
 Below is the definitive table of the **exact 40-character SHA-1 commit hashes** that Doom Emacs uses to pin the GNU ELPA packages present in your configuration.
 
-| Package Name | Doom Emacs Module | Doom Emacs Pin Commit (SHA-1) |
-| :--- | :--- | :--- |
-| `vertico` | `:completion vertico` | `95bd36e27bafe36158085017b5c5726391089d6b` |
-| `orderless` | `:completion vertico` | `09c90d93efce4fdac52edfe8b22591b773f3e607` |
-| `consult` | `:completion vertico` | `540ad1e59ef80b1c8dd712cbbaae8957533ad02c` |
-| `consult-dir` | `:completion vertico` | `1497b46d6f48da2d884296a1297e5ace1e050eb5` |
-| `consult-flycheck` | `:completion vertico` | `9dd95361669f87e14230376f4f93c6b9a222c497` |
-| `embark` | `:completion vertico` | `350ca86924c5027e80875943fba7b912a71e5791` |
-| `embark-consult` | `:completion vertico` | `350ca86924c5027e80875943fba7b912a71e5791` |
-| `marginalia` | `:completion vertico` | `feb66c02bbd88dba867cdd92b94fe24279ed578a` |
-| `corfu` | `:completion corfu` | `4a9c67da16eb64cadaa4bfcc16713188145c83da` |
-| `cape` | `:completion corfu` | `c99911b08831c26179145686b4beffa96f1f8a68` |
-| `org` | `:lang org` | `cdc16898fd46a30d7187c0a5830b2b898ffbd2de` |
-| `org-modern` | `:lang org` | `1959cd4759d4abc8dd695a560563283d838e44e1` |
-| `magit` | `:tools magit` | `b6c512597fd66abe69883a058a2d13bcea76bf33` |
-| `transient` | `:tools magit` | `3d20a780605f0a33d6360dc0a2ce9174c69a9a92` |
-| `diff-hl` | `:ui vc-gutter` | `2f1623d98a29cee791fac2b879a45d53eec3ba82` |
-| `avy` | `:config default` | `933d1f36cca0f71e4acb5fac707e9ae26c536264` |
-| `link-hint` | `:config default` | `8fda5dcb9caff5a3c49d22b82e570ac9e29af7dd` |
-| `apheleia` | `:editor format` | `14a0bb4454fb2cc3b5b377619288b742ce117da5` |
-| `envrc` | `:tools direnv` | `77e9dec1563bc204cc9e086cd8a7d3622196224c` |
-| `dape` | `:tools debugger` | `083a16739fe6f4ae5f55c136de9e7ec3ceec2a4d` |
-| `yasnippet` | `:editor snippets` | `c1e6ff23e9af16b856c88dfaab9d3ad7b746ad37` |
-| `consult-yasnippet` | `:completion vertico` | `89e39887c87e25d18861216a4d72e5d174f13751` |
-| `yasnippet-capf` | `:completion corfu` | `f53c42a996b86fc95b96bdc2deeb58581f48c666` |
+| Package Name            | Doom Emacs Module     | Doom Emacs Pin Commit (SHA-1)              |
+| :---------------------- | :-------------------- | :----------------------------------------- |
+| `vertico`               | `:completion vertico` | `95bd36e27bafe36158085017b5c5726391089d6b` |
+| `orderless`             | `:completion vertico` | `09c90d93efce4fdac52edfe8b22591b773f3e607` |
+| `consult`               | `:completion vertico` | `540ad1e59ef80b1c8dd712cbbaae8957533ad02c` |
+| `consult-dir`           | `:completion vertico` | `1497b46d6f48da2d884296a1297e5ace1e050eb5` |
+| `consult-flycheck`      | `:completion vertico` | `9dd95361669f87e14230376f4f93c6b9a222c497` |
+| `embark`                | `:completion vertico` | `350ca86924c5027e80875943fba7b912a71e5791` |
+| `embark-consult`        | `:completion vertico` | `350ca86924c5027e80875943fba7b912a71e5791` |
+| `marginalia`            | `:completion vertico` | `feb66c02bbd88dba867cdd92b94fe24279ed578a` |
+| `corfu`                 | `:completion corfu`   | `4a9c67da16eb64cadaa4bfcc16713188145c83da` |
+| `cape`                  | `:completion corfu`   | `c99911b08831c26179145686b4beffa96f1f8a68` |
+| `org`                   | `:lang org`           | `cdc16898fd46a30d7187c0a5830b2b898ffbd2de` |
+| `org-modern`            | `:lang org`           | `1959cd4759d4abc8dd695a560563283d838e44e1` |
+| `magit`                 | `:tools magit`        | `b6c512597fd66abe69883a058a2d13bcea76bf33` |
+| `transient`             | `:tools magit`        | `3d20a780605f0a33d6360dc0a2ce9174c69a9a92` |
+| `diff-hl`               | `:ui vc-gutter`       | `2f1623d98a29cee791fac2b879a45d53eec3ba82` |
+| `avy`                   | `:config default`     | `933d1f36cca0f71e4acb5fac707e9ae26c536264` |
+| `link-hint`             | `:config default`     | `8fda5dcb9caff5a3c49d22b82e570ac9e29af7dd` |
+| `apheleia`              | `:editor format`      | `14a0bb4454fb2cc3b5b377619288b742ce117da5` |
+| `envrc`                 | `:tools direnv`       | `77e9dec1563bc204cc9e086cd8a7d3622196224c` |
+| `dape`                  | `:tools debugger`     | `083a16739fe6f4ae5f55c136de9e7ec3ceec2a4d` |
+| `yasnippet`             | `:editor snippets`    | `c1e6ff23e9af16b856c88dfaab9d3ad7b746ad37` |
+| `consult-yasnippet`     | `:completion vertico` | `89e39887c87e25d18861216a4d72e5d174f13751` |
+| `yasnippet-capf`        | `:completion corfu`   | `f53c42a996b86fc95b96bdc2deeb58581f48c666` |
 | `nerd-icons-completion` | `:completion vertico` | `45b585d972192a3eaeb239e15e55de7f46f8920a` |
-| `nerd-icons-corfu` | `:completion corfu` | `f821e953b1a3dc9b381bc53486aabf366bf11cb1` |
+| `nerd-icons-corfu`      | `:completion corfu`   | `f821e953b1a3dc9b381bc53486aabf366bf11cb1` |
 
 ### Packages Doom Emacs Replaces or Leaves Unpinned
 
@@ -189,15 +188,15 @@ Doom Emacs makes distinct architectural choices that diverge from your `config.o
 
 ### Source Location in Doom Emacs Repositories
 
-The information above was extracted directly from the official Doom Emacs module library. Following the recent repository split, the modules are no longer in `doomemacs/doomemacs` (which now redirects to the core engine). 
+The information above was extracted directly from the official Doom Emacs module library. Following the recent repository split, the modules are no longer in `doomemacs/doomemacs` (which now redirects to the core engine).
 
 You can verify these pins yourself by navigating to the **`doomemacs/modules`** repository on GitHub and inspecting the `packages.el` file within each module's directory on the `main` branch:
 
-*   **Completion Framework:** `modules/completion/vertico/packages.el` and `modules/completion/corfu/packages.el`
-*   **Org Mode:** `modules/lang/org/packages.el`
-*   **Version Control:** `modules/tools/magit/packages.el` and `modules/ui/vc-gutter/packages.el`
-*   **Core Utilities:** `modules/config/default/packages.el`
-*   **Formatting & Environment:** `modules/editor/format/packages.el` and `modules/tools/direnv/packages.el`
-*   **Debugging & Snippets:** `modules/tools/debugger/packages.el` and `modules/editor/snippets/packages.el`
+- **Completion Framework:** `modules/completion/vertico/packages.el` and `modules/completion/corfu/packages.el`
+- **Org Mode:** `modules/lang/org/packages.el`
+- **Version Control:** `modules/tools/magit/packages.el` and `modules/ui/vc-gutter/packages.el`
+- **Core Utilities:** `modules/config/default/packages.el`
+- **Formatting & Environment:** `modules/editor/format/packages.el` and `modules/tools/direnv/packages.el`
+- **Debugging & Snippets:** `modules/tools/debugger/packages.el` and `modules/editor/snippets/packages.el`
 
 This declarative `:pin` approach in `packages.el` is Doom's equivalent to your `straight-freeze-versions` lockfile, ensuring that every user who installs Doom gets the exact same tested commit hashes for these packages.
