@@ -1207,24 +1207,31 @@ Native pixel-precision viewport translation for hardware input and keyboard inte
 #+end_src
 
 ** DONE Tree-sitter
-Downloads language parsers and routes major modes to their tree-sitter variants across Emacs 30 and 31.
+Downloads language parsers that power code coloring and structural navigation.
 #+begin_src emacs-lisp
 (use-package treesit
   :ensure nil
   :if (treesit-available-p)
   :preface
+  ;; Must precede :custom (load-order constraint).
   (defvar ar/treesit-grammar-dir
     (no-littering-expand-var-file-name "tree-sitter/")
     "Target directory for compiled tree-sitter grammars.")
   :init
+  ;; Ensures the grammar directory exists before any download occurs.
   (unless (file-exists-p ar/treesit-grammar-dir)
     (make-directory ar/treesit-grammar-dir t))
-  ;; Safe for both 30 (defvar) and 31 (defcustom). Set via setq to prevent
-  ;; customize-variable warnings in Emacs 30.2.
-  (setq treesit-extra-load-path (list ar/treesit-grammar-dir))
+  :custom
+  ;; First directory is the default install target for auto-installation.
+  (treesit-extra-load-path (list ar/treesit-grammar-dir))
+  ;; Silently installs missing grammars without prompting.
+  (treesit-auto-install-grammar 'always)
+  ;; Routes all supported file types to their tree-sitter modes.
+  (treesit-enabled-modes t)
   :config
+  ;; Maximum syntax highlighting detail level.
   (setq treesit-font-lock-level 4)
-  ;; Registers grammar sources for manual or auto installation.
+  ;; Registers non-built-in grammar sources (Emacs 31 ships typescript, toml, yaml, dockerfile, rust).
   (dolist (source '((python "https://github.com/tree-sitter/tree-sitter-python")
                     (bash "https://github.com/tree-sitter/tree-sitter-bash")
                     (c "https://github.com/tree-sitter/tree-sitter-c")
@@ -1239,45 +1246,7 @@ Downloads language parsers and routes major modes to their tree-sitter variants 
                     (make "https://github.com/tree-sitter-grammars/tree-sitter-make")
                     (awk "https://github.com/BeagleFoot/tree-sitter-awk")
                     (org "https://github.com/milisims/tree-sitter-org")))
-    (setf (alist-get (car source) treesit-language-source-alist) (cdr source)))
-  ;; Emacs 31+ native auto-installation and mode routing.
-  (when (>= emacs-major-version 31)
-    (setq treesit-auto-install-grammar 'always)
-    (setq treesit-enabled-modes t)))
-
-;; Emacs 30 fallback via treesit-auto
-(use-package treesit-auto
-  :ensure t
-  :if (and (treesit-available-p) (< emacs-major-version 31))
-  :after treesit
-  :demand t
-  :custom
-  (treesit-auto-langs '(python bash c cpp css html json latex bibtex nix java make awk org))
-  (treesit-auto-install 'prompt)
-  :config
-  ;; CRITICAL FIX: In Emacs 30, `treesit-install-language-grammar` ignores
-  ;; `treesit-extra-load-path` for the installation target, defaulting to
-  ;; `~/.emacs.d/tree-sitter/`. We advise it to route installations into
-  ;; our no-littering directory.
-  (define-advice treesit-install-language-grammar (:around (fn lang &optional out-dir) route-to-no-littering)
-    (funcall fn lang (or out-dir ar/treesit-grammar-dir)))
-  ;; Explicitly map core prog-modes to their ts-mode counterparts.
-  ;; While treesit-auto attempts this via advice, seeding `major-mode-remap-alist`
-  ;; guarantees robust routing before the auto-mode engine evaluates.
-  (dolist (mapping '((python-mode . python-ts-mode)
-                     (sh-mode . bash-ts-mode)
-                     (c-mode . c-ts-mode)
-                     (c++-mode . c++-ts-mode)
-                     (css-mode . css-ts-mode)
-                     (mhtml-mode . html-ts-mode)
-                     (js-json-mode . json-ts-mode)
-                     (java-mode . java-ts-mode)
-                     (makefile-mode . makefile-ts-mode)
-                     (yaml-mode . yaml-ts-mode)
-                     (dockerfile-mode . dockerfile-ts-mode)))
-    (when (fboundp (cdr mapping))
-      (add-to-list 'major-mode-remap-alist mapping)))
-  (global-treesit-auto-mode))
+    (setf (alist-get (car source) treesit-language-source-alist) (cdr source))))
 #+end_src
 
 ** DONE Electric Pair
@@ -6208,223 +6177,169 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
 
 
 * TODO Development Tools
-** TODO Eglot
+** TODO Language Server Protocol
+Integrates language servers for code navigation, analysis, and diagnostics, rendering floating documentation, inline peek overlays, live minibuffer symbol previews, and hierarchical tree sidebars.
 #+begin_src emacs-lisp
-(use-package eglot
-  :ensure nil
+(use-package lsp-mode
+  :defer t
   :hook ((prog-mode . (lambda ()
-                        (unless (derived-mode-p
-                                 'emacs-lisp-mode 'lisp-mode
-                                 'makefile-mode 'snippet-mode
-                                 'ron-mode)
-                          (eglot-ensure))))
-         ((LaTeX-mode markdown-mode yaml-mode-hook yaml-ts-mode) . eglot-ensure))
+                      (unless (derived-mode-p
+                               'emacs-lisp-mode 'lisp-mode
+                               'makefile-mode 'snippet-mode
+                               'ron-mode)
+                        (lsp-deferred))))
+         ((LaTeX-mode markdown-ts-mode yaml-mode yaml-ts-mode) . lsp-deferred))
   :custom
-  (eglot-autoshutdown t)
-  ;; Native Emacs 31 Tree-sitter renderer (zero-latency). Use 'gfm-view-mode for external regex-based nested code parity.
-  ;;(eglot-documentation-renderer 'markdown-ts-view-mode)
-  (eglot-documentation-renderer 'gfm-view-mode)
-  (eglot-ignored-server-capabilities '(:documentFormattingProvider
-                                       :documentOnTypeFormattingProvider
-                                       :colorProvider
-                                       :inlayHintProvider
-                                       :semanticTokensProvider
-                                       :foldingRangeProvider))
-  ;; Render the code action indicators strictly in the margin to prevent echo-area noise.
-  (eglot-code-action-indications '(eldoc-hint))
-  ;; Use a simple Unicode glyph to avoid emoji rendering glitches in TTY or tree-sitter modes.
-  (eglot-code-action-indicator "⚡")
-  ;; Prevent Eglot from configuring the forbidden company-mode ecosystem.
-  (eglot-stay-out-of '("company"))
-  ;; Always prompt with a summary before applying multi-file server edits.
-  (eglot-confirm-server-edits 'summary)
+  (lsp-completion-provider :none)
+  (lsp-idle-delay 0.25)
+  (lsp-session-file (no-littering-expand-var-file-name "lsp/session.el"))
+  (lsp-keymap-prefix nil)
+  (lsp-enable-xref t)
+  (lsp-log-io nil)
+  (lsp-auto-guess-root t)
+  (lsp-file-watch-threshold 4000)
+  (lsp-enable-folding nil)
+  (lsp-enable-indentation nil)
+  (lsp-enable-on-type-formatting nil)
+  (lsp-enable-text-document-color nil)
+  (lsp-enable-links nil)
+  (lsp-enable-dap-auto-configure nil) 
+  (lsp-format-buffer-on-save nil)
+  (lsp-lens-enable nil)
+  (lsp-inlay-hint-enable nil)
+  (lsp-enable-symbol-highlighting nil)
+  (lsp-semantic-tokens-enable nil)
+  (lsp-headerline-breadcrumb-enable nil)
+  (lsp-headerline-breadcrumb-enable-diagnostics nil)
+  ;; (lsp-signature-auto-activate '(:on-trigger-char :on-server-request))
+  (lsp-signature-render-documentation t)
+  (lsp-signature-doc-lines 2)
+  (lsp-diagnostics-provider :flycheck)
+  (lsp-eldoc-enable-hover nil)
+  (lsp-keep-workspace-alive nil)
+  (lsp-enable-suggest-server-download nil)
+  (lsp-modeline-code-actions-enable nil)
+  (lsp-modeline-diagnostics-enable nil)
+  (lsp-modeline-workspace-status-enable nil)
   :config
-  ;; Inject Emacs 31 native UI parity modes when a buffer becomes managed by an LSP server.
-  (add-hook 'eglot-managed-mode-hook
-            (lambda ()
-              (when (eglot-managed-p)
-                (eglot-inlay-hints-mode 1)
-                (eglot-semantic-tokens-mode 1))))
-
-  ;; LSP-aware file rename sequencing will/didRenameFiles payloads.
-  (defun ar/eglot-rename-file (new-name)
-    "Rename current file to NEW-NAME and notify the LSP server."
-    (interactive
-     (list (read-file-name "Rename to: "
-                           (file-name-directory (buffer-file-name))
-                           (buffer-file-name))))
-    (let* ((old-name (buffer-file-name))
-           (server (eglot-current-server)))
-      (unless old-name
-        (user-error "Buffer is not visiting a file"))
-      (unless server
-        (user-error "No active Eglot server in this buffer"))
-      (let* ((old-uri (eglot-path-to-uri old-name))
-             (new-uri (eglot-path-to-uri new-name))
-             (dir (file-name-directory new-name)))
-        (unless (file-directory-p dir)
-          (make-directory dir t))
-        (ignore-errors
-          (let ((edits (eglot--request
-                        server
-                        :workspace/willRenameFiles
-                        `(:files [(:oldUri ,old-uri :newUri ,new-uri)]))))
-            (when edits
-              (eglot--apply-workspace-edit server edits 'ar/eglot-rename-file))))
-        (rename-file old-name new-name 1)
-        (set-visited-file-name new-name nil t)
-        (jsonrpc-notify server :workspace/didRenameFiles
-                        `(:files [(:oldUri ,old-uri :newUri ,new-uri)]))
-        (message "Renamed %s → %s and updated LSP references"
-                 (file-name-nondirectory old-name)
-                 (file-name-nondirectory new-name)))))
-
-  ;; Moniker inspection for LSP 3.16+ cross-repository identity.
-  (defun ar/eglot-moniker-at-point ()
-    "Display the LSP moniker for the symbol at point in the echo area."
+  (defvar ar/lsp--deferred-shutdown-timer nil
+    "Timer for deferred LSP workspace shutdown.")
+  (define-advice lsp--shutdown-workspace (:around (fn &optional restart) defer-shutdown)
+    "Defer server shutdown to prevent expensive restarts when switching buffers."
+    (if (or lsp-keep-workspace-alive restart)
+        (funcall fn restart)
+      (when (timerp ar/lsp--deferred-shutdown-timer)
+        (cancel-timer ar/lsp--deferred-shutdown-timer))
+      (setq ar/lsp--deferred-shutdown-timer
+            (run-at-time 3 nil
+                         (lambda (workspaces)
+                           (dolist (ws workspaces)
+                             (or (cl-some #'lsp-buffer-live-p
+                                          (lsp--workspace-buffers ws))
+                                 (with-lsp-workspace ws
+                                   (let ((lsp-restart 'ignore))
+                                     (funcall fn))))))
+                         lsp--buffer-workspaces))))
+  ;; Breadcrumb toggle: enables headerline breadcrumb on demand.
+  (defun ar/lsp-breadcrumb-toggle ()
+    "Toggle LSP headerline breadcrumb mode."
     (interactive)
-    (let ((server (eglot-current-server)))
-      (if (not server)
-          (user-error "No active Eglot server")
-        (if (not (eglot-server-capable :monikerProvider))
-            (message "Server does not support monikers")
-          (eglot--async-request
-           server
-           :textDocument/moniker
-           (eglot--TextDocumentPositionParams)
-           :success-fn
-           (lambda (result)
-             (if (and result (cl-plusp (length result)))
-                 (let* ((primary (aref result 0))
-                        (scheme (plist-get primary :scheme))
-                        (identifier (plist-get primary :identifier))
-                        (kind (plist-get primary :kind)))
-                   (message "Moniker [%s]: %s (Kind: %s)"
-                            scheme identifier kind))
-               (message "No moniker found for symbol at point."))))))))
-
-  ;; Moniker copying for external indexer integration.
-  (defun ar/eglot-copy-moniker ()
-    "Copy the primary moniker identifier at point to the kill-ring."
-    (interactive)
-    (let ((server (eglot-current-server)))
-      (if (not server)
-          (user-error "No active Eglot server")
-        (if (not (eglot-server-capable :monikerProvider))
-            (message "Server does not support monikers")
-          (eglot--async-request
-           server
-           :textDocument/moniker
-           (eglot--TextDocumentPositionParams)
-           :success-fn
-           (lambda (result)
-             (if (and result (cl-plusp (length result)))
-                 (let ((identifier (plist-get (aref result 0) :identifier)))
-                   (kill-new identifier)
-                   (message "Copied moniker: %s" identifier))
-               (message "No moniker found to copy.")))))))))
-
-
-;;(use-package org-src-context
-;;  :ensure nil
-;;  :after eglot
-;;  :custom
-;;  ;; Visual: Set to 'nil' to see the grayed-out context surrounding your block.
-;;  ;; Set to 't' if you prefer a focused view (narrowed to just your code).
-;;  (org-src-context-narrow-p nil)
-;;  ;; Safety: Disable context injection for files larger than 500KB to prevent lag.
-;;  (org-src-context-max-filesize 500000)
-;;  :config
-;;  ;; Activate global minor mode directly in :config per Elpaca load-order physics.
-;;  (org-src-context-mode 1)
-;;  ;; Enable Apheleia (auto-formatting) inside the edit buffer.
-;;  ;; The patched org-src-context ensures a valid file path exists for this to work.
-;;  (with-eval-after-load 'apheleia
-;;    (add-hook 'org-src-mode-hook
-;;              (lambda ()
-;;                (apheleia-mode 1)))))
-
-
+    (lsp-headerline-breadcrumb-mode
+     (if lsp-headerline-breadcrumb-mode -1 1))))
 #+end_src
 
 #+begin_src emacs-lisp
-(use-package consult-eglot
+(use-package lsp-ui
   :defer t
-  :after (consult eglot))
+  :hook (lsp-mode . lsp-ui-mode)
+  :custom
+  (lsp-ui-doc-show-with-cursor nil)
+  (lsp-ui-doc-show-with-mouse nil)
+  (lsp-ui-doc-position 'at-point)
+  (lsp-ui-doc-max-height 8)
+  (lsp-ui-doc-max-width 72)
+  (lsp-ui-doc-header t)
+  (lsp-ui-doc-footer t)
+  (lsp-ui-sideline-enable nil)
+  (lsp-ui-peek-enable t)
+  (lsp-ui-peek-always-show t)
+  (lsp-ui-doc-delay 0.1))
+#+end_src
 
-(use-package consult-eglot-embark
+#+begin_src emacs-lisp
+(use-package consult-lsp
   :defer t
-  :after (embark consult-eglot)
-  :config
-  (consult-eglot-embark-mode 1))
+  :after (consult lsp-mode))
 
-;; Remaps native xref apropos search to consult-eglot's workspace symbol search.
+;; Remaps native xref apropos search to consult-lsp's live-preview engine.
 (general-define-key
-  :keymaps 'eglot-mode-map
-  [remap xref-find-apropos] #'consult-eglot-symbols)
+  :keymaps 'lsp-mode-map
+  [remap xref-find-apropos] #'consult-lsp-symbols)
 #+end_src
 
-** DONE Flymake
-Native on-the-fly syntax checking and diagnostic aggregation with inline overlay rendering.
 #+begin_src emacs-lisp
-;; Foundational diagnostic aggregator and LSP payload router.
-(use-package flymake
-  :ensure nil
-  :init
-  (add-hook 'prog-mode-hook #'flymake-mode)
-  (add-hook 'text-mode-hook #'flymake-mode)
-  :custom
-  ;; Disable native EOL to prevent spatial stacking collisions with flyover.
-  (flymake-show-diagnostics-at-end-of-line nil)
-  (flymake-indicator-type 'fringes)
-  ;; (flymake-fringe-indicator-position 'left-fringe)
-  (flymake-suppress-zero-counters t)
-  (flymake-wrap-around nil)
-  (flymake-indicator-type 'margins)
-  ;; (flymake-margin-indicators-string '((error "●" flymake-error-fringe)
-  ;;                                     (warning "▲" flymake-warning-fringe)
-  ;;                                     (note "■" flymake-note-fringe)))
-  :custom-face
-  (flymake-error ((t (:underline (:style line :color "#f7768e" :position bottom)))))
-  (flymake-warning ((t (:underline (:style line :color "#e0af68" :position bottom)))))
-  (flymake-note ((t (:underline (:style line :color "#7aa2f7" :position bottom)))))
-  (flymake-error-fringe ((t (:foreground "#f7768e"))))
-  (flymake-warning-fringe ((t (:foreground "#e0af68"))))
-  (flymake-note-fringe ((t (:foreground "#7aa2f7")))))
-
-;; Project-wide diagnostic search wrapper for consult-flymake.
-(defun consult-flymake-project ()
-  "Invoke consult-flymake across all project buffers."
-  (interactive)
-  (consult-flymake t))
+(use-package lsp-treemacs
+  :defer t
+  :after (lsp-mode treemacs)
+  :config
+  (setq lsp-treemacs-sync-mode 1))
 #+end_src
 
-** Flyover
+** TODO Code Diagnostics
+Highlights syntax errors and warnings inline via save-triggered diagnostics and Error Lens, upgrading buffer navigation with live minibuffer previews and severity narrowing.
 #+begin_src emacs-lisp
-(use-package flyover
-  :hook (flymake-mode . flyover-mode)
+(use-package flycheck
+  :defer t
+  :hook (((prog-mode yaml-mode markdown-mode) . flycheck-mode)
+         ((prog-mode yaml-mode markdown-mode) . flycheck-annotate-mode))
   :custom
-  ;; Checker settings
-  (flyover-checkers '(flymake))
-  (flyover-levels '(error warning info))
-
-  (flyover-background-lightness 45)
-  (flyover-show-at-eol t)
-  ;; (flyover-info-icon "")
-  ;; (flyover-warning-icon "")
-  ;; (flyover-error-icon "")
-  (flyover-border-style 'slant)
-  (flyover-virtual-line-type 'curved-dotted-arrow)
-  ;; (flyover-line-position-offset 0)
-  (flyover-debounce-interval 0.1)
-  (flyover-cursor-debounce-interval 0.1)
-  (flyover-display-mode 'show-only-on-same-line)
-
-  ;; Completion integration
-  (flyover-hide-during-completion t))
-
+  (flycheck-emacs-lisp-load-path 'inherit)
+  ;; Routes diagnostic indicators to the right fringe for a modern IDE gutter.
+  (flycheck-indication-mode 'left-fringe)
+  (flycheck-highlighting-mode 'symbols)
+  (flycheck-help-echo-function nil) 
+  ;; Events triggering automatic syntax checks. Order matches upstream `defcustom`:
+  ;; `save` checks immediately after the buffer is saved; `mode-enabled` checks
+  ;; immediately when `flycheck-mode` is non-nil. `idle-change` and `new-line`
+  ;; are excluded to prevent redisplay storms during active typing.
+  (flycheck-check-syntax-automatically '(save mode-enabled))
+  (flycheck-display-errors-delay 0.25)
+  (flycheck-buffer-switch-check-intermediate-buffers nil)
+  (flycheck-standard-error-navigation nil)
+  (flycheck-checker-error-threshold 500)
+  (flycheck-annotate-other-lines-style nil)
+  ;; TRAMP/remote syntax checking disabled per user directive.
+  ;; (flycheck-check-syntax-automatically-remote '(save mode-enabled))
+  :config
+  ;; Disables org-lint to prevent false positives in Denote/Org silos.
+  (setq-default flycheck-disabled-checkers '(org-lint))
+  ;; Hardened Emacs-Lisp predicate: lints project.el roots AND standalone personal configs.
+  (eval '(setf (flycheck-checker-get 'emacs-lisp 'predicate)
+               (lambda ()
+                 (and (not (bound-and-true-p no-byte-compile))
+                      (or (project-current)
+                          (and (buffer-file-name)
+                               (file-in-directory-p (buffer-file-name) user-emacs-directory)))))) t)
+  ;; Main-Thread Protection: aborts activation in massive buffers (>500KB / >10k lines)
+  ;; to prevent redisplay stutter and main-thread freezing.
+  (define-advice flycheck-mode (:before-while (&optional arg) guard-large-files)
+    (or (and arg (< (prefix-numeric-value arg) 1))
+        (not (too-long-file-p))))
+  ;; Prevents the *Flycheck errors* buffer from stealing input focus when popped.
+  (add-to-list 'display-buffer-alist
+               '("\\*Flycheck error messages\\*\\|\\*Flycheck errors\\*"
+                 (display-buffer-reuse-window display-buffer-in-side-window)
+                 (side . bottom)
+                 (window-height . 0.25)
+                 (window-parameters (no-delete-other-windows . t)))))
 #+end_src
 
+#+begin_src emacs-lisp
+(use-package consult-flycheck
+  :defer t
+  :after (consult flycheck)
+  :commands (consult-flycheck))
+#+end_src
 
 ** TODO Minimap
 Provides a detachable, zoomed-out minimap sidebar with native diff-hl fringe synchronization.
@@ -6965,6 +6880,180 @@ Routes global search commands and local navigation for the TODO ecosystem.
 #+end_src
 
 
+* DONE Markdown Mode
+Native tree-sitter Markdown editing and viewing via Emacs 31's built-in engine. Provides structure-aware coloring, hidden markup rendering, inline images, table editing, code block context, and outline folding without any external packages.
+
+** DONE Grammar Setup
+Registers the two required tree-sitter grammars so they are available before the first Markdown file is opened.
+#+begin_src emacs-lisp
+;; Register markdown grammar sources for auto-installation.
+;; The built-in markdown-ts-mode.el also registers these at load time,
+;; but early registration ensures availability for `markdown-ts-mode-install-parsers'.
+(when (treesit-available-p)
+  (dolist (source
+           '((markdown
+              "https://github.com/tree-sitter-grammars/tree-sitter-markdown"
+              :source-dir "tree-sitter-markdown/src")
+             (markdown-inline
+              "https://github.com/tree-sitter-grammars/tree-sitter-markdown"
+              :source-dir "tree-sitter-markdown-inline/src")))
+    (setf (alist-get (car source) treesit-language-source-alist) (cdr source))))
+#+end_src
+
+** DONE Core Setup
+Configures editing defaults, code block language mappings, prose-friendly buffer hooks, and Evil initial states for the main Markdown mode.
+#+begin_src emacs-lisp
+(use-package markdown-ts-mode
+  :if (treesit-available-p)
+  :custom
+  (markdown-ts-fontify-code-blocks-natively t)
+  (markdown-ts-enable-code-block-context-mode t)
+  (markdown-ts-enable-table-mode t)
+  (markdown-ts-table-auto-align '(cell-navigation transpose))
+  (markdown-ts-table-align-features '(justify-cells))
+  (markdown-ts-default-code-block-mode 'text-mode)
+  (markdown-ts-default-folding 'show-all)
+  (markdown-ts-hide-markup nil)
+  (markdown-ts-inline-images nil)
+  (markdown-ts-image-max-width 'window)
+  (markdown-ts-display-remote-inline-images nil)
+  (markdown-ts-inhibit-code-block-mode-warnings t)
+  (markdown-ts-code-block-in-context-mode-lighter nil)
+  (markdown-ts-in-table-mode-lighter nil)
+  :hook
+  ;; Prose-friendly buffer settings.
+  (markdown-ts-mode . visual-line-mode)
+  (markdown-ts-mode . (lambda ()
+                        (setq-local show-trailing-whitespace nil)
+                        (setq-local fill-column 80)))
+  ;; Disable line numbers in prose buffers.
+  (markdown-ts-mode . (lambda ()
+                        (when (bound-and-true-p display-line-numbers-mode)
+                          (display-line-numbers-mode -1))))
+  ;; Enable color visualization for hex/rgb values.
+  (markdown-ts-mode . colorful-mode)
+  (markdown-ts-mode . lsp-deferred)
+  :config
+  (require 'lsp-marksman)
+  ;; Extend code block language-to-mode mappings for common aliases.
+  (dolist (pair '((nix nix-ts-mode)
+                  (docker dockerfile-ts-mode)
+                  (dockerfile dockerfile-ts-mode)
+                  (vim vimrc-mode)
+                  (zsh bash-ts-mode)
+                  (fish bash-ts-mode)
+                  (console text-mode)
+                  (terminal text-mode)
+                  (txt text-mode)
+                  (text text-mode)
+                  (org org-mode)
+                  (r r-mode)
+                  (R r-mode)
+                  (diff diff-mode)
+                  (patch diff-mode)
+                  (ini conf-mode)
+                  (toml toml-ts-mode)
+                  (conf conf-mode)))
+    (setf (alist-get (car pair) markdown-ts-code-block-modes) (cdr pair)))
+  ;; Evil initial states.
+  (evil-set-initial-state 'markdown-ts-mode 'normal)
+  (evil-set-initial-state 'markdown-ts-view-mode 'normal)
+  ;; Wire evil-embrace markdown pairs into markdown-ts-mode buffers.
+  ;; The function is defined in the Evil Surround section (loaded earlier).
+  (add-hook 'markdown-ts-mode-hook
+            (lambda ()
+              (when (fboundp 'ar/embrace-markdown-setup)
+                (ar/embrace-markdown-setup)))))
+#+end_src
+
+** DONE Reading Mode
+Tunes the read-only view for comfortable long-form reading with hidden markup, inline images, and folded headings.
+#+begin_src emacs-lisp
+;; View-mode defaults are set internally by markdown-ts-view-mode:
+;; hide-markup=t, inline-images=t, code-block-context=nil, table-mode=nil.
+;; Additional tuning via the pre-init hook and post-mode hook.
+(with-eval-after-load 'markdown-ts-mode
+  ;; Fold to top-level headings on entry for a clean document overview.
+  (add-hook 'markdown-ts-view-mode-hook
+            (lambda ()
+              (when (eq markdown-ts-default-folding 'show-all)
+                (outline-hide-sublevels 1))
+              ;; Disable trailing whitespace and line numbers in view mode.
+              (setq-local show-trailing-whitespace nil)
+              (when (bound-and-true-p display-line-numbers-mode)
+                (display-line-numbers-mode -1))))
+  ;; Provide a quick command to open the current file in view mode.
+  (defun ar/markdown-view ()
+    "Open the current Markdown file in read-only view mode."
+    (interactive)
+    (if (derived-mode-p 'markdown-ts-mode)
+        (markdown-ts-view-mode)
+      (user-error "Not a Markdown buffer"))))
+#+end_src
+
+** DONE Keybindings
+Routes all Markdown editing, viewing, table, and structure commands through the local leader prefix.
+#+begin_src emacs-lisp
+;; Local leader (SPC m) for markdown-ts-mode buffers.
+(ar/local-leader
+ :keymaps 'markdown-ts-mode-map
+ ;; Structure & Editing
+ "x"   '(markdown-ts-toggle-checkbox :wk "Toggle checkbox")
+ "r"   '(markdown-ts-renumber-list :wk "Renumber list")
+ "i"   '(markdown-ts-insert-structure :wk "Insert block")
+ "e"   '(markdown-ts-emphasize :wk "Emphasize text")
+ "E"   '(markdown-ts-remove-emphasis :wk "Remove emphasis")
+ ;; Heading & Section Manipulation
+ "p"   '(markdown-ts-promote :wk "Promote heading/item")
+ "d"   '(markdown-ts-demote :wk "Demote heading/item")
+ "k"   '(markdown-ts-move-subtree-up :wk "Move section up")
+ "j"   '(markdown-ts-move-subtree-down :wk "Move section down")
+ ;; Display Toggles
+ "h"   '(markdown-ts-toggle-hide-markup :wk "Toggle hide markup")
+ "v"   '(markdown-ts-toggle-inline-images :wk "Toggle images")
+ "V"   '(ar/markdown-view :wk "Open view mode")
+ ;; Code Block Navigation
+ "n"   '(markdown-ts-move-to-next-code-block :wk "Next code block")
+ "N"   '(markdown-ts-move-to-previous-code-block :wk "Prev code block")
+ ;; Outline
+ "o"   '(:ignore t :wk "outline")
+ "o n" '(outline-next-heading :wk "Next heading")
+ "o p" '(outline-previous-heading :wk "Prev heading")
+ "o u" '(outline-up-heading :wk "Up heading")
+ "o f" '(outline-forward-same-level :wk "Forward same level")
+ "o b" '(outline-backward-same-level :wk "Backward same level")
+ "o c" '(markdown-ts-outline-cycle :wk "Cycle fold")
+ "o a" '(outline-show-all :wk "Show all")
+ ;; Table Operations
+ "t"   '(:ignore t :wk "table")
+ "t i" '(markdown-ts-table-insert-table :wk "Insert table")
+ "t d" '(markdown-ts-table-delete-table :wk "Delete table")
+ "t r" '(markdown-ts-table-insert-row-below :wk "Insert row below")
+ "t R" '(markdown-ts-table-insert-row-above :wk "Insert row above")
+ "t x" '(markdown-ts-table-delete-row :wk "Delete row")
+ "t c" '(markdown-ts-table-insert-column-right :wk "Insert col right")
+ "t C" '(markdown-ts-table-insert-column-left :wk "Insert col left")
+ "t X" '(markdown-ts-table-delete-column :wk "Delete col")
+ "t a" '(markdown-ts-table-align-table :wk "Align table")
+ "t t" '(markdown-ts-table-transpose-table :wk "Transpose table")
+ "t m" '(markdown-ts-table-move-row-down :wk "Move row down")
+ "t M" '(markdown-ts-table-move-row-up :wk "Move row up"))
+;; Local leader for view mode (subset of editing commands).
+(ar/local-leader
+ :keymaps 'markdown-ts-view-mode-map
+ "h"   '(markdown-ts-toggle-hide-markup :wk "Toggle hide markup")
+ "v"   '(markdown-ts-toggle-inline-images :wk "Toggle images")
+ "n"   '(markdown-ts-move-to-next-code-block :wk "Next code block")
+ "N"   '(markdown-ts-move-to-previous-code-block :wk "Prev code block")
+ "o"   '(:ignore t :wk "outline")
+ "o n" '(outline-next-heading :wk "Next heading")
+ "o p" '(outline-previous-heading :wk "Prev heading")
+ "o u" '(outline-up-heading :wk "Up heading")
+ "o c" '(markdown-ts-outline-cycle :wk "Cycle fold")
+ "o a" '(outline-show-all :wk "Show all"))
+#+end_src
+
+
 * TODO LaTeX Writing Environment
 ** DONE Denote Citar Sections
 Injects bibliography abstracts and formatted references into the universal sidecar for literature notes.
@@ -6999,14 +7088,29 @@ Configures Python editing, dual LSP server routing, workspace settings, formatti
   (setf (alist-get 'python-mode apheleia-mode-alist) '(ruff-isort ruff))
   (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(ruff-isort ruff)))
 
+;; ;; --- LSP Server Routing (Pyrefly + Ruff) ---
+;; (with-eval-after-load 'lsp-mode
+;;   ;; Registers Pyrefly as the primary type-checker and navigation server.
+;;   ;; Lambda wrapper defers `executable-find` to guarantee `envrc` path resolution.
+;;   (lsp-register-client
+;;    (make-lsp-client
+;;     :new-connection (lsp-stdio-connection
+;;                      (lambda ()
+;;                        (let ((bin (executable-find "pyrefly")))
+;;                          (unless bin
+;;                            (user-error "pyrefly not found in current direnv environment"))
+;;                          (list bin "lsp" "-j" "4"))))
+;;     :activation-fn (lsp-activate-on "python")
+;;     :priority 1
+;;     :add-on? nil
+;;     :server-id 'pyrefly))
 
-(use-package flymake-ruff
-  :hook (eglot-managed-mode . flymake-ruff-load))
-
-(use-package lazy-ruff
-  :bind (("C-c f" . lazy-ruff-lint-format-dwim)) ;; keybinding
-  :config
-  (lazy-ruff-global-mode t)) ;; Enable the lazy-ruff minor mode globally
+;;   (define-advice lsp--send-did-save-p (:around (fn &rest args) force-pyrefly-save)
+;;     "Force didSave for pyrefly despite missing save in TextDocumentSyncOptions."
+;;     (or (apply fn args)
+;;         (when-let* ((workspace (or (car args) lsp--cur-workspace))
+;;                     (client (lsp--workspace-client workspace)))
+;;           (eq (lsp--client-server-id client) 'pyrefly)))))
 #+end_src
 
 
