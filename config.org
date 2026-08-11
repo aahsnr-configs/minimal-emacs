@@ -25,66 +25,29 @@ The =no-byte-compile: t= header directive stops Emacs from prematurely compiling
 ;; Prefer newer source files over stale byte-compiled artifacts.
 (setq load-prefer-newer t)
 
-;; Ensure use-package macro availability during byte-compilation.
-(eval-when-compile (require 'use-package))
-(require 'bind-key)
+(setq straight-check-at-startup nil)
 
-;; ELPACA BOOTSTRAP
-(defvar elpaca-installer-version 0.12)
-;; Redirect Elpaca root to var/elpaca/ (no-littering paradigm).
-(defvar elpaca-directory (expand-file-name "var/elpaca/" user-emacs-directory))
-(defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
-(defvar elpaca-sources-directory (expand-file-name "sources/" elpaca-directory))
-(defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
-                              :ref nil :depth 1 :inherit ignore
-                              :files (:defaults "elpaca-test.el" (:exclude "extensions"))
-                              :build (:not elpaca-activate)))
-(let* ((repo  (expand-file-name "elpaca/" elpaca-sources-directory))
-       (build (expand-file-name "elpaca/" elpaca-builds-directory))
-       (order (cdr elpaca-order))
-       (default-directory repo))
-  (add-to-list 'load-path (if (file-exists-p build) build repo))
-  (unless (file-exists-p repo)
-    (make-directory repo t)
-    (when (<= emacs-major-version 28) (require 'subr-x))
-    (condition-case-unless-debug err
-        (if-let* ((buffer (pop-to-buffer-same-window "*elpaca-bootstrap*"))
-                  ((zerop (apply #'call-process `("git" nil ,buffer t "clone"
-                                                  ,@(when-let* ((depth (plist-get order :depth)))
-                                                      (list (format "--depth=%d" depth) "--no-single-branch"))
-                                                  ,(plist-get order :repo) ,repo))))
-                  ((zerop (call-process "git" nil buffer t "checkout"
-                                        (or (plist-get order :ref) "--"))))
-                  (emacs (concat invocation-directory invocation-name))
-                  ((zerop (call-process emacs nil buffer nil "-Q" "-L" "." "--batch"
-                                        "--eval" "(byte-recompile-directory \".\" 0 'force)")))
-                  ((require 'elpaca))
-                  ((elpaca-generate-autoloads "elpaca" repo)))
-            (progn (message "%s" (buffer-string)) (kill-buffer buffer))
-          (error "%s" (with-current-buffer buffer (buffer-string))))
-      ((error) (warn "%s" err) (delete-directory repo 'recursive))))
-  (unless (require 'elpaca-autoloads nil t)
-    (require 'elpaca)
-    (elpaca-generate-autoloads "elpaca" repo)
-    (let ((load-source-file-function nil)) (load "./elpaca-autoloads"))))
-;; Exception: Internal bootstrap hook must remain `after-init-hook`.
-(add-hook 'after-init-hook #'elpaca-process-queues)
-(elpaca `(,@elpaca-order))
+(defvar bootstrap-version)
+(let ((bootstrap-file
+       (expand-file-name
+        "straight/repos/straight.el/bootstrap.el"
+        (or (bound-and-true-p straight-base-dir)
+            user-emacs-directory)))
+      (bootstrap-version 7))
+  (unless (file-exists-p bootstrap-file)
+    (with-current-buffer
+        (url-retrieve-synchronously
+         "https://raw.githubusercontent.com/radian-software/straight.el/develop/install.el"
+         'silent 'inhibit-cookies)
+      (goto-char (point-max))
+      (eval-print-last-sexp)))
+  (load bootstrap-file nil 'nomessage))
 
-;; Use Package Integration
-(elpaca elpaca-use-package
-  (elpaca-use-package-mode)
-  (setq elpaca-use-package-by-default t))
+(straight-use-package 'use-package)
+(straight-use-package 'esup)
 
-;; Block init reading until elpaca-use-package advice is applied.
-(elpaca-wait)
-
-;; Force Elpaca to use SSH to bypass Codeberg HTTPS rate limits
-(setq elpaca-recipe-defaults '(:protocol ssh))
-
-;; Use Package Configuration
+(setq straight-use-package-by-default t)
 (setq use-package-verbose nil
-      use-package-always-ensure t
       use-package-expand-minimally t
       use-package-compute-statistics nil
       use-package-enable-imenu-support t)
@@ -92,7 +55,6 @@ The =no-byte-compile: t= header directive stops Emacs from prematurely compiling
 ;; NO-LITTERING & CUSTOM FILE
 ;; Synchronously load no-littering to preempt async package cache paths.
 (use-package no-littering
-  :ensure (:wait t)
   :demand t
   :config
   (setq custom-file (no-littering-expand-etc-file-name "custom.el"))
@@ -135,17 +97,51 @@ Disables expensive minor modes in massive buffers to prevent main-thread freezin
            (> (car (buffer-line-statistics)) 10000))))
 
 (defun reload-init-file ()
-  "Tangle and reload the Emacs configuration from `config.org'."
+  "Tangle and reload the Emacs configuration from config.org.
+This function is optimized for use with straight.el by ensuring stale
+byte-compiled files do not interfere with the reload."
   (interactive)
-  (let ((config-org (expand-file-name "config.org" user-emacs-directory))
-        (init-el (expand-file-name "init.el" user-emacs-directory)))
+  (let* ((config-org (expand-file-name "config.org" user-emacs-directory))
+         (init-el (expand-file-name "init.el" user-emacs-directory))
+         (init-elc (expand-file-name "init.elc" user-emacs-directory))
+         (start-time (current-time)))
+
     (unless (file-exists-p config-org)
-      (user-error "Configuration file %s not found" config-org))
-    (require 'org)
-    (org-babel-tangle-file config-org init-el "emacs-lisp")
-    (load-file init-el)
-    (garbage-collect)
-    (message "Configuration reloaded.")))
+      (user-error "Configuration file %s not found!" config-org))
+
+    (when (yes-or-no-p "Tangle and reload configuration? ")
+      (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+      (message "Tangling configuration from config.org...")
+
+      (condition-case err
+          (progn
+            ;; Ensure Org Babel is loaded for tangling
+            (require 'org)
+            (require 'ob-tangle)
+            (org-babel-tangle-file config-org init-el "emacs-lisp"))
+        (error
+         (user-error "Failed to tangle config.org: %s" (error-message-string err))))
+
+      (message "✓ Tangling complete")
+
+      (when (file-exists-p init-elc)
+        (delete-file init-elc)
+        (message "✓ Removed stale init.elc"))
+
+      (message "Loading init.el...")
+      (condition-case err
+          (load-file init-el)
+        (error
+         (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+         (user-error "Failed to load init.el: %s" (error-message-string err))))
+
+      (let ((elapsed-time (float-time (time-subtract (current-time) start-time))))
+        (message "✓ Configuration loaded successfully")
+        (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        (message "Reload completed in %.2f seconds" elapsed-time)
+        (message "")
+        (message "NOTE: Some changes (removed hooks/packages) require a full restart.")
+        (message "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")))))
 
 (defun selected-region-or-symbol-at-point ()
   "Return the active region, or the symbol at point if inactive.
@@ -199,11 +195,11 @@ Rendering, scrolling, and input-latency optimizations. Excludes obsolete Emacs 2
 
 ;; Disables GTK input methods on PGTK/Wayland builds to mitigate severe input latency.
 ;; Applied post-frame creation.
-(when (fboundp 'pgtk-use-im-context)
-  (add-hook 'after-make-frame-functions
-            (lambda (frame)
-              (with-selected-frame frame
-                (pgtk-use-im-context nil)))))
+;; (when (fboundp 'pgtk-use-im-context)
+;;   (add-hook 'after-make-frame-functions
+;;             (lambda (frame)
+;;               (with-selected-frame frame
+;;                 (pgtk-use-im-context nil)))))
 
 ;; Emacs 29+ long line optimizations. Prevents main-thread freezing on minified JSON
 ;; or large logs by disabling expensive redisplay features.
@@ -262,7 +258,7 @@ Quality-of-life settings, safety guards, and core minor modes. Disables unused V
       compilation-scroll-output t)
 
 ;; UI and input latency reductions.
-(setq echo-keystrokes 0.1
+(setq ;; echo-keystrokes 0.1
       ad-redefinition-action 'accept)
 
 ;; Filesystem and buffer safety.
@@ -304,12 +300,12 @@ Quality-of-life settings, safety guards, and core minor modes. Disables unused V
 ** DONE Repeat Mode
 Enables native sticky-key repetition for debugging and spatial commands while suppressing echo area noise.
 #+begin_src emacs-lisp
-;; (use-package repeat
-;;   :ensure nil
-;;   :hook (elpaca-after-init . repeat-mode)
-;;   :custom
-;;   ;; Suppresses echo area hints to prevent collisions with Eldoc and Which-Key.
-;;   (repeat-echo-function #'ignore))
+(use-package repeat
+  :ensure nil
+  :hook (elpaca-after-init . repeat-mode)
+  :custom
+  ;; Suppresses echo area hints to prevent collisions with Eldoc and Which-Key.
+  (repeat-echo-function #'ignore))
 #+end_src
 
 ** DONE Garbage Collector
@@ -4222,7 +4218,7 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
   (corfu-on-exact-match nil)
   ;; Temporarily writes the selected candidate into the buffer as a live preview that commits on further input or RET.
   ;; (corfu-preview-current 'insert)
-  (corfu-preview-current nil)
+  ;; (corfu-preview-current nil)
   ;; Delays auto-completion to prevent GC stutter with Orderless.
   (corfu-auto-delay 0.24)
   (corfu-auto-prefix 2)
@@ -4235,18 +4231,18 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
                              ghostel-mode
                              ghostel-compile-view-mode)
                         t))
-  ;; :custom-face
-  ;; (corfu-border ((t (:inherit region :background unspecified))))
+  :custom-face
+  (corfu-border ((t (:inherit region :background unspecified))))
   :bind (:map corfu-map
               ("TAB"       . corfu-next)
               ("<tab>"     . corfu-next)
               ("S-TAB"     . corfu-previous)
               ("<backtab>" . corfu-previous)
-              ("RET"       . corfu-insert)
+              ;; ("RET"       . corfu-insert)
               )
   :config
   ;; Free the RET key for less intrusive behavior.
-  ;;(keymap-unset corfu-map "RET")
+  (keymap-unset corfu-map "RET")
 
     ;; Guards the minibuffer against Corfu popups and routes CAPF to Vertico.
   (defun ar/corfu-minibuffer-guard ()
@@ -7556,4 +7552,3 @@ Centralized leader bindings for spatial window traversal, splitting, and ace-win
   "w r"         '(winner-redo :wk "Winner redo")
   "w t"         '(toggle-window-split :wk "Toggle split"))
 #+end_src
-
