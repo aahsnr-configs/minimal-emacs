@@ -55,7 +55,7 @@
   ;; ====================
   ;; Define a custom lockfile profile to centralize package version pinning.
   ;; This must be set before the straight.el bootstrap snippet in init.el.
-  (setq elpaca-lock-file (expand-file-name "etc/elpaca.eld" user-emacs-directory))
+  ; (setq elpaca-lock-file (expand-file-name "etc/elpaca.eld" user-emacs-directory))
   ;; ====================
   ;; NATIVE COMPILATION
   ;; ====================
