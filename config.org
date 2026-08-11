@@ -488,6 +488,56 @@ Configures the window and icon title bars to display the current buffer name usi
       icon-title-format frame-title-format)
 #+end_src
 
+** DONE Macros
+*** with-eval-after-load-all
+#+begin_src emacs-lisp
+(defmacro with-eval-after-load-all (features &rest body)
+  "Run BODY once every feature in FEATURES has loaded.
+
+FEATURES is a single feature or an unquoted list of features, where
+each feature is a symbol or (per `with-eval-after-load') a file-name
+string:
+
+  (with-eval-after-load-all lsp-mode ...)              ; one feature
+  (with-eval-after-load-all (lsp-mode flycheck) ...)    ; several
+  (with-eval-after-load-all '(lsp-mode flycheck) ...)   ; quoted list
+
+BODY runs exactly once, the moment the LAST of FEATURES to load
+actually finishes loading -- whichever one that happens to be. Any
+FEATURES already loaded when this macro is evaluated are satisfied
+immediately; only the remaining ones are waited on. The order in
+which FEATURES are listed has no effect on when or whether BODY runs.
+
+BODY is automatically wrapped in `with-no-warnings', since it will
+typically call functions or reference variables from packages that
+are not yet loaded (and therefore not yet defined) at byte-compile
+time, which would otherwise produce spurious compiler warnings.
+
+\(fn FEATURES BODY...)"
+  (declare (indent 1) (debug (form body)))
+  ;; Normalize FEATURES to a flat, unquoted list, accepting any of:
+  ;; SYMBOL, 'SYMBOL, (SYMBOL...), '(SYMBOL...).
+  (when (eq (car-safe features) 'quote)
+    (setq features (cadr features)))
+  (unless (listp features)
+    (setq features (list features)))
+  (setq features (delete-dups (copy-sequence features)))
+  (unless features
+    (error "with-eval-after-load-all: FEATURES must not be empty"))
+  (dolist (f features)
+    (unless (or (symbolp f) (stringp f))
+      (error "with-eval-after-load-all: invalid feature %S (must be a symbol or string)" f)))
+  ;; Build one `with-eval-after-load' per feature, nested innermost-out,
+  ;; with BODY (wrapped in `with-no-warnings') at the core. Nesting order
+  ;; doesn't matter for *when* BODY runs: `with-eval-after-load' fires
+  ;; immediately for a feature that's already loaded, so no matter which
+  ;; order we nest in, BODY only actually fires once the last outstanding
+  ;; feature loads.
+  (let ((form `(with-no-warnings ,(macroexp-progn body))))
+    (dolist (f (reverse features))
+      (setq form `(with-eval-after-load ,(if (stringp f) f `',f) ,form)))
+    form))
+#+end_src
 
 
 * DONE Vim Emulation
@@ -1800,84 +1850,84 @@ Trims trailing whitespace only on lines you edit to keep version control diffs c
 ** DONE Dtrt Indent
 Heuristic indentation detection for programming buffers. Executes post-mode initialization to preempt LSP spawning and aborts on massive files.
 #+begin_src emacs-lisp
-(use-package dtrt-indent
-  :defer t
-  :custom
-  ;; Defers to SMIE indentation engines in supported modes.
-  (dtrt-indent-run-after-smie t)
-  ;; Synchronizes Emacs' global fallback indentation variable.
-  (dtrt-indent-update-standard-indent t)
-  ;; Restricts line scanning to prevent main-thread micro-stutters.
-  (dtrt-indent-max-lines 2000)
-  ;; Minimum confidence threshold for indentation detection.
-  (dtrt-indent-min-quality 80.0)
-  ;; Suppresses echo-area logging.
-  (dtrt-indent-verbosity 0)
-  :init
-  (defun ar/dtrt-indent-maybe-enable ()
-    "Enable `dtrt-indent-mode' in programming buffers, excluding structural exceptions."
-    (when (and (derived-mode-p 'prog-mode 'conf-mode)
-               (not (too-long-file-p))
-               ;; Excludes Makefiles (requires hard tabs) and YAML (strict spacing).
-               (not (apply #'derived-mode-p '(makefile-mode yaml-mode))))
-      (dtrt-indent-mode 1)))
-  ;; Executes after major-mode body but before mode hooks and LSP spawning.
-  (add-hook 'change-major-mode-after-body-hook #'ar/dtrt-indent-maybe-enable)
-  :config
-  ;; Synchronizes Evil shift-width with the detected indentation offset.
-  (add-hook 'dtrt-indent-hook
-            (lambda () (setq-local evil-shift-width tab-width))))
+;; (use-package dtrt-indent
+;;   :defer t
+;;   :custom
+;;   ;; Defers to SMIE indentation engines in supported modes.
+;;   (dtrt-indent-run-after-smie t)
+;;   ;; Synchronizes Emacs' global fallback indentation variable.
+;;   (dtrt-indent-update-standard-indent t)
+;;   ;; Restricts line scanning to prevent main-thread micro-stutters.
+;;   (dtrt-indent-max-lines 2000)
+;;   ;; Minimum confidence threshold for indentation detection.
+;;   (dtrt-indent-min-quality 80.0)
+;;   ;; Suppresses echo-area logging.
+;;   (dtrt-indent-verbosity 0)
+;;   :init
+;;   (defun ar/dtrt-indent-maybe-enable ()
+;;     "Enable `dtrt-indent-mode' in programming buffers, excluding structural exceptions."
+;;     (when (and (derived-mode-p 'prog-mode 'conf-mode)
+;;                (not (too-long-file-p))
+;;                ;; Excludes Makefiles (requires hard tabs) and YAML (strict spacing).
+;;                (not (apply #'derived-mode-p '(makefile-mode yaml-mode))))
+;;       (dtrt-indent-mode 1)))
+;;   ;; Executes after major-mode body but before mode hooks and LSP spawning.
+;;   (add-hook 'change-major-mode-after-body-hook #'ar/dtrt-indent-maybe-enable)
+;;   :config
+;;   ;; Synchronizes Evil shift-width with the detected indentation offset.
+;;   (add-hook 'dtrt-indent-hook
+;;             (lambda () (setq-local evil-shift-width tab-width))))
 #+end_src
 
 ** DONE Indent Bars
 AST-aware vertical guides synchronizing depth colorization with rainbow-delimiters while restricting activation to programming buffers to prevent Org-mode structural corruption.
 #+begin_src emacs-lisp
-(use-package indent-bars
-  :defer t
-  :init
-  ;; Blocks activation in massive files, child frames, fontification buffers, and Org buffers.
-  (defun ar/indent-bars-should-enable-p ()
-    "Return non-nil if indent-bars should be enabled in current buffer."
-    (not (or (too-long-file-p)
-             (frame-parameter nil 'parent-frame)
-             (bound-and-true-p org-indent-mode)
-             (string-prefix-p " *org-src-fontification:" (buffer-name))
-             (derived-mode-p 'org-mode
-                             'lisp-mode
-                             'emacs-lisp-mode
-                             'lisp-interaction-mode 'lisp-data-mode))))
+;; (use-package indent-bars
+;;   :defer t
+;;   :init
+;;   ;; Blocks activation in massive files, child frames, fontification buffers, and Org buffers.
+;;   (defun ar/indent-bars-should-enable-p ()
+;;     "Return non-nil if indent-bars should be enabled in current buffer."
+;;     (not (or (too-long-file-p)
+;;              (frame-parameter nil 'parent-frame)
+;;              (bound-and-true-p org-indent-mode)
+;;              (string-prefix-p " *org-src-fontification:" (buffer-name))
+;;              (derived-mode-p 'org-mode
+;;                              'lisp-mode
+;;                              'emacs-lisp-mode
+;;                              'lisp-interaction-mode 'lisp-data-mode))))
 
-  (defun ar/indent-bars-maybe-enable ()
-    "Enable indent-bars-mode if conditions are met."
-    (when (ar/indent-bars-should-enable-p)
-      (indent-bars-mode 1)))
-  :custom
-  ;; Enforces AST structural boundaries and prevents string descent.
-  (indent-bars-treesit-support t)
-  (indent-bars-no-descend-lists t)
-  (indent-bars-prefer-character t)
-  (indent-bars-no-descend-string 'all)
-  ;; Encapsulates multi-line AST nodes to prevent visual fragmentation.
-  (indent-bars-treesit-wrap '((python argument_list parameters)
-                              (c argument_list parameter_list)
-                              (cpp argument_list parameter_list)
-                              (rust arguments parameters)
-                              (javascript arguments formal_parameters)
-                              (typescript arguments formal_parameters)
-                              (tsx arguments formal_parameters)))
-  ;; Renders ghost bars on empty lines to connect structural blocks.
-  (indent-bars-display-on-blank-lines t)
-  ;; Unicode fallback for terminals and PGTK stipple failures.
-  ;;(indent-bars-no-stipple-char ?▍)
-  ;; Tokyo Night depth palette matching rainbow-delimiters.
-  (indent-bars-color-by-depth '(:palette ("#7aa2f7" "#e0af68" "#9ece6a" "#1abc9c" "#bb9af7" "#9d7cd8" "#ff9e64" "#f7768e") :blend 1))
-  ;; High-contrast active scope tracking.
-  (indent-bars-highlight-current-depth '(:color "#c0caf5" :blend 0.3 :width 0.25))
-  :hook ((prog-mode conf-mode yaml-mode) . ar/indent-bars-maybe-enable)
-  :config
-  ;; Disables rendering inside magit-blame overlays.
-  (with-eval-after-load 'magit-blame
-    (add-to-list 'magit-blame-disable-modes 'indent-bars-mode)))
+;;   (defun ar/indent-bars-maybe-enable ()
+;;     "Enable indent-bars-mode if conditions are met."
+;;     (when (ar/indent-bars-should-enable-p)
+;;       (indent-bars-mode 1)))
+;;   :custom
+;;   ;; Enforces AST structural boundaries and prevents string descent.
+;;   (indent-bars-treesit-support t)
+;;   (indent-bars-no-descend-lists t)
+;;   (indent-bars-prefer-character t)
+;;   (indent-bars-no-descend-string 'all)
+;;   ;; Encapsulates multi-line AST nodes to prevent visual fragmentation.
+;;   (indent-bars-treesit-wrap '((python argument_list parameters)
+;;                               (c argument_list parameter_list)
+;;                               (cpp argument_list parameter_list)
+;;                               (rust arguments parameters)
+;;                               (javascript arguments formal_parameters)
+;;                               (typescript arguments formal_parameters)
+;;                               (tsx arguments formal_parameters)))
+;;   ;; Renders ghost bars on empty lines to connect structural blocks.
+;;   (indent-bars-display-on-blank-lines t)
+;;   ;; Unicode fallback for terminals and PGTK stipple failures.
+;;   ;;(indent-bars-no-stipple-char ?▍)
+;;   ;; Tokyo Night depth palette matching rainbow-delimiters.
+;;   (indent-bars-color-by-depth '(:palette ("#7aa2f7" "#e0af68" "#9ece6a" "#1abc9c" "#bb9af7" "#9d7cd8" "#ff9e64" "#f7768e") :blend 1))
+;;   ;; High-contrast active scope tracking.
+;;   (indent-bars-highlight-current-depth '(:color "#c0caf5" :blend 0.3 :width 0.25))
+;;   :hook ((prog-mode conf-mode yaml-mode) . ar/indent-bars-maybe-enable)
+;;   :config
+;;   ;; Disables rendering inside magit-blame overlays.
+;;   (with-eval-after-load 'magit-blame
+;;     (add-to-list 'magit-blame-disable-modes 'indent-bars-mode)))
 #+end_src
 
 ** DONE Move Text
@@ -2891,7 +2941,7 @@ Configures the core documentation engine with strict echo area limits, Emacs 31 
 
   :custom
   (diff-hl-draw-borders nil)
-  (diff-hl-flydiff-delay 0.1) ;; Update immediately while typing
+  ;; (diff-hl-flydiff-delay 0.1) ;; Update immediately while typing
 
   :config
   (diff-hl-flydiff-mode 1)
@@ -4161,15 +4211,18 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
   :init
   (global-corfu-mode)
   :custom
-  ;;(corfu-cycle t)
+  ;; (corfu-cycle t)
   (corfu-auto t)
   (corfu-quit-at-boundary 'separator)
   (corfu-quit-no-match 'separator)
-  ;;(corfu-count 5)
+  (corfu-count 5)
   (corfu-max-width 120)
   ;; Preselects the prompt to prevent accidental candidate commits.
   (corfu-preselect 'prompt)
   (corfu-on-exact-match nil)
+  ;; Temporarily writes the selected candidate into the buffer as a live preview that commits on further input or RET.
+  ;; (corfu-preview-current 'insert)
+  (corfu-preview-current nil)
   ;; Delays auto-completion to prevent GC stutter with Orderless.
   (corfu-auto-delay 0.24)
   (corfu-auto-prefix 2)
@@ -4188,12 +4241,12 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
               ("TAB"       . corfu-next)
               ("<tab>"     . corfu-next)
               ("S-TAB"     . corfu-previous)
-              ("<backtab>" . corfu-previous))
-              ;; ("RET"       . corfu-insert)
-              ;; ("<escape>"  . corfu-quit))
+              ("<backtab>" . corfu-previous)
+              ("RET"       . corfu-insert)
+              )
   :config
   ;; Free the RET key for less intrusive behavior.
-  (keymap-unset corfu-map "RET")
+  ;;(keymap-unset corfu-map "RET")
 
     ;; Guards the minibuffer against Corfu popups and routes CAPF to Vertico.
   (defun ar/corfu-minibuffer-guard ()
@@ -4206,7 +4259,7 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
   (add-hook 'minibuffer-setup-hook #'ar/corfu-minibuffer-guard)
   ;; Closes the popup on insert state exit or buffer save.
   (add-hook 'evil-insert-state-exit-hook #'corfu-quit)
-  (add-hook 'before-save-hook #'corfu-quit))
+  (advice-add #'save-buffer :before (lambda (&rest _) (corfu-quit))))
 
 ;; ;; Bundled extensions isolated for load-order safety.
 (use-package corfu-history
@@ -4242,7 +4295,6 @@ Configures native Emacs completion styles and indentation triggers.
 #+begin_src emacs-lisp
 (use-package emacs
   :ensure nil
-  :no-require t
   :custom
   ;; Triggers completion-at-point if the line is already indented.
   (tab-always-indent 'complete)
@@ -4284,7 +4336,7 @@ Wraps and merges completion-at-point functions for global and local pipelines.
             (lambda () (add-hook 'completion-at-point-functions #'cape-file nil t)))
   (advice-add #'lsp-completion-at-point :around #'cape-wrap-noninterruptible)
   (advice-add #'lsp-completion-at-point :around #'cape-wrap-nonexclusive)
-  (advice-add #'lsp-completion-at-point :around #'cape-wrap-noninterruptible)
+  (advice-add #'lsp-completion-at-point :around #'cape-wrap-buster)
   (advice-add #'comint-completion-at-point :around #'cape-wrap-nonexclusive) 
   (advice-add #'pcomplete-completions-at-point :around #'cape-wrap-nonexclusive))
 #+end_src
@@ -6187,14 +6239,12 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
                                'emacs-lisp-mode 'lisp-mode
                                'makefile-mode 'snippet-mode
                                'ron-mode)
-                        (lsp-deferred))))
-         ((LaTeX-mode markdown-ts-mode yaml-mode yaml-ts-mode) . lsp-deferred))
+                        (lsp-deferred)))))
   :custom
   (lsp-completion-provider :none)
-  (lsp-idle-delay 0.25)
+  ;; (lsp-idle-delay 0.24)
   (lsp-session-file (no-littering-expand-var-file-name "lsp/session.el"))
   (lsp-keymap-prefix nil)
-  (lsp-enable-xref nil)
   (lsp-log-io nil)
   (lsp-auto-guess-root t)
   ;;(lsp-file-watch-threshold 4000)
@@ -6207,14 +6257,10 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
   (lsp-format-buffer-on-save nil)
   (lsp-lens-enable nil)
   (lsp-inlay-hint-enable nil)
-  (lsp-enable-symbol-highlighting t)
   (lsp-semantic-tokens-enable nil)
   (lsp-headerline-breadcrumb-enable nil)
   (lsp-headerline-breadcrumb-enable-diagnostics nil)
-  (lsp-signature-auto-activate '(:on-trigger-char :on-server-request))
-  (lsp-signature-render-documentation t)
-  (lsp-signature-doc-lines 2)
-  (lsp-diagnostics-provider :flycheck)
+  ;; (lsp-diagnostics-provider :flycheck)
   (lsp-eldoc-enable-hover nil)
   (lsp-keep-workspace-alive nil)
   (lsp-enable-suggest-server-download nil)
@@ -6222,6 +6268,21 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
   (lsp-modeline-diagnostics-enable nil)
   (lsp-modeline-workspace-status-enable nil)
   :config
+  (setq lsp-disabled-clients
+        (append '(pyright
+                  basedpyright
+                  mspyls
+                  ruff-isort
+                  pylsp
+                  jedi-language-server)
+                lsp-disabled-clients))
+  (setq lsp-signature-auto-activate '(:on-trigger-char :on-server-request)
+        lsp-signature-render-documentation t
+        lsp-signature-doc-lines 1
+        lsp-enable-symbol-highlighting t
+        lsp-symbol-highlighting-skip-current t)
+
+  (add-hook 'lsp-mode-hook #'lsp-completion-mode)
   (defvar ar/lsp--deferred-shutdown-timer nil
     "Timer for deferred LSP workspace shutdown.")
   (define-advice lsp--shutdown-workspace (:around (fn &optional restart) defer-shutdown)
@@ -7068,30 +7129,31 @@ Injects bibliography abstracts and formatted references into the universal sidec
 #+end_src
 
 
-* Languages
+* TODO Languages
 ** TODO Python
 Configures Python editing, dual LSP server routing, workspace settings, formatting, and debug adapter integration.
 #+begin_src emacs-lisp
-(use-package python
-  :ensure nil
-  :custom
-  (python-shell-completion-native-enable nil)
-  (python-indent-guess-indent-offset-verbose nil)
-  (python-indent-offset 4)
-  :config
-  (when (executable-find "ipython")
-    (setq python-shell-interpreter "ipython"
-          python-shell-interpreter-args "-i --simple-prompt --no-color-info")))
+;; (use-package python
+;;   :ensure nil
+;;   :custom
+;;   (python-shell-completion-native-enable nil)
+;;   (python-indent-guess-indent-offset-verbose nil)
+;;   (python-indent-offset 4)
+;;   :config
+;;   (when (executable-find "ipython")
+;;     (setq python-shell-interpreter "ipython"
+;;           python-shell-interpreter-args "-i --simple-prompt --no-color-info")))
 
 ;; Maps `ruff-isort` and `ruff` formatters; `apheleia-mode-alist` ignores `derived-mode-p`.
 (with-eval-after-load 'apheleia
   (setf (alist-get 'python-mode apheleia-mode-alist) '(ruff-isort ruff))
   (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(ruff-isort ruff)))
 
-;; ;; --- LSP Server Routing (Pyrefly + Ruff) ---
+(with-eval-after-load-all '(lsp-mode flycheck)
+  (lsp-diagnostics-lsp-checker-if-needed)
+  (flycheck-add-next-checker 'lsp 'python-ruff))
+
 ;; (with-eval-after-load 'lsp-mode
-;;   ;; Registers Pyrefly as the primary type-checker and navigation server.
-;;   ;; Lambda wrapper defers `executable-find` to guarantee `envrc` path resolution.
 ;;   (lsp-register-client
 ;;    (make-lsp-client
 ;;     :new-connection (lsp-stdio-connection
