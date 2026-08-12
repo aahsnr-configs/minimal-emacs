@@ -4220,7 +4220,7 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
   ;; Temporarily writes the selected candidate into the buffer as a live preview that commits on further input or RET.
   ;; (corfu-preview-current 'insert)
   ;; (corfu-preview-current nil)
-  (corfu-auto-delay 0.75)
+  (corfu-auto-delay 0.24)
   (corfu-auto-prefix 2)
   (global-corfu-modes '((not erc-mode
                              eshell-mode
@@ -6238,23 +6238,26 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
                                'ron-mode)
                         (lsp-deferred)))))
   :custom
-  (lsp-auto-configure nil)
+  ;; (lsp-auto-configure nil)
   (lsp-auto-guess-root t)
   (lsp-completion-provider :none)
   (lsp-eldoc-enable-hover nil)
   (lsp-enable-dap-auto-configure nil)
+  ;; (lsp-enable-file-watchers t)
   (lsp-enable-folding nil)
+  ;; (lsp-enable-imenu t)
   (lsp-enable-indentation nil)
   (lsp-enable-links nil)
   (lsp-enable-on-type-formatting nil)
   (lsp-enable-suggest-server-download nil)
   (lsp-enable-symbol-highlighting nil)
   (lsp-enable-text-document-color nil)
+  ;; (lsp-enable-xref t)
   (lsp-file-watch-threshold 4000)
   (lsp-format-buffer-on-save nil)
   (lsp-headerline-breadcrumb-enable nil)
   (lsp-headerline-breadcrumb-enable-diagnostics nil)
-  (lsp-idle-delay 0.24)
+  ;; (lsp-idle-delay 0.24)
   (lsp-inlay-hint-enable nil)
   (lsp-keep-workspace-alive nil)
   (lsp-keymap-prefix nil)
@@ -7147,26 +7150,28 @@ Configures Python editing, dual LSP server routing, workspace settings, formatti
   ;;                 pylsp
   ;;                 jedi-language-server)
   ;;               lsp-disabled-clients)) 
+  (require 'lsp-python-ty)
+  (require 'lsp-ruff)
+  
+  ;; (lsp-register-client
+  ;;  (make-lsp-client
+  ;;   :new-connection (lsp-stdio-connection
+  ;;                    (lambda ()
+  ;;                      (let ((bin (executable-find "pyrefly")))
+  ;;                        (unless bin
+  ;;                          (user-error "pyrefly not found in current direnv environment"))
+  ;;                        (list bin "lsp" "-j" "4"))))
+  ;;   :activation-fn (lsp-activate-on "python")
+  ;;   :priority 1
+  ;;   :add-on? nil
+  ;;   :server-id 'pyrefly))
 
-  (lsp-register-client
-   (make-lsp-client
-    :new-connection (lsp-stdio-connection
-                     (lambda ()
-                       (let ((bin (executable-find "pyrefly")))
-                         (unless bin
-                           (user-error "pyrefly not found in current direnv environment"))
-                         (list bin "lsp" "-j" "4"))))
-    :activation-fn (lsp-activate-on "python")
-    :priority 1
-    :add-on? nil
-    :server-id 'pyrefly))
-
-  (define-advice lsp--send-did-save-p (:around (fn &rest args) force-pyrefly-save)
-    "Force didSave for pyrefly despite missing save in TextDocumentSyncOptions."
-    (or (apply fn args)
-        (when-let* ((workspace (or (car args) lsp--cur-workspace))
-                    (client (lsp--workspace-client workspace)))
-          (eq (lsp--client-server-id client) 'pyrefly))))
+  ;; (define-advice lsp--send-did-save-p (:around (fn &rest args) force-pyrefly-save)
+  ;;   "Force didSave for pyrefly despite missing save in TextDocumentSyncOptions."
+  ;;   (or (apply fn args)
+  ;;       (when-let* ((workspace (or (car args) lsp--cur-workspace))
+  ;;                   (client (lsp--workspace-client workspace)))
+  ;;         (eq (lsp--client-server-id client) 'pyrefly))))
 
   ;; (lsp-register-custom-settings '(("ty.diagnosticMode" "off" t)))
   ;; (lsp-register-custom-settings '(("pyrefly.disableTypeErrors" t t)))
