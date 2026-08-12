@@ -41,7 +41,6 @@ etc/*
 # Un-ignore specific configuration files defined in your config.org.
 !etc/custom.el
 !etc/projects.el
-!etc/elpaca.eld
 
 # ====================
 # ELPACA PACKAGE MANAGER
