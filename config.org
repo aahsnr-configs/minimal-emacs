@@ -841,6 +841,7 @@ Intercepts Evil's =o= and =O= operators to continue comment lines natively. Util
     (evil-open-above (prefix-numeric-value current-prefix-arg))))
 #+end_src
 
+
 * DONE General
 Manages global and local leader keybindings for accessing editor commands.
 #+begin_src emacs-lisp
@@ -4258,13 +4259,13 @@ Renders in-buffer completion candidates in a minimal, unobtrusive popup.
   (advice-add #'save-buffer :before (lambda (&rest _) (corfu-quit))))
 
 ;; ;; Bundled extensions isolated for load-order safety.
-(use-package corfu-history
-  :straight nil
-  :after corfu
-  :config
-  (corfu-history-mode 1)
-  (with-eval-after-load 'savehist
-    (add-to-list 'savehist-additional-variables 'corfu-history)))
+;; (use-package corfu-history
+;;   :straight nil
+;;   :after corfu
+;;   :config
+;;   (corfu-history-mode 1)
+;;   (with-eval-after-load 'savehist
+;;     (add-to-list 'savehist-additional-variables 'corfu-history)))
 
 ;; (use-package corfu-popupinfo
 ;;   :ensure nil
@@ -6347,8 +6348,8 @@ Highlights syntax errors and warnings inline via save-triggered diagnostics and 
 #+begin_src emacs-lisp
 (use-package flycheck
   :defer t
-  :hook (((prog-mode yaml-mode markdown-mode) . flycheck-mode))
-         ;; ((prog-mode yaml-mode markdown-mode) . flycheck-annotate-mode))
+  :hook (((prog-mode yaml-mode markdown-mode) . flycheck-mode)
+         ((prog-mode yaml-mode markdown-mode) . flycheck-annotate-mode))
   :custom
   (flycheck-emacs-lisp-load-path 'inherit)
   ;; Routes diagnostic indicators to the right fringe for a modern IDE gutter.
@@ -6359,8 +6360,8 @@ Highlights syntax errors and warnings inline via save-triggered diagnostics and 
   ;; `save` checks immediately after the buffer is saved; `mode-enabled` checks
   ;; immediately when `flycheck-mode` is non-nil. `idle-change` and `new-line`
   ;; are excluded to prevent redisplay storms during active typing.
-  (flycheck-check-syntax-automatically '(save))
-  (flycheck-display-errors-delay 0.25)
+  (flycheck-check-syntax-automatically '(save mode-enabled))
+  (flycheck-display-errors-delay 2.65)
   (flycheck-buffer-switch-check-intermediate-buffers nil)
   (flycheck-standard-error-navigation nil)
   (flycheck-checker-error-threshold 500)
@@ -6377,8 +6378,7 @@ Highlights syntax errors and warnings inline via save-triggered diagnostics and 
                       (or (project-current)
                           (and (buffer-file-name)
                                (file-in-directory-p (buffer-file-name) user-emacs-directory)))))) t)
-  ;; Main-Thread Protection: aborts activation in massive buffers (>500KB / >10k lines)
-  ;; to prevent redisplay stutter and main-thread freezing.
+
   (define-advice flycheck-mode (:before-while (&optional arg) guard-large-files)
     (or (and arg (< (prefix-numeric-value arg) 1))
         (not (too-long-file-p))))
@@ -7140,75 +7140,14 @@ Configures Python editing, dual LSP server routing, workspace settings, formatti
     (setq python-shell-interpreter "ipython"
           python-shell-interpreter-args "-i --simple-prompt --no-color-info")))
 
-(with-eval-after-load 'lsp-mode
-  
-  ;; (setq lsp-disabled-clients
-  ;;       (append '(pyright
-  ;;                 basedpyright
-  ;;                 mspyls
-  ;;                 ruff
-  ;;                 pylsp
-  ;;                 jedi-language-server)
-  ;;               lsp-disabled-clients)) 
-  (require 'lsp-python-ty)
-  (require 'lsp-ruff)
-  
-  ;; (lsp-register-client
-  ;;  (make-lsp-client
-  ;;   :new-connection (lsp-stdio-connection
-  ;;                    (lambda ()
-  ;;                      (let ((bin (executable-find "pyrefly")))
-  ;;                        (unless bin
-  ;;                          (user-error "pyrefly not found in current direnv environment"))
-  ;;                        (list bin "lsp" "-j" "4"))))
-  ;;   :activation-fn (lsp-activate-on "python")
-  ;;   :priority 1
-  ;;   :add-on? nil
-  ;;   :server-id 'pyrefly))
-
-  ;; (define-advice lsp--send-did-save-p (:around (fn &rest args) force-pyrefly-save)
-  ;;   "Force didSave for pyrefly despite missing save in TextDocumentSyncOptions."
-  ;;   (or (apply fn args)
-  ;;       (when-let* ((workspace (or (car args) lsp--cur-workspace))
-  ;;                   (client (lsp--workspace-client workspace)))
-  ;;         (eq (lsp--client-server-id client) 'pyrefly))))
-
-  ;; (lsp-register-custom-settings '(("ty.diagnosticMode" "off" t)))
-  ;; (lsp-register-custom-settings '(("pyrefly.disableTypeErrors" t t)))
-  
-)
+(use-package lsp-pyright
+  :defer t
+  :custom (lsp-pyright-langserver-command "basedpyright")
+  :hook (python-mode . (lambda ()
+                          (require 'lsp-pyright)
+                          (lsp-deferred))))
 
 
-;; (with-eval-after-load 'flycheck
-  ;; (flycheck-define-checker python-ty
-  ;;   "A Python type checker using Astral's ty."
-  ;;   :command ("ty" "check" source-original)
-  ;;   :error-patterns
-  ;;   ((error line-start (file-name) ":" line ":" column " error" (optional "[" (id (one-or-more (not (any ":")))) "]: ") (message) line-end)
-  ;;    (warning line-start (file-name) ":" line ":" column " warning" (optional "[" (id (one-or-more (not (any ":")))) "]: ") (message) line-end))
-  ;;   :modes (python-mode python-ts-mode))
-
-  ;; (flycheck-define-checker python-pyrefly
-  ;;   "A Python type checker using Meta's pyrefly."
-  ;;   :command ("pyrefly" "check" source-original)
-  ;;   :error-patterns
-  ;;   ((error line-start (file-name) ":" line ":" column " " (one-or-more (not (any ":"))) ": " (message) line-end)
-  ;;    (warning line-start (file-name) ":" line ":" column " " (one-or-more (not (any ":"))) ": " (message) line-end))
-  ;;   :modes (python-mode python-ts-mode))
-  ;; ;; Register the checkers so Flycheck can find them
-  ;; (add-to-list 'flycheck-checkers 'python-ty)
-  ;; (add-to-list 'flycheck-checkers 'python-pyrefly)
-  ;; )
-
-;; (with-eval-after-load-all '(lsp-mode flycheck)
-;;   (lsp-diagnostics-lsp-checker-if-needed)
-;;   (flycheck-add-next-checker 'python-ty 'python-ruff)
-;;   (flycheck-add-next-checker 'python-pyrefly 'python-ruff)
- 
-;;   ;; Keep the LSP checker chained as a fallback
-;;   (flycheck-add-next-checker 'lsp 'python-ruff))
-
-;; Maps `ruff-isort` and `ruff` formatters; `apheleia-mode-alist` ignores `derived-mode-p`.
 (with-eval-after-load 'apheleia
   (setf (alist-get 'python-mode apheleia-mode-alist) '(ruff-isort ruff))
   (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(ruff-isort ruff)))
