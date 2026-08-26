@@ -231,7 +231,7 @@ Rendering, scrolling, and input-latency optimizations. Excludes obsolete Emacs 2
 
 ;; Defers syntax highlighting by 50ms to prevent font-lock and LSP tokens from blocking the main thread.
 ;; COMMENT: No longer needed for lsp-mode 
-;; (setq jit-lock-defer-time 0.05)
+(setq jit-lock-defer-time 0.05)
 
 ;; Forces internal Emacs tooltips over the GTK DBus API to prevent UI hangs on hover.
 (when (boundp 'x-gtk-use-system-tooltips)

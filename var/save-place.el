@@ -1,2 +1,2 @@
 ;;; -*- coding: utf-8; mode: lisp-data -*-
-(("/home/ahsan/Git/common/python/flake.nix" . 283) ("/home/ahsan/Git/common/python/src/sample.py" . 10) ("/home/ahsan/.config/emacs/config.org" . 262382) ("/home/ahsan/.config/emacs/early-init.el" . 342))
+(("/home/ahsan/.config/emacs/config.org" . 9640) ("/home/ahsan/.config/emacs/early-init.el" . 342))
