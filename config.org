@@ -6230,8 +6230,18 @@ Consolidates Evil modal integration, Doom Emacs leader routing, Unimpaired motio
 Integrates language servers for code navigation, analysis, and diagnostics, rendering floating documentation, inline peek overlays, live minibuffer symbol previews, and hierarchical tree sidebars.
 #+begin_src emacs-lisp
 (use-package lsp-mode
-  :defer t
-  :init (setq lsp-use-plists t)
+  :init
+  (setq lsp-use-plists t
+        lsp-keep-workspace-alive nil
+        lsp-enable-folding nil
+        lsp-session-file (no-littering-expand-var-file-name "lsp/session.el")
+        lsp-enable-text-document-color nil
+        lsp-enable-on-type-formatting nil
+  lsp-headerline-breadcrumb-enable nil
+
+        )
+  
+  
   :hook ((prog-mode . (lambda ()
                       (unless (derived-mode-p
                                'emacs-lisp-mode 'lisp-mode
@@ -6242,25 +6252,19 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
   ;; (lsp-auto-configure nil)
   (lsp-auto-guess-root t)
   (lsp-completion-provider :none)
-  (lsp-eldoc-enable-hover nil)
+  ;; (lsp-eldoc-enable-hover nil)
   (lsp-enable-dap-auto-configure nil)
-  ;; (lsp-enable-file-watchers t)
-  (lsp-enable-folding nil)
-  ;; (lsp-enable-imenu t)
+  (lsp-enable-file-watchers t)
+  (lsp-enable-imenu t)
   (lsp-enable-indentation nil)
   (lsp-enable-links nil)
-  (lsp-enable-on-type-formatting nil)
   (lsp-enable-suggest-server-download nil)
   (lsp-enable-symbol-highlighting nil)
-  (lsp-enable-text-document-color nil)
-  ;; (lsp-enable-xref t)
+  (lsp-enable-xref t)
   (lsp-file-watch-threshold 4000)
   (lsp-format-buffer-on-save nil)
-  (lsp-headerline-breadcrumb-enable nil)
-  (lsp-headerline-breadcrumb-enable-diagnostics nil)
   ;; (lsp-idle-delay 0.24)
   (lsp-inlay-hint-enable nil)
-  (lsp-keep-workspace-alive nil)
   (lsp-keymap-prefix nil)
   (lsp-lens-enable nil)
   (lsp-log-io nil)
@@ -6268,12 +6272,11 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
   (lsp-modeline-diagnostics-enable nil)
   (lsp-modeline-workspace-status-enable nil)
   (lsp-semantic-tokens-enable nil)
-  (lsp-session-file (no-littering-expand-var-file-name "lsp/session.el"))
-
+  
   :config
-  (setq lsp-signature-auto-activate '(:on-trigger-char :on-server-request)
-        lsp-signature-render-documentation t
-        lsp-signature-doc-lines 1)
+  ;; (setq lsp-signature-auto-activate '(:on-trigger-char :on-server-request)
+  ;;       lsp-signature-render-documentation t
+  ;;       lsp-signature-doc-lines 1)
 
   (add-hook 'lsp-mode-hook #'lsp-completion-mode)
   (defvar ar/lsp--deferred-shutdown-timer nil
@@ -6307,7 +6310,6 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
 
 #+begin_src emacs-lisp
 (use-package lsp-ui
-  :defer t
   :hook (lsp-mode . lsp-ui-mode)
   :custom
   (lsp-ui-doc-show-with-cursor nil)
@@ -6317,11 +6319,10 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
   (lsp-ui-doc-max-width 72)
   (lsp-ui-doc-header t)
   (lsp-ui-doc-footer t)
-  (lsp-ui-sideline-show-hover nil)
-  (lsp-ui-sideline-enable nil)
-  (lsp-ui-peek-enable nil)
-  ;; (lsp-ui-peek-always-show t)
-  (lsp-ui-doc-delay 0.75))
+  (lsp-ui-sideline-ignore-duplicate t)
+  (lsp-ui-peek-enable t)
+  (lsp-ui-doc-delay 0.75)
+  (lsp-ui-sideline-actions-icon lsp-ui-sideline-actions-icon-default))
 #+end_src
 
 #+begin_src emacs-lisp
@@ -6336,59 +6337,27 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
 #+end_src
 
 #+begin_src emacs-lisp
-(use-package lsp-treemacs
-  :defer t
-  :after (lsp-mode treemacs)
-  :config
-  (setq lsp-treemacs-sync-mode 1))
+;; (use-package lsp-treemacs
+;;   :defer t
+;;   :after (lsp-mode treemacs)
+;;   :config
+;;   (setq lsp-treemacs-sync-mode 1))
 #+end_src
 
 ** TODO Code Diagnostics
 Highlights syntax errors and warnings inline via save-triggered diagnostics and Error Lens, upgrading buffer navigation with live minibuffer previews and severity narrowing.
 #+begin_src emacs-lisp
 (use-package flycheck
-  :defer t
-  :hook (((prog-mode yaml-mode markdown-mode) . flycheck-mode)
-         ((prog-mode yaml-mode markdown-mode) . flycheck-annotate-mode))
-  :custom
-  (flycheck-emacs-lisp-load-path 'inherit)
-  ;; Routes diagnostic indicators to the right fringe for a modern IDE gutter.
-  (flycheck-indication-mode 'left-fringe)
-  (flycheck-highlighting-mode 'symbols)
-  (flycheck-help-echo-function nil) 
-  ;; Events triggering automatic syntax checks. Order matches upstream `defcustom`:
-  ;; `save` checks immediately after the buffer is saved; `mode-enabled` checks
-  ;; immediately when `flycheck-mode` is non-nil. `idle-change` and `new-line`
-  ;; are excluded to prevent redisplay storms during active typing.
-  (flycheck-check-syntax-automatically '(save mode-enabled))
-  (flycheck-display-errors-delay 2.65)
-  (flycheck-buffer-switch-check-intermediate-buffers nil)
-  (flycheck-standard-error-navigation nil)
-  (flycheck-checker-error-threshold 500)
-  (flycheck-annotate-other-lines-style nil)
-  ;; TRAMP/remote syntax checking disabled per user directive.
-  ;; (flycheck-check-syntax-automatically-remote '(save mode-enabled))
   :config
-  ;; Disables org-lint to prevent false positives in Denote/Org silos.
-  (setq-default flycheck-disabled-checkers '(org-lint))
-  ;; Hardened Emacs-Lisp predicate: lints project.el roots AND standalone personal configs.
-  (eval '(setf (flycheck-checker-get 'emacs-lisp 'predicate)
-               (lambda ()
-                 (and (not (bound-and-true-p no-byte-compile))
-                      (or (project-current)
-                          (and (buffer-file-name)
-                               (file-in-directory-p (buffer-file-name) user-emacs-directory)))))) t)
+  (add-hook 'after-init-hook #'global-flycheck-mode)
+  (setq flycheck-emacs-lisp-load-path 'inherit)
 
-  (define-advice flycheck-mode (:before-while (&optional arg) guard-large-files)
-    (or (and arg (< (prefix-numeric-value arg) 1))
-        (not (too-long-file-p))))
-  ;; Prevents the *Flycheck errors* buffer from stealing input focus when popped.
-  (add-to-list 'display-buffer-alist
-               '("\\*Flycheck error messages\\*\\|\\*Flycheck errors\\*"
-                 (display-buffer-reuse-window display-buffer-in-side-window)
-                 (side . bottom)
-                 (window-height . 0.25)
-                 (window-parameters (no-delete-other-windows . t)))))
+  ;; Rerunning checks on every newline is a mote excessive.
+  (delq 'new-line flycheck-check-syntax-automatically)
+  ;; And don't recheck on idle as often
+  (setq flycheck-idle-change-delay 1.0)
+  (setq flycheck-buffer-switch-check-intermediate-buffers t)
+  (setq flycheck-display-errors-delay 0.25))
 #+end_src
 
 #+begin_src emacs-lisp
@@ -6396,48 +6365,6 @@ Highlights syntax errors and warnings inline via save-triggered diagnostics and 
   :defer t
   :after (consult flycheck)
   :commands (consult-flycheck))
-#+end_src
-
-** TODO Minimap
-Provides a detachable, zoomed-out minimap sidebar with native diff-hl fringe synchronization.
-#+begin_src emacs-lisp
-(use-package demap
-  :defer t
-  :commands (demap-toggle demap-open demap-close)
-  :custom
-  (demap-minimap-window-side 'right)
-  (demap-minimap-window-width 15)
-  ;; Refuse to track buffers exceeding the too-long-file-p threshold.
-  ;; Prevents a second full-buffer indirect clone from doubling redisplay
-  ;; cost in massive files (>500KB / >1000 lines).
-  (demap-track-window-mode-update-p-func
-   (lambda ()
-     (and (demap-track-window-mode-update-p-func-default)
-          (not (too-long-file-p)))))
-  :custom-face
-  ;; Align minimap typography with the global JetBrains Mono baseline.
-  (demap-minimap-font-face ((t (:family "JetBrains Mono" :height 25))))
-  ;; Inherit theme faces for automatic doom-themes and solaire-mode synergy.
-  ;; Note: demap-visible-region-face and demap-current-line-face defaults
-  ;; already inherit from region and hl-line respectively; these are
-  ;; re-declared for explicit documentation parity.
-  (demap-visible-region-face ((t (:inherit region :extend t))))
-  (demap-visible-region-inactive-face ((t (:inherit mode-line-inactive :extend t))))
-  (demap-current-line-face ((t (:inherit hl-line :extend t))))
-  (demap-current-line-inactive-face ((t (:inherit shadow :extend t))))
-  :config
-  ;; Ecosystem integration: enable diff-hl fringe markers and solaire-mode
-  ;; background swapping inside the minimap indirect buffer.
-  ;; Wrapped in ignore-errors to prevent a single package failure from
-  ;; aborting the entire demap-minimap-construct-hook chain.
-  (defun ar/demap-integrate-ecosystem ()
-    "Enable `diff-hl-mode' and `solaire-mode' in demap minimap buffers."
-    (ignore-errors
-      (when (fboundp 'diff-hl-mode)
-        (diff-hl-mode 1))
-      (when (fboundp 'solaire-mode)
-        (solaire-mode 1))))
-  (add-hook 'demap-minimap-construct-hook #'ar/demap-integrate-ecosystem))
 #+end_src
 
 ** DONE Debug Adapter Protocol
@@ -6558,60 +6485,60 @@ Automatically formats code using external tools when saving files.
 ** DONE Transient Menu
 Provides a centralized dashboard for code actions, navigation, diagnostics, folding, and documentation lookup.
 #+begin_src emacs-lisp
-(with-eval-after-load 'transient
-  (defun ar/devtools-title ()
-    (concat
-     (if (fboundp 'nerd-icons-faicon)
-         (nerd-icons-faicon "nf-fa-laptop_code" :face 'transient-heading :v-adjust 0.02)
-       "")
-     (propertize " Development Tools" 'face 'transient-heading)))
+;; (with-eval-after-load 'transient
+;;   (defun ar/devtools-title ()
+;;     (concat
+;;      (if (fboundp 'nerd-icons-faicon)
+;;          (nerd-icons-faicon "nf-fa-laptop_code" :face 'transient-heading :v-adjust 0.02)
+;;        "")
+;;      (propertize " Development Tools" 'face 'transient-heading)))
 
-  (transient-define-prefix ar/toggles-devtools ()
-    "Development Tools Dashboard"
-    [:description ar/devtools-title
-     ["Actions"
-      ("a" "Code Action" lsp-execute-code-action)
-      ("r" "Rename Symb" lsp-rename)
-      ("f" "Frmt Buf" apheleia-format-buffer)
-      ("i" "Org Imports" lsp-organize-imports)
-      ("h" "Toggle Hint" lsp-inlay-hints-mode :transient t)
-      ("S" "Sem Tokens" lsp-semantic-tokens-mode :transient t)
-      ("R" "Reconn LSP" lsp-workspace-restart)]
-     ["Navigate"
-      ("d" "Define" lsp-find-definition)
-      ("D" "Refer" lsp-find-references)
-      ("t" "Type Def" lsp-find-type-definition)
-      ("I" "Implem" lsp-find-implementation)
-      ("A" "Apropos" xref-find-apropos)
-      ("." "Go Back" xref-go-back)
-      ("p" "Peek Def" lsp-ui-peek-find-definitions)
-      ("P" "Peek Ref" lsp-ui-peek-find-references)
-      ("c" "Call Hierarchy" lsp-treemacs-call-hierarchy)
-      ("T" "Type Hierarchy" lsp-treemacs-type-hierarchy)]
-     ["Search"
-      ("s" "Work Symb" consult-lsp-symbols)
-      ("S" "File Symb" consult-lsp-file-symbols)
-      ("o" "Outline" consult-outline)
-      ("m" "Imenu" consult-imenu)
-      ("M" "Imenu Multi" consult-imenu-multi)
-      ("l" "Search Line" consult-line)]
-     ["Diagn"
-      ("n" "Next Err" flycheck-next-error :transient t)
-      ("p" "Prev Err" flycheck-previous-error :transient t)
-      ("e" "Buf Err" flycheck-list-errors)
-      ("E" "Proj Err" lsp-treemacs-errors-list)
-      ("!" "Check" flycheck-buffer :transient t)]
-     ["Folding"
-      ("TAB" "Toggle" ar/fold-toggle :transient t)
-      ("O" "Open All" ar/fold-open-all :transient t)
-      ("C" "Close All" ar/fold-close-all :transient t)
-      ("v" "Vim Toggle" vimish-fold-toggle :transient t)]
-     ["Docs"
-      ("h" "Desc Thing" lsp-describe-thing-at-point)
-      ("K" "Echo Doc" eldoc)
-      ("?" "Info Man" consult-info)
-      ("M" "Man Page" woman)
-      ("<escape>" "" transient-quit-one :format " ")]]))
+;;   (transient-define-prefix ar/toggles-devtools ()
+;;     "Development Tools Dashboard"
+;;     [:description ar/devtools-title
+;;      ["Actions"
+;;       ("a" "Code Action" lsp-execute-code-action)
+;;       ("r" "Rename Symb" lsp-rename)
+;;       ("f" "Frmt Buf" apheleia-format-buffer)
+;;       ("i" "Org Imports" lsp-organize-imports)
+;;       ("h" "Toggle Hint" lsp-inlay-hints-mode :transient t)
+;;       ("S" "Sem Tokens" lsp-semantic-tokens-mode :transient t)
+;;       ("R" "Reconn LSP" lsp-workspace-restart)]
+;;      ["Navigate"
+;;       ("d" "Define" lsp-find-definition)
+;;       ("D" "Refer" lsp-find-references)
+;;       ("t" "Type Def" lsp-find-type-definition)
+;;       ("I" "Implem" lsp-find-implementation)
+;;       ("A" "Apropos" xref-find-apropos)
+;;       ("." "Go Back" xref-go-back)
+;;       ("p" "Peek Def" lsp-ui-peek-find-definitions)
+;;       ("P" "Peek Ref" lsp-ui-peek-find-references)
+;;       ("c" "Call Hierarchy" lsp-treemacs-call-hierarchy)
+;;       ("T" "Type Hierarchy" lsp-treemacs-type-hierarchy)]
+;;      ["Search"
+;;       ("s" "Work Symb" consult-lsp-symbols)
+;;       ("S" "File Symb" consult-lsp-file-symbols)
+;;       ("o" "Outline" consult-outline)
+;;       ("m" "Imenu" consult-imenu)
+;;       ("M" "Imenu Multi" consult-imenu-multi)
+;;       ("l" "Search Line" consult-line)]
+;;      ["Diagn"
+;;       ("n" "Next Err" flycheck-next-error :transient t)
+;;       ("p" "Prev Err" flycheck-previous-error :transient t)
+;;       ("e" "Buf Err" flycheck-list-errors)
+;;       ("E" "Proj Err" lsp-treemacs-errors-list)
+;;       ("!" "Check" flycheck-buffer :transient t)]
+;;      ["Folding"
+;;       ("TAB" "Toggle" ar/fold-toggle :transient t)
+;;       ("O" "Open All" ar/fold-open-all :transient t)
+;;       ("C" "Close All" ar/fold-close-all :transient t)
+;;       ("v" "Vim Toggle" vimish-fold-toggle :transient t)]
+;;      ["Docs"
+;;       ("h" "Desc Thing" lsp-describe-thing-at-point)
+;;       ("K" "Echo Doc" eldoc)
+;;       ("?" "Info Man" consult-info)
+;;       ("M" "Man Page" woman)
+;;       ("<escape>" "" transient-quit-one :format " ")]]))
 #+end_src
 
 ** TODO Keybinds
@@ -6937,181 +6864,8 @@ Routes global search commands and local navigation for the TODO ecosystem.
 #+end_src
 
 
-* DONE Markdown Mode
-Native tree-sitter Markdown editing and viewing via Emacs 31's built-in engine. Provides structure-aware coloring, hidden markup rendering, inline images, table editing, code block context, and outline folding without any external packages.
-
-** DONE Grammar Setup
-Registers the two required tree-sitter grammars so they are available before the first Markdown file is opened.
-#+begin_src emacs-lisp
-;; Register markdown grammar sources for auto-installation.
-;; The built-in markdown-ts-mode.el also registers these at load time,
-;; but early registration ensures availability for `markdown-ts-mode-install-parsers'.
-(when (treesit-available-p)
-  (dolist (source
-           '((markdown
-              "https://github.com/tree-sitter-grammars/tree-sitter-markdown"
-              :source-dir "tree-sitter-markdown/src")
-             (markdown-inline
-              "https://github.com/tree-sitter-grammars/tree-sitter-markdown"
-              :source-dir "tree-sitter-markdown-inline/src")))
-    (setf (alist-get (car source) treesit-language-source-alist) (cdr source))))
-#+end_src
-
-** DONE Core Setup
-Configures editing defaults, code block language mappings, prose-friendly buffer hooks, and Evil initial states for the main Markdown mode.
-#+begin_src emacs-lisp
-(use-package markdown-ts-mode
-  :if (treesit-available-p)
-  :custom
-  (markdown-ts-fontify-code-blocks-natively t)
-  (markdown-ts-enable-code-block-context-mode t)
-  (markdown-ts-enable-table-mode t)
-  (markdown-ts-table-auto-align '(cell-navigation transpose))
-  (markdown-ts-table-align-features '(justify-cells))
-  (markdown-ts-default-code-block-mode 'text-mode)
-  (markdown-ts-default-folding 'show-all)
-  (markdown-ts-hide-markup nil)
-  (markdown-ts-inline-images nil)
-  (markdown-ts-image-max-width 'window)
-  (markdown-ts-display-remote-inline-images nil)
-  (markdown-ts-inhibit-code-block-mode-warnings t)
-  (markdown-ts-code-block-in-context-mode-lighter nil)
-  (markdown-ts-in-table-mode-lighter nil)
-  :hook
-  ;; Prose-friendly buffer settings.
-  (markdown-ts-mode . visual-line-mode)
-  (markdown-ts-mode . (lambda ()
-                        (setq-local show-trailing-whitespace nil)
-                        (setq-local fill-column 80)))
-  ;; Disable line numbers in prose buffers.
-  (markdown-ts-mode . (lambda ()
-                        (when (bound-and-true-p display-line-numbers-mode)
-                          (display-line-numbers-mode -1))))
-  ;; Enable color visualization for hex/rgb values.
-  (markdown-ts-mode . colorful-mode)
-  (markdown-ts-mode . lsp-deferred)
-  :config
-  (require 'lsp-marksman)
-  ;; Extend code block language-to-mode mappings for common aliases.
-  (dolist (pair '((nix nix-ts-mode)
-                  (docker dockerfile-ts-mode)
-                  (dockerfile dockerfile-ts-mode)
-                  (vim vimrc-mode)
-                  (zsh bash-ts-mode)
-                  (fish bash-ts-mode)
-                  (console text-mode)
-                  (terminal text-mode)
-                  (txt text-mode)
-                  (text text-mode)
-                  (org org-mode)
-                  (r r-mode)
-                  (R r-mode)
-                  (diff diff-mode)
-                  (patch diff-mode)
-                  (ini conf-mode)
-                  (toml toml-ts-mode)
-                  (conf conf-mode)))
-    (setf (alist-get (car pair) markdown-ts-code-block-modes) (cdr pair)))
-  ;; Evil initial states.
-  (evil-set-initial-state 'markdown-ts-mode 'normal)
-  (evil-set-initial-state 'markdown-ts-view-mode 'normal)
-  ;; Wire evil-embrace markdown pairs into markdown-ts-mode buffers.
-  ;; The function is defined in the Evil Surround section (loaded earlier).
-  (add-hook 'markdown-ts-mode-hook
-            (lambda ()
-              (when (fboundp 'ar/embrace-markdown-setup)
-                (ar/embrace-markdown-setup)))))
-#+end_src
-
-** DONE Reading Mode
-Tunes the read-only view for comfortable long-form reading with hidden markup, inline images, and folded headings.
-#+begin_src emacs-lisp
-;; View-mode defaults are set internally by markdown-ts-view-mode:
-;; hide-markup=t, inline-images=t, code-block-context=nil, table-mode=nil.
-;; Additional tuning via the pre-init hook and post-mode hook.
-(with-eval-after-load 'markdown-ts-mode
-  ;; Fold to top-level headings on entry for a clean document overview.
-  (add-hook 'markdown-ts-view-mode-hook
-            (lambda ()
-              (when (eq markdown-ts-default-folding 'show-all)
-                (outline-hide-sublevels 1))
-              ;; Disable trailing whitespace and line numbers in view mode.
-              (setq-local show-trailing-whitespace nil)
-              (when (bound-and-true-p display-line-numbers-mode)
-                (display-line-numbers-mode -1))))
-  ;; Provide a quick command to open the current file in view mode.
-  (defun ar/markdown-view ()
-    "Open the current Markdown file in read-only view mode."
-    (interactive)
-    (if (derived-mode-p 'markdown-ts-mode)
-        (markdown-ts-view-mode)
-      (user-error "Not a Markdown buffer"))))
-#+end_src
-
-** DONE Keybindings
-Routes all Markdown editing, viewing, table, and structure commands through the local leader prefix.
-#+begin_src emacs-lisp
-;; Local leader (SPC m) for markdown-ts-mode buffers.
-(ar/local-leader
- :keymaps 'markdown-ts-mode-map
- ;; Structure & Editing
- "x"   '(markdown-ts-toggle-checkbox :wk "Toggle checkbox")
- "r"   '(markdown-ts-renumber-list :wk "Renumber list")
- "i"   '(markdown-ts-insert-structure :wk "Insert block")
- "e"   '(markdown-ts-emphasize :wk "Emphasize text")
- "E"   '(markdown-ts-remove-emphasis :wk "Remove emphasis")
- ;; Heading & Section Manipulation
- "p"   '(markdown-ts-promote :wk "Promote heading/item")
- "d"   '(markdown-ts-demote :wk "Demote heading/item")
- "k"   '(markdown-ts-move-subtree-up :wk "Move section up")
- "j"   '(markdown-ts-move-subtree-down :wk "Move section down")
- ;; Display Toggles
- "h"   '(markdown-ts-toggle-hide-markup :wk "Toggle hide markup")
- "v"   '(markdown-ts-toggle-inline-images :wk "Toggle images")
- "V"   '(ar/markdown-view :wk "Open view mode")
- ;; Code Block Navigation
- "n"   '(markdown-ts-move-to-next-code-block :wk "Next code block")
- "N"   '(markdown-ts-move-to-previous-code-block :wk "Prev code block")
- ;; Outline
- "o"   '(:ignore t :wk "outline")
- "o n" '(outline-next-heading :wk "Next heading")
- "o p" '(outline-previous-heading :wk "Prev heading")
- "o u" '(outline-up-heading :wk "Up heading")
- "o f" '(outline-forward-same-level :wk "Forward same level")
- "o b" '(outline-backward-same-level :wk "Backward same level")
- "o c" '(markdown-ts-outline-cycle :wk "Cycle fold")
- "o a" '(outline-show-all :wk "Show all")
- ;; Table Operations
- "t"   '(:ignore t :wk "table")
- "t i" '(markdown-ts-table-insert-table :wk "Insert table")
- "t d" '(markdown-ts-table-delete-table :wk "Delete table")
- "t r" '(markdown-ts-table-insert-row-below :wk "Insert row below")
- "t R" '(markdown-ts-table-insert-row-above :wk "Insert row above")
- "t x" '(markdown-ts-table-delete-row :wk "Delete row")
- "t c" '(markdown-ts-table-insert-column-right :wk "Insert col right")
- "t C" '(markdown-ts-table-insert-column-left :wk "Insert col left")
- "t X" '(markdown-ts-table-delete-column :wk "Delete col")
- "t a" '(markdown-ts-table-align-table :wk "Align table")
- "t t" '(markdown-ts-table-transpose-table :wk "Transpose table")
- "t m" '(markdown-ts-table-move-row-down :wk "Move row down")
- "t M" '(markdown-ts-table-move-row-up :wk "Move row up"))
-;; Local leader for view mode (subset of editing commands).
-(ar/local-leader
- :keymaps 'markdown-ts-view-mode-map
- "h"   '(markdown-ts-toggle-hide-markup :wk "Toggle hide markup")
- "v"   '(markdown-ts-toggle-inline-images :wk "Toggle images")
- "n"   '(markdown-ts-move-to-next-code-block :wk "Next code block")
- "N"   '(markdown-ts-move-to-previous-code-block :wk "Prev code block")
- "o"   '(:ignore t :wk "outline")
- "o n" '(outline-next-heading :wk "Next heading")
- "o p" '(outline-previous-heading :wk "Prev heading")
- "o u" '(outline-up-heading :wk "Up heading")
- "o c" '(markdown-ts-outline-cycle :wk "Cycle fold")
- "o a" '(outline-show-all :wk "Show all"))
-#+end_src
-
-
 * TODO LaTeX Writing Environment
+- State "DONE"       from "TODO"       [2026-08-27 Thu 06:24]
 ** DONE Denote Citar Sections
 Injects bibliography abstracts and formatted references into the universal sidecar for literature notes.
 #+begin_src emacs-lisp
