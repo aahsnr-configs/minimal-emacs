@@ -66,6 +66,48 @@ The =no-byte-compile: t= header directive stops Emacs from prematurely compiling
 (add-to-list 'load-path (expand-file-name "lisp" user-emacs-directory))
 #+end_src
 
+** DONE Garbage Collection
+#+begin_src emacs-lisp
+;; CRITICAL: Restore GC after startup with optimized values
+(defvar better-gc-cons-threshold (* 128 1024 1024)  ;; 128MB
+  "Optimal GC threshold for modern LSP-heavy workflows.
+Lower this if you experience freezing, raise if stuttering.")
+
+(defvar better-gc-cons-percentage 0.1
+  "GC percentage of heap to trigger collection.")
+
+;; Restore GC settings after startup
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (setq gc-cons-threshold better-gc-cons-threshold
+                  gc-cons-percentage better-gc-cons-percentage)
+
+            ;; FIX: Only restore file handlers if the original variable actually exists
+            (when (boundp 'file-name-handler-alist-original)
+              (setq file-name-handler-alist file-name-handler-alist-original)
+              (makunbound 'file-name-handler-alist-original))
+
+            ;; Report startup time
+            (message "Emacs loaded in %.2fs with %d GCs"
+                     (float-time (time-subtract after-init-time before-init-time))
+                     gcs-done))
+          101) ;; Run late to ensure accurate timing
+
+;; Increase GC threshold in minibuffer to prevent slowdowns during completion
+(add-hook 'emacs-startup-hook
+          (lambda ()
+            (defun gc-minibuffer-setup-hook ()
+              (setq gc-cons-threshold (* better-gc-cons-threshold 2)))
+
+            (defun gc-minibuffer-exit-hook ()
+              (garbage-collect)
+              (setq gc-cons-threshold better-gc-cons-threshold))
+
+            (add-hook 'minibuffer-setup-hook #'gc-minibuffer-setup-hook)
+            (add-hook 'minibuffer-exit-hook #'gc-minibuffer-exit-hook)))
+#+end_src
+
+
 ** DONE Custom Functions
 Utility functions for environment validation, performance guards, and configuration reloading. Includes childframe and icon rendering checks for UI dependencies, a buffer-size threshold to suspend expensive minor modes, an Elpaca-aware configuration reloader, and a region/symbol fallback for text operations.
 
@@ -310,7 +352,7 @@ Enables native sticky-key repetition for debugging and spatial commands while su
 ;;   (repeat-echo-function #'ignore))
 #+end_src
 
-** DONE Garbage Collector
+** DONE GCMH
 Manages garbage collection via =gcmh= idle timers. Elevates the GC threshold during active input and triggers background collection during idle periods. Disables =gcmh= on experimental MPS Incremental GC (=igc=) builds and utilizes =after-focus-change-function= for focus-out memory reclamation.
 
 #+begin_src emacs-lisp
@@ -6237,11 +6279,7 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
         lsp-session-file (no-littering-expand-var-file-name "lsp/session.el")
         lsp-enable-text-document-color nil
         lsp-enable-on-type-formatting nil
-  lsp-headerline-breadcrumb-enable nil
-
-        )
-  
-  
+        lsp-headerline-breadcrumb-enable nil)
   :hook ((prog-mode . (lambda ()
                       (unless (derived-mode-p
                                'emacs-lisp-mode 'lisp-mode
@@ -6252,7 +6290,7 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
   ;; (lsp-auto-configure nil)
   (lsp-auto-guess-root t)
   (lsp-completion-provider :none)
-  ;; (lsp-eldoc-enable-hover nil)
+  (lsp-eldoc-enable-hover nil)
   (lsp-enable-dap-auto-configure nil)
   (lsp-enable-file-watchers t)
   (lsp-enable-imenu t)
@@ -6320,7 +6358,7 @@ Integrates language servers for code navigation, analysis, and diagnostics, rend
   (lsp-ui-doc-header t)
   (lsp-ui-doc-footer t)
   (lsp-ui-sideline-ignore-duplicate t)
-  (lsp-ui-peek-enable t)
+  (lsp-ui-peek-enable nil)
   (lsp-ui-doc-delay 0.75)
   (lsp-ui-sideline-actions-icon lsp-ui-sideline-actions-icon-default))
 #+end_src
@@ -6633,7 +6671,6 @@ Routes centralized leader keybindings for code analysis, multi-cursor editing, a
  "K" #'lsp-describe-thing-at-point
  "F2" #'lsp-rename)
 #+end_src
-
 
 * TODO Snippet Engine
 ** TODO Yasnippet
