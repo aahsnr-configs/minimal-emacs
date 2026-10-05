@@ -3,68 +3,46 @@
 ;;; Commentary:
 
 ;; Loaded by Emacs 31.1 before init.el, before package activation and
-;; before the first frame.  One section per topic below.  This file and
-;; init.el are the only two entry points Emacs loads directly; every
-;; feature-providing module lives in lisp/.
+;; before the first frame.  This file and init.el are the only two entry
+;; points Emacs loads directly; every feature-providing module lives in
+;; lisp/ and is wired by init.el.
 
 ;;; Code:
 
-;; Loaded before init.el, package activation and the first frame.
-
-;; GC deferral (research-packages §4: the ~0.8 MB default costs 5 GCs/~29 ms
-;; on one heavy load — the settings below keep startup at ≤1 collection).
-;; Interactively GC is disabled until the restore hook at the bottom of this
-;; file; batch caps at 256 MB so smoke-test installs cannot grow an unbounded
-;; heap (minimal-emacs.d pattern, research-packages §4/§5).
+;; GC deferral: unlimited threshold during startup (target ≤1 collection),
+;; capped in batch so smoke-test installs cannot grow an unbounded heap.
+;; Steady state is owned by gcmh once it activates (core module).
 (setopt gc-cons-threshold (if noninteractive (* 256 1024 1024) most-positive-fixnum)
         gc-cons-percentage 1.0)
 
-;; Process I/O and load discipline.  read-process-output-max 4 MiB is parity
-;; with the old early-init.el:16 (the research floor is 1 MiB; 4 MiB has run
-;; fine for a year and keeps JSON-RPC/ripgrep output off the main thread).
-;; load-prefer-newer makes a stale .elc never win over fresher source
-;; (research-packages §5).
+;; Process I/O and load discipline: 4 MiB keeps JSON-RPC/ripgrep output off
+;; the main thread; a stale .elc never wins over fresher source.
 (setopt read-process-output-max (* 4 1024 1024)
         load-prefer-newer t)
 
-;; Package startup: package-enable-at-startup is consulted before init.el
-;; runs, so it must be nil here — straight.el owns packages entirely and
-;; no package.el activation happens in any session.  The eln-cache
-;; follows `user-emacs-directory' into var/ automatically (see the
-;; directory swap below).  Silence async native-compilation reports:
-;; byte-compile warnings from straight-built packages must not pop up in
-;; *Warnings* at startup ('silent still logs to the *Async Native
-;; Compilation Log* buffer for debugging).
+;; Package startup: straight.el owns packages entirely; no package.el
+;; activation in any session.  Silence async native-compilation report
+;; popups (still logged to the *Async Native Compilation Log* buffer).
 (defvar native-comp-async-report-warnings-errors)
 (setq package-enable-at-startup nil
       native-comp-async-report-warnings-errors 'silent)
 
-;; lsp-mode's plist deserialization mode.  The variable is a plain defvar
-;; inside `eval-and-compile' in lsp-protocol.el whose initial value is read
-;; from the environment (lsp-protocol.el:37-46, quoted in
-;; research2/lsp-facts.md §1.3), and lsp-mode's generated accessor macros
-;; branch on the COMPILE-TIME value (lsp-protocol.el:76-86, §1.4): the value
-;; must therefore be set before straight builds lsp-mode (this file runs
-;; before init.el's straight pass) and stays set at run time; after any
-;; change, rebuild (M-x straight-rebuild-package RET lsp-mode) — the docs'
-;; "delete and reinstall" step (performance.md:41-47).
+;; lsp-mode's plist deserialization: lsp-mode branches on the COMPILE-TIME
+;; value, so it must be set in the environment before straight builds
+;; lsp-mode.  After changing it: M-x straight-rebuild-package RET lsp-mode.
 (setenv "LSP_USE_PLISTS" "true")
 
-;; State and configuration directories — decluttering without the
-;; no-littering package, following minimal-emacs.d's documented
-;; approach: `user-emacs-directory' itself is swapped to var/ so that
-;; EVERYTHING deriving from it lands under var/ automatically —
-;; straight's repositories and builds, the eln-cache (including advice
-;; trampolines, which are compiled against `user-emacs-directory' and
-;; would otherwise land in the configuration root), histories,
-;; auto-saves — while `ar/config-dir' keeps pointing at the real
-;; configuration root for source files.  This lives in early-init.el on
-;; purpose: the swap must be active before init.el bootstraps straight
-;; and before any package is installed.  `snippets/' deliberately stays
-;; at the configuration root (it holds user content, see
-;; my/snippets-directory in dev-config).
-(defvar ar/config-dir (file-name-as-directory user-emacs-directory)
-  "The real configuration root: source files, lisp/, snippets/, etc/.")
+;; State and configuration directories — decluttering without no-littering:
+;; `user-emacs-directory' itself is swapped to var/ so EVERYTHING deriving
+;; from it (straight repos/builds, eln-cache, histories, autosaves) lands
+;; under var/ automatically, while `ar/config-dir' keeps pointing at the
+;; real configuration root.  snippets/ deliberately stays at the root (user
+;; content).
+(defvar ar/config-dir (file-name-as-directory (file-truename user-emacs-directory))
+  "The real configuration root: source files, lisp/, snippets/, etc/.
+Truenamed so every derived path survives symlinked homes (e.g. /home
+-> /var/home on Silverblue) -- git, magit and external tools resolve
+to the canonical path regardless of how the session was started.")
 (setq user-emacs-directory (expand-file-name "var/" ar/config-dir))
 (defvar ar/etc-dir (expand-file-name "etc/" ar/config-dir)
   "Directory for configuration files a user might read or edit.")
@@ -80,8 +58,8 @@
   (expand-file-name name ar/var-dir))
 
 ;; Declared so the routing setq below byte-compiles without free-variable
-;; warnings; each package's own defvar/defcustom (evaluated when that
-;; package loads) keeps the values set here.
+;; warnings; each package's own defcustom (evaluated when that package
+;; loads) keeps the values set here.
 (defvar tramp-backup-directory-alist)
 (defvar tramp-auto-save-directory)
 (defvar recentf-save-file)
@@ -96,6 +74,7 @@
 (defvar nsm-settings-file)
 (defvar eshell-directory-name)
 (defvar abbrev-file-name)
+(defvar gcmh-high-cons-threshold)
 
 (dolist (dir (list ar/etc-dir ar/var-dir
                    (ar/var-file "backup/")
@@ -105,17 +84,14 @@
                    (ar/var-file "transient/")
                    (ar/var-file "eshell/")
                    (ar/var-file "org/")
+                   (ar/var-file "persp/")
                    (ar/var-file "eln-cache/")))
   (make-directory dir t))
 
 ;; The native-comp machinery writes advice trampolines into
-;; `<config-root>/eln-cache/' through a code path that neither the
-;; `user-emacs-directory' swap above nor `startup-redirect-eln-cache'
-;; can influence (verified on 31.1: trampolines land at the original
-;; location in every routing scheme).  Keep the configuration root
-;; clean by making that one path a symlink into var/eln-cache — writes
-;; follow the link into var/, and the root keeps a single pointer
-;; instead of a cache directory.
+;; `<config-root>/eln-cache/' through a code path neither the directory swap
+;; nor `startup-redirect-eln-cache' can influence.  Keep the root clean by
+;; making that one path a symlink into var/eln-cache.
 (let ((link (expand-file-name "eln-cache" ar/config-dir))
       (target (ar/var-file "eln-cache/")))
   (when (native-comp-available-p)
@@ -127,17 +103,15 @@
         (delete-directory link 'recursive)) ;; stale cache; regenerable
       (make-symbolic-link target link))))
 
-;; straight's `straight-base-dir' defaults to `user-emacs-directory',
-;; which is now var/ — repositories and builds land in var/straight/.
+;; straight's `straight-base-dir' defaults to `user-emacs-directory', which
+;; is now var/ -- repositories and builds land in var/straight/.
 
 ;; The user's custom-file belongs to etc/.
 (setopt custom-file (ar/etc-file "custom.el"))
 
-;; Backups, auto-saves, and per-package state files into var/ (the
-;; per-variable set follows minimal-emacs.d's native routing).  core-config
-;; disables make-backup-files and auto-save-default (super-save owns the
-;; save strategy), but the routing is in place for anyone re-enabling them.
-;; Lockfiles are already disabled (create-lockfiles nil in core-config).
+;; Backups, auto-saves, and per-package state files into var/ (core module
+;; disables backups/auto-save in favor of super-save; routing stays in place
+;; for anyone re-enabling them).
 (setq backup-directory-alist `(("." . ,(ar/var-file "backup")))
       tramp-backup-directory-alist backup-directory-alist
       auto-save-list-file-prefix (ar/var-file "autosave/")
@@ -156,48 +130,34 @@
       abbrev-file-name (ar/etc-file "abbrev_defs"))
 (when (and (fboundp 'startup-redirect-eln-cache) (native-comp-available-p))
   (startup-redirect-eln-cache
-   (convert-standard-filename (expand-file-name "var/eln-cache/" user-emacs-directory))))
+   (convert-standard-filename (ar/var-file "eln-cache/"))))
 
-;; Deterministic startup, quiet warnings.  site-run-file: since 31.1
-;; site-start.el is processed BEFORE this file (NEWS:55-59; startup.el loads
-;; site-run at :1526 and early-init at :1540), so nil'ing it here no longer
-;; suppresses the site load — kept per design §4.1 as parity, and it must be
-;; setq: site-run-file's custom setter errors ("Customizing `site-run-file'
-;; does not work", startup.el:381).  warning-suppress-types is parity with the
-;; old early-init.el:91: org-element's byte-comp noise and native-comp *display*
-;; warnings stay off without touching async-comp behavior.
+;; Deterministic startup, quiet warnings.  Since 31.1 site-start.el runs
+;; BEFORE this file, nil'ing it here is parity only; it must be setq (its
+;; custom setter errors).  (org-element) and (comp) byte-comp noise stays off.
 (setq site-run-file nil
       warning-suppress-types '((org-element) (comp)))
 
-;; Defer file-name handlers (Tramp, epa, jka-compr) until startup finishes:
-;; save/nil now, lexically capture and restore the original alist together
-;; with the GC steady state (research-packages §4: restore, never leave nil).
-;; emacs-startup-hook does not run in batch, which is correct here: batch
-;; harness runs (package bootstrap, byte-compilation) touch
-;; only local files, and built-in .elc files win the load-prefer-newer tie
-;; against same-mtime .el.gz sources, so no decompression handler is needed.
-;; DEPTH 101 runs the restore after user startup hooks (old early-init.el:103).
-(let ((fnha file-name-handler-alist))
-  (setq file-name-handler-alist nil)
-  (add-hook 'emacs-startup-hook
-            (lambda ()
-              (setq file-name-handler-alist fnha
-                    gc-cons-threshold 100000000 ; 100 MB steady state, must match ar/gc-steady-cons-threshold
-                    gc-cons-percentage 0.1))
-            101))
+;; Defer file-name handlers (Tramp, epa, jka-compr) until startup finishes;
+;; restore the original alist together with the GC handoff to gcmh.  Batch
+;; never defers: startup hooks do not fire there, so nil'ing the alist
+;; would leave Tramp/jka-compr/epa dead for the whole batch session.
+(defvar ar/startup-file-name-handler-alist file-name-handler-alist
+  "Original `file-name-handler-alist', captured before startup deferral.")
 
-;; Display-only startup tuning — guarded so batch (which -l's this file) is a
-;; no-op here.  Every form is a pure variable write needing no frame, so
-;; daemon and TTY sessions still take it (the old early-init.el set these
-;; unconditionally).  Menu/tool/scrollbar stripping goes through
-;; default-frame-alist BEFORE the first frame — cheaper than -1'ing the modes.
-;; frame-inhibit-implied-resize stays t rather than NEWS:488's 'force for
-;; tiling WMs — parity (design §4.1).  redisplay-skip-fontification-on-input
-;; is the corrected spelling of design.md:305 ("fontication" — that variable
-;; does not exist in 31.1; old early-init.el:32 had the right name).  Dropped
-;; from the old file per design §6: the mouse-color frame parameter.  (The
-;; LSP_USE_PLISTS setenv is no longer dropped -- lsp-mode replaced eglot and
-;; the setenv is restored in the package-startup section; design-lsp §9.)
+(defun ar/startup-restore-file-name-handlers ()
+  "Restore `file-name-handler-alist' and settle GC after startup."
+  (setq file-name-handler-alist ar/startup-file-name-handler-alist
+        gc-cons-threshold (* 64 1024 1024)
+        gc-cons-percentage 0.1))
+
+(unless noninteractive
+  (setq file-name-handler-alist nil)
+  (add-hook 'emacs-startup-hook #'ar/startup-restore-file-name-handlers 101))
+
+;; Display-only startup tuning -- guarded so batch (which -l's this file) is
+;; a no-op here.  Menu/tool/scrollbar stripping goes through
+;; default-frame-alist BEFORE the first frame.
 (unless noninteractive
   (setq redisplay-skip-fontification-on-input t
         fast-but-imprecise-scrolling t

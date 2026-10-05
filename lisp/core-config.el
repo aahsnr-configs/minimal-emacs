@@ -2,12 +2,20 @@
 
 ;;; Commentary:
 
-;; The core module: editor defaults, performance and GC tuning, and the
-;; shared predicates/macros (`icons-displayable-p', `with-eval-after-load-all',
+;; The core module: editor defaults, gcmh GC management, and the shared
+;; predicates/macros (`ar/icons-displayable-p', `with-eval-after-load-all',
 ;; `too-long-file-p', ...) that every later module builds on.  Also owns
 ;; `reload-init-file', which re-evaluates all module files after edits.
 
 ;;; Code:
+
+(declare-function windmove-find-other-window "windmove")
+(declare-function pgtk-use-im-context "pgtk")
+(declare-function org-in-src-block-p "org")
+
+(defvar global-hl-line-overlay)
+(defvar evil-visual-state-entry-hook)
+(defvar evil-visual-state-exit-hook)
 
 ;; Shared predicates and macros.  Keep this block first: every later module
 ;; (and every later block here) may call these helpers.
@@ -18,23 +26,8 @@
   "Customization group for this configuration's `ar/' options."
   :group 'convenience)
 
-;; Childframes (posframe/corfu popups) need a graphical display or a TTY
-;; build with child-frame support, plus a dedicated minibuffer frame.
-(defun childframe-workable-p ()
-  "Return non-nil if childframes are supported in this session.
-Used by UI packages such as `corfu' and `posframe'."
-  (and (not noninteractive)
-       (or (display-graphic-p)
-           (featurep 'tty-child-frames))
-       (eq (frame-parameter (selected-frame) 'minibuffer) 't)))
-
-(defun childframe-completion-workable-p ()
-  "Return non-nil if childframe completion UIs may be used."
-  (childframe-workable-p))
-
-(defun icons-displayable-p ()
-  "Return non-nil if the `nerd-icons' icon font is displayable.
-Guards icon rendering in environments without nerd-icon support."
+(defun ar/icons-displayable-p ()
+  "Return non-nil if the `nerd-icons' icon font is displayable."
   (or (featurep 'nerd-icons)
       (require 'nerd-icons nil t)))
 
@@ -51,45 +44,19 @@ files, minified JSON and logs."
 (defmacro ar/define-large-file-guard (mode)
   "Advise minor-mode command MODE to refuse activation in huge buffers.
 A negative or zero prefix argument bypasses the guard so the mode can
-still be toggled deliberately.  Every module defines its large-file
-guard through this macro so the thresholds stay consistent config-wide."
+still be toggled deliberately."
   `(define-advice ,mode (:before-while (&optional arg) guard-large-files)
      (or (and arg (< (prefix-numeric-value arg) 1))
          (not (too-long-file-p)))))
 
-;; Region-or-symbol fallback shared by search, navigation and transient menus.
-(defun selected-region-or-symbol-at-point ()
-  "Return the active region, or the symbol at point if no region is active."
-  (if (region-active-p)
-      (buffer-substring-no-properties (region-beginning) (region-end))
-    (thing-at-point 'symbol t)))
-
 (defmacro with-eval-after-load-all (features &rest body)
   "Run BODY once every feature in FEATURES has loaded.
-
-FEATURES is a single feature or an unquoted list of features, where
-each feature is a symbol or (per `with-eval-after-load') a file-name
-string:
-
-  (with-eval-after-load-all eglot ...)                 ; one feature
-  (with-eval-after-load-all (eglot flymake) ...)       ; several
-  (with-eval-after-load-all \\='(eglot flymake) ...)      ; quoted list
-
-BODY runs exactly once, the moment the LAST of FEATURES to load
-actually finishes loading -- whichever one that happens to be.  Any
-FEATURES already loaded when this macro is evaluated are satisfied
-immediately; only the remaining ones are waited on.  The order in
-which FEATURES are listed has no effect on when or whether BODY runs.
-
-BODY is automatically wrapped in `with-no-warnings', since it will
-typically call functions or reference variables from packages that
-are not yet loaded (and therefore not yet defined) at byte-compile
-time, which would otherwise produce spurious compiler warnings.
+FEATURES is a single feature or an unquoted list of features.  BODY
+runs exactly once, the moment the LAST of FEATURES to load actually
+finishes loading.  BODY is automatically wrapped in `with-no-warnings'.
 
 \(fn FEATURES BODY...)"
   (declare (indent 1) (debug (form body)))
-  ;; Normalize FEATURES to a flat, unquoted list, accepting any of:
-  ;; SYMBOL, 'SYMBOL, (SYMBOL...), '(SYMBOL...).
   (when (eq (car-safe features) 'quote)
     (setq features (cadr features)))
   (unless (listp features)
@@ -100,12 +67,6 @@ time, which would otherwise produce spurious compiler warnings.
   (dolist (f features)
     (unless (or (symbolp f) (stringp f))
       (error "Invalid feature %S for `with-eval-after-load-all' (must be a symbol or string)" f)))
-  ;; Build one `with-eval-after-load' per feature, nested innermost-out,
-  ;; with BODY (wrapped in `with-no-warnings') at the core.  Nesting order
-  ;; does not matter for *when* BODY runs: `with-eval-after-load' fires
-  ;; immediately for a feature that is already loaded, so no matter which
-  ;; order we nest in, BODY only actually fires once the last outstanding
-  ;; feature loads.
   (let ((form `(with-no-warnings ,(macroexp-progn body))))
     (dolist (f (reverse features))
       (setq form `(with-eval-after-load ,(if (stringp f) f `',f) ,form)))
@@ -113,23 +74,18 @@ time, which would otherwise produce spurious compiler warnings.
 
 ;; Unified escape: clear search highlights, then abort the minibuffer or the
 ;; pending command.  Bound to `<escape>' in normal/visual/motion states and
-;; all minibuffer maps by the keybinds module; defined here so those bindings
-;; always resolve.
+;; all minibuffer maps by the keybinds module.
 (defun ar/escape-key ()
   "Clear search highlights, abort recursive edits, or quit pending commands."
   (interactive)
-  ;; Clear Evil ex-search highlights.
   (when (fboundp 'evil-ex-nohighlight)
     (evil-ex-nohighlight))
-  ;; Abort the minibuffer if active, otherwise cancel macros/popups.
   (if (minibufferp)
       (abort-recursive-edit)
     (keyboard-quit)))
 
-;; Swap a horizontal split to vertical or vice versa.  Bound to `SPC w t' by
-;; the keybinds module (the old config bound a symbol that is not an Emacs
-;; command; this is the real command).
-(defun window-toggle-split-direction ()
+;; Swap a horizontal split to vertical or vice versa.
+(defun ar/window-toggle-split-direction ()
   "Switch window split from horizontal to vertical, or vice versa."
   (interactive)
   (require 'windmove)
@@ -143,8 +99,11 @@ time, which would otherwise produce spurious compiler warnings.
                (neighbor1 (windmove-find-other-window neighbor-dir win))
                (neighbor2 (if next-win (with-selected-window next-win
                                           (windmove-find-other-window neighbor-dir next-win)))))
-          (setq done (and (eq neighbor1 neighbor2)
-                          (not (minibufferp neighbor2))))
+          (setq done (and next-win
+                          (window-live-p next-win)
+                          (not (window-minibuffer-p next-win))
+                          (eq neighbor1 neighbor2)
+                          (not (window-minibuffer-p neighbor2))))
           (when done
             (let* ((other-buf (window-buffer next-win)))
               (delete-window next-win)
@@ -157,72 +116,48 @@ time, which would otherwise produce spurious compiler warnings.
 ;; source of truth; stale .elc artifacts are removed before reloading so
 ;; `load-prefer-newer' cannot resurrect them.
 (defvar ar-modules) ;; bound by init.el with the ordered module feature list
+(defvar ar/config-dir) ;; the real configuration root, set by early-init.el
 
 (defun reload-init-file ()
   "Re-evaluate every module file in `ar-modules'.
 early-init.el and init.el are deliberately excluded: the bootstrap they
-own (package bootstrap, module require order) must run exactly
-once per session.  Some changes (removed hooks, packages) still require
-a full restart."
+own (package bootstrap, module require order) must run exactly once per
+session.  Loads the lisp/ sources directly -- never the var/bytecode
+cache, whose stale artifacts are exactly what a reload must bypass.
+Some changes (removed hooks, packages) still require a full restart."
   (interactive)
-  (let ((start-time (current-time)))
+  (let ((start-time (current-time))
+        (lisp-dir (expand-file-name "lisp" ar/config-dir)))
     (dolist (mod ar-modules)
-      (let ((src (file-name-sans-extension
-                  (or (locate-library (symbol-name mod))
-                      (user-error "Reload: %s not found on `load-path'" mod)))))
+      (let ((src (expand-file-name (concat (symbol-name mod) ".el") lisp-dir)))
+        (unless (file-exists-p src)
+          (user-error "Reload: %s not found in %s" mod lisp-dir))
         (message "Reloading %s..." mod)
-        ;; Re-evaluate the SOURCE file: byte-compiled artifacts are ignored
-        ;; for this one load, so recent edits always take effect.
-        (load (concat src ".el") nil 'nomessage)))
+        (load src nil 'nomessage)))
     (message "Reload finished in %.2fs -- restart Emacs for package changes."
              (float-time (time-subtract (current-time) start-time)))))
 
-;; Performance and garbage collection.  Startup-time GC deferral is owned by
-;; early-init.el (design section 4.1); this block replaces `gcmh' at runtime
-;; with the measured steady-state values from the same section.
+;; Performance and garbage collection.  Startup-time GC deferral is owned
+;; by early-init.el; this block hands steady-state control to gcmh (Doom
+;; core parity: 64 MB high threshold, auto idle delay x10).
+(defvar gcmh-high-cons-threshold)
+(setq gcmh-high-cons-threshold (* 64 1024 1024))
 
-(defconst ar/gc-steady-cons-threshold 100000000
-  "Steady-state `gc-cons-threshold' (100 MB, lsp-mode's documented value).
-Lower it if freezing appears under heavy LSP work, raise it for stutter.")
+(use-package gcmh
+  :defer t
+  :custom
+  (gcmh-idle-delay 'auto)
+  (gcmh-auto-idle-delay-factor 10))
 
-(defun ar/gc-restore-steady-state ()
-  "Restore steady-state GC thresholds after a heavy phase."
-  (setq gc-cons-threshold ar/gc-steady-cons-threshold
-        gc-cons-percentage 0.1))
+(defun ar/gcmh-activate-after-startup ()
+  "Hand steady-state GC to gcmh once startup completes."
+  (unless (bound-and-true-p gcmh-mode)
+    (when (require 'gcmh nil t)
+      (gcmh-mode 1))))
 
-;; Batch runs keep whatever early-init.el set (the 256 MB batch cap, design
-;; section 4.1) -- after-init-time is already non-nil for `-l' loads, so it
-;; is not a reliable reload marker there.  Interactive: restore on
-;; `emacs-startup-hook' during normal startup; early-init restores the same
-;; values on the same hook, so this is belt and braces.  Live reloads
-;; (reload-init-file re-evaluates core-config.el) apply the steady state at once.
+;; Activate gcmh right after startup completes (batch runs skip it).
 (unless noninteractive
-  (if after-init-time
-      (ar/gc-restore-steady-state)
-    (add-hook 'emacs-startup-hook #'ar/gc-restore-steady-state 101)))
-
-;; Raise the GC threshold while the minibuffer is active so completion input
-;; never triggers a collection mid-keystroke; collect and restore on exit.
-(defun ar/gc-minibuffer-setup ()
-  "Defer garbage collection while the minibuffer is in use."
-  (setq gc-cons-threshold (* 2 ar/gc-steady-cons-threshold)))
-
-(defun ar/gc-minibuffer-exit ()
-  "Collect garbage and restore steady-state thresholds after completion."
-  (garbage-collect)
-  (ar/gc-restore-steady-state))
-
-(add-hook 'minibuffer-setup-hook #'ar/gc-minibuffer-setup)
-(add-hook 'minibuffer-exit-hook #'ar/gc-minibuffer-exit)
-
-;; Reclaim memory when the frame loses focus.  Proven habit from the old
-;; config's gcmh block; `after-focus-change-function' is the replacement for
-;; the obsolete `focus-out-hook'.
-(defun ar/gc-when-unfocused ()
-  "Collect garbage when no frame has input focus."
-  (unless (frame-focus-state)
-    (garbage-collect)))
-(add-function :after after-focus-change-function #'ar/gc-when-unfocused)
+  (add-hook 'emacs-startup-hook #'ar/gcmh-activate-after-startup 102))
 
 ;; Long-line optimizations (Emacs 29+): keep redisplay linear on minified
 ;; JSON, logs and generated code.
@@ -230,8 +165,8 @@ Lower it if freezing appears under heavy LSP work, raise it for stutter.")
               large-hscroll-threshold 1000
               syntax-wholeline-max 1000)
 
-;; Predictable LTR redisplay: no per-paragraph bidi search and no Parenthesis
-;; Algorithm inhibition overhead on this Latin/CJK workload.
+;; Predictable LTR redisplay: no per-paragraph bidi search on this
+;; Latin/CJK workload.
 (setq-default bidi-paragraph-direction 'left-to-right
               bidi-inhibit-bpa t)
 
@@ -241,8 +176,7 @@ Lower it if freezing appears under heavy LSP work, raise it for stutter.")
         undo-outer-limit 120000000)
 
 ;; Scrolling and redisplay: viewport stays put while typing, font-lock defers
-;; 50 ms so input wins (proven feel under eglot + tree-sitter), and case
-;; folding is skipped while picking major modes.
+;; 50 ms so input wins, and case folding is skipped while picking major modes.
 (setopt highlight-nonselected-windows nil
         window-resize-pixelwise nil
         jit-lock-defer-time 0.05
@@ -252,10 +186,8 @@ Lower it if freezing appears under heavy LSP work, raise it for stutter.")
 ;; Platform layer: PGTK/Wayland workarounds, daemon plumbing, UTF-8 on every
 ;; I/O boundary, and identity.  All of it is batch-safe.
 
-;; Disable the GTK input-method context per frame: it adds noticeable input
-;; latency under Wayland (fcitx5/ibus), and Emacs' own input handling is what
-;; we want.  Frame-local, so it re-applies to every new frame, including
-;; daemon client frames.
+;; Disable the GTK input-method context per frame: it adds input latency
+;; under Wayland (fcitx5/ibus).
 (defun ar/pgtk-disable-im-context (frame)
   "Turn off the GTK input-method context on FRAME."
   (with-selected-frame frame
@@ -276,27 +208,24 @@ Lower it if freezing appears under heavy LSP work, raise it for stutter.")
         use-file-dialog nil)
 
 ;; GPG passphrases are prompted in the minibuffer (`loopback') instead of a
-;; GTK pinentry dialog, preserving daemon stability on PGTK/Wayland.
+;; GTK pinentry dialog.
 (setopt epg-pinentry-mode 'loopback)
 
-;; Native compilation: defaults stay (design section 4.1 keeps
-;; `native-comp-speed' 2 and relies on the 30.1+ important-warnings filter).
-;; Only the *display* of async-comp warnings is quieted -- the old config's
-;; parity behavior.  early-init owns the same suppression; this idempotent
-;; push covers reload paths and is additive, never clobbering other entries.
+;; Native compilation: defaults stay (native-comp-speed 2 + the 30.1+
+;; important-warnings filter).  Only the *display* of async-comp warnings
+;; is quieted; this idempotent push covers reload paths.
 (unless (member '(comp) warning-suppress-types)
   (push '(comp) warning-suppress-types))
 
 ;; Daemon plumbing: load server.el eagerly in daemon sessions so
-;; `server-after-make-frame-hook' is a live list from the first client frame;
-;; the ui module hangs font setup on it.  Interactive sessions are covered by
-;; `after-make-frame-functions' above.  The server itself is started by the
-;; systemd user unit / emacsclient, never from the config.
+;; `server-after-make-frame-hook' is a live list from the first client
+;; frame.  The server itself is started by the systemd user unit /
+;; emacsclient, never from the config.
 (when (daemonp)
   (require 'server))
 
 ;; UTF-8 on every I/O boundary.  The Windows selection guard is kept so the
-;; config stays portable: forcing utf-8 there breaks the utf-16-le clipboard.
+;; config stays portable.
 (set-language-environment "UTF-8")
 (set-default-coding-systems 'utf-8)
 (set-terminal-coding-system 'utf-8)
@@ -322,20 +251,19 @@ Lower it if freezing appears under heavy LSP work, raise it for stutter.")
 (setopt vc-handled-backends '(Git)
         vc-follow-symlinks t)
 
-;; Process and compilation safeguards: never prompt about processes or save
-;; modified buffers mid-compile, and always scroll the compilation window.
+;; Process and compilation safeguards.
 (setopt confirm-kill-processes nil
         compilation-ask-about-save nil)
 (setq compilation-always-kill t
-      compilation-scroll-output t)
+        compilation-scroll-output t)
 
 ;; Silence advice-redefinition noise; echo keystrokes responsively.
 (setopt ad-redefinition-action 'accept
         echo-keystrokes 0.1)
 
 ;; Filesystem hygiene: no lockfiles (they fight file watchers), no backup
-;; clutter, no auto-save files (super-save in the editor module owns the
-;; save strategy), and a final newline always ensured.
+;; clutter, no auto-save files (super-save owns the save strategy), and a
+;; final newline always ensured.
 (setopt create-lockfiles nil
         make-backup-files nil
         auto-save-default nil
@@ -353,15 +281,13 @@ Lower it if freezing appears under heavy LSP work, raise it for stutter.")
 ;; kill-ring before any kill operation overwrites it.
 (setopt save-interprogram-paste-before-kill t)
 
-;; `q' buries read-only list buffers (*Packages*, *Buffer List*, ...) to match
-;; Vim/Emacs muscle memory.  Deferred until tabulated-list first loads.
+;; `q' buries read-only list buffers to match Vim muscle memory.
 (use-package tabulated-list
   :defer t
   :config
   (keymap-set tabulated-list-mode-map "q" #'quit-window))
 
 ;; Fallback major modes for extensions without native support.
-;; `shell-script-mode' is the autoload alias of `sh-mode' (verified on 31.1).
 (dolist (pair '(("\\.in\\'" . text-mode)
                 ("\\.out\\'" . text-mode)
                 ("\\.args\\'" . text-mode)
@@ -370,13 +296,9 @@ Lower it if freezing appears under heavy LSP work, raise it for stutter.")
                 ("\\.Rmd\\'" . markdown-mode)))
   (add-to-list 'auto-mode-alist pair))
 
-;; Editing defaults from `simple' (preloaded): sensible buffer state, quiet
-;; bells, single-character prompts and per-mode trailing-whitespace display.
+;; Editing defaults from `simple' (preloaded).
 
-;; Trailing whitespace is a per-mode decision: code and config buffers only,
-;; so minibuffer, echo-area and UI buffers are never affected (Doom-style
-;; per-mode hooks instead of a global mode).  Top-level defun so every hook
-;; always resolves to a defined command.
+;; Trailing whitespace is a per-mode decision: code and config buffers only.
 (defun ar/show-trailing-whitespace ()
   "Show trailing whitespace in code and config buffers."
   (setq-local show-trailing-whitespace t))
@@ -428,26 +350,8 @@ Lower it if freezing appears under heavy LSP work, raise it for stutter.")
 
 ;; recentf helpers, defined at top level so they exist before recentf-mode
 ;; can ever consult the exclusion list.
-(defvar ar/recentf-org-agenda-cache nil
-  "Cached list of resolved `org-agenda' file paths (recentf exclusion).")
 (defvar ar/recentf-flush-timer nil
   "Periodic `recentf-save-list' timer (daemon hygiene).")
-(defvar ar/recentf-org-agenda-timer nil
-  "Idle timer refreshing the `org-agenda' recentf exclusion cache.")
-
-(defun ar/update-recentf-org-agenda-cache ()
-  "Refresh the recentf exclusion cache for `org-agenda' files."
-  (when (bound-and-true-p org-agenda-files)
-    (setq ar/recentf-org-agenda-cache
-          (mapcar #'file-truename
-                  (seq-filter #'file-exists-p (org-agenda-files t))))))
-
-(defun ar/exclude-org-agenda-files-p (file)
-  "Return non-nil if FILE is an `org-agenda' file, using the cached list."
-  (and (not (file-remote-p file))
-       (string-suffix-p ".org" file t)
-       ar/recentf-org-agenda-cache
-       (member (file-truename file) ar/recentf-org-agenda-cache)))
 
 (use-package saveplace
   :custom
@@ -476,19 +380,12 @@ Lower it if freezing appears under heavy LSP work, raise it for stutter.")
   (add-to-list 'recentf-exclude
                (recentf-expand-file-name ar/etc-dir))
   (add-to-list 'recentf-exclude #'file-remote-p)
-  (add-to-list 'recentf-exclude #'ar/exclude-org-agenda-files-p)
   ;; Abbreviate instead of resolving truenames when recording entries.
   (setq recentf-filename-handlers '(abbreviate-file-name))
   ;; Daemon-safe periodic flush: state survives SIGKILL'd sessions.
   (unless (timerp ar/recentf-flush-timer)
     (setq ar/recentf-flush-timer
-          (run-at-time 300 300 #'recentf-save-list)))
-  ;; Defer org-agenda cache updates until org is actually loaded.
-  (with-eval-after-load 'org
-    (add-hook 'org-mode-hook #'ar/update-recentf-org-agenda-cache)
-    (unless (timerp ar/recentf-org-agenda-timer)
-      (setq ar/recentf-org-agenda-timer
-            (run-with-idle-timer 30 t #'ar/update-recentf-org-agenda-cache)))))
+          (run-at-time 300 300 #'recentf-save-list))))
 
 (use-package savehist
   :init
@@ -503,7 +400,6 @@ Lower it if freezing appears under heavy LSP work, raise it for stutter.")
   (savehist-mode 1))
 
 ;; Keep buffers synchronized with disk changes via native file notifications.
-
 (use-package autorevert
   :custom
   (auto-revert-verbose nil)
@@ -513,16 +409,13 @@ Lower it if freezing appears under heavy LSP work, raise it for stutter.")
   (global-auto-revert-mode 1))
 
 ;; camelCase-aware word boundaries, globally.
-
 (use-package subword
   :config
   (global-subword-mode 1))
 
 ;; Viewport stability and native pixel-precision scrolling, tuned for
-;; PGTK/Wayland.
-
-;; `scroll-margin' MUST stay 0: non-zero values snap the viewport and destroy
-;; pixel-smooth animation on this compositor.
+;; PGTK/Wayland.  `scroll-margin' MUST stay 0: non-zero values snap the
+;; viewport and destroy pixel-smooth animation on this compositor.
 (setopt hscroll-step 1
         hscroll-margin 2
         scroll-step 1
@@ -542,13 +435,11 @@ Lower it if freezing appears under heavy LSP work, raise it for stutter.")
   (pixel-scroll-precision-mode 1))
 
 ;; Pair machinery: electric insertion and O(1) multi-character emphasis
-;; pairs in prose.  (`delete-pair' tuning and the `ar/delete-pair-dwim' DWIM
-;; live in the editor module -- the single copy of each definition.)
+;; pairs in prose.  (Decision: electric-pair, NOT smartparens.)
 
 ;; O(1) multi-character emphasis injection: typing *, =, _ or ~ twice in a
 ;; row in prose produces the closing pair immediately.  Strictly inhibited
-;; inside Org src blocks and Markdown code spans.  Top-level defun so the
-;; post-self-insert hook always resolves to a defined command.
+;; inside Org src blocks and Markdown code spans.
 (defun ar/elec-pair-multi-char-prose ()
   "Insert a matching emphasis pair after doubled punctuation in prose."
   (when (and (derived-mode-p 'text-mode 'org-mode 'markdown-mode)
@@ -564,10 +455,8 @@ Lower it if freezing appears under heavy LSP work, raise it for stutter.")
            (after-pair (char-after)))
       (when (and c1 c2 (eq c1 c2)
                  (memq c1 '(?* ?= ?_ ?~))
-                 ;; Do not fire when appending to identical punctuation (***).
                  (not (eq before-pair c1))
                  (not (eq after-pair c1))
-                 ;; Only in empty space or before words, never after words.
                  (or (null before-pair)
                      (not (memq (char-syntax before-pair) '(?w ?_)))))
         (insert (string c1 c1))
@@ -575,8 +464,6 @@ Lower it if freezing appears under heavy LSP work, raise it for stutter.")
 
 (use-package elec-pair
   :config
-  ;; Conservative inhibition avoids pairing in unbalanced buffers and inside
-  ;; complex strings.
   (setq electric-pair-inhibit-predicate #'electric-pair-conservative-inhibit
         electric-pair-skip-whitespace t
         electric-pair-delete-adjacent-pairs t)
@@ -585,7 +472,6 @@ Lower it if freezing appears under heavy LSP work, raise it for stutter.")
 
 ;; Electric indentation plus an "electric words" engine: keywords like
 ;; `else' re-indent the line as soon as they are completed at end of line.
-
 (defcustom ar/electric-indent-words
   '("else" "elif" "elseif" "catch" "finally" "except")
   "Words that trigger immediate re-indentation when typed at EOL."
@@ -613,7 +499,6 @@ Confined to `prog-mode' derivatives to avoid prose collisions."
                                               electric-indent-chars)))
 
 ;; Matching-delimiter highlighting and event-driven blink feedback.
-
 (use-package paren
   :custom
   (show-paren-delay 0.05)
@@ -626,33 +511,26 @@ Confined to `prog-mode' derivatives to avoid prose collisions."
   (show-paren-context-when-offscreen 'overlay)
   :config
   (show-paren-mode 1)
-  ;; Emacs 31: no phantom highlighting inside strings and comments.  The
-  ;; released 31.1 defcustom takes `all'/`on-mismatch'/nil (the old config's
-  ;; boolean t predates the release type); `all' is the strictest guard.
+  ;; Emacs 31: no phantom highlighting inside strings and comments.
   (setopt show-paren-not-in-comments-or-strings 'all))
 
-;; Blink feedback on closing-delimiter insertion.  The unbounded search
-;; distance guarantees accuracy in deeply nested AST blocks.
+;; Blink feedback on closing-delimiter insertion.
 (setopt blink-matching-paren t
         blink-matching-paren-distance nil
         blink-matching-delay 0.1
         blink-matching-paren-highlight-offscreen t)
 
-;; Whitespace fontification restricted to mixed-indentation detection;
-;; trailing spaces are handled by `show-trailing-whitespace' (simple block).
-
+;; Whitespace fontification restricted to mixed-indentation detection.
 (use-package whitespace
   :defer t
   :hook ((prog-mode conf-mode) . whitespace-mode)
   :custom
-  (whitespace-style '(space-before-tab space-after-tab indentation))
-  :config
-  ;; Abort activation in huge buffers (negative/zero prefix bypasses).
-  (ar/define-large-file-guard whitespace-mode))
+  (whitespace-style '(space-before-tab space-after-tab indentation)))
+
+(ar/define-large-file-guard whitespace-mode)
 
 ;; Native line numbers: absolute current line with relative surroundings for
 ;; Vim motions, with a pre-sized margin to prevent redisplay jitter.
-
 (use-package display-line-numbers
   :defer t
   :hook ((prog-mode conf-mode yaml-mode LaTeX-mode tex-mode)
@@ -662,44 +540,31 @@ Confined to `prog-mode' derivatives to avoid prose collisions."
   (display-line-numbers-grow-only t)
   (display-line-numbers-type 'absolute)
   :custom-face
-  ;; Recessive margin typography, matching the doom-tokyo-night palette the
-  ;; ui module loads.  Note: a loaded theme re-asserts its own faces; these
-  ;; values exist to match it byte-for-byte if it does not.
+  ;; Recessive margin typography, matching the doom-tokyo-night palette.
   (line-number ((t (:inherit shadow :foreground "#565f89"))))
   (line-number-current-line
-   ((t (:inherit default :foreground "#c0caf5" :weight bold))))
-  :config
-  ;; Abort activation in huge buffers (negative/zero prefix bypasses).
-  (ar/define-large-file-guard display-line-numbers-mode))
+   ((t (:inherit default :foreground "#c0caf5" :weight bold)))))
 
-;; Window dividers: right-only placement with a 1px baseline, so horizontal
-;; window boundaries carry no redundant chrome.
+(ar/define-large-file-guard display-line-numbers-mode)
 
+;; Window dividers: right-only placement with a 1px baseline.
 (use-package frame
   :custom
   (window-divider-default-places 'right-only)
   (window-divider-default-right-width 1)
   (window-divider-default-bottom-width 1)
   :custom-face
-  ;; Harmonizes with the doom-tokyo-night border color.
   (window-divider ((t (:foreground "#292e42"))))
   :config
-  ;; Synchronous activation guarantees registration before the first paint.
   (window-divider-mode 1))
 
 ;; Active-line highlight: selected window only, behind syntax highlighting,
 ;; suppressed in terminal/UI modes and during Evil visual selection.
-
 (use-package hl-line
   :custom
-  ;; Confine the highlight strictly to the active window.
   (hl-line-sticky-flag nil)
-  ;; Render the overlay behind syntax highlighting and diagnostics.
   (hl-line-overlay-priority -1)
   :config
-  ;; Delete the overlay instead of highlighting in excluded modes.  Pruned to
-  ;; modes that exist in this config (ghostel lives in the vc-projects
-  ;; module; treemacs likewise).
   (define-advice global-hl-line-highlight (:around (fn) guard-excluded-modes)
     (if (derived-mode-p 'dired-mode
                         'magit-mode
@@ -714,30 +579,19 @@ Confined to `prog-mode' derivatives to avoid prose collisions."
         (when global-hl-line-overlay
           (delete-overlay global-hl-line-overlay))
       (funcall fn)))
-  ;; Drop the highlight while an Evil visual selection is active, redraw it
-  ;; on exit.  The hooks are inert until the editor module loads evil.
   (add-hook 'evil-visual-state-entry-hook #'global-hl-line-unhighlight)
   (add-hook 'evil-visual-state-exit-hook #'global-hl-line-highlight)
-  ;; Synchronous activation guarantees overlay registration.
   (global-hl-line-mode 1))
 
 ;; Long-daemon hygiene: automatically kill long-inactive, buried buffers.
-
 (use-package buffer-terminator
   :defer 60
   :custom
-  ;; Keep the minibuffer free of echo-area logging.
   (buffer-terminator-verbose nil)
   ;; Terminate buffers inactive for 30 minutes, checked every 10 minutes.
   (buffer-terminator-inactivity-timeout (* 30 60))
   (buffer-terminator-interval (* 10 60))
   :config
-  ;; Janitor semantics: the package only needs its background timer running,
-  ;; so 60 idle seconds after startup is exactly as good as module load time
-  ;; (use-package `:defer N' arms an idle timer; batch runs never fire idle
-  ;; timers, so the gates see the package unloaded).  The eager load bought
-  ;; nothing but startup cost, and the package is outside the design's
-  ;; eager-load budget.
   (buffer-terminator-mode 1))
 
 ;; Module boundary: core is loaded by init.el before every other module.

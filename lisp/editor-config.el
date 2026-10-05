@@ -2,22 +2,24 @@
 
 ;;; Commentary:
 
-;; The editing module.  Defines `ar/global-leader' and
-;; `ar/local-leader' (used by every module loaded after this one) and
-;; configures the evil stack and the core editing aids.  Package
-;; installation is handled exclusively by init.el's `ar/packages'
-;; manifest, so these declarations install nothing.  evil-ts-obj is a
-;; git recipe in that manifest; everything else resolves through
-;; straight's default recipe repositories.
+;; The editing module.  Defines `ar/global-leader' and `ar/local-leader'
+;; (used by every module loaded after this one) and configures the evil
+;; stack -- the full Doom plugin suite plus this config's AST and
+;; multi-cursor tools -- and the core editing aids.  Package installation
+;; is handled exclusively by init.el's `ar/packages' manifest.
 
 ;;; Code:
 
-;; Evil core engine.  Loaded eagerly: the evil stack is part of the
-;; startup eager-load budget (design §4.2).
+(declare-function evil-multiedit-default-keybinds "evil-multiedit")
+(declare-function ar/evil-avy-goto-char-2 "editor-config")
+(declare-function ar/evil-avy-goto-line "editor-config")
+(declare-function ar/evil-avy-goto-char-timer "editor-config")
+(declare-function ar/ast-refactor-transient "editor-config")
+
+;; Evil core engine.  Loaded eagerly: part of the startup eager-load budget.
 (use-package evil
   :demand t
   :init
-  ;; Core settings required before package load.
   (setq evil-want-integration t
         evil-want-keybinding nil
         evil-want-minibuffer nil
@@ -26,10 +28,6 @@
         evil-symbol-word-search t
         evil-undo-system 'undo-fu
         evil-kill-on-visual-paste nil)
-  ;; Extended keybindings and behavioral toggles.
-  ;; (The old config also set `evil-want-C-h-delete', which exists in evil
-  ;; 1.15.0 (evil-vars.el:580, default nil); it is deliberately dropped so
-  ;; C-h keeps its default insert-state behavior.)
   (setq evil-want-C-g-bindings t
         evil-want-C-i-jump nil
         evil-want-C-u-scroll t
@@ -38,7 +36,6 @@
         evil-want-Y-yank-to-eol t
         evil-want-abbrev-expand-on-insert-exit nil
         evil-respect-visual-line-mode nil)
-  ;; State-dependent cursor shapes (variable state only; batch-safe).
   (setq evil-normal-state-cursor '(box)
         evil-insert-state-cursor '(bar)
         evil-visual-state-cursor '(hollow)
@@ -50,16 +47,11 @@
   (evil-vsplit-window-right t)
   (evil-echo-state nil)
   (evil-move-cursor-back nil)
-  ;; (The old `evil-v$-excludes-newline t' entry is dropped: evil 1.15.0
-  ;; defines it (evil-vars.el:1138, default nil) but we keep the default
-  ;; `$' behavior.)
   (evil-want-fine-undo t)
-  ;; Prevents cursor from moving past EOL.
   (evil-move-beyond-eol nil)
   (evil-search-wrap t)
   (select-enable-clipboard t)
   (evil-visual-update-x-selection-p nil)
-  ;; Search behavior and highlighting.
   (evil-ex-search-case 'smart)
   (evil-ex-search-incremental t)
   (evil-ex-search-highlight-all t)
@@ -74,74 +66,54 @@
     (define-key keymap (kbd "<down>") #'next-history-element)
     (define-key keymap (kbd "C-p") #'previous-history-element)
     (define-key keymap (kbd "C-n") #'next-history-element))
-  ;; Forces normal state in read-only UI buffers.  (dashboard-mode is not
-  ;; installed in the new stack; dropped.)
   (evil-set-initial-state 'messages-buffer-mode 'normal))
 
-;; Evil Collection: standardized Vim bindings for non-text buffers, with
-;; Unimpaired bracket navigation.  Minibuffer integration stays off to
-;; protect Vertico.
+;; Evil Collection: standardized Vim bindings for non-text buffers.
+;; Minibuffer integration stays off to protect Vertico.
 (use-package evil-collection
   :after evil
   :init
   (setq evil-collection-want-unimpaired-p t)
-  ;; Find-usages bindings are enabled by default in evil-collection 3.x.
-  ;; (The old config set `evil-collection-want-find-usages-bindings-p', a
-  ;; variable that never existed; the obsolete knob is
-  ;; `evil-collection-want-find-usages-bindings' and already defaults to t.)
   :config
   (evil-collection-init))
+
+;; evil-escape: a custom escape sequence (jk) for leaving insert state.
+(use-package evil-escape
+  :after evil
+  :custom
+  (evil-escape-key-sequence "jk")
+  (evil-escape-delay 0.15)
+  (evil-escape-excluded-states '(normal visual multiedit emacs motion))
+  (evil-escape-excluded-major-modes '(magit-status-mode magit-diff-mode))
+  :config
+  (when (fboundp 'evil-escape-mode)
+    (evil-escape-mode 1)))
 
 ;; Linear undo/redo backend consumed by `evil-undo-system'.
 (use-package undo-fu
   :defer t)
 
-;; Persistent undo across sessions.  Excluded modes are pruned to those that
-;; actually exist in the new package set (dashboard/pdf/vterm/eat dropped).
-;; Eagerly loaded: with ":defer t" (the old shape) the :config body never
-;; runs, so the compression choice, custom hasher, and
-;; `undo-fu-session-global-mode' never activate.
+;; Persistent undo across sessions, plus vundo for visual tree navigation.
 (use-package undo-fu-session
   :demand t
   :custom
-  ;; Route persistent undo history to the var directory.
   (undo-fu-session-directory (ar/var-file "undo-fu-session/"))
-  ;; Align disk footprint with undo-fu's linear paradigm; ignore branching history.
   (undo-fu-session-linear t)
-  ;; Cull oldest session files to prevent infinite filesystem bloat and I/O stutter.
   (undo-fu-session-file-limit 500)
-  ;; Exclude transient Git files to prevent metadata leakage and I/O errors.
   (undo-fu-session-incompatible-files
-   '("/COMMIT_EDITMSG\\'"
-     "/git-rebase-todo\\'"))
+   '("/COMMIT_EDITMSG\\'" "/git-rebase-todo\\'"))
   (undo-fu-session-incompatible-major-modes
-   '(magit-status-mode
-     magit-log-mode
-     magit-diff-mode
-     magit-revision-mode
-     git-commit-mode
-     dired-mode
-     dirvish-mode
-     treemacs-mode
-     eshell-mode
-     term-mode
-     ghostel-mode
-     compilation-mode
-     grep-mode
-     occur-mode
-     org-agenda-mode
-     help-mode
-     helpful-mode
-     Info-mode
-     special-mode))
+   '(magit-status-mode magit-log-mode magit-diff-mode magit-revision-mode
+     git-commit-mode dired-mode dirvish-mode treemacs-mode eshell-mode
+     term-mode ghostel-mode compilation-mode grep-mode occur-mode
+     org-agenda-mode help-mode helpful-mode Info-mode special-mode))
   :config
-  ;; Conditional compression: prefer zstd for near-instantaneous I/O, fallback to gzip.
+  ;; Conditional compression: prefer zstd, fallback to gzip.
   (setq undo-fu-session-compression
         (cond ((executable-find "zstd") 'zst)
               ((executable-find "gzip") 'gz)
               (t nil)))
-  ;; Bulletproof path hashing: stable `secure-hash' primitive bypasses OS
-  ;; 255-char limits while appending the truncated base filename for readability.
+  ;; Stable `secure-hash' primitive bypasses OS 255-char limits.
   (defun ar/undo-fu-session-hash-path (file ext)
     "Safely hash FILE to bypass OS 255-char limits, appending EXT."
     (let* ((base (file-name-nondirectory file))
@@ -150,20 +122,19 @@
   (setq undo-fu-session-make-file-name-function #'ar/undo-fu-session-hash-path)
   (undo-fu-session-global-mode 1))
 
-;; Changelist navigation orthogonal to the jump list; powers evil's
-;; COUNT-aware g; and g, temporal motions.
-(use-package goto-chg
+(use-package vundo
   :defer t
-  :commands (goto-last-change goto-last-change-reverse)
+  :commands (vundo)
   :custom
-  ;; Spatial threshold to group micro-edits into logical navigation blocks.
-  (glc-default-span 16))
+  (vundo-glyph-alist vundo-unicode-symbols))
 
-;; gc / gcc comment operators.
-(use-package evil-commentary
+;; gc comment operator backed by evil-nerd-commenter (decision: replaces
+;; evil-commentary; language-aware commenting).
+(use-package evil-nerd-commenter
   :after evil
+  :commands (evilnc-comment-operator evilnc-comment-or-uncomment-lines)
   :config
-  (evil-commentary-mode 1))
+  (evilnc-default-hotkeys))
 
 ;; Argument text objects bound to `a'.
 (use-package evil-args
@@ -172,9 +143,7 @@
   (define-key evil-inner-text-objects-map "a" 'evil-inner-arg)
   (define-key evil-outer-text-objects-map "a" 'evil-outer-arg))
 
-;; Numeric increment/decrement, autoloaded on first use.  No key bindings
-;; here on purpose: the old config never bound it either, and the natural
-;; C-a/C-x bindings would shadow the global C-x prefix in normal state.
+;; Numeric increment/decrement, autoloaded on first use.
 (use-package evil-numbers
   :defer t
   :commands (evil-numbers/inc-at-pt evil-numbers/dec-at-pt))
@@ -185,8 +154,12 @@
   :config
   (evil-exchange-install))
 
-;; Visual pulse feedback on evil edit operations; inherits the theme's
-;; highlight face.
+;; Indent-based text objects (ii/ai, iI/aI, iJ/aJ).
+(use-package evil-indent-plus
+  :after evil
+  :demand t)
+
+;; Visual pulse feedback on evil edit operations.
 (use-package evil-goggles
   :after evil
   :custom
@@ -196,32 +169,95 @@
   :config
   (evil-goggles-mode 1))
 
-;; gl / gL alignment operators (global minor mode).
+;; gl / gL alignment operators.
 (use-package evil-lion
   :after evil
   :config
   (evil-lion-mode 1))
 
+;; Retro-active Vim-style wrapping (ys/cs/ds) plus evil-embrace's
+;; regex-aware structural pairs for prose and LaTeX environments.
+(use-package evil-surround
+  :after evil
+  :config
+  (global-evil-surround-mode 1))
+
+(use-package evil-embrace
+  :after evil-surround
+  :config
+  (evil-embrace-enable-evil-surround-integration)
+  (add-hook 'org-mode-hook #'embrace-org-mode-hook)
+  (add-hook 'LaTeX-mode-hook #'embrace-LaTeX-mode-hook)
+  (defun ar/embrace-markdown-setup ()
+    "Inject markdown emphasis and code pairs into embrace."
+    (embrace-add-pair ?* "*" "*")
+    (embrace-add-pair ?_ "_" "_")
+    (embrace-add-pair ?` "`" "`"))
+  (add-hook 'markdown-mode-hook #'ar/embrace-markdown-setup)
+  (add-hook 'gfm-mode-hook #'ar/embrace-markdown-setup))
+
+;; Closest enclosing block text object (ib/ab).
+(use-package evil-textobj-anyblock
+  :after evil
+  :demand t)
+
+;; Visual preview of ex substitution commands (:%s) as typed.
+(use-package evil-traces
+  :after evil
+  :config
+  (when (fboundp 'evil-traces-mode)
+    (evil-traces-mode 1)))
+
+;; `*'/`#' from visual state search the selection (evil-visualstar).
+(use-package evil-visualstar
+  :after evil
+  :commands (evil-visualstar/begin-search-forward
+             evil-visualstar/begin-search-backward)
+  :config
+  (define-key evil-visual-state-map "*"
+              #'evil-visualstar/begin-search-forward)
+  (define-key evil-visual-state-map "#"
+              #'evil-visualstar/begin-search-backward))
+
+;; XML/HTML attribute text object (ix/ax).
+(use-package exato
+  :after evil
+  :demand t)
+
+;; The `god' operator diffs two evil selections, `goD' cancels.  The
+;; package ships no per-buffer mode: installing it binds the operator
+;; keys once, triggered by the first git-tracked programming buffer.
+(defun ar/evil-quick-diff-install-maybe ()
+  "Install `evil-quick-diff' operator keys once a git buffer is opened."
+  (when (and buffer-file-name (eq (vc-backend buffer-file-name) 'Git))
+    (evil-quick-diff-install)
+    (remove-hook 'prog-mode-hook #'ar/evil-quick-diff-install-maybe)))
+
+(use-package evil-quick-diff
+  :after evil
+  :commands (evil-quick-diff-install evil-quick-diff evil-quick-diff-cancel)
+  :hook (prog-mode . ar/evil-quick-diff-install-maybe))
+
 ;; general.el defines the leader machinery shared by every later module.
-;; Loaded eagerly right after evil so that `ar/global-leader' and
-;; `ar/local-leader' are available below and in modules 5-10.
 (use-package general
   :demand t
   :after evil
   :config
   ;; Global leader prefix: SPC (also C-SPC), across evil states.
-  (general-create-definer ar/global-leader
-    :states '(normal insert visual emacs)
-    :prefix "SPC"
-    :global-prefix "C-SPC")
+  ;; Local leader prefix: SPC m (also C-SPC m).  (with-no-warnings: the
+  ;; definer macro generates docstrings the compiler nitpicks.)
+  (with-no-warnings
+    (general-create-definer ar/global-leader
+      :states '(normal insert visual emacs)
+      :prefix "SPC"
+      :global-prefix "C-SPC")
 
-  ;; Local leader prefix: SPC m (also C-SPC m).
-  (general-create-definer ar/local-leader
-    :states '(normal insert visual emacs)
-    :prefix "SPC m"
-    :global-prefix "C-SPC m"))
+    (general-create-definer ar/local-leader
+      :states '(normal insert visual emacs)
+      :prefix "SPC m"
+      :global-prefix "C-SPC m")))
 
-;; Top-level leader entries (ported from the old general block).
+;; Top-level leader entries.
 (ar/global-leader
   "SPC" '(execute-extended-command :wk "M-x")
   ":"   '(eval-expression :wk "Eval")
@@ -229,17 +265,11 @@
   "!"   '(shell-command :wk "Shell cmd")
   "X"   '(org-capture :wk "Org capture"))
 
-;; The unified <escape> wrapper binding (`ar/escape-key' is defined in core)
-;; moved to the keybinds module, which owns all escape/pop routing.
-
-;; Intercepts evil's o/O operators to continue comment lines natively, using
-;; bounded O(1) line searches for comment presence and precise cursor
-;; placement.  Carried from the old config and now actually bound (design
-;; §6.3: the old config defined these commands but never bound o/O).
+;; Intercepts evil's o/O operators to continue comment lines natively.
 (defcustom ar/evil-want-o/O-to-continue-comments t
   "If non-nil, o/O keys will continue comment lines."
   :type 'boolean
-  :group 'evil)
+  :group 'ar)
 
 (defun ar/evil-open-below-smart ()
   "Open line below, continuing comments if applicable."
@@ -269,7 +299,6 @@
         (comment-indent-new-line)
         (forward-line -1)
         (indent-according-to-mode)
-        ;; Push cursor past the delimiter on the newly created line.
         (re-search-forward comment-start-skip (line-end-position) t)
         (evil-insert-state))
     (evil-open-above (prefix-numeric-value current-prefix-arg))))
@@ -279,19 +308,13 @@
  "o" #'ar/evil-open-below-smart
  "O" #'ar/evil-open-above-smart)
 
-;; Auto-save on idle and at natural navigation boundaries.  Activated from
-;; `after-init-hook': interactively that runs before the first user input,
-;; so the auto-save safety net is live from the first keystroke, while
-;; batch -l runs (which never fire the hook) stay free of the package.
-;; core-config.el nils `auto-save-default', so nothing else owns saving before
-;; this fires -- an idle-timer start would leave a window with no net.
+;; Auto-save on idle and at natural navigation boundaries.
 (use-package super-save
   :hook (after-init . super-save-mode)
   :custom
   (super-save-auto-save-when-idle t)
   (super-save-idle-duration 10)
   (super-save-remote-files nil)
-  ;; Event-driven triggers at window/buffer switches.
   (super-save-triggers
    '(other-window
      windmove-up
@@ -300,43 +323,15 @@
      windmove-right
      ace-window)))
 
-;; Retro-active Vim-style wrapping (ys/cs/ds) plus evil-embrace's regex-aware
-;; structural pairs for prose and LaTeX environments.
-(use-package evil-surround
-  :after evil
-  :config
-  (global-evil-surround-mode 1))
-
-(use-package evil-embrace
-  :after evil-surround
-  :config
-  ;; Merge the regex-aware structural engine into evil-surround operators.
-  (evil-embrace-enable-evil-surround-integration)
-  ;; Native Org emphasis pairs (*, /, _, =, ~) with regex boundaries.
-  (add-hook 'org-mode-hook #'embrace-org-mode-hook)
-  ;; Native LaTeX pairs ($, \verb).
-  (add-hook 'LaTeX-mode-hook #'embrace-LaTeX-mode-hook)
-  ;; Markdown/GFM pair injection (embrace.el lacks a native markdown hook).
-  (defun ar/embrace-markdown-setup ()
-    "Inject markdown emphasis and code pairs into embrace."
-    (embrace-add-pair ?* "*" "*")
-    (embrace-add-pair ?_ "_" "_")
-    (embrace-add-pair ?` "`" "`"))
-  (add-hook 'markdown-mode-hook #'ar/embrace-markdown-setup)
-  (add-hook 'gfm-mode-hook #'ar/embrace-markdown-setup))
-
-;; Native delete-pair tuning plus an O(1) DWIM wrapper for adjacent, string,
-;; and nested pair deletion, strictly confined to programming modes.
-;; `delete-pair-push-mark' is a verified Emacs 31.1 variable (research-emacs31 §3).
-;; This is the single definition of each: a byte-identical earlier copy of
-;; the DWIM in core-config.el (and core's setopt of the two variables) was removed
-;; so edits here can never be silently shadowed by the later-loaded module.
-(setq delete-pair-blink-delay 0.1)
-(setq delete-pair-push-mark t)
+;; Native delete-pair tuning plus an O(1) DWIM wrapper, confined to
+;; programming modes.
+(setq delete-pair-blink-delay 0.1
+      delete-pair-push-mark t)
 
 (defun ar/delete-pair-dwim ()
   "Intelligently delete the pair surrounding or preceding the cursor.
-Strictly confined to `prog-mode' to prevent structural destruction in prose."
+Strictly confined to `prog-mode' to prevent structural destruction in
+prose."
   (interactive)
   (unless (derived-mode-p 'prog-mode)
     (user-error "Delete Pair DWIM restricted to prog-mode; use `ds' in prose"))
@@ -344,21 +339,16 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
         (next (char-after))
         (ppss (syntax-ppss)))
     (cond
-     ;; Delete preceding closing delimiter or quote.
      ((and prev (memq (char-syntax prev) '(?\) ?\" ?\|)))
       (delete-pair -1))
-     ;; Delete following opening delimiter or quote.
      ((and next (memq (char-syntax next) '(?\( ?\" ?\|)))
       (delete-pair 1))
-     ;; Inside a string: jump to start, handle prefixes, and delete.
      ((nth 3 ppss)
       (let ((start (nth 8 ppss)))
         (goto-char start)
-        ;; Handle string prefixes (e.g., f"..." in Python).
         (unless (memq (char-after) '(?\" ?\|))
           (forward-char 1))
         (delete-pair 1)))
-     ;; Fallback: jump out of the current list and delete the enclosing pair.
      (t
       (condition-case nil
           (progn
@@ -366,24 +356,13 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
             (delete-pair 1))
         (scan-error (user-error "Not inside a deletable pair")))))))
 
-;; Extends the % motion across semantic blocks (LaTeX, HTML, code).
-(use-package evil-matchit
-  :after evil
-  :config
-  (global-evil-matchit-mode 1))
-
 ;; AST text objects for evil's operator-pending maps plus Unimpaired-style
-;; goto motions.  The old config used ":defer t :after evil", which never
-;; loads the package (use-package 2.4.5 expansion verified: nothing triggers
-;; the require), so the text objects were silently dead; :demand t :after
-;; evil registers them right after evil loads, as the old config intended.
+;; goto motions.
 (use-package evil-textobj-tree-sitter
   :demand t
   :after evil
   :config
-  ;; Map AST nodes directly to evil's operator-pending text-object keymaps.
-  ;; `evil-textobj-tree-sitter-get-textobj' is a macro: arguments are passed
-  ;; literally (never quote the group lists).
+  (with-no-warnings
   (define-key evil-inner-text-objects-map "f" (evil-textobj-tree-sitter-get-textobj "function.inner"))
   (define-key evil-outer-text-objects-map "f" (evil-textobj-tree-sitter-get-textobj "function.outer"))
   (define-key evil-inner-text-objects-map "F" (evil-textobj-tree-sitter-get-textobj "call.inner"))
@@ -396,10 +375,9 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
   (define-key evil-inner-text-objects-map "l" (evil-textobj-tree-sitter-get-textobj "loop.inner"))
   (define-key evil-outer-text-objects-map "l" (evil-textobj-tree-sitter-get-textobj "loop.outer"))
   (define-key evil-inner-text-objects-map "a" (evil-textobj-tree-sitter-get-textobj ("parameter.inner" "call.inner")))
-  (define-key evil-outer-text-objects-map "a" (evil-textobj-tree-sitter-get-textobj ("parameter.outer" "call.outer")))
+  (define-key evil-outer-text-objects-map "a" (evil-textobj-tree-sitter-get-textobj ("parameter.outer" "call.outer"))))
 
-  ;; Dynamically registers named interactive commands for Unimpaired-style
-  ;; bracket navigation.
+  ;; Dynamically registers named interactive commands for bracket goto.
   (defun ar/ts-register-goto (key node &optional previous)
     "Bind KEY to a goto command for tree-sitter NODE; PREVIOUS inverts it."
     (let* ((suffix (if previous "prev" "next"))
@@ -431,37 +409,32 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
   (ar/ts-register-goto "]a" "parameter.outer")
   (ar/ts-register-goto "[a" "parameter.outer" t)
 
-  ;; Strip verbose package prefixes and .inner/.outer suffixes from which-key.
   (with-eval-after-load 'which-key
     (add-to-list 'which-key-replacement-alist
                  '(("" . "\\`+?evil-textobj-tree-sitter-function--\\(.*\\)\\(?:\\.inner\\|\\.outer\\)") . (nil . "\\1")))))
 
-;; AST-aware structural manipulation (drag/swap/extract/raise) built on the
-;; Emacs 30 `treesit-thing' API.  Installed by init.el's manifest as a git
-;; recipe (git-only: dvzubarev/evil-ts-obj), hence a plain declarative form
-;; here.
+;; AST-aware structural manipulation (drag/swap/extract/raise) built on
+;; the Emacs 30 `treesit-thing' API.
+(defun ar/evil-ts-obj-maybe-enable ()
+  "Enable `evil-ts-obj-mode' in prog modes, except where it fights
+the plain-list/Makefile machinery."
+  (unless (derived-mode-p
+           'emacs-lisp-mode 'lisp-mode
+           'makefile-mode 'snippet-mode 'ron-mode)
+    (evil-ts-obj-mode)))
+
 (use-package evil-ts-obj
   :defer t
   :after evil
-  :hook ((prog-mode . (lambda ()
-                        (unless (derived-mode-p
-                                 'emacs-lisp-mode 'lisp-mode
-                                 'makefile-mode 'snippet-mode
-                                 'ron-mode)
-                          (evil-ts-obj-mode))))
-         ((LaTeX-mode markdown-mode markdown-ts-mode yaml-mode yaml-ts-mode) . evil-ts-obj-mode))
-  :config
-  ;; Aborts activation in massive buffers; bypasses guard to allow explicit
-  ;; deactivation.  `too-long-file-p' is defined in core.
-  (define-advice evil-ts-obj-mode (:before-while (&optional arg) guard-large-files)
-    (or (and arg (< (prefix-numeric-value arg) 1))
-        (not (too-long-file-p)))))
+  :hook ((prog-mode . ar/evil-ts-obj-maybe-enable)
+         ((LaTeX-mode markdown-mode markdown-ts-mode yaml-mode yaml-ts-mode) . evil-ts-obj-mode)))
 
-;; The AST refactor transient is defined as soon as transient loads, not
-;; inside evil-ts-obj's :config, so that the "c s" leader entry resolves
-;; before the first tree-sitter buffer is opened.  The evil-ts-obj-*
-;; operators it lists resolve when evil-ts-obj-mode activates.
+(ar/define-large-file-guard evil-ts-obj-mode)
+
+;; The AST refactor transient: defined as soon as transient loads so the
+;; "c s" leader entry resolves before the first tree-sitter buffer opens.
 (with-eval-after-load 'transient
+  (with-no-warnings
   (defun ar/ast-refactor-title ()
     "Return the titled heading for the AST refactor transient."
     (concat
@@ -489,15 +462,13 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
       ("C" "Clone Before" evil-ts-obj-clone-before-dwim :transient t)
       (">" "Slurp" evil-ts-obj-slurp :transient t)
       ("<" "Barf" evil-ts-obj-barf :transient t)
-      ("<escape>" "" transient-quit-one :format " ")]]))
+      ("<escape>" "" transient-quit-one :format " ")]])
 
-;; Bound here because the command lives in this module; the remaining SPC c
-;; entries belong to the dev module.
-(ar/global-leader
-  "c s" '(ar/ast-refactor-transient :wk "Structure refactor"))
+  (ar/global-leader
+    "c s" '(ar/ast-refactor-transient :wk "Structure refactor"))))
 
-;; Exposes the Emacs 30 `treesit-thing' API as Unimpaired-style bracket
-;; motions with C-level sibling traversal (no-op outside ts modes).
+;; Exposes the Emacs 30 `treesit-thing' API as bracket motions (no-op
+;; outside ts modes).
 (general-define-key
  :states '(normal visual motion)
  "]s" (lambda () (interactive) (ignore-errors (treesit-thing-next (point) 'sentence)))
@@ -505,14 +476,13 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
  "]x" (lambda () (interactive) (ignore-errors (treesit-thing-next (point) 'sexp)))
  "[x" (lambda () (interactive) (ignore-errors (treesit-thing-prev (point) 'sexp))))
 
-;; O(1) AST-aware visual selection expansion via the native treesit engine,
-;; integrated with repeat-mode for modifier-less tapping.
+;; O(1) AST-aware visual selection expansion via the native treesit
+;; engine, integrated with repeat-mode.
 (use-package expreg
   :if (treesit-available-p)
   :defer t
   :commands (expreg-expand expreg-contract)
   :config
-  ;; Restores the exact cursor origin on C-g to prevent spatial drift.
   (setq expreg-restore-point-on-quit t)
   (defvar-keymap expreg-repeat-map
     :doc "Keymap for repeating expreg commands."
@@ -523,9 +493,7 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
   (put 'expreg-expand 'repeat-map 'expreg-repeat-map)
   (put 'expreg-contract 'repeat-map 'expreg-repeat-map))
 
-(general-define-key
- :states 'visual
- "v" #'expreg-expand)
+(general-define-key :states 'visual "v" #'expreg-expand)
 
 (general-define-key
  :states '(normal visual motion)
@@ -538,30 +506,15 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
   :defer t
   :hook (prog-mode . ws-butler-mode))
 
-;; O(1) line/region dragging with automatic re-indentation of displaced text.
-(use-package move-text
-  :defer t
-  :commands (move-text-up move-text-down)
-  :config
-  (defun ar/move-text-indent-region-advice (&rest _ignored)
-    "Re-indent the current line or active region after moving text."
-    (let ((deactivate deactivate-mark))
-      (if (region-active-p)
-          (indent-region (region-beginning) (region-end))
-        (indent-region (line-beginning-position) (line-end-position)))
-      (setq deactivate-mark deactivate)))
-  (advice-add #'move-text-up :after #'ar/move-text-indent-region-advice)
-  (advice-add #'move-text-down :after #'ar/move-text-indent-region-advice))
-
-;; O(1) radix-tree jumping engine: at-full overlay style, home-row keys,
-;; proximity sorting, and the isearch M-j touch (the editor module's isearch
-;; configuration, design §2).
+;; O(1) radix-tree jumping engine: home-row keys, proximity sorting, and
+;; the isearch M-j touch.
 (use-package avy
   :defer t
   :commands (avy-goto-char-2
              avy-goto-line
              avy-goto-word-1
-             avy-goto-word-0
+             avy-goto-symbol-1
+             avy-goto-char-timer
              avy-isearch
              avy-move-line
              avy-copy-line
@@ -569,36 +522,29 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
              avy-transpose-lines-in-region
              avy-move-region
              avy-copy-region
-             avy-kill-ring-save-region)
+             avy-kill-ring-save-region
+             avy-pop-mark)
   :bind (:map isearch-mode-map
          ("M-j" . avy-isearch))
   :custom
-  ;; Path generation: standard shortest-path algorithm restricted to home-row.
   (avy-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l))
-  ;; Visual rendering: `at-full' preserves peripheral word context.
   (avy-style 'at-full)
-  ;; Buffer dimming: focus strictly on the opaque spotlights.
   (avy-background t)
-  ;; Scope control: default to the active window; C-u expands to all windows.
   (avy-all-windows nil)
   (avy-all-windows-alt t)
-  ;; Render an overlay even for a single target, preventing accidental jumps.
   (avy-single-candidate-jump nil)
-  ;; Proximity engine: sort candidates by physical distance to the cursor.
   (avy-orders-alist '((avy-goto-char . avy-order-closest)
                       (avy-goto-word-0 . avy-order-closest)
                       (avy-goto-word-1 . avy-order-closest)))
   (avy-timeout-seconds 0.3)
   :custom-face
-  ;; Opaque spotlight faces: 100% opaque backgrounds prevent ghosting.
   (avy-lead-face-0 ((t (:background "#f7768e" :foreground "#1a1b26" :weight bold))))
   (avy-lead-face-1 ((t (:background "#e0af68" :foreground "#1a1b26" :weight bold))))
   (avy-lead-face-2 ((t (:background "#9ece6a" :foreground "#1a1b26" :weight bold))))
   (avy-lead-face ((t (:background "#7dcfff" :foreground "#1a1b26" :weight bold)))))
 
-;; Wraps avy into evil's operator-pending grammar under a unified gs prefix,
-;; registering native avy commands as evil motions.  Loads after avy (which
-;; itself loads on first avy command via its autoloads).
+;; Wraps avy into evil's operator-pending grammar under a unified gs
+;; prefix.
 (use-package evil-easymotion
   :after (evil avy)
   :config
@@ -614,38 +560,28 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
     "Jump to string target via timer."
     :type exclusive :jump t
     (avy-goto-char-timer))
-  ;; Populate `evilem-map' under the "gs" prefix.
   (evilem-default-keybindings "gs")
   (define-key evilem-map "s" #'ar/evil-avy-goto-char-2)
   (define-key evilem-map "l" #'ar/evil-avy-goto-line)
   (define-key evilem-map "SPC" #'ar/evil-avy-goto-char-timer))
 
-;; Incremental, regex-aware s/S jumps.  Disabled-mode list is pruned to modes
-;; that exist in the new package set (pdf/vterm/eat/deadgrep/rg/ag/flycheck/
-;; lsp-ui/docker/dashboard dropped).
+;; Incremental, regex-aware s/S jumps.
 (use-package evil-snipe
   :after evil
   :custom
   (evil-snipe-enable-highlight t)
   (evil-snipe-enable-incremental-highlight t)
   (evil-snipe-auto-disable-substitute t)
-  ;; Full-screen spatial awareness for incremental highlighting.
   (evil-snipe-scope 'whole-visible)
-  ;; Vim parity: lowercase is case-insensitive, uppercase is strict.
   (evil-snipe-smart-case t)
-  ;; Keeps the echo area reserved for ElDoc and which-key.
   (evil-snipe-show-prompt nil)
   (evil-snipe-auto-scroll t)
-  ;; Expands search scope to the whole buffer if a localized snipe fails.
   (evil-snipe-spillover-scope 'whole-buffer)
-  ;; TAB dynamically increases the snipe buffer size.
   (evil-snipe-tab-increment t)
   :custom-face
   (evil-snipe-first-match-face ((t (:foreground "#7dcfff" :underline t))))
   (evil-snipe-matches-face ((t (:foreground "#7dcfff" :underline t))))
   :config
-  ;; Populate exclusions and aliases BEFORE activating the global modes;
-  ;; modifying defcustom lists here prevents upstream overwrites.
   (dolist (mode '(dirvish-directory-view-mode
                   dirvish-mode
                   git-timemachine-mode
@@ -669,22 +605,18 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
                   messages-buffer-mode
                   backtrace-mode))
     (add-to-list 'evil-snipe-disabled-modes mode))
-  ;; Map brackets and quotes to regex patterns for boundary jumping.
   (push '(?\[ "[[{(<]") evil-snipe-aliases)
   (push '(?\] "[]})>]") evil-snipe-aliases)
   (push '(?\" "[\"'`´]") evil-snipe-aliases)
-  ;; Activate global modes AFTER the exclusion list is fully populated.
   (evil-snipe-mode 1)
   (evil-snipe-override-mode 1)
-  ;; Visual-state z/Z: start a snipe and capture the traversed region.
   (evil-define-key 'visual evil-snipe-local-mode-map "z" #'evil-snipe-s)
   (evil-define-key 'visual evil-snipe-local-mode-map "Z" #'evil-snipe-S)
-  ;; Inject `evilem-map' into the snipe parent transient map.
   (with-eval-after-load 'evil-easymotion
     (define-key evil-snipe-parent-transient-map "g" evilem-map)))
 
 ;; Avy-backed navigation to and mutation of visible URLs, file paths, and
-;; buttons, with an embark fallback when no recognized link is at point.
+;; buttons, with an embark fallback.
 (use-package link-hint
   :commands (link-hint-open-link
              link-hint-copy-link
@@ -699,8 +631,7 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
                      (progn (embark-dwim) t)
                    (error nil))))))
 
-;; Match index/total in the modeline during searches, remapped over the
-;; query-replace family, with evil integration via evil-anzu.
+;; Match index/total in the modeline during searches.
 (use-package anzu
   :demand t
   :bind (([remap query-replace] . anzu-query-replace)
@@ -714,7 +645,6 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
   (anzu-search-threshold 1000)
   (anzu-replace-threshold 50)
   (anzu-replace-to-string-separator " → ")
-  ;; Disable native mode-line injection (doom-modeline renders it).
   (anzu-cons-mode-line-p nil)
   :config
   (global-anzu-mode 1))
@@ -722,22 +652,16 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
 (use-package evil-anzu
   :after (evil anzu))
 
-;; Occurrence editing engine backing evil-multiedit.  Deferred; evil-multiedit
-;; itself requires iedit when it loads.
+;; Occurrence editing engine backing evil-multiedit.
 (use-package iedit
   :commands (iedit-mode
              iedit-rectangle-mode)
   :custom
-  ;; Prevents the default C-; global keymap injection.
   (iedit-toggle-key-default nil)
   (iedit-auto-narrow nil)
   (iedit-occurrence-context-lines 1))
 
-;; Multi-cursor editing over iedit.  The old config used ":after (evil iedit)"
-;; with :commands, which defers the autoload registration until iedit loads
-;; (never on its own), leaving M-d bound to an unresolvable symbol; the
-;; verified use-package 2.4.5 expansion for this shape registers autoloads at
-;; evil load instead and loads the package on first invocation.
+;; Multi-cursor editing over iedit.
 (use-package evil-multiedit
   :after evil
   :defer t
@@ -747,7 +671,9 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
              evil-multiedit-abort
              evil-multiedit-toggle-or-restrict-region)
   :custom-face
-  (evil-multiedit-match-face ((t (:background "#bb9af7" :foreground "#1a1b26"))))
+  ;; evil-multiedit defines no faces of its own; the match highlight comes
+  ;; from iedit's occurrence face.
+  (iedit-occurrence ((t (:background "#bb9af7" :foreground "#1a1b26"))))
   :config
   (evil-multiedit-default-keybinds))
 
@@ -770,117 +696,8 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
   "c v I" '(evil-multiedit-match-symbol-and-prev :wk "Cursors in selection (beg)")
   "c v A" '(evil-multiedit-match-symbol-and-next :wk "Cursors in selection (end)"))
 
-;; Centralized dashboard for avy's spatial jumping and remote text mutation,
-;; with a DRY dispatcher honoring --above/--below transient scope args.
-(defun ar/avy-dispatch (cmd)
-  "Execute avy CMD with an `-above'/`-below' suffix based on transient args."
-  (let* ((t-args (transient-args transient-current-command))
-         (above (member "--above" t-args))
-         (below (member "--below" t-args))
-         (suffix (cond ((and above below) "")
-                       (above "-above")
-                       (below "-below")
-                       (t "")))
-         (target (intern (concat (symbol-name cmd) suffix))))
-    (call-interactively (if (fboundp target) target cmd))))
-
-;; Explicit wrappers to satisfy transient's command resolution.
-(defun ar/avy-goto-char-2 () "Goto char via `ar/avy-dispatch'." (interactive) (ar/avy-dispatch 'avy-goto-char-2))
-(defun ar/avy-goto-word-1 () "Goto word via `ar/avy-dispatch'." (interactive) (ar/avy-dispatch 'avy-goto-word-1))
-(defun ar/avy-goto-symbol-1 () "Goto symbol via `ar/avy-dispatch'." (interactive) (ar/avy-dispatch 'avy-goto-symbol-1))
-(defun ar/avy-goto-line () "Goto line via `ar/avy-dispatch'." (interactive) (ar/avy-dispatch 'avy-goto-line))
-
-;; avy 0.5.0 defines these two commands without autoload cookies (verified
-;; against avy.el:2170/2233 and its generated avy-autoloads.el, which lists
-;; neither); register them here so the first transient press loads the
-;; library instead of signaling void-function.
-(autoload #'avy-pop-mark "avy" nil t)
-(autoload #'avy-org-goto-heading-timer "avy" nil t)
-
-(with-eval-after-load 'transient
-  (defun ar/avy-title ()
-    "Return the titled heading for the avy transient."
-    (concat
-     (if (fboundp 'nerd-icons-faicon)
-         (nerd-icons-faicon "nf-fa-crosshairs" :face 'transient-heading :v-adjust 0.02)
-       "")
-     (propertize " Avy Spatial Jumps & Mutations" 'face 'transient-heading)))
-
-  (transient-define-prefix ar/avy-transient ()
-    "Avy Spatial Jumps and Mutations Dashboard"
-    [:description ar/avy-title
-     ["Scope (applies to ⬍)"
-      :description (lambda ()
-                     (let ((args (transient-args transient-current-command)))
-                       (format "Scope (applies to (%s))"
-                               (cond ((and (member "--above" args) (member "--below" args)) "#")
-                                     ((member "--above" args) "↑")
-                                     ((member "--below" args) "↓")
-                                     (t "#")))))
-      :class transient-row
-      ("a" "Above" "--above")
-      ("b" "Below" "--below")]
-
-     ["Goto Thing"
-      ("c" "Character" avy-goto-char-timer)
-      ("2" "2 Characters ⬍" ar/avy-goto-char-2)
-      ("w" "Word ⬍" ar/avy-goto-word-1)
-      ("s" "Symbol ⬍" ar/avy-goto-symbol-1)
-      ;; (The old "W" Whitespace-end entry is dropped as a preference: avy
-      ;; 0.5.0 defines `avy-goto-whitespace-end' (avy.el:1409, autoloaded).)
-      ("p" "Pop mark" avy-pop-mark)]
-
-     ["Goto Line"
-      :pad-keys t
-      ("l" "Line ⬍" ar/avy-goto-line)
-      ("e" "End of line" avy-goto-end-of-line)
-      ("o" "Org heading" avy-org-goto-heading-timer :if (lambda () (derived-mode-p 'org-mode)))
-      ("n" "Line number" goto-line :if (lambda () (bound-and-true-p display-line-numbers-mode)))]
-
-     ["Edit Other Line"
-      ("C" "Copy" avy-kill-ring-save-whole-line)
-      ("k" "Kill" avy-kill-whole-line :if (lambda () (not buffer-read-only)))
-      ("m" "Move" avy-move-line :if (lambda () (not buffer-read-only)))
-      ("d" "Duplicate" avy-copy-line :if (lambda () (not buffer-read-only)))]
-
-     ["Edit Other Region"
-      ("r" "Copy" avy-kill-ring-save-region)
-      ("K" "Kill" avy-kill-region :if (lambda () (not buffer-read-only)))
-      ("M" "Move" avy-move-region :if (lambda () (not buffer-read-only)))
-      ("D" "Duplicate" avy-copy-region :if (lambda () (not buffer-read-only)))
-      ("t" "Transpose" avy-transpose-lines-in-region :if (lambda () (and (not buffer-read-only) (region-active-p))))]
-
-     ["Index & Errors"
-      ("g" "Org Goto…" org-goto :if (lambda () (derived-mode-p 'org-mode)))
-      ("i" "Index…" imenu :if (lambda () (bound-and-true-p imenu--index-alist)))
-      ("M-p" "Previous" previous-error)
-      ("M-n" "Next" next-error)]
-
-     ["Exit"
-      ("<escape>" "" transient-quit-one :format " ")
-      ("RET" "Exit Avy" transient-quit-all)]]))
-
-(ar/global-leader
-  "y"   '(:ignore t :wk "avy/jump")
-  "y y" '(ar/avy-transient :wk "Avy dashboard")
-  "y c" '(avy-goto-char-timer :wk "Char timer")
-  "y l" '(avy-goto-line :wk "Line")
-  "y w" '(avy-goto-word-1 :wk "Word")
-  "y s" '(avy-goto-symbol-1 :wk "Symbol"))
-
-;; Enchant-based JIT spell checking with per-mode exclusions, an inline
-;; personal vocabulary, and a large-file guard.  Disabled-mode list pruned to
-;; modes that exist in the new package set (neotree/dashboard/vterm/pdf
-;; dropped).
-;;
-;; Deferred via `text-mode-hook' instead of a global mode: the disabled-mode
-;; list below already excluded prog-mode and conf-mode (and every other
-;; listed mode derives from one of them or is a UI buffer), so a global
-;; jinx-mode could never highlight there -- hooking the prose mode keeps the
-;; identical visible behavior while keeping jinx and its native module out
-;; of startup entirely.  org/markdown/gfm buffers run `text-mode-hook'
-;; through derived-mode inheritance, so one hook covers the whole prose
-;; family.
+;; Enchant-based JIT spell checking (kept vanilla extra, diverges from
+;; init.md's disabled :checkers spell).
 (use-package jinx
   :defer t
   :init
@@ -904,31 +721,38 @@ Strictly confined to `prog-mode' to prevent structural destruction in prose."
       ghostel-mode
       term-mode)
     "Modes in which Jinx should not activate.")
-  ;; Inline personal vocabulary (lowercase entries for broadest coverage).
   (defvar ar/jinx-personal-words
     "emacs elisp use-package org-mode prog-mode conf-mode text-mode
-eglot eldoc flymake minibuffer minimap config flycheck env corfu vertico orderless consult embark denote treemacs dirvish magit evil avy anzu jinx
+lsp flymake minibuffer config corfu vertico orderless consult embark
+denote treemacs dirvish magit evil avy anzu jinx persp
 tokyo night jetbrainsmono nerd font pgtk wayland ui
 tramp ssh json yaml toml lsp dap ast"
     "Personal vocabulary injected as `jinx-local-words' in prose buffers.")
-  ;; Per-buffer activation in prose buffers.  `add-hook' prepends, so the
-  ;; vocabulary injection below lands ahead of `jinx-mode' in
-  ;; `text-mode-hook' and the words are buffer-local before the mode starts
-  ;; scanning.
-  (add-hook 'text-mode-hook #'jinx-mode)
-  ;; Injects the personal vocabulary into prose and markup buffers.  Done in
-  ;; :init (it needs no jinx binding), so the hooks are in place even for
-  ;; the very first prose buffer that loads the package.
+  ;; Activation probe: jinx-mode loads its native module on first use; in
+  ;; environments where that fails (e.g. hidden Org buffers created during
+  ;; lsp-mode's org-element detection) the failure must not propagate.
+  (defvar ar/jinx-module-ok 'unknown
+    "Whether jinx's native module loaded successfully.")
+  (defun ar/jinx-mode-maybe ()
+    "Enable `jinx-mode' once its native module is known to work."
+    (when (eq ar/jinx-module-ok 'unknown)
+      (setq ar/jinx-module-ok
+            (condition-case nil
+                (progn (jinx-mode 1) (jinx-mode -1) t)
+              (error nil))))
+    (when (eq ar/jinx-module-ok t)
+      (jinx-mode 1)))
+  (add-hook 'text-mode-hook #'ar/jinx-mode-maybe)
+  (defun ar/jinx-personal-words-h ()
+    "Inject the personal vocabulary into prose buffers."
+    (setq-local jinx-local-words ar/jinx-personal-words))
   (dolist (mode '(org-mode
                   LaTeX-mode
                   markdown-mode
                   gfm-mode
                   text-mode))
-    (add-hook (intern (format "%s-hook" mode))
-              (lambda ()
-                (setq-local jinx-local-words ar/jinx-personal-words))))
+    (add-hook (intern (format "%s-hook" mode)) #'ar/jinx-personal-words-h))
   :custom
-  ;; Deterministic English regardless of system locale.
   (jinx-languages "en")
   :config
   (setq jinx-exclude-regexps
@@ -943,27 +767,18 @@ tramp ssh json yaml toml lsp dap ast"
              "\\(?:Local Variables\\|End\\):\\s-*$"
              "jinx-\\(?:languages\\|local-words\\):\\s-+.*$"
              "[/~][a-zA-Z0-9._/-]+")))
-
-  ;; jinx's default `jinx-exclude-faces' for org-mode misses heading text and
-  ;; document metadata faces; inject them.
   (setf (alist-get 'org-mode jinx-exclude-faces)
         (append (alist-get 'org-mode jinx-exclude-faces)
                 '(org-level-1 org-level-2 org-level-3 org-level-4
                   org-level-5 org-level-6 org-level-7 org-level-8
-                  org-document-title org-document-info
-                  org-outline org-priority)))
-
-  ;; Aborts activation in massive buffers; bypasses guard for explicit toggles.
-  (define-advice jinx-mode (:before-while (&optional arg) guard-large-files)
-    (or (and arg (< (prefix-numeric-value arg) 1))
-        (not (too-long-file-p))))
-  ;; Enforces the custom disabled-mode list (`jinx-disabled-modes' does not
-  ;; exist in jinx itself -- checked through 2.11).
+                  org-document-title org-document-info org-priority)))
   (define-advice jinx--on (:before-while () guard-disabled-modes)
     (not (apply #'derived-mode-p ar/jinx-disabled-modes))))
 
-;; Rich help buffers with source, callers, and keybindings, remapped over the
-;; describe-* family.
+(ar/define-large-file-guard jinx-mode)
+
+;; Rich help buffers with source, callers, and keybindings, remapped over
+;; the describe-* family.
 (use-package helpful
   :commands (helpful-callable
              helpful-variable
@@ -979,88 +794,66 @@ tramp ssh json yaml toml lsp dap ast"
   ([remap describe-symbol] . helpful-symbol)
   ([remap describe-variable] . helpful-variable)
   :custom
-  ;; Limits open helpful buffers; kills the least-recently-used beyond this.
   (helpful-max-buffers 7)
-  ;; Apropos searches all symbols, not only user-facing ones.
   (apropos-do-all t))
 
-;; TODO keyword highlighting and navigation with Tokyo-Night keyword faces.
-;; FIX: the old config's ":hook (after-init . global-hl-line-mode)" enabled
-;; the wrong mode (and after-init-hook never fires in batch), so TODO
-;; highlighting was never active; this loads hl-todo eagerly and enables the
-;; real global mode.
-(use-package hl-todo
-  :demand t
-  :bind (:map hl-todo-mode-map
-              ("C-c n" . hl-todo-next)
-              ("C-c p" . hl-todo-previous)
-              ("C-c i" . hl-todo-insert))
-  :custom-face
-  (hl-todo ((t (:inherit font-lock-keyword-face :weight bold))))
+;; Snippet engine: personal collection first (shadows doom-snippets on
+;; name clash), community collection, hot-reload on save.
+(defvar ar/snippets-directory (expand-file-name "snippets" ar/config-dir)
+  "Directory for personal yasnippet snippets.")
+
+(unless (file-directory-p ar/snippets-directory)
+  (make-directory ar/snippets-directory t))
+
+(use-package yasnippet
+  :defer t
+  :hook ((prog-mode text-mode conf-mode comint-mode) . yas-minor-mode)
   :custom
-  (hl-todo-require-punctuation nil)
-  (hl-todo-highlight-punctuation ":!")
-  (hl-todo-keyword-faces
-   '(("TODO"       . "#e0af68")
-     ("COMMENT"    . "#e0af68")
-     ("FIXME"      . "#f7768e")
-     ("BUG"        . "#f7768e")
-     ("ISSUE"      . "#f7768e")
-     ("PROG"       . "#7aa2f7")
-     ("TRICK"      . "#ff9e64")
-     ("WORKAROUND" . "#ff9e64")
-     ("BENCHMARK"  . "#9ece6a")
-     ("REVIEW"     . "#7dcfff")
-     ("NOTE"       . "#bb9af7")
-     ("DEPRECATED" . "#73daca")
-     ("HACK"       . "#db4b4b")
-     ("DEBUG"      . "#e0af68")
-     ("STUB"       . "#e0af68")))
+  (yas-also-auto-indent-first-line t)
+  (yas-also-indent-empty-lines t)
+  (yas-snippet-revival nil)
+  (yas-wrap-around-region nil)
   :config
-  (global-hl-todo-mode 1)
-  ;; Safe registration of consult preview hooks (consult lives in the
-  ;; completion module; the variable exists there).
-  (with-eval-after-load 'consult
-    (when (boundp 'consult-preview-allowed-hooks)
-      (add-to-list 'consult-preview-allowed-hooks 'hl-todo-mode)
-      (add-to-list 'consult-preview-allowed-hooks 'global-hl-todo-mode)))
-  (defun ar/hl-todo-rg-project ()
-    "Search for TODO keywords across the current project using ripgrep."
-    (interactive)
-    (let ((regexp (concat "\\b(" (string-join (mapcar #'car hl-todo-keyword-faces) "|") ")\\b")))
-      (cond
-       ((fboundp 'consult-ripgrep)
-        (consult-ripgrep nil regexp))
-       ((fboundp 'hl-todo-rgrep)
-        (hl-todo-rgrep regexp))
-       (t
-        (user-error "Neither consult-ripgrep nor hl-todo-rgrep is available"))))))
+  (add-to-list 'yas-snippet-dirs ar/snippets-directory)
+  (defun ar/yas-reload-snippets-on-save ()
+    "Reload all snippets if a snippet file is being saved."
+    (when-let* ((file (buffer-file-name)))
+      (when (string-prefix-p ar/snippets-directory file)
+        (yas-reload-all)
+        (message "Yasnippet collection reloaded."))))
+  (add-hook 'after-save-hook #'ar/yas-reload-snippets-on-save))
 
-;; Global leader for buffer and project TODO searches.  consult-todo /
-;; consult-todo-project are completion-module packages (autoloaded), bound
-;; here to keep the old SPC s t/T/C/P quartet intact.
-(ar/global-leader
-  "s t" '(hl-todo-occur :wk "Todo list (buffer)")
-  "s T" '(ar/hl-todo-rg-project :wk "Todo in project (rg)")
-  "s C" '(consult-todo :wk "Todo list (consult)")
-  "s P" '(consult-todo-project :wk "Todo in project (consult)"))
+;; Doom's curated snippet collection registers itself against yasnippet;
+;; load defensively in case the package ships no feature symbol.
+(with-eval-after-load 'yasnippet
+  (when (locate-library "doom-snippets")
+    (require 'doom-snippets nil t))
+  (yas-reload-all))
 
-;; Local leader (SPC m) for hl-todo navigation in hl-todo buffers.
-(ar/local-leader
-  :keymaps 'hl-todo-mode-map
-  "n" '(hl-todo-next :wk "Next todo")
-  "p" '(hl-todo-previous :wk "Previous todo")
-  "i" '(hl-todo-insert :wk "Insert todo"))
+;; Record ad-hoc templates from typed examples.
+(use-package auto-yasnippet
+  :defer t
+  :commands (aya-create aya-expand aya-open-line))
 
-;; Reopen the current file via TRAMP sudo.  The SPC f E entry is bound here
-;; because the command lives in this module; the rest of the SPC f tree is
-;; bound by the keybinds module's leader-trees block.
+;; Reopen the current file via TRAMP sudo.
 (use-package sudo-edit
   :defer t
   :commands (sudo-edit))
 
 (ar/global-leader
   "f E" '(sudo-edit :wk "Sudo edit"))
+
+;; Word wrap (:editor word-wrap): adaptive prefix indentation + visual columns.
+(use-package adaptive-wrap
+  :defer t
+  :hook (visual-line-mode . adaptive-wrap-prefix-mode))
+
+(use-package visual-fill-column
+  :defer t
+  :hook (visual-line-mode . visual-fill-column-mode)
+  :custom
+  (visual-fill-column-width 100)
+  (visual-fill-column-center-text t))
 
 (provide 'editor-config)
 ;;; editor-config.el ends here
