@@ -349,7 +349,7 @@
 (defcustom ar/dabbrev-buffer-scanning-size-limit (* 1 1024 1024)
   "Size limit in characters for a buffer to be scanned by dabbrev."
   :type 'integer
-  :group 'dabbrev)
+  :group 'ar)
 
 (defun ar/dabbrev-friend-buffer-p (other-buffer)
   "Return non-nil if OTHER-BUFFER is safe and under the size limit."

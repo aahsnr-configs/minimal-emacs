@@ -104,7 +104,7 @@
 ;; Transient base: rectangular grid alignment for the custom transient
 ;; menus.
 (use-package transient
-  :defer t
+  :demand t
   :custom
   (transient-align-variable-pitch t))
 

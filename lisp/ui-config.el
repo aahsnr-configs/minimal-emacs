@@ -426,7 +426,7 @@
 
 (defgroup ar/popup nil
   "The rule-based popup window manager (Doom :ui popup port)."
-  :group 'convenience)
+  :group 'ar)
 
 (defcustom ar/popup--rules
   '(;; Core output / transient UI
@@ -552,6 +552,9 @@ never match)."
        (window-parameter (or window (selected-window)) 'popup)))
 
 ;; The buffer-local minor mode applied to every popup.
+(defvar-local ar/popup--hide-modeline-was-active nil
+  "Non-nil when modeline hiding was active before popup mode.")
+
 (define-minor-mode ar/popup-buffer-mode
   "Minor mode for buffers displayed in popup windows."
   :init-value nil
@@ -560,10 +563,15 @@ never match)."
             (define-key map (kbd "C-g") #'ar/popup-quit)
             (define-key map (kbd "q") #'ar/popup-quit)
             map)
-  (when ar/popup-buffer-mode
-    (setq-local buffer-read-only t)
-    (setq-local mode-line-format nil)
-    (setq-local header-line-format nil)))
+  (if ar/popup-buffer-mode
+      (progn
+        (setq-local ar/popup--hide-modeline-was-active
+                    (bound-and-true-p ar/hide-modeline-mode))
+        (ar/hide-modeline-mode 1))
+    (when (local-variable-p 'ar/popup--hide-modeline-was-active)
+      (unless ar/popup--hide-modeline-was-active
+        (ar/hide-modeline-mode -1))
+      (kill-local-variable 'ar/popup--hide-modeline-was-active))))
 
 (defun ar/popup-quit ()
   "Quit the current popup window and restore the previous window."
@@ -623,16 +631,17 @@ never match)."
       (progn
         (setq ar/popup--alist-entry
               `((lambda (buffer &optional _alist)
-                  (ar/popup--match-p buffer))
-                (ar/popup--display)
-                (reusable-frames . visible)))
+                   (ar/popup--match-p buffer))
+                 (ar/popup--display)
+                 (reusable-frames . visible)))
         (add-to-list 'display-buffer-alist ar/popup--alist-entry)
         (advice-add #'keyboard-quit :before #'ar/popup-close-on-quit)
         (global-set-key (kbd "C-`") #'ar/popup-toggle))
-    (when ar/popup--alist-entry
-      (setq display-buffer-alist (delete ar/popup--alist-entry
-                                         display-buffer-alist))))
-    (advice-remove #'keyboard-quit #'ar/popup-close-on-quit))
+    (progn
+      (when ar/popup--alist-entry
+        (setq display-buffer-alist (delete ar/popup--alist-entry
+                                           display-buffer-alist)))
+      (advice-remove #'keyboard-quit #'ar/popup-close-on-quit))))
 
 (defun ar/popup--match-p (buffer &optional _alist)
   "Display-buffer condition: non-nil when BUFFER has a popup rule.
@@ -640,11 +649,11 @@ BUFFER may be a buffer object or a buffer name string (Emacs 31's
 `display-buffer-assq-regexp' passes the name)."
   (when (stringp buffer)
     (setq buffer (get-buffer buffer)))
-  (and (bufferp buffer)
-       (not (minibufferp buffer))
-       (not (bound-and-true-p vertico--input))
-       (ar/popup--rule-for buffer)
-       t))
+  (let ((rule (ar/popup--rule-for buffer)))
+    (and rule
+         (not (plist-get (cdr rule) :ignore))
+         (not (minibufferp buffer))
+         (not (bound-and-true-p vertico--input)))))
 
 (unless noninteractive
   (ar/popup-global-mode 1))
@@ -662,7 +671,7 @@ BUFFER may be a buffer object or a buffer name string (Emacs 31's
 
 (defgroup ar/dashboard nil
   "Doom-style startup dashboard."
-  :group 'convenience)
+  :group 'ar)
 
 (declare-function ar/var-file "early-init")
 (declare-function ar/etc-file "early-init")

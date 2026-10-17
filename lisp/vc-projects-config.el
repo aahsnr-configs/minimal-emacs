@@ -465,7 +465,7 @@
                    (const :tag "Highlight files and directories" extended)
                    (const :tag "Same as extended, but async" deferred)
                    (const :tag "Disabled" nil))
-    :group 'treemacs)
+    :group 'ar)
   (when ar/treemacs-git-mode
     (when (and (memq ar/treemacs-git-mode '(deferred extended))
                (not treemacs-python-executable)
@@ -705,7 +705,9 @@ lazy `project' -- the hook would not exist yet when ibuffer opens."
 (defun ar/workspace-project-switch ()
   "Switch project and open it in a new workspace."
   (interactive)
-  (call-interactively #'project-switch-project))
+  (let ((directory (project-prompt-project-dir)))
+    (persp-switch (abbreviate-file-name (directory-file-name directory)))
+    (project-switch-project directory)))
 
 (defun ar/workspace-kill ()
   "Kill the current workspace."

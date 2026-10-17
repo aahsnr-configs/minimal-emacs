@@ -97,6 +97,12 @@ loaded, the empty string keeps the surrounding group names well-formed."
 (defun ar/create-denote-project-silo (project-name)
   "Create a new isolated Denote silo for PROJECT-NAME under `projects/'."
   (interactive "sProject Name: ")
+  (unless (and (stringp project-name)
+               (not (string-empty-p project-name))
+               (not (file-name-absolute-p project-name))
+               (not (member project-name '("." "..")))
+               (equal project-name (file-name-nondirectory project-name)))
+    (user-error "Project name must be a single path component"))
   (let ((silo-dir (ar/ensure-org-dir (concat "projects/" project-name))))
     (ar/ensure-denote-silo silo-dir)
     (message "Created Denote Silo: %s" silo-dir)
@@ -517,9 +523,11 @@ loaded, the empty string keeps the surrounding group names well-formed."
     (cl-check-type lang (or symbol null))
     (when lang
       (unless (cdr (assq lang org-babel-load-languages))
-        (prog1 (or (require (intern (format "ob-%s" lang)) nil t)
-                   (require lang nil t))
-          (add-to-list 'org-babel-load-languages (cons lang t))))))
+        (let ((loaded (or (require (intern (format "ob-%s" lang)) nil t)
+                          (require lang nil t))))
+          (when loaded
+            (add-to-list 'org-babel-load-languages (cons lang t)))
+          loaded))))
 
   (define-advice org-babel-exp-src-block (:before (&optional element) lazy-load-export)
     "Lazy load a babel package when a block is processed during exporting."

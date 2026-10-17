@@ -198,7 +198,7 @@ arrives with json-mode.")
 (use-package pyvenv
   :defer t
   :commands (pyvenv-activate pyvenv-deactivate pyvenv-workon)
-  :hook (python-mode . ar/pyvenv-activate-project-venv))
+  :hook (python-base-mode . ar/pyvenv-activate-project-venv))
 
 (use-package conda
   :defer t

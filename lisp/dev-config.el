@@ -57,7 +57,7 @@
     makefile-mode makefile-ts-mode snippet-mode ron-mode)
   "Major modes in which lsp auto-start is never attempted."
   :type '(repeat symbol)
-  :group 'lsp-mode)
+  :group 'ar)
 
 (declare-function lsp-workspace-folders-add "lsp-mode")
 (declare-function lsp-session "lsp-mode")
@@ -126,6 +126,8 @@ the buffer directory as a workspace folder and call `lsp' directly."
   (add-hook 'lsp-after-initialize-hook #'ar/lsp-sync-workspaces)
   (add-hook 'lsp-after-open-hook #'ar/lsp-sync-workspaces)
   (add-hook 'lsp-after-uninitialized-functions #'ar/lsp-sync-workspaces))
+
+(ar/define-large-file-guard lsp-inlay-hints-mode)
 
 ;; lsp-ui: sideline diagnostics, hover doc popup, peek definitions.
 (use-package lsp-ui

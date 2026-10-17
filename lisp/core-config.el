@@ -383,7 +383,7 @@ Some changes (removed hooks, packages) still require a full restart."
   ;; Abbreviate instead of resolving truenames when recording entries.
   (setq recentf-filename-handlers '(abbreviate-file-name))
   ;; Daemon-safe periodic flush: state survives SIGKILL'd sessions.
-  (unless (timerp ar/recentf-flush-timer)
+  (unless (or noninteractive (timerp ar/recentf-flush-timer))
     (setq ar/recentf-flush-timer
           (run-at-time 300 300 #'recentf-save-list))))
 
