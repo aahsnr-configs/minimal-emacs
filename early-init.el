@@ -146,8 +146,12 @@ to the canonical path regardless of how the session was started.")
   "Original `file-name-handler-alist', captured before startup deferral.")
 
 (defun ar/startup-restore-file-name-handlers ()
-  "Restore `file-name-handler-alist' and settle GC after startup."
-  (setq file-name-handler-alist ar/startup-file-name-handler-alist
+  "Restore `file-name-handler-alist' and settle GC after startup.
+Handlers registered during startup (e.g. by Tramp) stay in front of the
+original ones instead of being discarded."
+  (setq file-name-handler-alist
+        (delete-dups (append file-name-handler-alist
+                             ar/startup-file-name-handler-alist))
         gc-cons-threshold (* 64 1024 1024)
         gc-cons-percentage 0.1))
 

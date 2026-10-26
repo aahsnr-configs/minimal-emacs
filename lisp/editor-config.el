@@ -229,7 +229,9 @@
 ;; keys once, triggered by the first git-tracked programming buffer.
 (defun ar/evil-quick-diff-install-maybe ()
   "Install `evil-quick-diff' operator keys once a git buffer is opened."
-  (when (and buffer-file-name (eq (vc-backend buffer-file-name) 'Git))
+  (when (and buffer-file-name
+             (not (file-remote-p buffer-file-name))
+             (eq (vc-backend buffer-file-name) 'Git))
     (evil-quick-diff-install)
     (remove-hook 'prog-mode-hook #'ar/evil-quick-diff-install-maybe)))
 
@@ -571,7 +573,6 @@ the plain-list/Makefile machinery."
   :custom
   (evil-snipe-enable-highlight t)
   (evil-snipe-enable-incremental-highlight t)
-  (evil-snipe-auto-disable-substitute t)
   (evil-snipe-scope 'whole-visible)
   (evil-snipe-smart-case t)
   (evil-snipe-show-prompt nil)

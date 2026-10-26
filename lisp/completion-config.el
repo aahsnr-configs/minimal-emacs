@@ -310,9 +310,6 @@
 
 ;; lsp-completion's capf is exclusive by default; make it coexist with
 ;; cape and yasnippet-capf.
-(defun ar/cape-wrap-nonexclusive-advice (orig-fun &rest _args)
-  (funcall (cape-wrap-nonexclusive orig-fun)))
-
 (use-package cape
   :after corfu
   :config
@@ -330,9 +327,9 @@
   (add-hook 'minibuffer-setup-hook #'ar/cape-history-local-h)
   (add-hook 'sh-mode-hook #'ar/cape-file-local-h)
   (add-hook 'bash-ts-mode-hook #'ar/cape-file-local-h)
-  (advice-add #'lsp-completion-at-point :around #'ar/cape-wrap-nonexclusive-advice)
-  (advice-add #'comint-completion-at-point :around #'ar/cape-wrap-nonexclusive-advice)
-  (advice-add #'pcomplete-completions-at-point :around #'ar/cape-wrap-nonexclusive-advice))
+  (advice-add #'lsp-completion-at-point :around #'cape-wrap-nonexclusive)
+  (advice-add #'comint-completion-at-point :around #'cape-wrap-nonexclusive)
+  (advice-add #'pcomplete-completions-at-point :around #'cape-wrap-nonexclusive))
 
 (use-package yasnippet-capf
   :after (yasnippet corfu)

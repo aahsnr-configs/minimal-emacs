@@ -113,9 +113,7 @@ arrives with json-mode.")
 (use-package cdlatex
   :defer t
   :commands (cdlatex-mode turn-on-cdlatex)
-  :hook (LaTeX-mode . turn-on-cdlatex)
-  :custom
-  (cdlatex-tab-indent-limit 8))
+  :hook (LaTeX-mode . turn-on-cdlatex))
 
 ;; evil-tex: LaTeX text objects/operators (+everywhere).
 (use-package evil-tex

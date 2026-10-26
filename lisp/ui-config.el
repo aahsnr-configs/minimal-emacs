@@ -465,6 +465,7 @@
     ("^\\*Org Export Dispatcher\\*$"  :size 0.30 :select t :quit t)
     ("^\\*Org Note\\*$"        :size 0.30 :select t :quit t)
     ;; Shells and processes (sticky: quit only on explicit close)
+    ("^\\*jupyter-repl"        :size 0.35 :select t :quit nil)
     (comint-mode               :size 0.30 :select t :quit nil)
     (inferior-python-mode      :size 0.30 :select t :quit nil)
     ("^\\*Python\\*$"          :size 0.30 :select t :quit nil)
@@ -481,6 +482,7 @@
     ;; OUT: they are editable working buffers, and popup-mode's read-only
     ;; would break `org-capture-finalize'.
     ("^\\*Capture"             :ignore t)
+    ("^\\*Org Agenda"          :ignore t)
     ("^\\*doom\\*\\'"          :ignore t)
     ("^\\*scratch\\*\\'"       :ignore t)
     ("^\\*Ibuffer\\*$"         :ignore t)
@@ -530,11 +532,7 @@ never match)."
          (prev-win (selected-window))
          (window
           (display-buffer-in-side-window
-           buffer
-           `((side . ,side)
-             ,@(if (floatp size)
-                   `((window-height . ,size))
-                 `((window-height . ,size)))))))
+           buffer `((side . ,side) (window-height . ,size)))))
     (when (window-live-p window)
       (set-window-parameter window 'popup t)
       (set-window-parameter window 'popup-quit (plist-get props :quit))
@@ -555,13 +553,21 @@ never match)."
 (defvar-local ar/popup--hide-modeline-was-active nil
   "Non-nil when modeline hiding was active before popup mode.")
 
+(defun ar/popup--read-only-filter (command)
+  "Return COMMAND only in read-only buffers.
+Keeps `q' typeable in editable popups (REPLs, Org notes) while still
+dismissing read-only ones."
+  (and buffer-read-only command))
+
 (define-minor-mode ar/popup-buffer-mode
   "Minor mode for buffers displayed in popup windows."
   :init-value nil
   :lighter nil
   :keymap (let ((map (make-sparse-keymap)))
             (define-key map (kbd "C-g") #'ar/popup-quit)
-            (define-key map (kbd "q") #'ar/popup-quit)
+            (define-key map (kbd "q")
+                        '(menu-item "" ar/popup-quit
+                                    :filter ar/popup--read-only-filter))
             map)
   (if ar/popup-buffer-mode
       (progn
@@ -574,9 +580,10 @@ never match)."
       (kill-local-variable 'ar/popup--hide-modeline-was-active))))
 
 (defun ar/popup-quit ()
-  "Quit the current popup window and restore the previous window."
+  "Quit the current popup window and restore the previous window.
+Sticky popups (rule `:quit nil') only get a plain `keyboard-quit'."
   (interactive)
-  (if (ar/popup-p)
+  (if (and (ar/popup-p) (window-parameter (selected-window) 'popup-quit))
       (quit-restore-window (selected-window) 'kill)
     (call-interactively #'keyboard-quit)))
 
@@ -630,10 +637,9 @@ never match)."
   (if ar/popup-global-mode
       (progn
         (setq ar/popup--alist-entry
-              `((lambda (buffer &optional _alist)
-                   (ar/popup--match-p buffer))
-                 (ar/popup--display)
-                 (reusable-frames . visible)))
+              '(ar/popup--match-p
+                (ar/popup--display)
+                (reusable-frames . visible)))
         (add-to-list 'display-buffer-alist ar/popup--alist-entry)
         (advice-add #'keyboard-quit :before #'ar/popup-close-on-quit)
         (global-set-key (kbd "C-`") #'ar/popup-toggle))
@@ -674,7 +680,6 @@ BUFFER may be a buffer object or a buffer name string (Emacs 31's
   :group 'ar)
 
 (declare-function ar/var-file "early-init")
-(declare-function ar/etc-file "early-init")
 (defvar ar/config-dir)
 (declare-function widget-create "wid-edit")
 (declare-function nerd-icons-octicon "nerd-icons")
@@ -781,11 +786,26 @@ BUFFER may be a buffer object or a buffer name string (Emacs 31's
       (with-selected-window window
         (dashboard-insert-startupify-lists t)))))
 
+;; The banner is drawn here, not read from a file; the `ascii' banner type
+;; inserts `dashboard-banner-ascii' verbatim and centers it.
+(defconst ar/dashboard-banner
+  (mapconcat
+   #'identity
+   '("███████╗███╗   ███╗ █████╗  ██████╗███████╗"
+     "██╔════╝████╗ ████║██╔══██╗██╔════╝██╔════╝"
+     "█████╗  ██╔████╔██║███████║██║     ███████╗"
+     "██╔══╝  ██║╚██╔╝██║██╔══██║██║     ╚════██║"
+     "███████╗██║ ╚═╝ ██║██║  ██║╚██████╗███████║"
+     "╚══════╝╚═╝     ╚═╝╚═╝  ╚═╝ ╚═════╝╚══════╝")
+   "\n")
+  "The dashboard banner: \"EMACS\" in block letters.")
+
 (use-package dashboard
   :demand t
   :custom
   (dashboard-buffer-name "*ahsan*")
-  (dashboard-startup-banner (ar/etc-file "dashboard-emacs.txt"))
+  (dashboard-startup-banner 'ascii)
+  (dashboard-banner-ascii ar/dashboard-banner)
   (dashboard-banner-logo-title nil)
   (dashboard-center-content t)
   (dashboard-vertically-center-content t)

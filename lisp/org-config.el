@@ -139,13 +139,13 @@ loaded, the empty string keeps the surrounding group names well-formed."
   (org-src-fontify-natively t)
   (org-src-preserve-indentation t)
   (org-src-tab-acts-natively t)
-  (org-edit-src-content-indentation 0)
+  (org-src-content-indentation 0)
   ;; Performance
   (org-element-use-cache t)
   (org-element-cache-persistent nil)
   (org-highlight-latex-and-related '(latex script entities))
   ;; Startup
-  (org-startup-folded 'overview)
+  (org-startup-folded 'fold)
   (org-startup-with-inline-images nil)
   (org-startup-with-latex-preview nil)
   (org-cycle-separator-lines 2)
@@ -184,6 +184,108 @@ loaded, the empty string keeps the surrounding group names well-formed."
   (org-habit-show-habits-only-for-today t)
   (org-habit-preceding-days 21)
   (org-habit-following-days 7))
+
+;; Task flow: GTD-style states, inbox capture, refile, an agenda dashboard
+;; and clocking, all in plain Org files under `ar/org-directory'.  Capture
+;; lands in the inbox; refile moves items to tasks.org or a project note.
+
+(defvar ar/org-inbox-file (ar/ensure-org-file "inbox.org" "#+title: Inbox\n")
+  "Capture target: everything lands here first, then gets refiled.")
+(defvar ar/org-tasks-file (ar/ensure-org-file "tasks.org" "#+title: Tasks\n")
+  "Main task list; also a refile target.")
+(ar/ensure-org-dir "archive/")
+
+;; shortcut: project notes are scanned once at startup, so a note created in
+;; a new project silo joins the agenda after the next restart.
+(setopt org-agenda-files
+        (append (list ar/org-inbox-file ar/org-tasks-file)
+                ;; projects/ is created on demand by `ar/create-denote-project-silo'
+                (let ((projects (expand-file-name "projects/" ar/org-directory)))
+                  (when (file-directory-p projects)
+                    (directory-files-recursively projects "\\.org\\'"))))
+        org-archive-location (concat ar/org-directory "archive/%s_archive::")
+        org-id-link-to-org-use-id 'create-if-interactive-and-no-custom-id)
+
+(setopt org-todo-keywords
+        '((sequence "TODO(t)" "NEXT(n)" "WAIT(w@/!)" "|" "DONE(d!)" "CANCEL(c@)"))
+        org-todo-keyword-faces
+        '(("NEXT"   . (:foreground "#7aa2f7" :weight bold))
+          ("WAIT"   . (:foreground "#bb9af7" :weight bold))
+          ("CANCEL" . (:foreground "#565f89" :weight bold)))
+        org-log-done 'time
+        org-log-reschedule 'time
+        org-log-redeadline 'time
+        org-log-into-drawer t
+        org-enforce-todo-dependencies t
+        org-todo-repeat-to-state "NEXT")
+
+;; Refile to any heading (three levels deep) of any agenda file.
+(setopt org-refile-targets '((org-agenda-files :maxlevel . 3))
+        org-refile-use-outline-path 'file
+        org-outline-path-complete-in-steps nil
+        org-refile-allow-creating-parent-nodes 'confirm)
+
+;; Agenda: one-day view, finished items hidden, a dashboard on `d'.
+(setopt org-agenda-window-setup 'current-window
+        org-agenda-restore-windows-after-quit t
+        org-agenda-span 'day
+        org-agenda-skip-scheduled-if-done t
+        org-agenda-skip-deadline-if-done t
+        org-agenda-skip-deadline-prewarning-if-scheduled t
+        org-agenda-todo-ignore-scheduled 'future
+        org-agenda-compact-blocks t
+        org-agenda-block-separator ?─
+        org-deadline-warning-days 7
+        org-agenda-custom-commands
+        '(("d" "Dashboard"
+           ((agenda "")
+            (todo "NEXT" ((org-agenda-overriding-header "Next actions")))
+            (todo "WAIT" ((org-agenda-overriding-header "Waiting")))
+            (tags "LEVEL=1"
+                  ((org-agenda-files (list ar/org-inbox-file))
+                   (org-agenda-overriding-header "Inbox")))))
+          ("n" "Next actions" todo "NEXT")
+          ("w" "Waiting" todo "WAIT")
+          ("r" "Weekly review" agenda ""
+           ((org-agenda-span 8)
+            (org-agenda-start-day "-7d")
+            (org-agenda-start-with-log-mode t)))))
+
+;; Capture templates.  `denote-last-path' is set by `denote-org-capture'
+;; while the template is filled; defvar'd here so the target resolves even
+;; before denote loads.
+(defvar denote-last-path nil)
+(defvar org-capture-templates)
+
+(defun ar/org-journal-capture-target ()
+  "Return today's Denote journal file, loading the capture helper first."
+  (require 'denote-journal-capture)
+  (denote-journal-capture-entry-today))
+
+(with-eval-after-load 'org-capture
+  (setq org-capture-templates
+        '(("t" "Task" entry (file ar/org-inbox-file)
+           "* TODO %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n%i"
+           :empty-lines 1)
+          ("T" "Task with link" entry (file ar/org-inbox-file)
+           "* TODO %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n%a\n%i"
+           :empty-lines 1)
+          ("n" "Denote note" plain (file denote-last-path)
+           #'denote-org-capture
+           :no-save t :immediate-finish nil :kill-buffer t :jump-to-captured t)
+          ("j" "Journal entry" entry (file ar/org-journal-capture-target)
+           "* %<%H:%M> %?"
+           :empty-lines 1))))
+
+;; Clocking survives restarts; the running clock shows today's total.
+(with-eval-after-load 'org-clock
+  (setopt org-clock-persist t
+          org-clock-persist-file (ar/var-file "org/org-clock-save.el")
+          org-clock-in-resume t
+          org-clock-out-remove-zero-time-clocks t
+          org-clock-history-length 20
+          org-clock-mode-line-total 'today)
+  (org-clock-persistence-insinuate))
 
 ;; The Denote second brain.
 
@@ -435,7 +537,6 @@ loaded, the empty string keeps the surrounding group names well-formed."
   (org-modern-priority t)
   (org-modern-keyword t)
   (org-modern-horizontal-rule t)
-  (org-modern-block-keyword t)
   (org-modern-block-name
    '(("src"        "»" "«")
      ("example"    "¶" "¶")
@@ -485,6 +586,11 @@ loaded, the empty string keeps the surrounding group names well-formed."
   :defer t
   :after org)
 
+;; Jupyter blocks do their own async; ob-async would otherwise intercept
+;; `:async yes' and run them in a child Emacs with no kernel connection.
+(with-eval-after-load 'ob-async
+  (add-to-list 'ob-async-no-async-languages-alist "jupyter-python"))
+
 ;; Jupyter's Org Babel backend is loaded when a `jupyter-LANG' block is used.
 ;; evil-org integration (+everywhere parity).
 (use-package evil-org
@@ -516,10 +622,14 @@ loaded, the empty string keeps the surrounding group names well-formed."
       (matlab . octave) (rust . rustic-babel) (amm . ammonite))
     "Alist mapping divergent block headers to their `ob-*' package names.")
 
-  ;; Jupyter blocks require a session; define this before the first block is
-  ;; parsed so the initial execution works without a manual :session header.
+  ;; emacs-jupyter's recommended defaults: a named session so blocks share
+  ;; state, and its own native async (:async yes).  No :kernel: emacs-jupyter
+  ;; fills it in from the installed kernelspec, so a per-project kernel
+  ;; (not named "python3") keeps working.  Set before the first block is
+  ;; parsed so it executes without header args.
   (setq org-babel-default-header-args:jupyter-python
-        '((:session . "python")))
+        '((:async . "yes")
+          (:session . "py")))
 
   (defun ar/org--babel-lazy-load (lang)
     "Lazy load the babel package for LANG and register it."
@@ -566,12 +676,19 @@ loaded, the empty string keeps the surrounding group names well-formed."
            (lang (or (cdr (assq lang ar/org-babel-mode-alist)) lang)))
       (ar/org--babel-lazy-load lang)))
 
-  (define-advice org-src--get-lang-mode (:before (lang) lazy-load-syntax)
+  ;; Runs on every fontification of a source block, so each language is
+  ;; tried once per session: a failed `require' would otherwise search
+  ;; `load-path' again on every redisplay.
+  (defvar ar/org--lazy-load-attempted (make-hash-table :test 'equal)
+    "Languages `org-src-get-lang-mode' has already tried to lazy load.")
+
+  (define-advice org-src-get-lang-mode (:before (lang) lazy-load-syntax)
     "Lazy load a babel package to ensure syntax highlighting in edit buffers."
-    (let* ((lang-str (if (stringp lang) lang (symbol-name lang)))
-           (lang-sym (intern lang-str)))
-      (unless (cdr (assoc-string lang-str org-src-lang-modes))
-        (ar/org--babel-lazy-load lang-sym))))
+    (let ((lang-str (if (stringp lang) lang (symbol-name lang))))
+      (unless (or (cdr (assoc-string lang-str org-src-lang-modes))
+                  (gethash lang-str ar/org--lazy-load-attempted))
+        (puthash lang-str t ar/org--lazy-load-attempted)
+        (ar/org--babel-lazy-load (intern lang-str)))))
 
   (define-advice org-babel-confirm-evaluate (:after-while (info) lazy-load-execute)
     "Load babel libraries lazily when babel blocks are executed."
@@ -684,17 +801,67 @@ loaded, the empty string keeps the surrounding group names well-formed."
   "n m v" '(denote-review-display-list :wk "Review list")
   "n m u" '(denote-review-set-date :wk "Update review date"))
 
-;; Org agenda / capture basics (Doom defaults).
+;; Org agenda / capture / clock.
+(defun ar/org-agenda-dashboard ()
+  "Open the `d' dashboard custom agenda."
+  (interactive)
+  (org-agenda nil "d"))
+
+(defun ar/org-open-inbox ()
+  "Visit the capture inbox."
+  (interactive)
+  (find-file ar/org-inbox-file))
+
+(defun ar/org-open-tasks ()
+  "Visit the main task list."
+  (interactive)
+  (find-file ar/org-tasks-file))
+
 (ar/global-leader
   "o"     '(:ignore t :wk "open")
   "o c"   '(org-capture :wk "Capture")
   "o L"   '(org-store-link :wk "Store link")
   "o a"   '(:ignore t :wk "agenda")
-  "o a a" '(org-agenda :wk "Agenda dashboard")
-  "o A"   '(org-agenda :wk "Agenda dashboard")
+  "o a a" '(org-agenda :wk "Agenda dispatcher")
+  "o a d" '(ar/org-agenda-dashboard :wk "Dashboard")
+  "o A"   '(ar/org-agenda-dashboard :wk "Dashboard")
   "o a m" '(org-tags-view :wk "Tags search")
   "o a t" '(org-todo-list :wk "Global TODO list")
-  "o a v" '(consult-org-heading :wk "Fuzzy heading jump"))
+  "o a v" '(consult-org-heading :wk "Fuzzy heading jump")
+  "o a h" '(consult-org-agenda :wk "Fuzzy agenda heading")
+  "o a i" '(ar/org-open-inbox :wk "Open inbox")
+  "o a T" '(ar/org-open-tasks :wk "Open tasks")
+  "o k"   '(:ignore t :wk "clock")
+  "o k i" '(org-clock-in :wk "Clock in")
+  "o k l" '(org-clock-in-last :wk "Clock in last")
+  "o k o" '(org-clock-out :wk "Clock out")
+  "o k g" '(org-clock-goto :wk "Go to clock")
+  "o k x" '(org-clock-cancel :wk "Cancel clock"))
+
+;; Org buffer actions under the local leader prefix (SPC m), spelled out with
+;; `general-define-key' so the package-free test harness (which stubs it) can
+;; load this module.
+(with-eval-after-load 'org
+  (general-define-key
+    :states '(normal insert visual emacs)
+    :keymaps 'org-mode-map
+    :prefix "SPC m"
+    :global-prefix "C-SPC m"
+    "t"   '(org-todo :wk "Todo state")
+    "s"   '(org-schedule :wk "Schedule")
+    "d"   '(org-deadline :wk "Deadline")
+    "."   '(org-time-stamp :wk "Timestamp")
+    "p"   '(org-priority :wk "Priority")
+    "T"   '(org-set-tags-command :wk "Tags")
+    "r"   '(org-refile :wk "Refile")
+    "a"   '(org-archive-subtree-default :wk "Archive")
+    "i"   '(org-id-get-create :wk "Create ID")
+    "l"   '(org-insert-link :wk "Insert link")
+    "e"   '(org-export-dispatch :wk "Export")
+    "c"   '(:ignore t :wk "clock")
+    "c i" '(org-clock-in :wk "Clock in")
+    "c o" '(org-clock-out :wk "Clock out")
+    "c r" '(org-clock-report :wk "Clock report")))
 
 ;; Optional integration, only when the library is present.
 (when (locate-library "org-src-context")

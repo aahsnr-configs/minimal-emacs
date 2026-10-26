@@ -193,7 +193,10 @@ Some changes (removed hooks, packages) still require a full restart."
   (with-selected-frame frame
     (pgtk-use-im-context nil)))
 (when (fboundp 'pgtk-use-im-context)
-  (add-hook 'after-make-frame-functions #'ar/pgtk-disable-im-context))
+  (add-hook 'after-make-frame-functions #'ar/pgtk-disable-im-context)
+  ;; The hook never fires for the initial frame of a non-daemon session.
+  (when (eq window-system 'pgtk)
+    (pgtk-use-im-context nil)))
 
 ;; Internal Emacs tooltips: the GTK DBus tooltip path hangs on hover with
 ;; this PGTK/Wayland stack.
@@ -364,7 +367,7 @@ Some changes (removed hooks, packages) still require a full restart."
   :init
   (setopt recentf-max-saved-items 300
           recentf-exclude
-          '("\\.?cache" ".cask" "url" "COMMIT_EDITMSG\\'" "bookmarks"
+          '("/\\.?cache/" "/\\.cask/" "/url/" "COMMIT_EDITMSG\\'" "/bookmarks\\'"
             "\\.\\(?:gz\\|gif\\|svg\\|png\\|jpe?g\\|bmp\\|xpm\\)$"
             "\\.?ido\\.last$" "\\.revive$" "/G?TAGS$" "/.elfeed/"
             "^/tmp/" "^/var/folders/.+$" "/persp-confs/"))
@@ -529,8 +532,8 @@ Confined to `prog-mode' derivatives to avoid prose collisions."
 
 (ar/define-large-file-guard whitespace-mode)
 
-;; Native line numbers: absolute current line with relative surroundings for
-;; Vim motions, with a pre-sized margin to prevent redisplay jitter.
+;; Native line numbers: absolute numbering, with a pre-sized margin to
+;; prevent redisplay jitter.
 (use-package display-line-numbers
   :defer t
   :hook ((prog-mode conf-mode yaml-mode LaTeX-mode tex-mode)

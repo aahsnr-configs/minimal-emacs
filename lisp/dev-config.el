@@ -30,23 +30,24 @@
   (treesit-enabled-modes t)
   :config
   (setq treesit-font-lock-level 4)
-  ;; Registers non-built-in grammar sources (Emacs 31 ships typescript,
-  ;; toml, yaml, dockerfile, rust).  No :commit pins on purpose.
-  (dolist (source '((python "https://github.com/tree-sitter/tree-sitter-python")
-                    (bash "https://github.com/tree-sitter/tree-sitter-bash")
-                    (c "https://github.com/tree-sitter/tree-sitter-c")
-                    (cpp "https://github.com/tree-sitter/tree-sitter-cpp")
-                    (css "https://github.com/tree-sitter/tree-sitter-css")
-                    (html "https://github.com/tree-sitter/tree-sitter-html")
-                    (json "https://github.com/tree-sitter/tree-sitter-json")
-                    (latex "https://github.com/latex-lsp/tree-sitter-latex")
-                    (bibtex "https://github.com/latex-lsp/tree-sitter-bibtex")
-                    (nix "https://github.com/nix-community/tree-sitter-nix")
-                    (java "https://github.com/tree-sitter/tree-sitter-java")
-                    (make "https://github.com/tree-sitter-grammars/tree-sitter-make")
-                    (markdown "https://github.com/tree-sitter-grammars/tree-sitter-markdown")
-                    (awk "https://github.com/BeagleFoot/tree-sitter-awk")
-                    (org "https://github.com/milisims/tree-sitter-org")))
+  ;; Grammar sources for languages Emacs 31 does not register itself.  The
+  ;; built-in modes (python, bash, c, cpp, css, html, json, java, markdown,
+  ;; ...) add their own sources pinned to the commit their queries were
+  ;; written against; entries here would shadow those pins, and markdown's
+  ;; needs a :source-dir, so none are listed.  Revisions are pinned: bump
+  ;; one by hand when its mode needs a newer grammar.
+  (dolist (source '((latex "https://github.com/latex-lsp/tree-sitter-latex"
+                           :commit "fa8df448fc2c0192a8c2f8cfc97de53cb2b4ecb9")
+                    (bibtex "https://github.com/latex-lsp/tree-sitter-bibtex"
+                            :commit "8d04ed27b3bc7929f14b7df9236797dab9f3fa66")
+                    (nix "https://github.com/nix-community/tree-sitter-nix"
+                         :commit "37500eb28efff87b07af3df45e37d5726429b03a")
+                    (make "https://github.com/tree-sitter-grammars/tree-sitter-make"
+                          :commit "70613f3d812cbabbd7f38d104d60a409c4008b43")
+                    (awk "https://github.com/Beaglefoot/tree-sitter-awk"
+                         :commit "34bbdc7cce8e803096f47b625979e34c1be38127")
+                    (org "https://github.com/milisims/tree-sitter-org"
+                         :commit "64cfbc213f5a83da17632c95382a5a0a2f3357c1")))
     (setf (alist-get (car source) treesit-language-source-alist) (cdr source))))
 
 ;; Language servers: lsp-mode.  `ar/lsp-ensure-maybe' starts lsp from
@@ -62,7 +63,6 @@
 (declare-function lsp-workspace-folders-add "lsp-mode")
 (declare-function lsp-session "lsp-mode")
 (declare-function lsp--session-workspaces "lsp-mode")
-(declare-function flymake-ruff-load "flymake-ruff")
 (defvar lsp-python-ty-clients-server-command)
 (defvar lsp-enabled-clients)
 
@@ -71,10 +71,11 @@
 Interactive sessions defer through `lsp-deferred'.  Batch runs import
 the buffer directory as a workspace folder and call `lsp' directly."
   (unless (apply #'derived-mode-p ar/lsp-excluded-modes)
-    ;; The ty client is the sole Python language server in this buffer.
-    ;; Ruff diagnostics come from Flymake's CLI backend below.
+    ;; Python gets exactly two servers: ty (types, navigation, completion)
+    ;; and ruff (lint diagnostics, fixes, import organizing).  ruff is an
+    ;; add-on client, so it runs next to ty instead of replacing it.
     (when (derived-mode-p 'python-base-mode)
-      (setq-local lsp-enabled-clients '(ty-ls)))
+      (setq-local lsp-enabled-clients '(ty-ls ruff)))
     (if noninteractive
         (progn
           (require 'lsp-mode)
@@ -134,7 +135,11 @@ the buffer directory as a workspace folder and call `lsp' directly."
   (add-hook 'lsp-after-open-hook #'ar/lsp-sync-workspaces)
   (add-hook 'lsp-after-uninitialized-functions #'ar/lsp-sync-workspaces))
 
-;; lsp-mode ships the ty client; it starts Astral's `ty server' command.
+;; lsp-mode ships both Astral clients (`ty-ls' and `ruff'); install the
+;; binaries with `uv tool install ty ruff'.  Rule selection and ty settings
+;; belong in pyproject.toml ([tool.ruff], [tool.ty]), not here, so every
+;; editor and CI run agrees.  The `ruff' client needs no setup: its defaults
+;; (`ruff server', fix-all and organize-imports advertised) are what we want.
 (use-package lsp-python-ty
   :ensure nil
   :after lsp-mode
@@ -231,13 +236,6 @@ OLD-FN is the wrapped `lsp-resolve-final-command'."
   :commands (flymake-popon-mode)
   :hook (flymake-mode . flymake-popon-mode))
 
-;; Ruff lint diagnostics are a separate Flymake backend alongside ty's LSP
-;; type diagnostics.  python-base-mode covers python-mode and python-ts-mode.
-(use-package flymake-ruff
-  :defer t
-  :commands (flymake-ruff-load)
-  :hook (python-base-mode . flymake-ruff-load))
-
 ;; Python: interpreter and indentation.
 (use-package python
   :ensure nil
@@ -252,6 +250,10 @@ OLD-FN is the wrapped `lsp-resolve-final-command'."
           python-shell-interpreter-args "-i --simple-prompt --no-color-info")))
 
 ;; Formatting: apheleia runs formatters asynchronously on save (+onsave).
+;; Python is formatted by ruff only: imports first (`ruff-isort', rule I),
+;; then `ruff format'.  Both read pyproject.toml; apheleia passes no
+;; line-length of its own while `apheleia-formatters-respect-fill-column'
+;; stays nil.
 (use-package apheleia
   :hook (prog-mode . apheleia-mode)
   :custom
@@ -259,6 +261,33 @@ OLD-FN is the wrapped `lsp-resolve-final-command'."
   :config
   (setf (alist-get 'python-mode apheleia-mode-alist) '(ruff-isort ruff))
   (setf (alist-get 'python-ts-mode apheleia-mode-alist) '(ruff-isort ruff)))
+
+(defun ar/python-ruff-fix-all ()
+  "Apply ruff's fix-all code action (safe autofixes) to the buffer."
+  (interactive)
+  (lsp-execute-code-action-by-kind "source.fixAll"))
+
+;; Python actions under the local leader (SPC m): ruff through lsp, and
+;; evaluation through emacs-jupyter (see tools-config).
+(with-eval-after-load 'python
+  (general-define-key
+    :states '(normal insert visual emacs)
+    :keymaps 'python-base-mode-map
+    :prefix "SPC m"
+    :global-prefix "C-SPC m"
+    "f" '(ar/python-ruff-fix-all :wk "Ruff fix all")
+    "i" '(lsp-organize-imports :wk "Organize imports")
+    "r" '(jupyter-run-repl :wk "Run Jupyter REPL")
+    "c" '(jupyter-connect-repl :wk "Connect to kernel")
+    "a" '(jupyter-repl-associate-buffer :wk "Associate with REPL")
+    "z" '(jupyter-repl-pop-to-buffer :wk "Go to REPL")
+    "e" '(jupyter-eval-line-or-region :wk "Eval line/region")
+    "d" '(jupyter-eval-defun :wk "Eval defun")
+    "b" '(jupyter-eval-buffer :wk "Eval buffer")
+    "h" '(jupyter-inspect-at-point :wk "Inspect at point")
+    "o" '(jupyter-eval-remove-overlays :wk "Clear result overlays")
+    "k" '(jupyter-repl-restart-kernel :wk "Restart kernel")
+    "x" '(jupyter-repl-interrupt-kernel :wk "Interrupt kernel")))
 
 ;; Debugger: dape (DAP: breakpoints, stepping, REPL, watch).
 (use-package dape
@@ -268,7 +297,7 @@ OLD-FN is the wrapped `lsp-resolve-final-command'."
              dape-pause dape-disconnect dape-evaluate-expression dape-repl dape-info
              dape-quit)
   :custom
-  (dape-buffer-window-arrangement 'gdb)
+  (dape-buffer-window-arrangement 'gud)
   ;; Project root (falling back to default-directory) is the default;
   ;; pinned explicitly so upstream default changes can't surprise us.
   (dape-cwd-function #'dape--default-cwd))
@@ -321,7 +350,7 @@ OLD-FN is the wrapped `lsp-resolve-final-command'."
 (general-define-key
  :states 'normal
  "K" #'eldoc
- "F2" #'lsp-rename)
+ "<f2>" #'lsp-rename)
 
 (provide 'dev-config)
 ;;; dev-config.el ends here

@@ -4,7 +4,7 @@
 > **Evil** for editing, **Denote** for notes, and no framework to work around.
 
 ![Emacs](https://img.shields.io/badge/Emacs-31.1-7F5AB6)
-![Packages](https://img.shields.io/badge/packages-185-4E9A06)
+![Packages](https://img.shields.io/badge/packages-187-4E9A06)
 ![Editing](https://img.shields.io/badge/editing-Evil-6A5ACD)
 ![Notes](https://img.shields.io/badge/notes-Denote-2E8B57)
 
@@ -52,9 +52,9 @@ platforms are not regularly tested.
 A complete Emacs configuration built directly on vanilla Emacs:
 
 - **10 local modules** under `lisp/`, loaded in a deliberate order.
-- **185 package entries** in one manifest, including **22 pinned git-only
+- **187 package entries** in one manifest, including **23 explicit git-only
   recipes**.
-- Roughly **6,300 lines** of Emacs Lisp, comments included.
+- Roughly **6,200 lines** of Emacs Lisp, comments included.
 - A Doom-inspired user experience: `SPC` leader keys, Evil, a dashboard, a
   rule-based popup manager, workspaces, and a Tokyo Night theme.
 - No Doom, Spacemacs, Prelude, `use-package` installer, `package.el`
@@ -116,10 +116,10 @@ anything; every `use-package` form in `lisp/` only configures.
    buffers, bytecode is cached and rebuilt in a subprocess, and native
    compilation output is kept out of the config root.
 
-8. **Pin what cannot be reproduced from a recipe repository.**
-   Git-only packages carry explicit `:host`, `:repo`, and `:pin` recipes.
-   Packages available from the configured recipe repositories are not pinned
-   individually.
+8. **Give git-only packages explicit recipes.**
+   Git-only packages carry explicit `:host` and `:repo` recipes. Packages
+   available from the configured recipe repositories use the default recipe.
+   No package versions are locked.
 
 ## Requirements
 
@@ -153,11 +153,12 @@ rg --version
 | Noto Sans | Geometric/dingbat fallbacks | Used for `#x25A0–#x25FF`, `#x2600–#x26FF`, and `#x2700–#x27BF`. |
 | `emacs-lsp-booster` | Optional LSP performance | If present, lsp-mode is wrapped automatically. |
 | `epdfinfo` | pdf-tools | Build once with `M-x pdf-tools-install`. |
-| `ruff`, `ruff-isort` | Python formatting | Wired into Apheleia for `python-mode` and `python-ts-mode`. |
+| `ty`, `ruff` | Python language servers | lsp-mode runs both in Python buffers (`ty server` for types and navigation, `ruff server` for lint and fixes). Install with `uv tool install ty ruff`. |
+| `ruff` | Python formatting | `ruff-isort` then `ruff format`, wired into Apheleia for `python-mode` and `python-ts-mode`. |
 | `nixfmt` | Nix formatting | Configured through `nix-mode`. |
 | `pytest` | python-pytest | Uses the `pytest` executable by default. |
 | `ipython` | Python REPL | Selected automatically when available. |
-| Jupyter | EIN and `jupyter` Babel blocks | Notebook support. |
+| `jupyter` + `ipykernel` | emacs-jupyter REPLs and `jupyter-python` Babel blocks | Install `ipykernel` in the project environment (`uv add --dev ipykernel`). The zmq module compiles on first use and needs a C compiler and libzmq. EIN provides notebooks. |
 | Ghostel's native dependency | Ghostel terminal | Ghostel is deferred; if its native module is unavailable, the rest of Emacs still starts. |
 
 Language servers, debug adapters, and API credentials are intentionally **not**
@@ -229,10 +230,8 @@ M-x straight-rebuild-all   ; rebuild after pulls or compiler changes
 M-x straight-prune-build   ; remove orphaned build directories
 ```
 
-Then restart Emacs. Pinned git-only recipes stay at their `:pin` until you
-change the pin. Packages resolved from MELPA/GNU ELPA follow the recipe
-repositories; this repository does **not** commit a straight lockfile, so a
-fresh install is not byte-for-byte reproducible.
+Then restart Emacs. Package versions are not locked: a fresh install and every
+`straight-pull-all` take the latest upstream commits.
 
 ## First run
 
@@ -242,11 +241,12 @@ After the dashboard appears, a few things may still need one-time setup:
    `M-x nerd-icons-install-fonts`, then restart the frame.
 2. **PDFs do not render** — run `M-x pdf-tools-install` once to build
    `epdfinfo`.
-3. **Tree-sitter grammars** — grammars are registered and auto-install when a
-   compatible compiler is available. If a grammar fails, install it manually
+3. **Tree-sitter grammars** — Emacs's own modes register their pinned grammar
+   sources; this config adds pinned sources for LaTeX, BibTeX, Nix, Make, Awk
+   and Org. Grammars auto-install when a compatible compiler is available. If a grammar fails, install it manually
    with `M-x treesit-install-language-grammar`.
 4. **Language servers** — lsp-mode starts on `prog-mode` hooks. Install the
-   server for your language (pyright, nixd/nil, texlab, qmlls,
+   server for your language (ty and ruff for Python, nixd/nil, texlab, qmlls,
    typescript-language-server, bash-language-server, etc.).
 5. **gptel** — set your backend/API key before using `SPC o l`.
 6. **Org files** — notes live outside the repository. See
@@ -549,9 +549,14 @@ main trees; `SPC` alone is the authoritative discovery mechanism.
 | --- | --- |
 | `SPC X` / `SPC o c` | Org capture |
 | `SPC o L` | Store Org link |
-| `SPC o a a` / `SPC o A` | Org agenda |
+| `SPC o a a` | Org agenda dispatcher |
 | `SPC o a m` / `SPC o a t` | Tags search / global TODO list |
-| `SPC o a v` | Fuzzy heading jump (`consult-org-heading`) |
+| `SPC o a v` / `SPC o a h` | Fuzzy heading jump / fuzzy agenda heading |
+| `SPC o a d` / `SPC o A` | Agenda dashboard |
+| `SPC o a i` / `SPC o a T` | Open inbox / open tasks |
+| `SPC o k i` / `o` / `l` / `g` / `x` | Clock in / out / in last / go to / cancel |
+| `SPC m` (Org buffer) | todo `t`, schedule `s`, deadline `d`, refile `r`, archive `a`, clock `c i/o/r`, export `e` |
+| `SPC m` (Python buffer) | ruff fix `f`, imports `i`, Jupyter REPL `r`, eval `e`/`d`/`b`, kernel `k`/`x` |
 
 ### Windows and workspaces
 
@@ -651,11 +656,10 @@ repositories) or an explicit recipe:
 
 ```elisp
 (evil-ts-obj :host github :repo "dvzubarev/evil-ts-obj"
-             :files ("lisp/*.el" "README.org")
-             :pin "8d0104f9ea04de323bdfefdb58378f8f589893fb")
+             :files ("lisp/*.el" "README.org"))
 ```
 
-The 22 explicit recipes are all pinned. Several Codeberg-hosted packages are
+Several Codeberg-hosted packages are
 redirected to their emacsmirror GitHub mirrors because of Codeberg's
 smart-HTTP rate limiting on some networks. `ws-butler` is isolated from the
 shared NonGNU ELPA mirror with a dedicated `:local-repo`.
@@ -677,8 +681,7 @@ This prevents straight from rebuilding bundled libraries when a package's
 ### Add a package
 
 1. Add the package to the matching group in `ar/packages` in `init.el`.
-   For a git-only package, write an explicit recipe with `:host`, `:repo`, and
-   `:pin`.
+   For a git-only package, write an explicit recipe with `:host` and `:repo`.
 2. Add a `use-package` block in the module that owns the feature. Configure it;
    do not install it.
 3. Restart Emacs. Manifest changes are not picked up by `SPC f l`.
@@ -760,8 +763,10 @@ Use the module that owns the command. The leader macros are defined in
 ```
 
 Global, cross-module bindings belong in `keybinds-config`. The local-leader
-definer (`SPC m`) exists and is reserved for module-local maps, but no bindings
-currently use it.
+prefix (`SPC m`) holds buffer-local actions: `org-mode-map` (todo, schedule,
+refile, archive, clock, export) and `python-base-mode-map` (ruff fixes and
+Jupyter evaluation). Those two blocks use `general-define-key` with the prefix
+spelled out, because the package-free test suite stubs it.
 
 ### Snippets
 
@@ -844,7 +849,7 @@ The name must be a single path component; escaping names are rejected.
 ### Org behavior
 
 - Org is deferred until the first Org buffer.
-- `org-startup-folded` is `overview`; inline images and LaTeX previews are off
+- `org-startup-folded` is `fold` (an overview); inline images and LaTeX previews are off
   at startup.
 - `org-modern` and `org-appear` prettify headings, blocks, checkboxes, and
   emphasis markers.
@@ -854,9 +859,15 @@ The name must be a single path component; escaping names are rejected.
   editing, and evaluation. `org-babel-do-load-languages` is overridden because
   the lazy loader registers languages itself.
 - `org-habit` loads with Org, not at startup.
-- Capture and agenda **templates/files are not predefined**. The commands
-  are bound, but you must add `org-capture-templates` and `org-agenda-files` in
-  `etc/custom.el` for a working GTD setup.
+- Task flow: states `TODO`, `NEXT`, `WAIT`, `DONE`, `CANCEL`; capture lands in
+  `inbox.org` and is refiled (`SPC m r`) to `tasks.org` or a project note.
+  Agenda files are `inbox.org`, `tasks.org` and every `.org` file under
+  `projects/` (scanned at startup).
+- Capture templates: `t` task, `T` task with link, `n` Denote note, `j` Denote
+  journal entry.
+- Agenda: `SPC o A` / `SPC o a d` opens the dashboard (today, next actions,
+  waiting, inbox); the dispatcher also has `n`, `w` and `r` (weekly review).
+- Clocking persists across restarts (`SPC o k`).
 
 ### Denote packages
 
@@ -876,10 +887,10 @@ a minimal atomic-note skeleton after creating a note in a Denote directory:
 ### Tree-sitter
 
 `dev-config` points `treesit-extra-load-path` at `var/tree-sitter/`, enables
-grammar auto-installation, and registers grammar sources for Python, Bash, C,
-C++, CSS, HTML, JSON, LaTeX, BibTeX, Nix, Java, Make, Markdown, Awk, and Org.
-Emacs 31's bundled grammars (TypeScript, TOML, YAML, Dockerfile, Rust) are left
-alone. Font-lock level is 4.
+grammar auto-installation, and registers commit-pinned grammar sources for
+LaTeX, BibTeX, Nix, Make, Awk and Org. Languages Emacs 31's own modes register
+(Python, Bash, C, C++, CSS, HTML, JSON, Java, Markdown, ...) are left alone so
+their pinned sources apply. Font-lock level is 4.
 
 Folding is routed through `treesit-fold` globally, with hideshow and
 vimish-fold as fallbacks. `expreg`, `evil-textobj-tree-sitter`, and
@@ -910,6 +921,16 @@ automatically.
 Flymake replaces Flycheck. `flymake-show-diagnostics-at-end-of-line` is set to
 `fancy`, and `flymake-popon` shows the diagnostic at point. Apheleia runs
 formatters asynchronously on save; Python uses `ruff-isort` and `ruff`.
+
+### Python and Jupyter
+
+Python buffers start two language servers through lsp-mode: `ty-ls` (types,
+navigation, completion) and `ruff` (an add-on client for lint diagnostics, fix
+all and organize imports). Rule selection lives in `pyproject.toml`. `SPC m`
+in a Python buffer offers ruff fix-all, organize imports and emacs-jupyter:
+run or connect a REPL, evaluate line, region, defun or buffer, inspect, restart
+or interrupt the kernel. `jupyter-python` Babel blocks default to
+`:async yes :session py`; the kernel comes from the installed kernelspec.
 
 ### Debugging
 
@@ -1038,7 +1059,7 @@ emacs -Q --batch \
   -f ert-run-tests-batch-and-exit
 ```
 
-The suite is intentionally package-free: it does not install the 185-package
+The suite is intentionally package-free: it does not install the 187-package
 manifest and does not need network access. For a full startup check, start
 interactive Emacs with `--debug-init` and watch the dashboard's package/module
 counts.
@@ -1064,7 +1085,7 @@ variables; cross-module references get `declare-function`/`defvar` first).
 | `ghostel` fails to start | Native terminal dependency missing | It is deferred and should not block startup. Install Ghostel's native dependency or ignore the terminal feature. |
 | `code-review` fails on a database class | code-review predates emacsql 4.x | The config aliases the old `emacsql-sqlite-connection` class onto the built-in backend before loading; update packages if the shim no longer applies. |
 | `git-timemachine` misbehaves under native compilation | JIT compilation of this package is unreliable | It is already on `native-comp-jit-compilation-deny-list`; restart after changing the list. |
-| Org agenda/capture is empty | No agenda files or capture templates are predefined | Add `org-agenda-files` and `org-capture-templates` in `etc/custom.el`. |
+| Agenda is empty | The agenda reads `inbox.org`, `tasks.org` and `projects/**.org` under the org directory | Capture a `TODO` (`SPC X`, `t`) or add files; restart after creating a new project silo. |
 | Search/project commands cannot find `rg` | ripgrep not on `exec-path` | Install ripgrep; check `(executable-find "rg")`. GUI Emacs must inherit your PATH. |
 
 ### Recovering a broken install
@@ -1102,9 +1123,8 @@ settings intentionally trade confirmation for speed:
   buffers.
 - **sudo-edit uses TRAMP.** `SPC f E` reopens the current file with elevated
   privileges; the usual TRAMP/sudo caveats apply.
-- **No package lockfile is committed.** A fresh install resolves unpinned
-  package recipes at clone time. Review changes after `straight-pull-all` if
-  reproducibility matters to you.
+- **No version locking.** Package versions follow upstream, so review changes
+  after `straight-pull-all`.
 
 ## Conventions
 
@@ -1127,23 +1147,18 @@ These are the rules the configuration follows; keep them when extending it.
 - **Batch safety:** guard display-only work with `noninteractive`; do not rely
   on idle timers or `after-init-hook` in batch.
 - **Large buffers:** expensive modes get `ar/define-large-file-guard`.
-- **Git-only packages:** explicit recipes with `:pin`; do not rely on an
-  implicit default recipe.
+- **Git-only packages:** explicit recipes with `:host` and `:repo`; do not rely
+  on an implicit default recipe.
 - **Reload vs restart:** `SPC f l` reloads module source; restart for manifest
   changes, removed hooks, or package upgrades.
 
-`AGENTS.md` is the operating manual for coding agents working in this
-repository and records the same invariants in more detail.
+`CLAUDE.md` is the short operating manual for coding agents working in this
+repository.
 
 ## Known limitations
 
-- **No committed lockfile.** Git-only recipes are pinned; recipe-repository
-  packages are not. First install and upgrades are not bit-reproducible.
-- **Org capture/agenda is not a ready-made GTD system.** The commands and
-  Denote integration are present, but agenda files and capture templates are
-  user configuration.
-- **The local leader is defined but unused.** `ar/local-leader` (`SPC m`) is
-  available for future module-local maps; no current bindings use it.
+- **Agenda project notes load once.** Files under `projects/` join the agenda at
+  startup, so a note in a new project silo appears after a restart.
 - **No CI configuration is included.** The ERT suite is local; there is no
   workflow file in this checkout.
 - **Platform coverage is uneven.** Linux/PGTK/Wayland is the primary target.

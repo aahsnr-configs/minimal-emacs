@@ -29,13 +29,29 @@
   :custom
   (ein:output-area-inlined-images t))
 
-;; emacs-jupyter: local/remote kernel REPLs and Org Babel backends.
+;; emacs-jupyter: kernel REPLs, evaluation from source buffers, and the
+;; Org Babel backend.  It needs the `jupyter' executable and `ipykernel' in
+;; the active environment (pyvenv activates the project's .venv, so a
+;; per-project kernel comes from `uv add --dev ipykernel'); the
+;; zmq module compiles itself on first use and needs a C compiler and libzmq.
 (use-package jupyter
   :defer t
   :commands (jupyter-run-repl
              jupyter-connect-repl
              jupyter-server-list-kernels
-             jupyter-repl-associate-buffer))
+             jupyter-repl-associate-buffer
+             jupyter-repl-pop-to-buffer
+             jupyter-repl-restart-kernel
+             jupyter-repl-interrupt-kernel
+             jupyter-eval-line-or-region
+             jupyter-eval-defun
+             jupyter-eval-buffer
+             jupyter-eval-remove-overlays
+             jupyter-inspect-at-point)
+  :custom
+  ;; Short results show as an end-of-line overlay (like eros for Elisp).
+  (jupyter-eval-use-overlays t)
+  (jupyter-repl-history-maximum-length 1000))
 
 ;; Persist named Jupyter kernels with the other savehist state in var/.
 (with-eval-after-load 'jupyter-server
@@ -69,15 +85,17 @@
   "o j a" '(jupyter-repl-associate-buffer :wk "Associate buffer with REPL"))
 
 ;; lookup: jump-to-definition fallback and online documentation providers.
+;; The backend hook lives in :init: it is what loads dumb-jump, so putting it
+;; in :config would never run.  consult-xref (completion-config) stays the
+;; definitions UI.
 (use-package dumb-jump
   :defer t
   :commands (dumb-jump-xref-activate)
+  :init
+  (add-hook 'xref-backend-functions #'dumb-jump-xref-activate)
   :custom
   (dumb-jump-prefer-searcher 'rg)
-  (dumb-jump-force-searcher 'rg)
-  (xref-show-definitions-function #'xref-show-definitions-completing-read)
-  :config
-  (add-hook 'xref-backend-functions #'dumb-jump-xref-activate))
+  (dumb-jump-force-searcher 'rg))
 
 (use-package request
   :defer t)
@@ -119,8 +137,7 @@
   :commands (org-babel-execute:gptel))
 
 (ar/global-leader
-  "o l" '(gptel :wk "Open gptel chat") ; rebinding: org-store-link moves below
-  "o L" '(org-store-link :wk "Store org link")
+  "o l" '(gptel :wk "Open gptel chat") ; org-store-link is on "o L" (org-config)
   "o g" '(gptel-menu :wk "gptel menu")
   "o q" '(gptel-quick :wk "Quick explain at point"))
 
@@ -142,8 +159,6 @@
              (file-exists-p pdf-info-epdfinfo-program))
     (pdf-loader-install 'no-query))
   ;; Evil bindings for pdf-view.
-  (with-eval-after-load 'evil-collection-pdf
-    nil)
   (evil-define-key 'normal pdf-view-mode-map
     "j" #'pdf-view-next-line-or-next-page
     "k" #'pdf-view-previous-line-or-previous-page

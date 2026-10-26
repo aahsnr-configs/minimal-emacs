@@ -65,34 +65,24 @@
     ;; git-only: evil-ts-obj ships its .el files under lisp/ in the repo,
     ;; so the default melpa recipe's file spec needs this override
     (evil-ts-obj :host github :repo "dvzubarev/evil-ts-obj"
-                 :files ("lisp/*.el" "README.org")
-                 :pin "8d0104f9ea04de323bdfefdb58378f8f589893fb")
+                 :files ("lisp/*.el" "README.org"))
     ;; git-only: evil-markdown and evil-quick-diff have no melpa recipes
-    (evil-markdown :host github :repo "Somelauw/evil-markdown"
-                  :pin "8e6cc68af83914b2fa9fd3a3b8472573dbcef477")
-    (evil-quick-diff :host github :repo "rgrinberg/evil-quick-diff"
-                   :pin "69c883720b30a892c63bc89f49d4f0e8b8028908")
+    (evil-markdown :host github :repo "Somelauw/evil-markdown")
+    (evil-quick-diff :host github :repo "rgrinberg/evil-quick-diff")
     ;; git-only: codeberg rate-limits git smart-http on this network, so
     ;; upstream repos are redirected to their emacsmirror GitHub mirrors
     ;; (same practice Doom uses for these packages)
-    (undo-fu :host github :repo "emacsmirror/undo-fu"
-             :pin "5684ef2aef5f60176472916b21869cf221e018cc")
-    (undo-fu-session :host github :repo "emacsmirror/undo-fu-session"
-                   :pin "92d733a5b162a70c572fac17b9f9e872426df547")
-    (visual-fill-column :host github :repo "emacsmirror/visual-fill-column"
-                      :pin "e1be9a1545157d24454d950c0ac79553c540edb7")
-    (git-timemachine :host github :repo "emacsmirror/git-timemachine"
-                   :pin "d1346a76122595aeeb7ebb292765841c6cfd417b")
-    (denote-wordcloud :host github :repo "emacsmirror/denote-wordcloud"
-                    :pin "01a74f13bd1fa4f1645851cc64f2701ff2654e64")
+    (undo-fu :host github :repo "emacsmirror/undo-fu")
+    (undo-fu-session :host github :repo "emacsmirror/undo-fu-session")
+    (visual-fill-column :host github :repo "emacsmirror/visual-fill-column")
+    (git-timemachine :host github :repo "emacsmirror/git-timemachine")
+    (denote-wordcloud :host github :repo "emacsmirror/denote-wordcloud")
     ;; git-only: popon (flymake-popon's dependency) lives on codeberg with
     ;; no official mirror; this is a plain GitHub clone of it
-    (popon :host github :repo "JasZhe/emacs-popon-mirror"
-            :pin "790d3b91b07603156da906feb63ec4185438c0a0")
+    (popon :host github :repo "JasZhe/emacs-popon-mirror")
     ;; git-only: shift-number (evil-numbers's dependency) is codeberg-hosted;
     ;; the recipe must match MELPA's or straight warns of conflicting recipes
-    (shift-number :host codeberg :repo "ideasman42/emacs-shift-number"
-                    :pin "52f4d32080cca50da0f88b2141d597827c7341cf")
+    (shift-number :host codeberg :repo "ideasman42/emacs-shift-number")
     ;; editing aids, undo, folding, formatting
     avy link-hint super-save sudo-edit
     ;; git-only: ws-butler is served from the NonGNU ELPA mirror branch,
@@ -103,31 +93,26 @@
      :host github
      :repo "emacsmirror/nongnu_elpa"
      :branch "elpa/ws-butler"
-     :local-repo "ws-butler"
-     :pin "67c49cfdf5a5a9f28792c500c8eb0017cfe74a3a")
+     :local-repo "ws-butler")
     ;; git-only: Doom's helpful fork (extra metadata in help buffers)
-    (helpful :host github :repo "hlissner/helpful"
-             :pin "e3e06eab5ee93470f009d68c5d398a9619d4c382")
+    (helpful :host github :repo "hlissner/helpful")
     vundo yasnippet yasnippet-capf
     ;; git-only: Doom's curated snippet collection
     (doom-snippets :host github :repo "doomemacs/snippets"
-                   :files (:defaults "*")
-                   :pin "fd4edaaf0c8476a26994db17d084b36733c635e2")
+                   :files (:defaults "*"))
     auto-yasnippet vimish-fold evil-vimish-fold treesit-fold apheleia
     adaptive-wrap anzu evil-anzu jinx
 
     ;; ui: theme, modeline, icons, gutter, workspaces, sidebar, folding
     doom-themes solaire-mode hl-todo
     ;; git-only: indent-bars is served from its GitHub repo
-    (indent-bars :host github :repo "jdtsmith/indent-bars"
-                   :pin "7733b4b8e1fbd69dc38940000e6eea7516ca2dbc")
+    (indent-bars :host github :repo "jdtsmith/indent-bars")
     doom-modeline diff-hl dashboard persp-mode treemacs treemacs-nerd-icons
     treemacs-evil treemacs-projectile treemacs-magit treemacs-persp
     lsp-treemacs colorful-mode rainbow-delimiters
     ;; Git-only: Doom-like widgets for emacs-dashboard
     (doom-dashboard :host github :repo "emacs-dashboard/doom-dashboard"
-                    :files (:defaults "banners")
-                    :pin "cb6756974237a18124a4713a25d19118247e3ac3")
+                    :files (:defaults "banners"))
 
     ;; completion (vertico/consult/embark + corfu/cape)
     vertico orderless marginalia consult consult-dir embark embark-consult
@@ -140,8 +125,7 @@
     org-contrib org-modern org-appear toc-org htmlize ox-clip
     org-cliplink ob-async jupyter evil-org
     ;; git-only: denote/heading companion absent from every recipe repo
-    (denote-merge :host github :repo "protesilaos/denote-merge"
-                  :pin "2f8d168d37e66b5c8a3b983e211031b9abbf402e")
+    (denote-merge :host github :repo "protesilaos/denote-merge")
     denote denote-silo denote-sequence denote-org denote-journal
     denote-journal-capture denote-menu denote-review denote-regexp
     denote-solo denote-explore consult-denote
@@ -152,11 +136,7 @@
     ;; dev: lsp-mode/flymake/dape/apheleia tooling
     lsp-mode lsp-ui consult-lsp
     ;; git-only: flymake-popon lives on the doomelpa mirror
-    (flymake-popon :host github :repo "doomelpa/flymake-popon"
-                     :pin "99ea813346f3edef7220d8f4faeed2ec69af6060")
-    ;; git-only: Ruff diagnostics as a built-in Flymake backend
-    (flymake-ruff :host github :repo "erickgnavar/flymake-ruff"
-                  :pin "ef4a6caed72bce77a27bda54ffb30e3fdb0e7d76")
+    (flymake-popon :host github :repo "doomelpa/flymake-popon")
     dape envrc
 
     ;; vc-projects: magit/forge porcelain, dired/dirvish, ibuffer
@@ -166,12 +146,9 @@
     ;; tools: notebooks, evaluation, lookup, LLM, pdf
     ein quickrun eros dumb-jump request gptel
     ;; git-only gptel companions
-    (gptel-quick :host github :repo "karthink/gptel-quick"
-                   :pin "36fe296e016449433fa1213f4b89cb8dc7d4db5e")
-    (gptel-magit :host github :repo "ArthurHeymans/gptel-magit"
-                    :pin "fc55c36d5b7d26104358021fe802cc338ddbdff4")
-    (ob-gptel :host github :repo "jwiegley/ob-gptel"
-                :pin "db030ea033e9cce0db6457ba530d6f29e5d181f2")
+    (gptel-quick :host github :repo "karthink/gptel-quick")
+    (gptel-magit :host github :repo "ArthurHeymans/gptel-magit")
+    (ob-gptel :host github :repo "jwiegley/ob-gptel")
     pdf-tools saveplace-pdf-view org-pdftools
 
     ;; lang: data formats, elisp dev, json, latex, markdown, nix, python,
@@ -184,19 +161,16 @@
     pip-requirements pipenv pyvenv conda nose python-pytest
     qml-mode qt-pro-mode
     ;; git-only: qml-ts-mode lives on GitHub
-    (qml-ts-mode :host github :repo "xhcoding/qml-ts-mode"
-                   :pin "b80c6663521b4d0083e416e6712ebc02d37b7aec")
+    (qml-ts-mode :host github :repo "xhcoding/qml-ts-mode")
     bash-completion emmet-mode haml-mode pug-mode slim-mode web-mode
     sass-mode stylus-mode sws-mode rainbow-mode yaml-mode
 
     ;; keybinds & terminal
     ace-window
     ;; git-only: ghostel + its evil extension come from the same repo
-    (ghostel :host github :repo "dakra/ghostel"
-             :pin "8cc917321a8ba5d704c72e3dd6d9d186ece7a692")
+    (ghostel :host github :repo "dakra/ghostel")
     (evil-ghostel :host github :repo "dakra/ghostel"
-                  :files ("extensions/evil-ghostel/*.el")
-                  :pin "8cc917321a8ba5d704c72e3dd6d9d186ece7a692"))
+                  :files ("extensions/evil-ghostel/*.el")))
   "Every external package this config installs, grouped by module.
 Entries are package names (straight's default recipe repositories
 resolve them) or explicit straight recipes for git-only packages.")

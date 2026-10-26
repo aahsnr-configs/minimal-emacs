@@ -19,7 +19,6 @@
 (declare-function dirvish-emerge-previous-group "dirvish")
 (declare-function dirvish-quit "dirvish")
 (declare-function dirvish-layout-toggle "dirvish")
-(declare-function persp-curr "persp-mode")
 (declare-function ar/var-file "early-init")
 (declare-function project-current "project" (&optional maybe-prompt dir))
 (declare-function project-root "project" (project))
@@ -363,6 +362,13 @@
         ("q" "Quit Dirvish" dirvish-quit)
         ("<escape>" "" transient-quit-one :format " ")]])))
 
+;; Bound below but absent from dirvish's generated autoloads: without these
+;; the keys signal void-function until the extension happens to load.
+(autoload #'dirvish-copy-file-true-path "dirvish-extras" nil t)
+(autoload #'dirvish-copy-remote-path "dirvish-extras" nil t)
+(autoload #'dirvish-emerge-next-group "dirvish-emerge" nil t)
+(autoload #'dirvish-emerge-previous-group "dirvish-emerge" nil t)
+
 ;; Dirvish evil-style keymaps.
 (with-eval-after-load 'dirvish
   (general-define-key
@@ -557,9 +563,14 @@
 ;; Projectile compat layer (per upstream Doom core): layered on project.el,
 ;; consumed by ibuffer-projectile and treemacs-projectile.
 (defun ar/projectile-project-root-from-project (dir)
-  "Return the project.el root for DIR, or nil when it is not a project."
-  (when-let* ((project (project-current nil dir)))
-    (project-root project)))
+  "Return the project.el root for DIR, or nil when it is not a project.
+`projectile-mode' puts `project-projectile' on `project-find-functions',
+which calls back into `projectile-project-root'; drop it for this lookup
+or the two recurse until `max-lisp-eval-depth'."
+  (let ((project-find-functions (remq #'project-projectile
+                                      project-find-functions)))
+    (when-let* ((project (project-current nil dir)))
+      (project-root project))))
 
 (defun ar/projectile-project-cache-file-a (original &optional project-root)
   "Store each Projectile project cache under `ar/var-dir'."
@@ -627,6 +638,7 @@
 
 (defun ar/project-recentf ()
   "Show recently opened files scoped to the current project."
+  (interactive)
   (if-let* ((proj (project-current)))
       (let* ((root (project-root proj))
              (files (seq-filter
@@ -732,12 +744,10 @@ lazy `project' -- the hook would not exist yet when ibuffer opens."
   ;; (`ar/dashboard-load-session').
   (setq persp-keymap-prefix (kbd "C-c w")
         persp-auto-save-opt 3
-        persp-auto-resume-time 0
+        persp-auto-resume-time 0.0
         persp-save-dir (ar/var-file "persp/")
         persp-auto-save-fname (ar/var-file "persp/persp-auto-save")
-        persp-set-last-persp-for-new-frames t
-        persp-add-new-buffers nil
-        persp-remove-buffers-from-all-persp t)
+        persp-set-last-persp-for-new-frames t)
   :config
   ;; Batch sessions (harness, compile subprocesses) never activate persp:
   ;; they must neither resume nor write workspace state.
