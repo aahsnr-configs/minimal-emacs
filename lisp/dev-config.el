@@ -62,12 +62,19 @@
 (declare-function lsp-workspace-folders-add "lsp-mode")
 (declare-function lsp-session "lsp-mode")
 (declare-function lsp--session-workspaces "lsp-mode")
+(declare-function flymake-ruff-load "flymake-ruff")
+(defvar lsp-python-ty-clients-server-command)
+(defvar lsp-enabled-clients)
 
 (defun ar/lsp-ensure-maybe ()
   "Start lsp for the current buffer unless its mode is excluded.
 Interactive sessions defer through `lsp-deferred'.  Batch runs import
 the buffer directory as a workspace folder and call `lsp' directly."
   (unless (apply #'derived-mode-p ar/lsp-excluded-modes)
+    ;; The ty client is the sole Python language server in this buffer.
+    ;; Ruff diagnostics come from Flymake's CLI backend below.
+    (when (derived-mode-p 'python-base-mode)
+      (setq-local lsp-enabled-clients '(ty-ls)))
     (if noninteractive
         (progn
           (require 'lsp-mode)
@@ -126,6 +133,13 @@ the buffer directory as a workspace folder and call `lsp' directly."
   (add-hook 'lsp-after-initialize-hook #'ar/lsp-sync-workspaces)
   (add-hook 'lsp-after-open-hook #'ar/lsp-sync-workspaces)
   (add-hook 'lsp-after-uninitialized-functions #'ar/lsp-sync-workspaces))
+
+;; lsp-mode ships the ty client; it starts Astral's `ty server' command.
+(use-package lsp-python-ty
+  :ensure nil
+  :after lsp-mode
+  :custom
+  (lsp-python-ty-clients-server-command '("ty" "server")))
 
 (ar/define-large-file-guard lsp-inlay-hints-mode)
 
@@ -217,8 +231,16 @@ OLD-FN is the wrapped `lsp-resolve-final-command'."
   :commands (flymake-popon-mode)
   :hook (flymake-mode . flymake-popon-mode))
 
+;; Ruff lint diagnostics are a separate Flymake backend alongside ty's LSP
+;; type diagnostics.  python-base-mode covers python-mode and python-ts-mode.
+(use-package flymake-ruff
+  :defer t
+  :commands (flymake-ruff-load)
+  :hook (python-base-mode . flymake-ruff-load))
+
 ;; Python: interpreter and indentation.
 (use-package python
+  :ensure nil
   :defer t
   :custom
   (python-shell-completion-native-enable nil)

@@ -1,6 +1,6 @@
 eln-cache/
 eln-cache
-etc/
+etc/*
+!etc/dashboard-emacs.txt
 var/
-etc/
-var/
+straight/

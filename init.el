@@ -121,9 +121,13 @@
     ;; git-only: indent-bars is served from its GitHub repo
     (indent-bars :host github :repo "jdtsmith/indent-bars"
                    :pin "7733b4b8e1fbd69dc38940000e6eea7516ca2dbc")
-    doom-modeline diff-hl persp-mode treemacs treemacs-nerd-icons
+    doom-modeline diff-hl dashboard persp-mode treemacs treemacs-nerd-icons
     treemacs-evil treemacs-projectile treemacs-magit treemacs-persp
     lsp-treemacs colorful-mode rainbow-delimiters
+    ;; Git-only: Doom-like widgets for emacs-dashboard
+    (doom-dashboard :host github :repo "emacs-dashboard/doom-dashboard"
+                    :files (:defaults "banners")
+                    :pin "cb6756974237a18124a4713a25d19118247e3ac3")
 
     ;; completion (vertico/consult/embark + corfu/cape)
     vertico orderless marginalia consult consult-dir embark embark-consult
@@ -150,6 +154,9 @@
     ;; git-only: flymake-popon lives on the doomelpa mirror
     (flymake-popon :host github :repo "doomelpa/flymake-popon"
                      :pin "99ea813346f3edef7220d8f4faeed2ec69af6060")
+    ;; git-only: Ruff diagnostics as a built-in Flymake backend
+    (flymake-ruff :host github :repo "erickgnavar/flymake-ruff"
+                  :pin "ef4a6caed72bce77a27bda54ffb30e3fdb0e7d76")
     dape envrc
 
     ;; vc-projects: magit/forge porcelain, dired/dirvish, ibuffer

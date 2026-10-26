@@ -86,7 +86,7 @@
   (nerd-icons-color-icons t))
 
 ;; Global typography.  Re-applied on daemon client frames.
-(defun ar/setup-fonts ()
+(defun ar/setup-fonts (&optional _frame)
   "Apply typography, baseline faces, and fontset fallbacks to the frame."
   (set-face-attribute 'default nil :font "JetBrains Mono" :height 125 :weight 'medium)
   (set-face-attribute 'fixed-pitch nil :font "JetBrains Mono" :height 125 :weight 'medium)
@@ -670,331 +670,187 @@ BUFFER may be a buffer object or a buffer name string (Emacs 31's
 (require 'cl-lib)
 
 (defgroup ar/dashboard nil
-  "Doom-style startup dashboard."
+  "Vanilla configuration for the Doom-styled dashboard."
   :group 'ar)
 
 (declare-function ar/var-file "early-init")
 (declare-function ar/etc-file "early-init")
-(defvar ar/packages)  ;; the manifest, set by init.el
-(defvar ar-modules)   ;; the ordered module list, set by init.el
+(defvar ar/config-dir)
+(declare-function widget-create "wid-edit")
+(declare-function nerd-icons-octicon "nerd-icons")
+(declare-function nerd-icons-sucicon "nerd-icons")
+(declare-function dashboard-open "dashboard")
+(declare-function dashboard-setup-startup-hook "dashboard")
+(declare-function dashboard-insert-startupify-lists "dashboard")
+(defvar dashboard-mode-map)
+(defvar ar/packages)
+(defvar ar-modules)
+(defvar dashboard-buffer-name)
+(defvar dashboard-before-initialize-hook)
+(defvar dashboard-after-initialize-hook)
+(defvar dashboard-display-icons-p)
+(defvar dashboard-items)
+(defvar dashboard-item-generators)
+(defvar doom-dashboard-set-widget-binding)
+(defvar server-after-make-frame-hook)
 
-(defcustom ar/dashboard-anchor '(center . center)
-  "How to vertically and horizontally align dashboard widgets."
-  :type '(cons (choice (const :tag "Top" top)
-                       (const :tag "Bottom" bottom)
-                       (const :tag "Centered" center))
-               (choice (const :tag "Left" left)
-                       (const :tag "Right" right)
-                       (const :tag "Centered" center)))
-  :group 'ar/dashboard)
+(defun ar/dashboard-init-info ()
+  "Return the startup summary shown by the dashboard."
+  (format "Emacs loaded %d packages across %d modules in %.3fs"
+          (length ar/packages)
+          (length ar-modules)
+          (float-time
+           (time-subtract (or after-init-time before-init-time)
+                          before-init-time))))
 
-(defcustom ar/dashboard-banner-vertical-padding '(2 . 2)
-  "Number of newlines to pad the banner with, above and below, respectively."
-  :type '(cons integer integer)
-  :group 'ar/dashboard)
+(defun ar/dashboard--insert-shortmenu (label command icon)
+  "Insert a dashboard button for LABEL, COMMAND, and Nerd ICON."
+  (when dashboard-display-icons-p
+    ;; Keep alignment spaces out of the icon's Nerd Font properties.  Padding
+    ;; a propertized icon with `format' can render the spaces as missing glyphs.
+    (insert (nerd-icons-octicon icon :face 'dashboard-heading))
+    (insert (propertize "  " 'face 'default)))
+  (widget-create
+   'item
+   :tag (format "%-30s" label)
+   :action (lambda (&rest _) (call-interactively command))
+   :mouse-face 'highlight
+   :button-face 'dashboard-heading
+   :button-prefix ""
+   :button-suffix ""
+   :format "%[%t%]")
+  (when doom-dashboard-set-widget-binding
+    (insert
+     (propertize
+      (substitute-command-keys (format "\\[%s]" command))
+      'face 'doom-dashboard-bindings-face))))
 
-(defcustom ar/dashboard-menu-sections
-  '(("Reload last session"
-     :icon (nerd-icons-octicon "nf-oct-history" :face 'ar/dashboard-menu-title)
-     :when (file-exists-p (ar/var-file "persp/persp-auto-save"))
-     :action ar/dashboard-load-session)
-    ("Open org-agenda"
-     :icon (nerd-icons-octicon "nf-oct-calendar" :face 'ar/dashboard-menu-title)
-     :when (fboundp 'org-agenda)
-     :action org-agenda)
-    ("Recently opened files"
-     :icon (nerd-icons-faicon "nf-fa-file_text" :face 'ar/dashboard-menu-title)
-     :action consult-recent-file)
-    ("Open project"
-     :icon (nerd-icons-octicon "nf-oct-briefcase" :face 'ar/dashboard-menu-title)
-     :action project-switch-project)
-    ("Jump to bookmark"
-     :icon (nerd-icons-octicon "nf-oct-bookmark" :face 'ar/dashboard-menu-title)
-     :action bookmark-jump)
-    ("Open private configuration"
-     :icon (nerd-icons-octicon "nf-oct-tools" :face 'ar/dashboard-menu-title)
-     :action ar/dashboard-open-config)
-    ("Open documentation"
-     :icon (nerd-icons-octicon "nf-oct-book" :face 'ar/dashboard-menu-title)
-     :action info-emacs-manual))
-  "Menu buttons of the dashboard, ported from Doom's
-`+dashboard-menu-sections'.  Each element is (LABEL . PLIST) with
-:icon (form evaluated at render), :when (form gating display),
-:action (interactive command), :key (hint override) and :face."
-  :type '(repeat sexp)
-  :group 'ar/dashboard)
+(defun ar/dashboard-insert-session-shortmenu (&optional _)
+  "Insert the Reload last session button when a saved session exists."
+  (when (file-exists-p (ar/var-file "persp/persp-auto-save"))
+    (ar/dashboard--insert-shortmenu
+     "Reload last session" #'ar/dashboard-load-session "nf-oct-history")))
 
-;; Our pinned doom-themes ships no dashboard faces to inherit, so these
-;; carry the Tokyo Night values seen on the real themed dashboard.
-(defface ar/dashboard-menu-title
-  '((t (:foreground "#f7768e" :weight bold)))
-  "Face used for the title of menu widgets on the dashboard."
-  :group 'ar/dashboard)
-(defface ar/dashboard-menu-desc
-  '((t (:foreground "#7dcfff")))
-  "Face used for the key description of menu widgets on the dashboard."
-  :group 'ar/dashboard)
-(defface ar/dashboard-loaded
-  '((t (:foreground "#565f89")))
-  "Face used for the loaded packages benchmark."
-  :group 'ar/dashboard)
-(defface ar/dashboard-footer-icon
-  '((t (:foreground "#7dcfff")))
-  "Face used for the icon of the footer on the dashboard."
-  :group 'ar/dashboard)
+(defun ar/dashboard-insert-agenda-shortmenu (&optional _)
+  "Insert the Open org-agenda dashboard button."
+  (ar/dashboard--insert-shortmenu
+   "Open org-agenda" #'org-agenda "nf-oct-calendar"))
 
-;; --- Centering engine (port of +dashboard-maxlen/+dashboard-insert) ------
+(defun ar/dashboard-insert-recents-shortmenu (&optional _)
+  "Insert the Recently opened files dashboard button."
+  (ar/dashboard--insert-shortmenu
+   "Recently opened files" #'consult-recent-file "nf-oct-file"))
 
-(defun ar/dashboard-strlen (string)
-  "Return the unicode-aware display width of STRING, in characters."
-  (let ((width (frame-char-width))
-        (len (string-pixel-width string)))
-    (+ (/ len width)
-       (if (zerop (% len width)) 0 1))))
+(defun ar/dashboard-insert-project-shortmenu (&optional _)
+  "Insert the Open project dashboard button."
+  (ar/dashboard--insert-shortmenu
+   "Open project" #'project-switch-project "nf-oct-briefcase"))
 
-(defun ar/dashboard-maxlen (string)
-  "Return the display width of the longest line in multiline STRING."
-  (with-temp-buffer
-    (insert string)
-    (goto-char (point-min))
-    (let ((width 0))
-      (while (< (point) (point-max))
-        (let ((len (ar/dashboard-strlen
-                    (buffer-substring (pos-bol) (pos-eol)))))
-          (setq width (max width len)))
-        (forward-line 1))
-      width)))
+(defun ar/dashboard-insert-bookmark-shortmenu (&optional _)
+  "Insert the Jump to bookmark dashboard button."
+  (ar/dashboard--insert-shortmenu
+   "Jump to bookmark" #'bookmark-jump "nf-oct-bookmark"))
 
-(defun ar/dashboard-insert (&rest lines)
-  "Insert LINES into the dashboard buffer, aligned per `ar/dashboard-anchor'.
-Alignment is a display-space spec on `line-prefix'/`indent-prefix',
-so redisplay centers the block against the window at paint time --
-no recomputed padding, at any window width."
-  (let ((lines (delq nil lines)))
-    (if-let* ((halign (cdr-safe ar/dashboard-anchor)))
-        (let* ((width (ar/dashboard-maxlen (string-join lines "\n")))
-               (prefix `(space :align-to
-                               (- ,halign ,(if (eq halign 'right)
-                                               (+ 2 width)
-                                             (/ width 2))))))
-          (add-text-properties
-           (point) (progn (mapc (lambda (line) (insert line "\n")) lines)
-                          (point))
-           `(line-prefix ,prefix indent-prefix ,prefix)))
-      (insert (string-join lines "\n")))))
+(defun ar/dashboard-insert-config-shortmenu (&optional _)
+  "Insert the Open private configuration button."
+  (ar/dashboard--insert-shortmenu
+   "Open private configuration" #'ar/dashboard-open-config "nf-oct-tools"))
 
-;; --- Widgets --------------------------------------------------------------
+(defun ar/dashboard-insert-manual-shortmenu (&optional _)
+  "Insert the Open documentation button."
+  (ar/dashboard--insert-shortmenu
+   "Open documentation" #'info-emacs-manual "nf-oct-book"))
 
-(defun ar/dashboard-widget-banner ()
-  "Draw the image banner widget.
-The splash image rides on a `display' text property over a plain
-space, with the line break inserted after it, so the `line-prefix'
-centering spec applies.  The align-to expression references the
-image by its spec cons `(image . PROPS)' -- the documented pixel
-specification form; the vector descriptor `create-image' returns is
-only valid as a `display' property, not inside align-to arithmetic.
-Terminals render no banner."
-  (let ((inhibit-read-only t))
-    (when (and (display-images-p)
-               (stringp fancy-splash-image)
-               (file-readable-p fancy-splash-image))
-      (let* ((halign (cdr ar/dashboard-anchor))
-             (image (create-image fancy-splash-image))
-             (image-spec (cons 'image (cdr (append image nil))))
-             (prefix (propertize
-                      " " 'display `(space :align-to
-                                           (- ,halign (0.5 . ,image-spec)))))
-             (top-pad (or (car-safe ar/dashboard-banner-vertical-padding) 0))
-             (bot-pad (or (cdr-safe ar/dashboard-banner-vertical-padding) 0)))
-        (when (> top-pad 0)
-          (insert (propertize "\n" 'display `(space :height ,top-pad))))
-        (let ((beg (point)))
-          (insert " ")
-          (add-text-properties beg (point)
-                               `(display ,image
-                                 line-prefix ,prefix
-                                 wrap-prefix ,prefix)))
-        (insert "\n")
-        (when (> bot-pad 0)
-          (insert (propertize " " 'display `(space :height ,bot-pad)) "\n"))))))
+(defun ar/dashboard-refresh-items ()
+  "Refresh the dashboard items, including session availability."
+  (setq dashboard-items
+        (append (when (file-exists-p (ar/var-file "persp/persp-auto-save"))
+                  '((session . 1)))
+                '((agenda . 1)
+                  (recents . 1)
+                  (projects . 1)
+                  (bookmarks . 1)
+                  (config . 1)
+                  (manual . 1)))))
 
-(defun ar/dashboard-widget-menu ()
-  "Draw dashboard menu items and keybindings.
+(defun ar/dashboard-center-visible (&rest args)
+  "Refresh the visible dashboard on the affected frame after a resize."
+  (let* ((frame (or (car args) (selected-frame)))
+         (window (get-buffer-window dashboard-buffer-name frame)))
+    (when (window-live-p window)
+      (with-selected-window window
+        (dashboard-insert-startupify-lists t)))))
 
-See `ar/dashboard-menu-sections' to change the contents of the menu."
-  (let ((inhibit-read-only t))
-    (insert "\n")
-    (dolist (section ar/dashboard-menu-sections)
-      (cl-destructuring-bind (label &key icon action when face key) section
-        (when (and (fboundp action)
-                   (or (null when) (eval when t)))
-          (ar/dashboard-insert
-           (let ((icon (if (stringp icon) icon (eval icon t))))
-             (format (format " %s%%s%%10s " (if icon "%s\t" "%s"))
-                     (or icon "")
-                     (with-temp-buffer
-                       (insert-text-button
-                        label
-                        'action (lambda (_button) (call-interactively action))
-                        'face (or face 'ar/dashboard-menu-title)
-                        'follow-link t
-                        'help-echo
-                        (format "%s (%s)" label
-                                (propertize (symbol-name action)
-                                            'face 'ar/dashboard-menu-desc)))
-                       (format "%-38s" (buffer-string)))
-                     ;; Look up the command's key binding dynamically.
-                     (propertize
-                      (or key
-                          (when-let* ((keys (where-is-internal action nil t)))
-                            (with-temp-buffer
-                              (save-excursion (insert (key-description keys)))
-                              (while (re-search-forward "<\\([^>]+\\)>" nil t)
-                                (replace-match
-                                 (let ((str (match-string 1)))
-                                   (upcase (substring str 0 (min (length str) 3))))))
-                              (buffer-string)))
-                          "")
-                      'face 'ar/dashboard-menu-desc)))
-           (propertize "\n" 'display '(space . (:relative-height 0.01)))))))))
+(use-package dashboard
+  :demand t
+  :custom
+  (dashboard-buffer-name "*ahsan*")
+  (dashboard-startup-banner (ar/etc-file "dashboard-emacs.txt"))
+  (dashboard-banner-logo-title nil)
+  (dashboard-center-content t)
+  (dashboard-vertically-center-content t)
+  (dashboard-projects-backend 'project-el)
+  (dashboard-items '((agenda . 1)
+                     (recents . 1)
+                     (projects . 1)
+                     (bookmarks . 1)
+                     (config . 1)
+                     (manual . 1)))
+  (dashboard-init-info #'ar/dashboard-init-info)
+  (dashboard-display-icons-p t)
+  (dashboard-icon-type 'nerd-icons)
+  (dashboard-set-heading-icons t)
+  (dashboard-page-separator "\n")
+  (dashboard-footer-icon
+   (or (ignore-errors
+         (nerd-icons-sucicon "nf-custom-emacs"
+                             :face 'dashboard-footer-face))
+       "Emacs"))
+  (dashboard-startupify-list
+   '(dashboard-insert-banner
+     dashboard-insert-newline
+     dashboard-insert-items
+     dashboard-insert-newline
+     dashboard-insert-init-info
+     dashboard-insert-newline
+     doom-dashboard-insert-homepage-footer))
+  :custom-face
+  (dashboard-text-banner ((t (:foreground "#7aa2f7" :weight bold)))))
 
-(defun ar/dashboard-widget-loaded ()
-  "Draw number of modules and packages loaded, and the session's startup time."
-  (ar/dashboard-insert
-   (propertize
-    (format "Emacs loaded %d packages across %d modules in %.3fs"
-            (length ar/packages) (length ar-modules)
-            (float-time (time-subtract (or after-init-time before-init-time)
-                                       before-init-time)))
-    'face 'ar/dashboard-loaded)))
-
-(defun ar/dashboard-widget-footer ()
-  "Draw the footer glyph button."
-  (ar/dashboard-insert
-   (with-temp-buffer
-     (insert "\n" (propertize " " 'display '(space . (:relative-height 2.0))))
-     (insert-text-button
-      (or (ignore-errors
-            (nerd-icons-sucicon "nf-custom-emacs"
-                                :face 'ar/dashboard-footer-icon))
-          (propertize "emacs" 'face 'ar/dashboard-footer-icon))
-      'action (lambda (_button)
-                (browse-url "https://www.gnu.org/software/emacs/"))
-      'follow-link t
-      'help-echo "Open the GNU Emacs project page")
-     (buffer-string))))
-
-(defcustom ar/dashboard-functions
-  '(ar/dashboard-widget-banner
-    ar/dashboard-widget-menu
-    ar/dashboard-widget-loaded
-    ar/dashboard-widget-footer)
-  "Ordered widget functions run to construct the dashboard buffer.
-
-These functions take no arguments and the dashboard buffer is current
-while they run."
-  :type 'hook
-  :group 'ar/dashboard)
-
-;; --- Point trap, selection and movement (Doom's button navigation) --------
-
-(defun ar/dashboard-reposition-point-h ()
-  "Trap the point in the buttons."
-  (when (eq (current-buffer) (get-buffer "*ahsan*"))
-    (when (region-active-p)
-      (setq deactivate-mark t)
-      (when (bound-and-true-p evil-local-mode)
-        (evil-change-to-previous-state)))
-    (cond ((button-at (point))
-           (forward-button 0 nil nil t))
-          ((save-restriction
-             (narrow-to-region (pos-bol) (pos-eol))
-             (forward-button 1 nil nil t)))
-          ((backward-button 1 nil nil t))
-          ((goto-char (point-min))
-           (forward-button 1 nil nil t)))
-    ;; Hide the cursor if there are no buttons.
-    (unless (button-at (point))
-      (setq-local cursor-type nil
-                  evil-normal-state-cursor (list nil)))))
-
-(defun ar/dashboard--help-echo ()
-  "Echo the help-echo of the button at point."
-  (when-let* ((button (button-at (point)))
-              (help (button-get button 'help-echo)))
-    (message "%s" help)))
-
-(defun ar/dashboard-forward-button (n)
-  "Like `forward-button', but don't wrap; echo the button's help."
-  (interactive "p")
-  (forward-button n nil)
-  (ar/dashboard--help-echo))
-
-(defun ar/dashboard-backward-button (n)
-  "Like `backward-button', but don't wrap; echo the button's help."
-  (interactive "p")
-  (backward-button n nil)
-  (ar/dashboard--help-echo))
-
-(defun ar/dashboard-push-button ()
-  "Push the button at point, saving the window's scroll position."
-  (interactive)
-  (let ((win (selected-window)))
-    (set-window-parameter win 'ar/dashboard-last-window-start
-                          (window-start win))
-    (set-window-parameter win 'ar/dashboard-last-position (point)))
-  (push-button))
-
-(define-derived-mode ar/dashboard-mode special-mode "ahsan"
-  "Major mode for the Doom-style startup dashboard."
-  (buffer-disable-undo)
-  (setq truncate-lines t)
-  (setq-local whitespace-style nil)
-  (setq-local show-trailing-whitespace nil)
-  (setq-local hscroll-margin 0)
-  (setq-local tab-width 2)
-  (setq-local scroll-preserve-screen-position nil)
-  (setq-local auto-hscroll-mode nil)
-  (setq-local display-line-numbers-type nil)
-  (setq-local mode-line-right-align-edge 'right-margin)
-  ;; hl-line would highlight up to the BOL of the following line, which
-  ;; looks ugly, so exclude the newline at EOL.
-  (setq-local hl-line-range-function (lambda () (cons (pos-bol) (pos-eol))))
-  (setq-local enable-local-variables nil)
-  ;; Buffer-local font scale: shrinks dashboard text only.  `face-remap'
-  ;; is per-buffer, so the global font settings are untouched.
-  (face-remap-add-relative 'default :height 0.8)
-  (hl-line-mode 1)
-  (ar/hide-modeline-mode 1)
-  (add-hook 'kill-buffer-hook #'ar/dashboard--reopen nil t)
-  (add-hook 'post-command-hook #'ar/dashboard-reposition-point-h nil 'local))
-
-(define-key ar/dashboard-mode-map [left-margin mouse-1] #'ignore)
-(define-key ar/dashboard-mode-map [remap forward-button]
-            #'ar/dashboard-forward-button)
-(define-key ar/dashboard-mode-map [remap backward-button]
-            #'ar/dashboard-backward-button)
-(define-key ar/dashboard-mode-map [remap push-button]
-            #'ar/dashboard-push-button)
-(define-key ar/dashboard-mode-map "n" #'ar/dashboard-forward-button)
-(define-key ar/dashboard-mode-map "p" #'ar/dashboard-backward-button)
-(define-key ar/dashboard-mode-map (kbd "C-n") #'ar/dashboard-forward-button)
-(define-key ar/dashboard-mode-map (kbd "C-p") #'ar/dashboard-backward-button)
-(define-key ar/dashboard-mode-map [down] #'ar/dashboard-forward-button)
-(define-key ar/dashboard-mode-map [up] #'ar/dashboard-backward-button)
-(define-key ar/dashboard-mode-map [tab] #'ar/dashboard-forward-button)
-(define-key ar/dashboard-mode-map [backtab] #'ar/dashboard-backward-button)
-(define-key ar/dashboard-mode-map [remap evil-next-line]
-            #'ar/dashboard-forward-button)
-(define-key ar/dashboard-mode-map [remap evil-previous-line]
-            #'ar/dashboard-backward-button)
-(define-key ar/dashboard-mode-map [remap evil-next-visual-line]
-            #'ar/dashboard-forward-button)
-(define-key ar/dashboard-mode-map [remap evil-previous-visual-line]
-            #'ar/dashboard-backward-button)
-(define-key ar/dashboard-mode-map [remap evil-delete] #'ignore)
-
-;; --- Session actions -------------------------------------------------------
+(use-package doom-dashboard
+  :after dashboard
+  :demand t
+  :bind
+  (:map dashboard-mode-map
+        ("<remap> <dashboard-previous-line>" . widget-backward)
+        ("<remap> <dashboard-next-line>" . widget-forward)
+        ("<remap> <previous-line>" . widget-backward)
+        ("<remap> <next-line>" . widget-forward)
+        ("<remap> <right-char>" . widget-forward)
+        ("<remap> <left-char>" . widget-backward))
+  :custom
+  (doom-dashboard-homepage-footer-url "https://www.gnu.org/software/emacs/")
+  (doom-dashboard-set-widget-binding t)
+  :config
+  (setq dashboard-item-generators
+        '((session . ar/dashboard-insert-session-shortmenu)
+          (agenda . ar/dashboard-insert-agenda-shortmenu)
+          (recents . ar/dashboard-insert-recents-shortmenu)
+          (projects . ar/dashboard-insert-project-shortmenu)
+          (bookmarks . ar/dashboard-insert-bookmark-shortmenu)
+          (config . ar/dashboard-insert-config-shortmenu)
+          (manual . ar/dashboard-insert-manual-shortmenu)))
+  (add-hook 'dashboard-before-initialize-hook #'ar/dashboard-refresh-items)
+  (unless noninteractive
+    (dashboard-setup-startup-hook)
+    (add-hook 'dashboard-after-initialize-hook
+              #'ar/dashboard-center-visible)
+    (add-hook 'window-size-change-functions
+              #'ar/dashboard-center-visible t)
+    (when (daemonp)
+      (setq initial-buffer-choice #'dashboard-open))
+    (with-eval-after-load 'server
+      (add-hook 'server-after-make-frame-hook #'dashboard-open))))
 
 (defun ar/dashboard-load-session ()
   "Restore the last saved persp-mode session from the auto-save file."
@@ -1002,106 +858,9 @@ while they run."
   (persp-load-state-from-file (ar/var-file "persp/persp-auto-save")))
 
 (defun ar/dashboard-open-config ()
-  "Open the configuration root in Dired (Doom's open-private-config)."
+  "Open the configuration root in Dired."
   (interactive)
   (dired ar/config-dir))
-
-;; --- Rendering and resize --------------------------------------------------
-
-(defun ar/dashboard-resize-h (&rest _)
-  "Re-center the dashboard vertically and reset its margins and fringes.
-Horizontal alignment is a display spec and needs no resize handling."
-  (dlet (buffer-list-update-hook
-         window-configuration-change-hook
-         window-size-change-functions)
-    (when-let* ((windows (get-buffer-window-list "*ahsan*" nil t)))
-      (dolist (win windows)
-        (unless (= (window-start win)
-                   (or (window-parameter win 'ar/dashboard-last-window-start)
-                       1))
-          (set-window-start
-           win (or (window-parameter win 'ar/dashboard-last-window-start) 0)))
-        (when-let* ((pos (window-parameter win 'ar/dashboard-last-position)))
-          (goto-char pos)
-          (ar/dashboard-reposition-point-h))
-        (cl-destructuring-bind (left right) (window-fringes win)
-          (unless (and (= left 0) (= right 0))
-            (set-window-fringes win 0 0))))
-      (with-current-buffer "*ahsan*"
-        (let ((inhibit-read-only t))
-          (save-excursion
-            (with-silent-modifications
-              ;; Only plain blank lines are re-centering padding; banner
-              ;; lines carry `display' properties (the pads and the splash
-              ;; image) and must survive the recount.
-              (goto-char (point-min))
-              (while (and (eolp) (not (eobp))
-                          (not (get-text-property (point) 'display)))
-                (forward-line 1))
-              (delete-region (point-min) (point))
-              (insert
-               (make-string
-                (max 0 (pcase (car-safe ar/dashboard-anchor)
-                         (`top 0)
-                         (`center
-                          (- (/ (window-height (get-buffer-window)) 2)
-                             (round (/ (count-lines (point-min) (point-max))
-                                       2))))
-                         (_ 0)))
-                ?\n)))))))))
-
-(defun ar/dashboard-reload (&optional force)
-  "Update the dashboard buffer (or create it, if it doesn't exist).
-Without FORCE, only reload when the dashboard is actually displayed."
-  (when (or force
-            (and (get-buffer-window "*ahsan*" t)
-                 (not (window-minibuffer-p (frame-selected-window)))))
-    (with-current-buffer (get-buffer-create "*ahsan*")
-      (with-silent-modifications
-        (let ((pt (point)))
-          (unless (eq major-mode 'ar/dashboard-mode)
-            (ar/dashboard-mode))
-          (let ((inhibit-read-only t))
-            (erase-buffer)
-            (dolist (widget ar/dashboard-functions)
-              (funcall widget)))
-          (goto-char pt)
-          (ar/dashboard-reposition-point-h))
-        (ar/dashboard-resize-h))
-      (current-buffer))))
-
-(defun ar/dashboard-initial-buffer ()
-  "Return the dashboard buffer, rendering it first."
-  (ar/dashboard-reload t))
-
-(defun ar/dashboard--reopen ()
-  "Reopen the dashboard when the last window's buffer is killed."
-  (when (and (null (delq nil (mapcar #'buffer-file-name (buffer-list))))
-             (not noninteractive))
-    (switch-to-buffer (ar/dashboard-reload t))))
-
-(defun ar/dashboard-scratch-to-dashboard-h ()
-  "Swap a fresh server frame's *scratch* for the dashboard."
-  (when (string= (buffer-name) "*scratch*")
-    (switch-to-buffer (ar/dashboard-reload t))))
-
-(defun ar/dashboard-reload-frame-h (_frame)
-  "Reload the dashboard after a brief pause: new frames' dimensions
-may not be fully initialized by the time this runs."
-  (run-with-timer 0.1 nil #'ar/dashboard-reload t))
-
-(setq fancy-splash-image (ar/etc-file "splash-image.png"))
-
-(unless noninteractive
-  (setq initial-buffer-choice #'ar/dashboard-initial-buffer)
-  (add-hook 'window-size-change-functions #'ar/dashboard-resize-h)
-  (with-eval-after-load 'server
-    (add-hook 'server-after-make-frame-hook
-              #'ar/dashboard-scratch-to-dashboard-h)
-    (add-hook 'server-after-make-frame-hook
-              #'ar/dashboard-reload-frame-h)))
-
-;; Module boundary: ui is loaded by init.el after editor-config.
 
 (provide 'ui-config)
 ;;; ui-config.el ends here

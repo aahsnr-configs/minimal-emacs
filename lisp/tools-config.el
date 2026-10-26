@@ -2,9 +2,9 @@
 
 ;;; Commentary:
 
-;; The tools module (:tools parity): ein (Jupyter notebooks), eval
-;; (quickrun + eros), lookup (dumb-jump + online providers), llm (gptel
-;; suite), and pdf (pdf-tools).
+;; The tools module (:tools parity): ein (notebooks) and emacs-jupyter
+;; (kernel REPLs and Org Babel), eval (quickrun + eros), lookup (dumb-jump
+;; + online providers), llm (gptel suite), and pdf (pdf-tools).
 
 ;;; Code:
 
@@ -14,6 +14,13 @@
 (declare-function pdf-view-previous-page "pdf-view")
 (declare-function pdf-view-scroll-up-or-next-page "pdf-view")
 (declare-function pdf-view-scroll-down-or-previous-page "pdf-view")
+(declare-function jupyter-run-repl "jupyter-repl"
+                  (kernel-name &optional repl-name associate-buffer client-class display))
+(declare-function jupyter-connect-repl "jupyter-repl"
+                  (file &optional repl-name associate-buffer client-class display))
+(declare-function jupyter-server-list-kernels "jupyter-server" (server))
+(declare-function jupyter-repl-associate-buffer "jupyter-repl" (client))
+(defvar savehist-additional-variables)
 
 ;; ein: tame Jupyter notebooks with emacs.
 (use-package ein
@@ -21,6 +28,20 @@
   :commands (ein:run ein:login ein:run-remote ein:notebooklist-open)
   :custom
   (ein:output-area-inlined-images t))
+
+;; emacs-jupyter: local/remote kernel REPLs and Org Babel backends.
+(use-package jupyter
+  :defer t
+  :commands (jupyter-run-repl
+             jupyter-connect-repl
+             jupyter-server-list-kernels
+             jupyter-repl-associate-buffer))
+
+;; Persist named Jupyter kernels with the other savehist state in var/.
+(with-eval-after-load 'jupyter-server
+  (with-eval-after-load 'savehist
+    (add-to-list 'savehist-additional-variables
+                 'jupyter-server-kernel-names)))
 
 ;; eval: run code, run (also, repls) -- quickrun recipes + eros overlays.
 (use-package quickrun
@@ -39,6 +60,13 @@
 (ar/global-leader
   "o r" '(quickrun :wk "Run code (quickrun)")
   "o R" '(quickrun-region :wk "Run region"))
+
+(ar/global-leader
+  "o j"   '(:ignore t :wk "Jupyter")
+  "o j r" '(jupyter-run-repl :wk "Run kernel REPL")
+  "o j c" '(jupyter-connect-repl :wk "Connect to kernel")
+  "o j s" '(jupyter-server-list-kernels :wk "Manage server kernels")
+  "o j a" '(jupyter-repl-associate-buffer :wk "Associate buffer with REPL"))
 
 ;; lookup: jump-to-definition fallback and online documentation providers.
 (use-package dumb-jump

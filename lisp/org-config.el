@@ -14,6 +14,7 @@
 (declare-function ar/denote-insert-atomic-note-template "org-config")
 (declare-function ar/var-file "early-init")
 (declare-function ar/icons-displayable-p "core-config")
+(defvar org-babel-default-header-args:jupyter-python)
 
 (require 'cl-lib)
 (require 'subr-x)
@@ -41,8 +42,8 @@ loaded, the empty string keeps the surrounding group names well-formed."
 (with-eval-after-load 'org-persist
   (setq org-persist-directory (ar/var-file "org/persist/")))
 
-;; Org stays OUT of startup: it loads with the first org buffer, and every
-;; `:after org' block (org-habit, ob-async, jupyter, evil-org) fires then.
+;; Org stays OUT of startup: it loads with the first Org buffer, and each
+;; `:after org' block (org-habit, ob-async, evil-org) fires then.
 
 ;; Base directory for all Org and Denote files, respecting XDG.
 
@@ -484,11 +485,7 @@ loaded, the empty string keeps the surrounding group names well-formed."
   :defer t
   :after org)
 
-;; Jupyter kernels via org-babel (+jupyter).
-(use-package jupyter
-  :defer t
-  :after org)
-
+;; Jupyter's Org Babel backend is loaded when a `jupyter-LANG' block is used.
 ;; evil-org integration (+everywhere parity).
 (use-package evil-org
   :after org
@@ -504,6 +501,7 @@ loaded, the empty string keeps the surrounding group names well-formed."
   (dolist (pair '(("sh" . "src shell")
                   ("el" . "src emacs-lisp")
                   ("py" . "src python")
+                  ("jp" . "src jupyter-python")
                   ("dot" . "src dot")
                   ("plantuml" . "src plantuml")
                   ("tex" . "src latex")
@@ -518,16 +516,47 @@ loaded, the empty string keeps the surrounding group names well-formed."
       (matlab . octave) (rust . rustic-babel) (amm . ammonite))
     "Alist mapping divergent block headers to their `ob-*' package names.")
 
+  ;; Jupyter blocks require a session; define this before the first block is
+  ;; parsed so the initial execution works without a manual :session header.
+  (setq org-babel-default-header-args:jupyter-python
+        '((:session . "python")))
+
   (defun ar/org--babel-lazy-load (lang)
     "Lazy load the babel package for LANG and register it."
     (cl-check-type lang (or symbol null))
     (when lang
-      (unless (cdr (assq lang org-babel-load-languages))
-        (let ((loaded (or (require (intern (format "ob-%s" lang)) nil t)
-                          (require lang nil t))))
-          (when loaded
-            (add-to-list 'org-babel-load-languages (cons lang t)))
-          loaded))))
+      (let* ((babel-lang
+              (if (string-prefix-p "jupyter-" (symbol-name lang))
+                  'jupyter
+                lang))
+             (already-enabled
+              (cdr (assq babel-lang org-babel-load-languages)))
+             (loaded
+              (if (eq babel-lang 'jupyter)
+                  ;; Ensure the backend loads even if a user has already
+                  ;; listed it in `org-babel-load-languages'.
+                  (require 'ob-jupyter nil t)
+                (unless already-enabled
+                  (or (require (intern (format "ob-%s" babel-lang)) nil t)
+                      (require babel-lang nil t))))))
+        (when loaded
+          (if (eq babel-lang 'jupyter)
+              ;; Keep Jupyter last in the registry as its Org integration adds
+              ;; source-language mappings for available kernel specifications.
+              (setq org-babel-load-languages
+                    (append (assq-delete-all 'jupyter
+                                             org-babel-load-languages)
+                            '((jupyter . t))))
+            (unless already-enabled
+              (add-to-list 'org-babel-load-languages
+                           (cons babel-lang t) t)))
+          ;; If Org Babel lazy-loads the backend while processing the current
+          ;; Org buffer, its `org-mode-hook' has already run. Register aliases
+          ;; now so the first `jupyter-LANG' block is ready to execute.
+          (when (and (eq babel-lang 'jupyter)
+                     (fboundp 'org-babel-jupyter-make-local-aliases))
+            (org-babel-jupyter-make-local-aliases)))
+        loaded)))
 
   (define-advice org-babel-exp-src-block (:before (&optional element) lazy-load-export)
     "Lazy load a babel package when a block is processed during exporting."

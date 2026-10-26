@@ -21,6 +21,11 @@
 (declare-function dirvish-layout-toggle "dirvish")
 (declare-function persp-curr "persp-mode")
 (declare-function ar/var-file "early-init")
+(declare-function project-current "project" (&optional maybe-prompt dir))
+(declare-function project-root "project" (project))
+(declare-function projectile-project-root "projectile" (&optional dir))
+(declare-function projectile-project-cache-file "projectile" (&optional project-root))
+(defvar projectile-cache-file)
 (defvar ediff-control-buffer)
 (declare-function ediff-scroll-vertically "ediff")
 (declare-function ediff-toggle-help "ediff")
@@ -508,7 +513,8 @@
                                    "pyproject.toml"
                                    "go.mod"
                                    "Makefile"
-                                   ".project"))
+                                   ".project"
+                                   ".projectile"))
   (project-vc-ignores '("node_modules/"
                         ".venv/"
                         "venv/"
@@ -550,16 +556,53 @@
 
 ;; Projectile compat layer (per upstream Doom core): layered on project.el,
 ;; consumed by ibuffer-projectile and treemacs-projectile.
+(defun ar/projectile-project-root-from-project (dir)
+  "Return the project.el root for DIR, or nil when it is not a project."
+  (when-let* ((project (project-current nil dir)))
+    (project-root project)))
+
+(defun ar/projectile-project-cache-file-a (original &optional project-root)
+  "Store each Projectile project cache under `ar/var-dir'."
+  (let* ((root (or project-root (projectile-project-root) default-directory))
+         (name (file-name-nondirectory (directory-file-name root)))
+         (projectile-cache-file
+          (expand-file-name
+           (format "%s-%s" name (secure-hash 'sha1 root))
+           (ar/var-file "projectile/"))))
+    (funcall original root)))
+
 (use-package projectile
-  :defer t
+  :commands (projectile-project-root
+             projectile-project-name
+             projectile-project-p
+             projectile-locate-dominating-file
+             projectile-relevant-known-projects)
   :after project
   :custom
   (projectile-project-search-path '("~/projects/" "~/work/"))
-  (projectile-enable-caching t)
-  (projectile-cache-file (ar/var-file "projectile.cache"))
-  (projectile-known-projects-file (ar/var-file "projectile-bookmarks.eld"))
+  (projectile-indexing-method 'hybrid)
+  (projectile-enable-caching (if noninteractive t 'persistent))
+  (projectile-globally-ignored-files '(".DS_Store" "TAGS"))
+  (projectile-globally-ignored-file-suffixes '(".elc" ".pyc" ".o"))
+  (projectile-kill-buffers-filter 'kill-only-files)
+  (projectile-ignored-projects '("~/"))
+  (projectile-known-projects-file (ar/var-file "projectile/projects.eld"))
+  ;; Let project.el define roots first, while retaining Projectile's local
+  ;; override and fallback marker handling for compatibility integrations.
+  (projectile-project-root-functions
+   '(projectile-root-local
+     ar/projectile-project-root-from-project
+     projectile-root-marked
+     projectile-root-bottom-up
+     projectile-root-top-down
+     projectile-root-top-down-recurring))
   :config
-  (projectile-mode 1))
+  (make-directory (ar/var-file "projectile/") t)
+  (unless (advice-member-p #'ar/projectile-project-cache-file-a
+                           'projectile-project-cache-file)
+    (advice-add 'projectile-project-cache-file :around
+                #'ar/projectile-project-cache-file-a))
+  (projectile-mode +1))
 
 ;;; Project utilities
 (defun ar/find-file-in-emacs-config ()
