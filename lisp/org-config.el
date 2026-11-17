@@ -843,30 +843,47 @@ loaded, the empty string keeps the surrounding group names well-formed."
 ;; load this module.
 (with-eval-after-load 'org
   (general-define-key
-    :states '(normal insert visual emacs)
-    :keymaps 'org-mode-map
-    :prefix "SPC m"
-    :global-prefix "C-SPC m"
-    "t"   '(org-todo :wk "Todo state")
-    "s"   '(org-schedule :wk "Schedule")
-    "d"   '(org-deadline :wk "Deadline")
-    "."   '(org-time-stamp :wk "Timestamp")
-    "p"   '(org-priority :wk "Priority")
-    "T"   '(org-set-tags-command :wk "Tags")
-    "r"   '(org-refile :wk "Refile")
-    "a"   '(org-archive-subtree-default :wk "Archive")
-    "i"   '(org-id-get-create :wk "Create ID")
-    "l"   '(org-insert-link :wk "Insert link")
-    "e"   '(org-export-dispatch :wk "Export")
-    "c"   '(:ignore t :wk "clock")
-    "c i" '(org-clock-in :wk "Clock in")
-    "c o" '(org-clock-out :wk "Clock out")
-    "c r" '(org-clock-report :wk "Clock report")))
+   :states '(normal insert visual emacs)
+   :keymaps 'org-mode-map
+   :prefix "SPC m"
+   :global-prefix "C-SPC m"
+   "t"   '(org-todo :wk "Todo state")
+   "s"   '(org-schedule :wk "Schedule")
+   "d"   '(org-deadline :wk "Deadline")
+   "."   '(org-time-stamp :wk "Timestamp")
+   "p"   '(org-priority :wk "Priority")
+   "T"   '(org-set-tags-command :wk "Tags")
+   "r"   '(org-refile :wk "Refile")
+   "a"   '(org-archive-subtree-default :wk "Archive")
+   "i"   '(org-id-get-create :wk "Create ID")
+   "l"   '(org-insert-link :wk "Insert link")
+   "e"   '(org-export-dispatch :wk "Export")
+   "c"   '(:ignore t :wk "clock")
+   "c i" '(org-clock-in :wk "Clock in")
+   "c o" '(org-clock-out :wk "Clock out")
+   "c r" '(org-clock-report :wk "Clock report")))
 
 ;; Optional integration, only when the library is present.
 (when (locate-library "org-src-context")
   (with-eval-after-load 'org
     (require 'org-src-context)))
+
+(use-package org-timegrid
+  :straight (:host github :repo "Gleek/org-timegrid")
+  :bind ("C-c a c" . org-timegrid-week)
+  :init
+  (setq org-timegrid-org-capture-file "~/org/calendar.org"
+        org-timegrid-org-tag-color-alist
+        '(("work" . indigo) ("personal" . green)))
+  :config
+  (require 'org-timegrid-org))
+
+(use-package org-timegrid-agenda
+  :straight nil
+  :after org-agenda
+  :config
+  (org-timegrid-agenda-mode 1))
+
 
 (provide 'org-config)
 ;;; org-config.el ends here
