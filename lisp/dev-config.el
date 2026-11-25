@@ -269,28 +269,6 @@ OLD-FN is the wrapped `lsp-resolve-final-command'."
   (interactive)
   (lsp-execute-code-action-by-kind "source.fixAll"))
 
-;; Python actions under the local leader (SPC m): ruff through lsp, and
-;; evaluation through emacs-jupyter (see tools-config).
-(with-eval-after-load 'python
-  (general-define-key
-   :states '(normal insert visual emacs)
-   :keymaps 'python-base-mode-map
-   :prefix "SPC m"
-   :global-prefix "C-SPC m"
-   "f" '(ar/python-ruff-fix-all :wk "Ruff fix all")
-   "i" '(lsp-organize-imports :wk "Organize imports")
-   "r" '(jupyter-run-repl :wk "Run Jupyter REPL")
-   "c" '(jupyter-connect-repl :wk "Connect to kernel")
-   "a" '(jupyter-repl-associate-buffer :wk "Associate with REPL")
-   "z" '(jupyter-repl-pop-to-buffer :wk "Go to REPL")
-   "e" '(jupyter-eval-line-or-region :wk "Eval line/region")
-   "d" '(jupyter-eval-defun :wk "Eval defun")
-   "b" '(jupyter-eval-buffer :wk "Eval buffer")
-   "h" '(jupyter-inspect-at-point :wk "Inspect at point")
-   "o" '(jupyter-eval-remove-overlays :wk "Clear result overlays")
-   "k" '(jupyter-repl-restart-kernel :wk "Restart kernel")
-   "x" '(jupyter-repl-interrupt-kernel :wk "Interrupt kernel")))
-
 ;; Debugger: dape (DAP: breakpoints, stepping, REPL, watch).
 (use-package dape
   :defer t

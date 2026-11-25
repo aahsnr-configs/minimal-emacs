@@ -121,11 +121,16 @@ This does not check login state, credentials, or network availability."
   (call-interactively #'gptel-add))
 
 (use-package gptel
-  :commands (gptel gptel-send)
+  :commands (gptel gptel-send gptel-add gptel-add-file gptel-menu)
   :custom
   (gptel-default-mode 'org-mode)
   (gptel-use-header-line t)
   (gptel-confirm-tool-calls t)
+  (gptel-model 'gpt-6-sol)
+  (gptel-directives
+   '((default . "You are a large language model living in Emacs and a helpful assistant. Respond concisely.")
+     (programming . "You are an experienced software engineer. Reply with code only, no explanations unless asked.")
+     (writing . "You are a professional writing assistant. Improve clarity, flow and correctness.")))
   :config
   (require 'gptel-openai-oauth)
   ;; Keep OAuth credentials in the existing var/ state tree.  This is an
@@ -134,8 +139,7 @@ This does not check login state, credentials, or network availability."
         (ar/var-file "gptel/openai-oauth-token"))
   ;; Change to 'device when authenticating over SSH with no localhost callback.
   ;; (setq gptel-openai-oauth-login-method 'device)
-  (setq gptel-backend (gptel-make-openai-oauth "ChatGPT subscription")
-        gptel-model 'gpt-6-sol))
+  (setq gptel-backend (gptel-make-openai-oauth "ChatGPT subscription")))
 
 (provide 'llm-config)
 ;;; llm-config.el ends here

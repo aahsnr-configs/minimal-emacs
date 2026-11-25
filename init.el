@@ -123,7 +123,7 @@
     ;; the retired ob-/ox- libraries org requires on demand; htmlize is a
     ;; dependency-only entry (org export buffers).
     org-contrib org-modern org-appear toc-org htmlize ox-clip
-    org-cliplink ob-async jupyter evil-org
+    org-cliplink ob-async websocket simple-httpd zmq jupyter evil-org
     ;; git-only: denote/heading companion absent from every recipe repo
     (denote-merge :host github :repo "protesilaos/denote-merge")
     denote denote-silo denote-sequence denote-org denote-journal

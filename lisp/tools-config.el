@@ -4,7 +4,8 @@
 
 ;; The tools module (:tools parity): ein (notebooks) and emacs-jupyter
 ;; (kernel REPLs and Org Babel), eval (quickrun + eros), lookup (dumb-jump
-;; + online providers), llm (gptel suite), and pdf (pdf-tools).
+;; + online providers), and pdf (pdf-tools). LLM configuration belongs to
+;; llm-config.
 
 ;;; Code:
 
@@ -25,7 +26,8 @@
 ;; ein: tame Jupyter notebooks with emacs.
 (use-package ein
   :defer t
-  :commands (ein:run ein:login ein:run-remote ein:notebooklist-open)
+  :commands (ein:run ein:login ein:run-remote ein:stop
+             ein:notebooklist-open)
   :custom
   (ein:output-area-inlined-images t))
 
@@ -41,9 +43,11 @@
              jupyter-server-list-kernels
              jupyter-repl-associate-buffer
              jupyter-repl-pop-to-buffer
+             jupyter-repl-scratch-buffer
              jupyter-repl-restart-kernel
              jupyter-repl-interrupt-kernel
              jupyter-eval-line-or-region
+             jupyter-eval-string-command
              jupyter-eval-defun
              jupyter-eval-buffer
              jupyter-eval-remove-overlays
@@ -52,6 +56,10 @@
   ;; Short results show as an end-of-line overlay (like eros for Elisp).
   (jupyter-eval-use-overlays t)
   (jupyter-repl-history-maximum-length 1000))
+
+;; These Org commands live in files separate from jupyter.el.
+(autoload #'org-babel-jupyter-scratch-buffer "ob-jupyter" nil t)
+(autoload #'jupyter-org-toggle-request-queuing "jupyter-org-client" nil t)
 
 ;; Persist named Jupyter kernels with the other savehist state in var/.
 (with-eval-after-load 'jupyter-server
@@ -77,13 +85,6 @@
   "o r" '(quickrun :wk "Run code (quickrun)")
   "o R" '(quickrun-region :wk "Run region"))
 
-(ar/global-leader
-  "o j"   '(:ignore t :wk "Jupyter")
-  "o j r" '(jupyter-run-repl :wk "Run kernel REPL")
-  "o j c" '(jupyter-connect-repl :wk "Connect to kernel")
-  "o j s" '(jupyter-server-list-kernels :wk "Manage server kernels")
-  "o j a" '(jupyter-repl-associate-buffer :wk "Associate buffer with REPL"))
-
 ;; lookup: jump-to-definition fallback and online documentation providers.
 ;; The backend hook lives in :init: it is what loads dumb-jump, so putting it
 ;; in :config would never run.  consult-xref (completion-config) stays the
@@ -102,18 +103,6 @@
 
 (ar/global-leader
   "c g x" '(dumb-jump-go-prefer-external :wk "Definition (external)"))
-
-;; llm: LLM integration powered by gptel (ChatGPT default backend).
-(use-package gptel
-  :defer t
-  :commands (gptel gptel-send gptel-add gptel-add-file gptel-menu)
-  :custom
-  (gptel-default-mode 'org-mode)
-  (gptel-model 'gpt-4o)
-  (gptel-directives
-   '((default . "You are a large language model living in Emacs and a helpful assistant. Respond concisely.")
-     (programming . "You are an experienced software engineer. Reply with code only, no explanations unless asked.")
-     (writing . "You are a professional writing assistant. Improve clarity, flow and correctness."))))
 
 ;; gptel-quick: quick explanations at point.
 (use-package gptel-quick
@@ -135,11 +124,6 @@
 (use-package ob-gptel
   :after (gptel org)
   :commands (org-babel-execute:gptel))
-
-(ar/global-leader
-  "o l" '(gptel :wk "Open gptel chat") ; org-store-link is on "o L" (org-config)
-  "o g" '(gptel-menu :wk "gptel menu")
-  "o q" '(gptel-quick :wk "Quick explain at point"))
 
 ;; pdf: Emacs as a PDF reader via pdf-tools.
 (use-package pdf-tools

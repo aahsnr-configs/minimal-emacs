@@ -4,7 +4,7 @@
 > **Evil** for editing, **Denote** for notes, and no framework to work around.
 
 ![Emacs](https://img.shields.io/badge/Emacs-31.1-7F5AB6)
-![Packages](https://img.shields.io/badge/packages-187-4E9A06)
+![Packages](https://img.shields.io/badge/packages-194-4E9A06)
 ![Editing](https://img.shields.io/badge/editing-Evil-6A5ACD)
 ![Notes](https://img.shields.io/badge/notes-Denote-2E8B57)
 
@@ -51,10 +51,10 @@ platforms are not regularly tested.
 
 A complete Emacs configuration built directly on vanilla Emacs:
 
-- **10 local modules** under `lisp/`, loaded in a deliberate order.
-- **187 package entries** in one manifest, including **23 explicit git-only
+- **11 local modules** under `lisp/`, loaded in a deliberate order.
+- **194 package entries** in one manifest, including **23 explicit git-only
   recipes**.
-- Roughly **6,200 lines** of Emacs Lisp, comments included.
+- Roughly **6,400 lines** of Emacs Lisp, comments included.
 - A Doom-inspired user experience: `SPC` leader keys, Evil, a dashboard, a
   rule-based popup manager, workspaces, and a Tokyo Night theme.
 - No Doom, Spacemacs, Prelude, `use-package` installer, `package.el`
@@ -77,7 +77,7 @@ anything; every `use-package` form in `lisp/` only configures.
 | Files and projects | project.el backbone, Projectile compatibility, Dired, Dirvish, Treemacs, ibuffer |
 | Workspaces | persp-mode, with explicit session save/restore |
 | Terminal | Ghostel terminal drawer, Eshell integration, TTY-faithful compilation buffers |
-| Tools | EIN/Jupyter, quickrun, eros, dumb-jump, gptel, pdf-tools |
+| Tools | EIN/Jupyter, quickrun, eros, dumb-jump, pdf-tools |
 | Appearance | doom-tokyo-night, doom-modeline, Nerd Icons, custom dashboard, popup manager, pixel scrolling |
 
 ## Design principles
@@ -158,12 +158,13 @@ rg --version
 | `nixfmt` | Nix formatting | Configured through `nix-mode`. |
 | `pytest` | python-pytest | Uses the `pytest` executable by default. |
 | `ipython` | Python REPL | Selected automatically when available. |
-| `jupyter` + `ipykernel` | emacs-jupyter REPLs and `jupyter-python` Babel blocks | Install `ipykernel` in the project environment (`uv add --dev ipykernel`). The zmq module compiles on first use and needs a C compiler and libzmq. EIN provides notebooks. |
+| `jupyter` + `ipykernel` | emacs-jupyter REPLs, Org Babel, and EIN notebooks | Install `ipykernel` in the project environment (`uv add --dev ipykernel`). The `zmq` module compiles on first use and needs a C compiler and libzmq. `websocket` and `simple-httpd` support widget output. Experimental widgets also need Node and a one-time `make widgets` in the emacs-jupyter checkout. |
 | Ghostel's native dependency | Ghostel terminal | Ghostel is deferred; if its native module is unavailable, the rest of Emacs still starts. |
 
-Language servers, debug adapters, and API credentials are intentionally **not**
-bundled. Install the server for each language you use, and configure gptel's
-backend in `etc/custom.el` or through `auth-source`.
+Language servers, debug adapters, and credentials are intentionally **not**
+bundled. Install the server for each language you use; authenticate command-line
+clients with their own login commands, and start the gptel ChatGPT subscription
+login from Emacs when needed.
 
 ## Installation
 
@@ -248,7 +249,7 @@ After the dashboard appears, a few things may still need one-time setup:
 4. **Language servers** — lsp-mode starts on `prog-mode` hooks. Install the
    server for your language (ty and ruff for Python, nixd/nil, texlab, qmlls,
    typescript-language-server, bash-language-server, etc.).
-5. **gptel** — set your backend/API key before using `SPC o l`.
+5. **ChatGPT in Emacs** — run `M-x ar/llm-gptel-login`, then use `SPC o a g`.
 6. **Org files** — notes live outside the repository. See
    [Org and Denote](#org-and-denote).
 
@@ -269,10 +270,11 @@ session.
 │   ├── completion-config.el   ; 4  Vertico/Consult/Embark, Corfu/Cape
 │   ├── org-config.el          ; 5  Org + Denote
 │   ├── dev-config.el          ; 6  treesit, LSP, Flymake, Dape, Apheleia
-│   ├── tools-config.el        ; 7  EIN, quickrun, gptel, PDF
+│   ├── tools-config.el        ; 7  EIN/Jupyter, evaluation, lookup, PDF
 │   ├── lang-config.el         ; 8  language modes and per-language tooling
 │   ├── vc-projects-config.el  ; 9  Magit, Dired/Dirvish, Treemacs, persp, Ghostel
-│   └── keybinds-config.el     ; 10 escape, leader trees, windows, which-key
+│   ├── llm-config.el          ; 10 Codex, OpenCode, ChatGPT/gptel
+│   └── keybinds-config.el     ; 11 escape, leader trees, windows, which-key
 ├── snippets/                  ; personal YASnippet snippets
 ├── tests/
 │   └── config-regressions.el  ; package-free ERT checks
@@ -333,10 +335,11 @@ Emacs starts
 | 4 | `completion-config` | Vertico/Consult/Embark, Corfu/Cape | core |
 | 5 | `org-config` | Org, Denote, note leader tree | core, leaders |
 | 6 | `dev-config` | treesit, lsp-mode, Flymake, Dape, Apheleia | core, leaders |
-| 7 | `tools-config` | EIN, quickrun, gptel, pdf-tools | core, leaders |
+| 7 | `tools-config` | EIN/Jupyter, quickrun, pdf-tools | core, leaders |
 | 8 | `lang-config` | language modes and per-language setup | core |
 | 9 | `vc-projects-config` | Magit, Dired/Dirvish, Treemacs, persp, Ghostel | core, leaders |
-| 10 | `keybinds-config` | escape/minibuffer maps, leader trees, windows, which-key | all of the above |
+| 10 | `llm-config` | Codex IDE, OpenCode ACP, ChatGPT/gptel | core |
+| 11 | `keybinds-config` | escape/minibuffer maps, leader trees, windows, which-key | all of the above |
 
 `reload-init-file` (`SPC f l`) re-evaluates these files from source in the same
 order. It deliberately excludes `early-init.el` and `init.el`: the bootstrap
@@ -394,9 +397,9 @@ and the lsp-mode plist-consistency check.
 
 ### `tools-config`
 
-EIN for Jupyter notebooks, quickrun and eros for evaluation, dumb-jump as an
-xref fallback, the gptel suite, pdf-tools, PDF scroll restoration, and
-org-pdftools links.
+EIN and emacs-jupyter, quickrun and eros for evaluation, dumb-jump as an xref
+fallback, pdf-tools, PDF scroll restoration, and org-pdftools links. The gptel
+backend and its settings are owned by `llm-config`.
 
 ### `lang-config`
 
@@ -443,7 +446,7 @@ main trees; `SPC` alone is the authoritative discovery mechanism.
 | `SPC s` | Search | Buffer, project, imenu, outline, marks |
 | `SPC h` | Help | Emacs manual (`SPC h d h`) |
 | `SPC q` | Quit/session | Save workspace, reload last session, quit |
-| `SPC o` | Open/applications | Org, projects, terminal, gptel, Dirvish |
+| `SPC o` | Open/applications | Org, Jupyter, AI assistants, projects, terminal, Dirvish |
 | `SPC w` | Windows | Ace-window, split, move, winner |
 | `SPC p` | Projects | Switch, find, search, dired, shell |
 | `SPC g` | Git | Magit, commit, push, log, hunks |
@@ -549,14 +552,26 @@ main trees; `SPC` alone is the authoritative discovery mechanism.
 | --- | --- |
 | `SPC X` / `SPC o c` | Org capture |
 | `SPC o L` | Store Org link |
-| `SPC o a a` | Org agenda dispatcher |
-| `SPC o a m` / `SPC o a t` | Tags search / global TODO list |
-| `SPC o a v` / `SPC o a h` | Fuzzy heading jump / fuzzy agenda heading |
-| `SPC o a d` / `SPC o A` | Agenda dashboard |
-| `SPC o a i` / `SPC o a T` | Open inbox / open tasks |
+| `SPC o g a` | Org agenda dispatcher |
+| `SPC o g m` / `SPC o g t` | Tags search / global TODO list |
+| `SPC o g v` / `SPC o g h` | Fuzzy heading jump / fuzzy agenda heading |
+| `SPC o g d` / `SPC o A` | Agenda dashboard |
+| `SPC o g i` / `SPC o g T` | Open inbox / open tasks |
 | `SPC o k i` / `o` / `l` / `g` / `x` | Clock in / out / in last / go to / cancel |
 | `SPC m` (Org buffer) | todo `t`, schedule `s`, deadline `d`, refile `r`, archive `a`, clock `c i/o/r`, export `e` |
-| `SPC m` (Python buffer) | ruff fix `f`, imports `i`, Jupyter REPL `r`, eval `e`/`d`/`b`, kernel `k`/`x` |
+| `SPC m` (Python buffer) | ruff fix `f`, imports `i`, Jupyter REPL `r`, connect `c`, scratch `s`, eval `e`/`E`/`d`/`b`, inspect `h`, kernel `k`/`x` |
+| `SPC m j` (Org buffer) | Jupyter scratch buffer `s`, toggle request queue `q` |
+| `SPC o j` | Jupyter REPL `r`, connect `c`, manage kernels `s`, associate buffer `a`; EIN local server `n`, connect `l`, remote `R`, notebook list `b`, stop `x` |
+
+### AI assistants (`SPC o a`)
+
+| Key | Command |
+| --- | --- |
+| `SPC o a c` / `SPC o a C` | Codex menu / new session |
+| `SPC o a o` / `SPC o a O` | OpenCode session / new session |
+| `SPC o a g` / `SPC o a m` | ChatGPT chat / options |
+| `SPC o a s` / `SPC o a q` | Send prompt or selection / quick explain |
+| `SPC o a r` / `SPC o a a` / `SPC o a l` | Rewrite / add context / login |
 
 ### Windows and workspaces
 
@@ -644,7 +659,9 @@ attribute), `ii/ai`, `iI/aI`, and `iJ/aJ` (indentation levels).
     ;; vc-projects
     magit forge code-review ... dirvish ...
     ;; tools
-    ein quickrun eros dumb-jump request gptel ...
+    ein quickrun eros dumb-jump request ...
+    ;; llm
+    shell-maker acp codex-ide agent-shell gptel gptel-quick ...
     ;; lang
     csv-mode json-mode ... auctex ... nix-mode ... python ...
     ;; keybinds & terminal
@@ -865,7 +882,7 @@ The name must be a single path component; escaping names are rejected.
   `projects/` (scanned at startup).
 - Capture templates: `t` task, `T` task with link, `n` Denote note, `j` Denote
   journal entry.
-- Agenda: `SPC o A` / `SPC o a d` opens the dashboard (today, next actions,
+- Agenda: `SPC o A` / `SPC o g d` opens the dashboard (today, next actions,
   waiting, inbox); the dispatcher also has `n`, `w` and `r` (weekly review).
 - Clocking persists across restarts (`SPC o k`).
 
@@ -927,10 +944,23 @@ formatters asynchronously on save; Python uses `ruff-isort` and `ruff`.
 Python buffers start two language servers through lsp-mode: `ty-ls` (types,
 navigation, completion) and `ruff` (an add-on client for lint diagnostics, fix
 all and organize imports). Rule selection lives in `pyproject.toml`. `SPC m`
-in a Python buffer offers ruff fix-all, organize imports and emacs-jupyter:
-run or connect a REPL, evaluate line, region, defun or buffer, inspect, restart
-or interrupt the kernel. `jupyter-python` Babel blocks default to
-`:async yes :session py`; the kernel comes from the installed kernelspec.
+in a Python buffer offers ruff fix-all, organize imports, and emacs-jupyter
+REPL, scratch, evaluation, inspection, restart, and interrupt commands.
+`SPC o j` starts or connects to kernels and manages server kernels; its EIN
+commands start/connect to local or remote notebook servers and open the
+notebook list. EIN also handles `.ipynb` notebook buffers.
+
+`jupyter-python` Babel blocks default to `:async yes :session py`; the kernel
+comes from the active environment's installed kernelspec. Org source editing
+associates the edit buffer with the block's session; `SPC m j s` opens a
+session-connected scratch buffer, and `SPC m j q` toggles request queuing.
+The Jupyter server manager supports live kernel operations, while `/jpy:` and
+`/jpys:` TRAMP paths expose notebook-server files over HTTP and HTTPS.
+
+Jupyter image, HTML, Markdown, and LaTeX results use Emacs's supported MIME
+renderers. Experimental widget rendering relays through a browser; install
+Node and run `make widgets` once in the emacs-jupyter package checkout. The
+Emacs configuration does not build widget assets during startup.
 
 ### Debugging
 
@@ -1059,7 +1089,7 @@ emacs -Q --batch \
   -f ert-run-tests-batch-and-exit
 ```
 
-The suite is intentionally package-free: it does not install the 187-package
+The suite is intentionally package-free: it does not install the 194-package
 manifest and does not need network access. For a full startup check, start
 interactive Emacs with `--debug-init` and watch the dashboard's package/module
 counts.

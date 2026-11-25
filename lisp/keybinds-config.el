@@ -104,11 +104,59 @@
   "o a O" '(ar/llm-opencode-new :wk "New OpenCode session")
   "o a g" '(gptel :wk "ChatGPT chat")
   "o a s" '(gptel-send :wk "Send prompt/selection")
+  "o a q" '(gptel-quick :wk "Quick explain at point")
   "o a m" '(ar/llm-gptel-menu :wk "ChatGPT options")
   "o a r" '(ar/llm-gptel-rewrite :wk "Rewrite with ChatGPT")
   "o a a" '(ar/llm-gptel-add :wk "Add ChatGPT context")
   "o a l" '(ar/llm-gptel-login :wk "ChatGPT login")
   "o a ?" '(ar/llm-check-prerequisites :wk "Check LLM tools"))
+
+;; Jupyter REPLs, kernel servers, and EIN notebooks.
+(ar/global-leader
+  "o j"   '(:ignore t :wk "Jupyter")
+  "o j r" '(jupyter-run-repl :wk "Run kernel REPL")
+  "o j c" '(jupyter-connect-repl :wk "Connect to kernel")
+  "o j s" '(jupyter-server-list-kernels :wk "Manage server kernels")
+  "o j a" '(jupyter-repl-associate-buffer :wk "Associate buffer with REPL")
+  "o j n" '(ein:run :wk "Start local notebook server")
+  "o j l" '(ein:login :wk "Connect to notebook server")
+  "o j R" '(ein:run-remote :wk "Connect to remote notebook server")
+  "o j b" '(ein:notebooklist-open :wk "Open notebook list")
+  "o j x" '(ein:stop :wk "Stop notebook server"))
+
+;; Python evaluation and REPL controls under SPC m.
+(with-eval-after-load 'python
+  (general-define-key
+   :states '(normal insert visual emacs)
+   :keymaps 'python-base-mode-map
+   :prefix "SPC m"
+   :global-prefix "C-SPC m"
+   "f" '(ar/python-ruff-fix-all :wk "Ruff fix all")
+   "i" '(lsp-organize-imports :wk "Organize imports")
+   "r" '(jupyter-run-repl :wk "Run Jupyter REPL")
+   "c" '(jupyter-connect-repl :wk "Connect to kernel")
+   "a" '(jupyter-repl-associate-buffer :wk "Associate with REPL")
+   "z" '(jupyter-repl-pop-to-buffer :wk "Go to REPL")
+   "s" '(jupyter-repl-scratch-buffer :wk "REPL scratch buffer")
+   "e" '(jupyter-eval-line-or-region :wk "Eval line/region")
+   "E" '(jupyter-eval-string-command :wk "Eval expression")
+   "d" '(jupyter-eval-defun :wk "Eval defun")
+   "b" '(jupyter-eval-buffer :wk "Eval buffer")
+   "h" '(jupyter-inspect-at-point :wk "Inspect at point")
+   "o" '(jupyter-eval-remove-overlays :wk "Clear result overlays")
+   "k" '(jupyter-repl-restart-kernel :wk "Restart kernel")
+   "x" '(jupyter-repl-interrupt-kernel :wk "Interrupt kernel")))
+
+;; Jupyter Org Babel scratch and request-queue controls.
+(with-eval-after-load 'org
+  (general-define-key
+   :states '(normal insert visual emacs)
+   :keymaps 'org-mode-map
+   :prefix "SPC m"
+   :global-prefix "C-SPC m"
+   "j" '(:ignore t :wk "Jupyter")
+   "j s" '(org-babel-jupyter-scratch-buffer :wk "Jupyter scratch buffer")
+   "j q" '(jupyter-org-toggle-request-queuing :wk "Toggle request queue")))
 
 ;; Global zoom bindings (commands defined in the ui module).
 (general-define-key
